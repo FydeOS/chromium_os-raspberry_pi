@@ -1,0 +1,12 @@
+{
+  "_comment": "See http://www.chromium.org/chromium-os/building-chromium-os/disk-layout-format",
+  "parent": "legacy_disk_layout.json",
+  "layouts":{
+    "usb":[
+      {
+        "num": 12,
+        "size": "64 MiB"
+      }
+    ]
+  }
+}

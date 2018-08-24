@@ -1,0 +1,37 @@
+From b73b340c37c6b3f1ac0636b385a5403c62a9777e Mon Sep 17 00:00:00 2001
+From: Miguel Casas <mcasas@chromium.org>
+Date: Mon, 7 May 2018 11:45:21 -0400
+Subject: [PATCH] i965: add {X,A}BGR2101010 to 'intel_image_formats'
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+This patch adds {X,A}BGR2101010 entries to the list of supported
+'intel_image_formats'.
+
+Bug: https://crbug.com/776093
+Reviewed-by: Chad Versace <chadversary@chromium.org>
+Reviewed-by: Tapani Pälli <tapani.palli@intel.com>
+---
+ src/mesa/drivers/dri/i965/intel_screen.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/src/mesa/drivers/dri/i965/intel_screen.c b/src/mesa/drivers/dri/i965/intel_screen.c
+index 4b0a573eaf..ab6c003b0f 100644
+--- a/src/mesa/drivers/dri/i965/intel_screen.c
++++ b/src/mesa/drivers/dri/i965/intel_screen.c
+@@ -190,6 +190,12 @@ static const struct intel_image_format intel_image_formats[] = {
+    { __DRI_IMAGE_FOURCC_XRGB2101010, __DRI_IMAGE_COMPONENTS_RGB, 1,
+      { { 0, 0, 0, __DRI_IMAGE_FORMAT_XRGB2101010, 4 } } },
+ 
++   { __DRI_IMAGE_FOURCC_ABGR2101010, __DRI_IMAGE_COMPONENTS_RGBA, 1,
++     { { 0, 0, 0, __DRI_IMAGE_FORMAT_ABGR2101010, 4 } } },
++
++   { __DRI_IMAGE_FOURCC_XBGR2101010, __DRI_IMAGE_COMPONENTS_RGB, 1,
++     { { 0, 0, 0, __DRI_IMAGE_FORMAT_XBGR2101010, 4 } } },
++
+    { __DRI_IMAGE_FOURCC_ARGB8888, __DRI_IMAGE_COMPONENTS_RGBA, 1,
+      { { 0, 0, 0, __DRI_IMAGE_FORMAT_ARGB8888, 4 } } },
+ 
+--
+2.17.0.441.gb46fe60e1d-goog

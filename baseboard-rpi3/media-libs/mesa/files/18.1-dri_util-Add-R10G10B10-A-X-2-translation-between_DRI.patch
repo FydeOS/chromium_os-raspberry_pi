@@ -1,0 +1,47 @@
+From 432df741e0b85c021da0ac027aa25cd4dc1454c6 Mon Sep 17 00:00:00 2001
+From: Miguel Casas <mcasas@chromium.org>
+Date: Mon, 7 May 2018 11:45:20 -0400
+Subject: [PATCH] dri_util: Add R10G10B10{A,X}2 translation between DRI and
+ mesa_format.
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Add R10G10B10{A,X}2 translation between mesa_format and DRI format
+to driGLFormatToImageFormat() and driImageFormatToGLFormat().
+
+Bug: https://crbug.com/776093
+Reviewed-by: Chad Versace <chadversary@chromium.org>
+Reviewed-by: Tapani Pälli <tapani.palli@intel.com>
+---
+ src/mesa/drivers/dri/common/dri_util.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/src/mesa/drivers/dri/common/dri_util.c b/src/mesa/drivers/dri/common/dri_util.c
+index 75d124097b..c58650491d 100644
+--- a/src/mesa/drivers/dri/common/dri_util.c
++++ b/src/mesa/drivers/dri/common/dri_util.c
+@@ -878,6 +878,10 @@ driGLFormatToImageFormat(mesa_format format)
+       return __DRI_IMAGE_FORMAT_ARGB2101010;
+    case MESA_FORMAT_B10G10R10X2_UNORM:
+       return __DRI_IMAGE_FORMAT_XRGB2101010;
++   case MESA_FORMAT_R10G10B10A2_UNORM:
++      return __DRI_IMAGE_FORMAT_ABGR2101010;
++   case MESA_FORMAT_R10G10B10X2_UNORM:
++      return __DRI_IMAGE_FORMAT_XBGR2101010;
+    case MESA_FORMAT_B8G8R8A8_UNORM:
+       return __DRI_IMAGE_FORMAT_ARGB8888;
+    case MESA_FORMAT_R8G8B8A8_UNORM:
+@@ -915,6 +919,10 @@ driImageFormatToGLFormat(uint32_t image_format)
+       return MESA_FORMAT_B10G10R10A2_UNORM;
+    case __DRI_IMAGE_FORMAT_XRGB2101010:
+       return MESA_FORMAT_B10G10R10X2_UNORM;
++   case __DRI_IMAGE_FORMAT_ABGR2101010:
++      return MESA_FORMAT_R10G10B10A2_UNORM;
++   case __DRI_IMAGE_FORMAT_XBGR2101010:
++      return MESA_FORMAT_R10G10B10X2_UNORM;
+    case __DRI_IMAGE_FORMAT_ARGB8888:
+       return MESA_FORMAT_B8G8R8A8_UNORM;
+    case __DRI_IMAGE_FORMAT_ABGR8888:
+--
+2.17.0.441.gb46fe60e1d-goog

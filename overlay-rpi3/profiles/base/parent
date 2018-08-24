@@ -1,0 +1,3 @@
+chromiumos:default/linux/arm/10.0/chromeos
+baseboard-rpi3:base
+freon:base/arm
