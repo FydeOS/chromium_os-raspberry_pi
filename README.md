@@ -2,6 +2,7 @@
 <!-- TOC -->
 
 - [Table of contents](#table-of-contents)
+- [Change log](#changelog)
 - [Introduction](#introduction)
     - [About this repository](#about-this-repository)
         - [Branches in this repository](#branches-in-this-repository)
@@ -39,20 +40,20 @@
 - [About us](#about-us)
 
 <!-- /TOC -->
+# Changelog
+
+### 2018-11-19
+##### Update to Chromium OS r70
+* The overlays are now updated to build Chromium OS r70
+* Fix poor graphic performance with full hardware accelecration enabled.
+* Add firmware support for Raspberry Pi 3B+. Note that although kernel patches for brcm are in place, there are still issues with wifi with this release.
+* You can build packages with "cros_embedded" (or uncomment the USE flags in `overlay-rpi3/make.conf`) to produce a more efficient image.
+
 
 # Introduction
-This document describes how to build and run Google Chromium OS on Raspberry Pi 3b, from its source code and the board overlay hosted in this repository.
+This document describes how to build and run Google Chromium OS on Raspberry Pi 3B & 3B+, from its source code and the board overlay hosted in this repository.
 
-This overlay and the document has been tested against Raspberry Pi 3b by the FydeOS team. It doesn't work on Pi 2.
-
-## Change Logs
-
-### Update to ChromiumOS R70
-* The overlays is move to fit for ChromiumOS R70.
-* Fix poor graphic performance (full hw accelecrate).
-* Add firmware for RPI 3B+, patches kernel for brcm, but it still doesn't work (so sad).
-* The image released is for testing usage, if you want more efficient, build packages with "cros_embedded" (or uncomment the USE flags in overlay-rpi3/make.conf) 
-* Some things need explored by yourself
+This overlay and the document has been tested against Raspberry Pi 3B & 3B+ by the FydeOS team. It doesn't work on any earlier version of the Raspberry Pi line-up.
 
 ## About this repository
 The code and document in this repository is the result of works by the people of the Flint team. We previously worked on this overlay internally and released a few disk images for Raspberry Pi to the public. Now we open this to the public.
@@ -370,9 +371,8 @@ After the disk image is successfully written to the SD card, plug it into the Ra
 # More information
 [Chromium OS Developer Guide](http://www.chromium.org/chromium-os/developer-guide). This is the official source of how to build Chromium OS
 
-[The FydeOS website, English site](https://fydeos.io), our home :)
 
-[The FydeOS website, Chinese site](https://fydeos.com), our home, in Chinese.
+[The FydeOS website](https://fydeos.com), our home.
 
 
 # About us
