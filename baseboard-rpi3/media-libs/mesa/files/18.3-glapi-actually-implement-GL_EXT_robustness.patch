@@ -1,0 +1,65 @@
+From 37eee90df730ac6ba371b2ba8e61a1db9e55d7df Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Marek=20Ol=C5=A1=C3=A1k?= <marek.olsak@amd.com>
+Date: Wed, 22 Aug 2018 17:28:26 -0400
+Subject: glapi: actually implement GL_EXT_robustness for GLES
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The extension was exposed but not the functions.
+
+This fixes:
+    dEQP-GLES31.functional.debug.negative_coverage.get_error.buffer.readn_pixels
+    dEQP-GLES31.functional.debug.negative_coverage.get_error.state.get_nuniformfv
+    dEQP-GLES31.functional.debug.negative_coverage.get_error.state.get_nuniformiv
+
+Cc: 18.1 18.2 <mesa-stable@lists.freedesktop.org>
+Reviewed-by: Tapani Pälli <tapani.palli@intel.com>
+---
+ src/mapi/glapi/gen/KHR_robustness_es.xml | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+
+diff --git a/src/mapi/glapi/gen/KHR_robustness_es.xml b/src/mapi/glapi/gen/KHR_robustness_es.xml
+index 84f6fd2..82b7edf 100644
+--- a/src/mapi/glapi/gen/KHR_robustness_es.xml
++++ b/src/mapi/glapi/gen/KHR_robustness_es.xml
+@@ -60,4 +60,36 @@
+ 
+ </category>
+ 
++<category name="GL_EXT_robustness" number="107">
++    <function name="GetGraphicsResetStatusEXT"
++              alias="GetGraphicsResetStatusARB" es2="2.0">
++        <return type="GLenum"/>
++    </function>
++
++    <function name="ReadnPixelsEXT" alias="ReadnPixelsARB" es2="2.0">
++        <param name="x" type="GLint"/>
++        <param name="y" type="GLint"/>
++        <param name="width" type="GLsizei"/>
++        <param name="height" type="GLsizei"/>
++        <param name="format" type="GLenum"/>
++        <param name="type" type="GLenum"/>
++        <param name="bufSize" type="GLsizei"/>
++        <param name="data" type="GLvoid *" output="true"/>
++    </function>
++
++    <function name="GetnUniformfvEXT" alias="GetnUniformfvARB" es2="2.0">
++        <param name="program" type="GLuint"/>
++        <param name="location" type="GLint"/>
++        <param name="bufSize" type="GLsizei"/>
++        <param name="params" type="GLfloat *" output="true"/>
++    </function>
++
++    <function name="GetnUniformivEXT" alias="GetnUniformivARB" es2="2.0">
++        <param name="program" type="GLuint"/>
++        <param name="location" type="GLint"/>
++        <param name="bufSize" type="GLsizei"/>
++        <param name="params" type="GLint *" output="true"/>
++    </function>
++</category>
++
+ </OpenGLAPI>
+-- 
+cgit v1.1
+

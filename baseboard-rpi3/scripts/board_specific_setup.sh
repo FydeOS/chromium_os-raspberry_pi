@@ -11,7 +11,7 @@ install_hybrid_mbr() {
   locate_gpt
   local start_esp=$(partoffset "$1" 12)
   local num_esp_sectors=$(partsize "$1" 12)
-  sudo sfdisk -X dos "$1" <<EOF
+  sudo sfdisk -Y dos "$1" <<EOF
 unit: sectors
 
 disk1 : start=   ${start_esp}, size=    ${num_esp_sectors}, Id= c, bootable

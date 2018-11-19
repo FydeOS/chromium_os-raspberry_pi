@@ -45,6 +45,15 @@ This document describes how to build and run Google Chromium OS on Raspberry Pi 
 
 This overlay and the document has been tested against Raspberry Pi 3b by the FydeOS team. It doesn't work on Pi 2.
 
+## Change Logs
+
+### Update to ChromiumOS R70
+* The overlays is move to fit for ChromiumOS R70.
+* Fix poor graphic performance (full hw accelecrate).
+* Add firmware for RPI 3B+, patches kernel for brcm, but it still doesn't work (so sad).
+* The image released is for testing usage, if you want more efficient, build packages with "cros_embedded" (or uncomment the USE flags in overlay-rpi3/make.conf) 
+* Some things need explored by yourself
+
 ## About this repository
 The code and document in this repository is the result of works by the people of the Flint team. We previously worked on this overlay internally and released a few disk images for Raspberry Pi to the public. Now we open this to the public.
 

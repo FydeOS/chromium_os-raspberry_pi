@@ -1,0 +1,87 @@
+From patchwork Wed Jul 18 12:01:49 2018
+Content-Type: text/plain; charset="utf-8"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Subject: util/disk_cache: Fix disk_cache_get_function_timestamp with disabled
+ cache.
+From: Bas Nieuwenhuizen <bas@basnieuwenhuizen.nl>
+X-Patchwork-Id: 239597
+Message-Id: <20180718120149.126873-1-bas@basnieuwenhuizen.nl>
+To: mesa-dev@lists.freedesktop.org
+Cc: Bas Nieuwenhuizen <bas@basnieuwenhuizen.nl>
+Date: Wed, 18 Jul 2018 14:01:49 +0200
+
+radv always needs it, so just check the header instead. Also
+do not declare the function if the variable is not set, so we
+get a nice compile error instead of failing to open a device
+at runtime.
+
+Fixes: b87ef9e606a "util: fix MSVC build issue in disk_cache.h"
+---
+ configure.ac          | 1 +
+ meson.build           | 2 +-
+ src/util/disk_cache.h | 8 +++-----
+ 3 files changed, 5 insertions(+), 6 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index c946454cfae..ffb8424a07b 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -872,6 +872,7 @@ AC_HEADER_MAJOR
+ AC_CHECK_HEADER([xlocale.h], [DEFINES="$DEFINES -DHAVE_XLOCALE_H"])
+ AC_CHECK_HEADER([sys/sysctl.h], [DEFINES="$DEFINES -DHAVE_SYS_SYSCTL_H"])
+ AC_CHECK_HEADERS([endian.h])
++AC_CHECK_HEADER([dlfcn.h], [DEFINES="$DEFINES -DHAVE_DLFCN_H"])
+ AC_CHECK_FUNC([strtof], [DEFINES="$DEFINES -DHAVE_STRTOF"])
+ AC_CHECK_FUNC([mkostemp], [DEFINES="$DEFINES -DHAVE_MKOSTEMP"])
+ AC_CHECK_FUNC([timespec_get], [DEFINES="$DEFINES -DHAVE_TIMESPEC_GET"])
+diff --git a/meson.build b/meson.build
+index e05645cbf39..86a4a4ce6da 100644
+--- a/meson.build
++++ b/meson.build
+@@ -960,7 +960,7 @@ elif cc.has_header_symbol('sys/mkdev.h', 'major')
+   pre_args += '-DMAJOR_IN_MKDEV'
+ endif
+ 
+-foreach h : ['xlocale.h', 'sys/sysctl.h', 'linux/futex.h', 'endian.h']
++foreach h : ['xlocale.h', 'sys/sysctl.h', 'linux/futex.h', 'endian.h', 'dlfcn.h']
+   if cc.compiles('#include <@0@>'.format(h), name : '@0@'.format(h))
+     pre_args += '-DHAVE_@0@'.format(h.to_upper().underscorify())
+   endif
+diff --git a/src/util/disk_cache.h b/src/util/disk_cache.h
+index f84840fb5ca..50bd9f41ac4 100644
+--- a/src/util/disk_cache.h
++++ b/src/util/disk_cache.h
+@@ -24,7 +24,7 @@
+ #ifndef DISK_CACHE_H
+ #define DISK_CACHE_H
+ 
+-#ifdef ENABLE_SHADER_CACHE
++#ifdef HAVE_DLFCN_H
+ #include <dlfcn.h>
+ #endif
+ #include <assert.h>
+@@ -88,10 +88,10 @@ disk_cache_format_hex_id(char *buf, const uint8_t *hex_id, unsigned size)
+    return buf;
+ }
+ 
++#ifdef HAVE_DLFCN_H
+ static inline bool
+ disk_cache_get_function_timestamp(void *ptr, uint32_t* timestamp)
+ {
+-#ifdef ENABLE_SHADER_CACHE
+    Dl_info info;
+    struct stat st;
+    if (!dladdr(ptr, &info) || !info.dli_fname) {
+@@ -102,10 +102,8 @@ disk_cache_get_function_timestamp(void *ptr, uint32_t* timestamp)
+    }
+    *timestamp = st.st_mtime;
+    return true;
+-#else
+-   return false;
+-#endif
+ }
++#endif
+ 
+ /* Provide inlined stub functions if the shader cache is disabled. */
+ 

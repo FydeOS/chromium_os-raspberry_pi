@@ -6,11 +6,11 @@ hdmi_drive=2
 disable_overscan=1
 gpu_mem=16
 cma_lwm=32
-cma_hwm=256
+cma_hwm=128
 cma_offline_start=32
 dtparam=audio=on
-dtoverlay=vc4-fkms-v3d,cma-256
-#mask_gpu_interrupt0=0x400   # KMS/DRM
+dtoverlay=vc4-kms-v3d,cma-128
+mask_gpu_interrupt0=0x400   # KMS/DRM
 avoid_warnings=2            # KMS/DRM
 #arm_control=0x200           # open armV8 mode
 force_turbo=1               # we need more power

@@ -1,0 +1,393 @@
+From f45aeabff7c37512dfc29f164b001b03a3156b9b Mon Sep 17 00:00:00 2001
+From: Fritz Koenig <frkoenig@google.com>
+Date: Mon, 23 Jul 2018 10:10:55 -0700
+Subject: [PATCH 2/2] i965: implement GL_MESA_framebuffer_flip_y [v3]
+
+Instead of using _mesa_is_winsys_fbo or
+_mesa_is_user_fbo to infer if an fbo is
+flipped use the FlipY flag.
+
+v2:
+  * additional window-system framebuffer checks [for jason]
+v3:
+  * s/inverted_y/flip_y/g [for chadv]
+  * s/InvertedY/FlipY/g [for chadv]
+
+Reviewed-by: Chad Versace <chadversary@chromium.org>
+---
+ src/mesa/drivers/dri/i965/brw_blorp.c         |  2 +-
+ src/mesa/drivers/dri/i965/brw_meta_util.c     |  4 +-
+ src/mesa/drivers/dri/i965/brw_sf.c            |  6 +--
+ src/mesa/drivers/dri/i965/genX_state_upload.c | 50 +++++++++----------
+ src/mesa/drivers/dri/i965/intel_extensions.c  |  1 +
+ src/mesa/drivers/dri/i965/intel_fbo.c         | 11 ++--
+ .../drivers/dri/i965/intel_pixel_bitmap.c     |  8 +--
+ src/mesa/drivers/dri/i965/intel_pixel_copy.c  |  4 +-
+ src/mesa/drivers/dri/i965/intel_pixel_draw.c  |  2 +-
+ 9 files changed, 43 insertions(+), 45 deletions(-)
+
+diff --git a/src/mesa/drivers/dri/i965/brw_blorp.c b/src/mesa/drivers/dri/i965/brw_blorp.c
+index f538cd03bc..3d7636096a 100644
+--- a/src/mesa/drivers/dri/i965/brw_blorp.c
++++ b/src/mesa/drivers/dri/i965/brw_blorp.c
+@@ -683,7 +683,7 @@ brw_blorp_copytexsubimage(struct brw_context *brw,
+    /* Account for the fact that in the system framebuffer, the origin is at
+     * the lower left.
+     */
+-   bool mirror_y = _mesa_is_winsys_fbo(ctx->ReadBuffer);
++   bool mirror_y = ctx->ReadBuffer->FlipY;
+    if (mirror_y)
+       apply_y_flip(&srcY0, &srcY1, src_rb->Height);
+ 
+diff --git a/src/mesa/drivers/dri/i965/brw_meta_util.c b/src/mesa/drivers/dri/i965/brw_meta_util.c
+index d292f5a8e2..908b098976 100644
+--- a/src/mesa/drivers/dri/i965/brw_meta_util.c
++++ b/src/mesa/drivers/dri/i965/brw_meta_util.c
+@@ -250,13 +250,13 @@ brw_meta_mirror_clip_and_scissor(const struct gl_context *ctx,
+    /* Account for the fact that in the system framebuffer, the origin is at
+     * the lower left.
+     */
+-   if (_mesa_is_winsys_fbo(read_fb)) {
++   if (read_fb->FlipY) {
+       GLint tmp = read_fb->Height - *srcY0;
+       *srcY0 = read_fb->Height - *srcY1;
+       *srcY1 = tmp;
+       *mirror_y = !*mirror_y;
+    }
+-   if (_mesa_is_winsys_fbo(draw_fb)) {
++   if (draw_fb->FlipY) {
+       GLint tmp = draw_fb->Height - *dstY0;
+       *dstY0 = draw_fb->Height - *dstY1;
+       *dstY1 = tmp;
+diff --git a/src/mesa/drivers/dri/i965/brw_sf.c b/src/mesa/drivers/dri/i965/brw_sf.c
+index 37ce999dc0..42fe55f02d 100644
+--- a/src/mesa/drivers/dri/i965/brw_sf.c
++++ b/src/mesa/drivers/dri/i965/brw_sf.c
+@@ -90,7 +90,7 @@ brw_upload_sf_prog(struct brw_context *brw)
+       return;
+ 
+    /* _NEW_BUFFERS */
+-   bool render_to_fbo = _mesa_is_user_fbo(ctx->DrawBuffer);
++   bool flip_y = ctx->DrawBuffer->FlipY;
+ 
+    memset(&key, 0, sizeof(key));
+ 
+@@ -137,7 +137,7 @@ brw_upload_sf_prog(struct brw_context *brw)
+     * Window coordinates in a FBO are inverted, which means point
+     * sprite origin must be inverted, too.
+     */
+-   if ((ctx->Point.SpriteOrigin == GL_LOWER_LEFT) != render_to_fbo)
++   if ((ctx->Point.SpriteOrigin == GL_LOWER_LEFT) == flip_y)
+       key.sprite_origin_lower_left = true;
+ 
+    /* BRW_NEW_FS_PROG_DATA */
+@@ -161,7 +161,7 @@ brw_upload_sf_prog(struct brw_context *brw)
+        * face orientation, just as we invert the viewport in
+        * sf_unit_create_from_key().
+        */
+-      key.frontface_ccw = brw->polygon_front_bit == render_to_fbo;
++      key.frontface_ccw = brw->polygon_front_bit != flip_y;
+    }
+ 
+    if (!brw_search_cache(&brw->cache, BRW_CACHE_SF_PROG,
+diff --git a/src/mesa/drivers/dri/i965/genX_state_upload.c b/src/mesa/drivers/dri/i965/genX_state_upload.c
+index 091e4137aa..eed2898744 100644
+--- a/src/mesa/drivers/dri/i965/genX_state_upload.c
++++ b/src/mesa/drivers/dri/i965/genX_state_upload.c
+@@ -217,7 +217,7 @@ genX(upload_polygon_stipple)(struct brw_context *brw)
+        * to a FBO (i.e. any named frame buffer object), we *don't*
+        * need to invert - we already match the layout.
+        */
+-      if (_mesa_is_winsys_fbo(ctx->DrawBuffer)) {
++      if (ctx->DrawBuffer->FlipY) {
+          for (unsigned i = 0; i < 32; i++)
+             poly.PatternRow[i] = ctx->PolygonStipple[31 - i]; /* invert */
+       } else {
+@@ -257,7 +257,7 @@ genX(upload_polygon_stipple_offset)(struct brw_context *brw)
+        * to a user-created FBO then our native pixel coordinate system
+        * works just fine, and there's no window system to worry about.
+        */
+-      if (_mesa_is_winsys_fbo(ctx->DrawBuffer)) {
++      if (ctx->DrawBuffer->FlipY) {
+          poly.PolygonStippleYOffset =
+             (32 - (_mesa_geometric_height(ctx->DrawBuffer) & 31)) & 31;
+       }
+@@ -1409,7 +1409,7 @@ genX(upload_clip_state)(struct brw_context *brw)
+ #endif
+ 
+ #if GEN_GEN == 7
+-      clip.FrontWinding = brw->polygon_front_bit == _mesa_is_user_fbo(fb);
++      clip.FrontWinding = brw->polygon_front_bit != fb->FlipY;
+ 
+       if (ctx->Polygon.CullFlag) {
+          switch (ctx->Polygon.CullFaceMode) {
+@@ -1524,7 +1524,7 @@ genX(upload_sf)(struct brw_context *brw)
+ 
+ #if GEN_GEN <= 7
+    /* _NEW_BUFFERS */
+-   bool render_to_fbo = _mesa_is_user_fbo(ctx->DrawBuffer);
++   bool flip_y = ctx->DrawBuffer->FlipY;
+    UNUSED const bool multisampled_fbo =
+       _mesa_geometric_samples(ctx->DrawBuffer) > 1;
+ #endif
+@@ -1576,7 +1576,7 @@ genX(upload_sf)(struct brw_context *brw)
+ 
+ #if GEN_GEN <= 7
+       /* _NEW_POLYGON */
+-      sf.FrontWinding = brw->polygon_front_bit == render_to_fbo;
++      sf.FrontWinding = brw->polygon_front_bit != flip_y;
+ #if GEN_GEN >= 6
+       sf.GlobalDepthOffsetEnableSolid = ctx->Polygon.OffsetFill;
+       sf.GlobalDepthOffsetEnableWireframe = ctx->Polygon.OffsetLine;
+@@ -1714,7 +1714,7 @@ genX(upload_sf)(struct brw_context *brw)
+        * Window coordinates in an FBO are inverted, which means point
+        * sprite origin must be inverted, too.
+        */
+-      if ((ctx->Point.SpriteOrigin == GL_LOWER_LEFT) != render_to_fbo) {
++      if ((ctx->Point.SpriteOrigin == GL_LOWER_LEFT) == flip_y) {
+          sf.PointSpriteTextureCoordinateOrigin = LOWERLEFT;
+       } else {
+          sf.PointSpriteTextureCoordinateOrigin = UPPERLEFT;
+@@ -2279,7 +2279,7 @@ const struct brw_tracked_state genX(cc_vp) = {
+ 
+ static void
+ set_scissor_bits(const struct gl_context *ctx, int i,
+-                 bool render_to_fbo, unsigned fb_width, unsigned fb_height,
++                 bool flip_y, unsigned fb_width, unsigned fb_height,
+                  struct GENX(SCISSOR_RECT) *sc)
+ {
+    int bbox[4];
+@@ -2301,7 +2301,7 @@ set_scissor_bits(const struct gl_context *ctx, int i,
+       sc->ScissorRectangleXMax = 0;
+       sc->ScissorRectangleYMin = 1;
+       sc->ScissorRectangleYMax = 0;
+-   } else if (render_to_fbo) {
++   } else if (!flip_y) {
+       /* texmemory: Y=0=bottom */
+       sc->ScissorRectangleXMin = bbox[0];
+       sc->ScissorRectangleXMax = bbox[1] - 1;
+@@ -2321,7 +2321,7 @@ static void
+ genX(upload_scissor_state)(struct brw_context *brw)
+ {
+    struct gl_context *ctx = &brw->ctx;
+-   const bool render_to_fbo = _mesa_is_user_fbo(ctx->DrawBuffer);
++   const bool flip_y = ctx->DrawBuffer->FlipY;
+    struct GENX(SCISSOR_RECT) scissor;
+    uint32_t scissor_state_offset;
+    const unsigned int fb_width = _mesa_geometric_width(ctx->DrawBuffer);
+@@ -2345,7 +2345,7 @@ genX(upload_scissor_state)(struct brw_context *brw)
+     * inclusive but max is exclusive.
+     */
+    for (unsigned i = 0; i < viewport_count; i++) {
+-      set_scissor_bits(ctx, i, render_to_fbo, fb_width, fb_height, &scissor);
++      set_scissor_bits(ctx, i, flip_y, fb_width, fb_height, &scissor);
+       GENX(SCISSOR_RECT_pack)(
+          NULL, scissor_map + i * GENX(SCISSOR_RECT_length), &scissor);
+    }
+@@ -2460,7 +2460,7 @@ genX(upload_sf_clip_viewport)(struct brw_context *brw)
+    const unsigned viewport_count = brw->clip.viewport_count;
+ 
+    /* _NEW_BUFFERS */
+-   const bool render_to_fbo = _mesa_is_user_fbo(ctx->DrawBuffer);
++   const bool flip_y = ctx->DrawBuffer->FlipY;
+    const uint32_t fb_width = (float)_mesa_geometric_width(ctx->DrawBuffer);
+    const uint32_t fb_height = (float)_mesa_geometric_height(ctx->DrawBuffer);
+ 
+@@ -2484,12 +2484,12 @@ genX(upload_sf_clip_viewport)(struct brw_context *brw)
+ #endif
+ 
+    /* _NEW_BUFFERS */
+-   if (render_to_fbo) {
+-      y_scale = 1.0;
+-      y_bias = 0;
+-   } else {
++   if (flip_y) {
+       y_scale = -1.0;
+       y_bias = (float)fb_height;
++   } else {
++      y_scale = 1.0;
++      y_bias = 0;
+    }
+ 
+    for (unsigned i = 0; i < brw->clip.viewport_count; i++) {
+@@ -2517,7 +2517,7 @@ genX(upload_sf_clip_viewport)(struct brw_context *brw)
+       clv.YMaxClipGuardband = gb_ymax;
+ 
+ #if GEN_GEN < 6
+-      set_scissor_bits(ctx, i, render_to_fbo, fb_width, fb_height,
++      set_scissor_bits(ctx, i, flip_y, fb_width, fb_height,
+                        &sfv.ScissorRectangle);
+ #elif GEN_GEN >= 8
+       /* _NEW_VIEWPORT | _NEW_BUFFERS: Screen Space Viewport
+@@ -2534,16 +2534,16 @@ genX(upload_sf_clip_viewport)(struct brw_context *brw)
+       const float viewport_Ymax =
+          MIN2(ctx->ViewportArray[i].Y + ctx->ViewportArray[i].Height, fb_height);
+ 
+-      if (render_to_fbo) {
++      if (flip_y) {
+          sfv.XMinViewPort = viewport_Xmin;
+          sfv.XMaxViewPort = viewport_Xmax - 1;
+-         sfv.YMinViewPort = viewport_Ymin;
+-         sfv.YMaxViewPort = viewport_Ymax - 1;
++         sfv.YMinViewPort = fb_height - viewport_Ymax;
++         sfv.YMaxViewPort = fb_height - viewport_Ymin - 1;
+       } else {
+          sfv.XMinViewPort = viewport_Xmin;
+          sfv.XMaxViewPort = viewport_Xmax - 1;
+-         sfv.YMinViewPort = fb_height - viewport_Ymax;
+-         sfv.YMaxViewPort = fb_height - viewport_Ymin - 1;
++         sfv.YMinViewPort = viewport_Ymin;
++         sfv.YMaxViewPort = viewport_Ymax - 1;
+       }
+ #endif
+ 
+@@ -3474,14 +3474,14 @@ genX(upload_sbe)(struct brw_context *brw)
+       sbe.NumberofSFOutputAttributes = wm_prog_data->num_varying_inputs;
+ 
+       /* _NEW_BUFFERS */
+-      bool render_to_fbo = _mesa_is_user_fbo(ctx->DrawBuffer);
++      bool flip_y = ctx->DrawBuffer->FlipY;
+ 
+       /* _NEW_POINT
+        *
+        * Window coordinates in an FBO are inverted, which means point
+        * sprite origin must be inverted.
+        */
+-      if ((ctx->Point.SpriteOrigin == GL_LOWER_LEFT) != render_to_fbo)
++      if ((ctx->Point.SpriteOrigin == GL_LOWER_LEFT) == flip_y)
+          sbe.PointSpriteTextureCoordinateOrigin = LOWERLEFT;
+       else
+          sbe.PointSpriteTextureCoordinateOrigin = UPPERLEFT;
+@@ -4379,7 +4379,7 @@ genX(upload_raster)(struct brw_context *brw)
+    const struct gl_context *ctx = &brw->ctx;
+ 
+    /* _NEW_BUFFERS */
+-   const bool render_to_fbo = _mesa_is_user_fbo(ctx->DrawBuffer);
++   const bool flip_y = ctx->DrawBuffer->FlipY;
+ 
+    /* _NEW_POLYGON */
+    const struct gl_polygon_attrib *polygon = &ctx->Polygon;
+@@ -4388,7 +4388,7 @@ genX(upload_raster)(struct brw_context *brw)
+    const struct gl_point_attrib *point = &ctx->Point;
+ 
+    brw_batch_emit(brw, GENX(3DSTATE_RASTER), raster) {
+-      if (brw->polygon_front_bit == render_to_fbo)
++      if (brw->polygon_front_bit != flip_y)
+          raster.FrontWinding = CounterClockwise;
+ 
+       if (polygon->CullFlag) {
+diff --git a/src/mesa/drivers/dri/i965/intel_extensions.c b/src/mesa/drivers/dri/i965/intel_extensions.c
+index b5860f13cb..f068608985 100644
+--- a/src/mesa/drivers/dri/i965/intel_extensions.c
++++ b/src/mesa/drivers/dri/i965/intel_extensions.c
+@@ -120,6 +120,7 @@ intelInitExtensions(struct gl_context *ctx)
+    ctx->Extensions.APPLE_object_purgeable = true;
+    ctx->Extensions.ATI_separate_stencil = true;
+    ctx->Extensions.ATI_texture_env_combine3 = true;
++   ctx->Extensions.MESA_framebuffer_flip_y = true;
+    ctx->Extensions.MESA_pack_invert = true;
+    ctx->Extensions.NV_conditional_render = true;
+    ctx->Extensions.NV_fog_distance = true;
+diff --git a/src/mesa/drivers/dri/i965/intel_fbo.c b/src/mesa/drivers/dri/i965/intel_fbo.c
+index 29a4f90d22..6bcde4415c 100644
+--- a/src/mesa/drivers/dri/i965/intel_fbo.c
++++ b/src/mesa/drivers/dri/i965/intel_fbo.c
+@@ -115,9 +115,6 @@ intel_map_renderbuffer(struct gl_context *ctx,
+    void *map;
+    ptrdiff_t stride;
+ 
+-   /* driver does not support GL_FRAMEBUFFER_FLIP_Y_MESA */
+-   assert((rb->Name == 0) == flip_y);
+-
+    if (srb->Buffer) {
+       /* this is a malloc'd renderbuffer (accum buffer), not an irb */
+       GLint bpp = _mesa_get_format_bytes(rb->Format);
+@@ -166,14 +163,14 @@ intel_map_renderbuffer(struct gl_context *ctx,
+     * upside-down.  So we need to ask for a rectangle on flipped vertically, and
+     * we then return a pointer to the bottom of it with a negative stride.
+     */
+-   if (rb->Name == 0) {
++   if (flip_y) {
+       y = rb->Height - y - h;
+    }
+ 
+    intel_miptree_map(brw, mt, irb->mt_level, irb->mt_layer,
+ 		     x, y, w, h, mode, &map, &stride);
+ 
+-   if (rb->Name == 0) {
++   if (flip_y) {
+       map += (h - 1) * stride;
+       stride = -stride;
+    }
+@@ -849,10 +846,10 @@ intel_blit_framebuffer_with_blitter(struct gl_context *ctx,
+          if (!intel_miptree_blit(brw,
+                                  src_irb->mt,
+                                  src_irb->mt_level, src_irb->mt_layer,
+-                                 srcX0, srcY0, src_rb->Name == 0,
++                                 srcX0, srcY0, readFb->FlipY,
+                                  dst_irb->mt,
+                                  dst_irb->mt_level, dst_irb->mt_layer,
+-                                 dstX0, dstY0, dst_rb->Name == 0,
++                                 dstX0, dstY0, drawFb->FlipY,
+                                  dstX1 - dstX0, dstY1 - dstY0,
+                                  COLOR_LOGICOP_COPY)) {
+             perf_debug("glBlitFramebuffer(): unknown blit failure.  "
+diff --git a/src/mesa/drivers/dri/i965/intel_pixel_bitmap.c b/src/mesa/drivers/dri/i965/intel_pixel_bitmap.c
+index 5bc341bfc0..bdeba5ce40 100644
+--- a/src/mesa/drivers/dri/i965/intel_pixel_bitmap.c
++++ b/src/mesa/drivers/dri/i965/intel_pixel_bitmap.c
+@@ -158,10 +158,10 @@ static GLuint get_bitmap_rect(GLsizei width, GLsizei height,
+ static inline int
+ y_flip(struct gl_framebuffer *fb, int y, int height)
+ {
+-   if (_mesa_is_user_fbo(fb))
+-      return y;
+-   else
++   if (fb->FlipY)
+       return fb->Height - y - height;
++   else
++      return y;
+ }
+ 
+ /*
+@@ -283,7 +283,7 @@ do_blit_bitmap( struct gl_context *ctx,
+                                      w, h,
+                                      (GLubyte *)stipple,
+                                      8,
+-                                     _mesa_is_winsys_fbo(fb));
++                                     fb->FlipY);
+          if (count == 0)
+ 	    continue;
+ 
+diff --git a/src/mesa/drivers/dri/i965/intel_pixel_copy.c b/src/mesa/drivers/dri/i965/intel_pixel_copy.c
+index 8029ffbedd..4020859d48 100644
+--- a/src/mesa/drivers/dri/i965/intel_pixel_copy.c
++++ b/src/mesa/drivers/dri/i965/intel_pixel_copy.c
+@@ -170,9 +170,9 @@ do_blit_copypixels(struct gl_context * ctx,
+ 
+    if (!intel_miptree_blit(brw,
+                            read_irb->mt, read_irb->mt_level, read_irb->mt_layer,
+-                           srcx, srcy, _mesa_is_winsys_fbo(read_fb),
++                           srcx, srcy, read_fb->FlipY,
+                            draw_irb->mt, draw_irb->mt_level, draw_irb->mt_layer,
+-                           dstx, dsty, _mesa_is_winsys_fbo(fb),
++                           dstx, dsty, fb->FlipY,
+                            width, height,
+                            (ctx->Color.ColorLogicOpEnabled ?
+                             ctx->Color._LogicOp : COLOR_LOGICOP_COPY))) {
+diff --git a/src/mesa/drivers/dri/i965/intel_pixel_draw.c b/src/mesa/drivers/dri/i965/intel_pixel_draw.c
+index 82dca4a2eb..65c492af08 100644
+--- a/src/mesa/drivers/dri/i965/intel_pixel_draw.c
++++ b/src/mesa/drivers/dri/i965/intel_pixel_draw.c
+@@ -127,7 +127,7 @@ do_blit_drawpixels(struct gl_context * ctx,
+                            pbo_mt, 0, 0,
+                            0, 0, src_flip,
+                            irb->mt, irb->mt_level, irb->mt_layer,
+-                           x, y, _mesa_is_winsys_fbo(ctx->DrawBuffer),
++                           x, y, ctx->DrawBuffer->FlipY,
+                            width, height, COLOR_LOGICOP_COPY)) {
+       DBG("%s: blit failed\n", __func__);
+       intel_miptree_release(&pbo_mt);
+-- 
+2.18.0.345.g5c9ce644c3-goog
+

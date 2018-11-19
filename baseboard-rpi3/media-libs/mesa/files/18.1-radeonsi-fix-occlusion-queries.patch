@@ -1,0 +1,35 @@
+From 9410cd53c376be791dc40aad3ddfc659a3d8313b Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Marek=20Ol=C5=A1=C3=A1k?= <marek.olsak@amd.com>
+Date: Wed, 20 Jun 2018 18:43:36 -0500
+Subject: radeonsi: fix occlusion queries with 16x AA without FBO attachments
+ on Stoney
+
+Reviewed-by: Bas Nieuwenhuizen <bas@basnieuwenhuizen.nl>
+---
+ src/gallium/drivers/radeonsi/si_state.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+diff --git a/src/gallium/drivers/radeonsi/si_state.c b/src/gallium/drivers/radeonsi/si_state.c
+index 675b1adbe6..35168b8c6f 100644
+--- a/src/gallium/drivers/radeonsi/si_state.c
++++ b/src/gallium/drivers/radeonsi/si_state.c
+@@ -1373,9 +1373,17 @@ static void si_emit_db_render_state(struct si_context *sctx)
+ 		bool perfect = sctx->num_perfect_occlusion_queries > 0;
+ 
+ 		if (sctx->chip_class >= CIK) {
++			unsigned log_sample_rate = sctx->framebuffer.log_samples;
++
++			/* Stoney doesn't increment occlusion query counters
++			 * if the sample rate is 16x. Use 8x sample rate instead.
++			 */
++			if (sctx->family == CHIP_STONEY)
++				log_sample_rate = MIN2(log_sample_rate, 3);
++
+ 			radeon_emit(cs,
+ 				    S_028004_PERFECT_ZPASS_COUNTS(perfect) |
+-				    S_028004_SAMPLE_RATE(sctx->framebuffer.log_samples) |
++				    S_028004_SAMPLE_RATE(log_sample_rate) |
+ 				    S_028004_ZPASS_ENABLE(1) |
+ 				    S_028004_SLICE_EVEN_ENABLE(1) |
+ 				    S_028004_SLICE_ODD_ENABLE(1));
+-- 
+cgit v1.1

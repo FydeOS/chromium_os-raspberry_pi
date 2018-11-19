@@ -1,0 +1,1359 @@
+From d34bee8b19e1eafd18f4f65d64ef33b0c9b0c539 Mon Sep 17 00:00:00 2001
+From: Bas Nieuwenhuizen <bas@basnieuwenhuizen.nl>
+Date: Tue, 14 Aug 2018 00:07:57 +0200
+Subject: [PATCH 3/3] radv: Add on-demand compilation of built-in shaders.
+
+In environments where we cannot cache, e.g. Android (no homedir),
+ChromeOS (readonly rootfs) or sandboxes (cannot open cache), the
+startup cost of creating a device in radv is rather high, due
+to compiling all possible built-in pipelines up front. This meant
+depending on the CPU a 1-4 sec cost of creating a Device.
+
+For CTS this cost is unacceptable, and likely for starting random
+apps too.
+
+So if there is no cache, with this patch radv will compile shaders
+on demand. Once there is a cache from the first run, even if
+incomplete, the driver knows that it can likely write the cache
+and precompiles everything.
+
+Note that I did not switch the buffer and itob/btoi compute pipelines
+to on-demand, since you cannot really do anything in Vulkan without
+them and there are only a few.
+
+This reduces the CTS runtime for the no caches scenario on my
+threadripper from 32 minutes to 8 minutes.
+
+Reviewed-by: Dave Airlie <airlied@redhat.com>
+(cherry picked from commit fbcd1673144facf0f4037330ba3d6b176dad955b)
+Signed-off-by: Bas Nieuwenhuizen <basni@chromium.org>
+---
+ src/amd/vulkan/radv_meta.c            | 36 ++++++----
+ src/amd/vulkan/radv_meta.h            | 18 ++---
+ src/amd/vulkan/radv_meta_blit.c       | 86 ++++++++++++++++++------
+ src/amd/vulkan/radv_meta_blit2d.c     | 69 ++++++++++++++++++-
+ src/amd/vulkan/radv_meta_clear.c      | 96 +++++++++++++++++++++++++--
+ src/amd/vulkan/radv_meta_decompress.c | 32 ++++++++-
+ src/amd/vulkan/radv_meta_fast_clear.c | 29 +++++++-
+ src/amd/vulkan/radv_meta_resolve.c    | 47 ++++++++++++-
+ src/amd/vulkan/radv_meta_resolve_cs.c | 34 ++++++++--
+ src/amd/vulkan/radv_meta_resolve_fs.c | 31 +++++++--
+ src/amd/vulkan/radv_pipeline_cache.c  | 16 +++--
+ src/amd/vulkan/radv_private.h         |  8 ++-
+ src/amd/vulkan/radv_query.c           | 32 +++++++--
+ 13 files changed, 454 insertions(+), 80 deletions(-)
+
+diff --git a/src/amd/vulkan/radv_meta.c b/src/amd/vulkan/radv_meta.c
+index 56b72d1c99b..45cf0bcd942 100644
+--- a/src/amd/vulkan/radv_meta.c
++++ b/src/amd/vulkan/radv_meta.c
+@@ -258,7 +258,7 @@ radv_builtin_cache_path(char *path)
+ 	return true;
+ }
+ 
+-static void
++static bool
+ radv_load_meta_pipeline(struct radv_device *device)
+ {
+ 	char path[PATH_MAX + 1];
+@@ -266,11 +266,11 @@ radv_load_meta_pipeline(struct radv_device *device)
+ 	void *data = NULL;
+ 
+ 	if (!radv_builtin_cache_path(path))
+-		return;
++		return false;
+ 
+ 	int fd = open(path, O_RDONLY);
+ 	if (fd < 0)
+-		return;
++		return false;
+ 	if (fstat(fd, &st))
+ 		goto fail;
+ 	data = malloc(st.st_size);
+@@ -279,10 +279,11 @@ radv_load_meta_pipeline(struct radv_device *device)
+ 	if(read(fd, data, st.st_size) == -1)
+ 		goto fail;
+ 
+-	radv_pipeline_cache_load(&device->meta_state.cache, data, st.st_size);
++	return radv_pipeline_cache_load(&device->meta_state.cache, data, st.st_size);
+ fail:
+ 	free(data);
+ 	close(fd);
++	return false;
+ }
+ 
+ static void
+@@ -331,6 +332,8 @@ radv_device_init_meta(struct radv_device *device)
+ {
+ 	VkResult result;
+ 
++	memset(&device->meta_state, 0, sizeof(device->meta_state));
++
+ 	device->meta_state.alloc = (VkAllocationCallbacks) {
+ 		.pUserData = device,
+ 		.pfnAllocation = meta_alloc,
+@@ -340,21 +343,24 @@ radv_device_init_meta(struct radv_device *device)
+ 
+ 	device->meta_state.cache.alloc = device->meta_state.alloc;
+ 	radv_pipeline_cache_init(&device->meta_state.cache, device);
+-	radv_load_meta_pipeline(device);
++	bool loaded_cache = radv_load_meta_pipeline(device);
++	bool on_demand = !loaded_cache;
++
++	mtx_init(&device->meta_state.mtx, mtx_plain);
+ 
+-	result = radv_device_init_meta_clear_state(device);
++	result = radv_device_init_meta_clear_state(device, on_demand);
+ 	if (result != VK_SUCCESS)
+ 		goto fail_clear;
+ 
+-	result = radv_device_init_meta_resolve_state(device);
++	result = radv_device_init_meta_resolve_state(device, on_demand);
+ 	if (result != VK_SUCCESS)
+ 		goto fail_resolve;
+ 
+-	result = radv_device_init_meta_blit_state(device);
++	result = radv_device_init_meta_blit_state(device, on_demand);
+ 	if (result != VK_SUCCESS)
+ 		goto fail_blit;
+ 
+-	result = radv_device_init_meta_blit2d_state(device);
++	result = radv_device_init_meta_blit2d_state(device, on_demand);
+ 	if (result != VK_SUCCESS)
+ 		goto fail_blit2d;
+ 
+@@ -362,7 +368,7 @@ radv_device_init_meta(struct radv_device *device)
+ 	if (result != VK_SUCCESS)
+ 		goto fail_bufimage;
+ 
+-	result = radv_device_init_meta_depth_decomp_state(device);
++	result = radv_device_init_meta_depth_decomp_state(device, on_demand);
+ 	if (result != VK_SUCCESS)
+ 		goto fail_depth_decomp;
+ 
+@@ -370,19 +376,19 @@ radv_device_init_meta(struct radv_device *device)
+ 	if (result != VK_SUCCESS)
+ 		goto fail_buffer;
+ 
+-	result = radv_device_init_meta_query_state(device);
++	result = radv_device_init_meta_query_state(device, on_demand);
+ 	if (result != VK_SUCCESS)
+ 		goto fail_query;
+ 
+-	result = radv_device_init_meta_fast_clear_flush_state(device);
++	result = radv_device_init_meta_fast_clear_flush_state(device, on_demand);
+ 	if (result != VK_SUCCESS)
+ 		goto fail_fast_clear;
+ 
+-	result = radv_device_init_meta_resolve_compute_state(device);
++	result = radv_device_init_meta_resolve_compute_state(device, on_demand);
+ 	if (result != VK_SUCCESS)
+ 		goto fail_resolve_compute;
+ 
+-	result = radv_device_init_meta_resolve_fragment_state(device);
++	result = radv_device_init_meta_resolve_fragment_state(device, on_demand);
+ 	if (result != VK_SUCCESS)
+ 		goto fail_resolve_fragment;
+ 	return VK_SUCCESS;
+@@ -408,6 +414,7 @@ fail_blit:
+ fail_resolve:
+ 	radv_device_finish_meta_clear_state(device);
+ fail_clear:
++	mtx_destroy(&device->meta_state.mtx);
+ 	radv_pipeline_cache_finish(&device->meta_state.cache);
+ 	return result;
+ }
+@@ -429,6 +436,7 @@ radv_device_finish_meta(struct radv_device *device)
+ 
+ 	radv_store_meta_pipeline(device);
+ 	radv_pipeline_cache_finish(&device->meta_state.cache);
++	mtx_destroy(&device->meta_state.mtx);
+ }
+ 
+ nir_ssa_def *radv_meta_gen_rect_vertices_comp2(nir_builder *vs_b, nir_ssa_def *comp2)
+diff --git a/src/amd/vulkan/radv_meta.h b/src/amd/vulkan/radv_meta.h
+index 4a9abae30ac..ba12b249038 100644
+--- a/src/amd/vulkan/radv_meta.h
++++ b/src/amd/vulkan/radv_meta.h
+@@ -58,34 +58,34 @@ struct radv_meta_saved_state {
+ 	VkRect2D render_area;
+ };
+ 
+-VkResult radv_device_init_meta_clear_state(struct radv_device *device);
++VkResult radv_device_init_meta_clear_state(struct radv_device *device, bool on_demand);
+ void radv_device_finish_meta_clear_state(struct radv_device *device);
+ 
+-VkResult radv_device_init_meta_resolve_state(struct radv_device *device);
++VkResult radv_device_init_meta_resolve_state(struct radv_device *device, bool on_demand);
+ void radv_device_finish_meta_resolve_state(struct radv_device *device);
+ 
+-VkResult radv_device_init_meta_depth_decomp_state(struct radv_device *device);
++VkResult radv_device_init_meta_depth_decomp_state(struct radv_device *device, bool on_demand);
+ void radv_device_finish_meta_depth_decomp_state(struct radv_device *device);
+ 
+-VkResult radv_device_init_meta_fast_clear_flush_state(struct radv_device *device);
++VkResult radv_device_init_meta_fast_clear_flush_state(struct radv_device *device, bool on_demand);
+ void radv_device_finish_meta_fast_clear_flush_state(struct radv_device *device);
+ 
+-VkResult radv_device_init_meta_blit_state(struct radv_device *device);
++VkResult radv_device_init_meta_blit_state(struct radv_device *device, bool on_demand);
+ void radv_device_finish_meta_blit_state(struct radv_device *device);
+ 
+-VkResult radv_device_init_meta_blit2d_state(struct radv_device *device);
++VkResult radv_device_init_meta_blit2d_state(struct radv_device *device, bool on_demand);
+ void radv_device_finish_meta_blit2d_state(struct radv_device *device);
+ 
+ VkResult radv_device_init_meta_buffer_state(struct radv_device *device);
+ void radv_device_finish_meta_buffer_state(struct radv_device *device);
+ 
+-VkResult radv_device_init_meta_query_state(struct radv_device *device);
++VkResult radv_device_init_meta_query_state(struct radv_device *device, bool on_demand);
+ void radv_device_finish_meta_query_state(struct radv_device *device);
+ 
+-VkResult radv_device_init_meta_resolve_compute_state(struct radv_device *device);
++VkResult radv_device_init_meta_resolve_compute_state(struct radv_device *device, bool on_demand);
+ void radv_device_finish_meta_resolve_compute_state(struct radv_device *device);
+ 
+-VkResult radv_device_init_meta_resolve_fragment_state(struct radv_device *device);
++VkResult radv_device_init_meta_resolve_fragment_state(struct radv_device *device, bool on_demand);
+ void radv_device_finish_meta_resolve_fragment_state(struct radv_device *device);
+ 
+ void radv_meta_save(struct radv_meta_saved_state *saved_state,
+diff --git a/src/amd/vulkan/radv_meta_blit.c b/src/amd/vulkan/radv_meta_blit.c
+index 3941da5a3f8..c2f1b3ead1f 100644
+--- a/src/amd/vulkan/radv_meta_blit.c
++++ b/src/amd/vulkan/radv_meta_blit.c
+@@ -31,6 +31,13 @@ struct blit_region {
+ 	VkExtent3D dest_extent;
+ };
+ 
++static VkResult
++build_pipeline(struct radv_device *device,
++               VkImageAspectFlagBits aspect,
++               enum glsl_sampler_dim tex_dim,
++               unsigned fs_key,
++               VkPipeline *pipeline);
++
+ static nir_shader *
+ build_nir_vertex_shader(void)
+ {
+@@ -261,6 +268,20 @@ build_nir_copy_fragment_shader_stencil(enum glsl_sampler_dim tex_dim)
+ 	return b.shader;
+ }
+ 
++static enum glsl_sampler_dim
++translate_sampler_dim(VkImageType type) {
++	switch(type) {
++	case VK_IMAGE_TYPE_1D:
++		return GLSL_SAMPLER_DIM_1D;
++	case VK_IMAGE_TYPE_2D:
++		return GLSL_SAMPLER_DIM_2D;
++	case VK_IMAGE_TYPE_3D:
++		return GLSL_SAMPLER_DIM_3D;
++	default:
++		unreachable("Unhandled image type");
++	}
++}
++
+ static void
+ meta_emit_blit(struct radv_cmd_buffer *cmd_buffer,
+                struct radv_image *src_image,
+@@ -321,11 +342,12 @@ meta_emit_blit(struct radv_cmd_buffer *cmd_buffer,
+ 				       .height = dst_height,
+ 				       .layers = 1,
+ 				}, &cmd_buffer->pool->alloc, &fb);
+-	VkPipeline pipeline;
++	VkPipeline* pipeline = NULL;
++	unsigned fs_key = 0;
+ 	switch (src_iview->aspect_mask) {
+ 	case VK_IMAGE_ASPECT_COLOR_BIT: {
+-		unsigned fs_key = radv_format_meta_fs_key(dest_image->vk_format);
+ 		unsigned dst_layout = radv_meta_dst_layout_from_layout(dest_image_layout);
++		fs_key = radv_format_meta_fs_key(dest_image->vk_format);
+ 
+ 		radv_CmdBeginRenderPass(radv_cmd_buffer_to_handle(cmd_buffer),
+ 					      &(VkRenderPassBeginInfo) {
+@@ -341,13 +363,13 @@ meta_emit_blit(struct radv_cmd_buffer *cmd_buffer,
+ 						       }, VK_SUBPASS_CONTENTS_INLINE);
+ 		switch (src_image->type) {
+ 		case VK_IMAGE_TYPE_1D:
+-			pipeline = device->meta_state.blit.pipeline_1d_src[fs_key];
++			pipeline = &device->meta_state.blit.pipeline_1d_src[fs_key];
+ 			break;
+ 		case VK_IMAGE_TYPE_2D:
+-			pipeline = device->meta_state.blit.pipeline_2d_src[fs_key];
++			pipeline = &device->meta_state.blit.pipeline_2d_src[fs_key];
+ 			break;
+ 		case VK_IMAGE_TYPE_3D:
+-			pipeline = device->meta_state.blit.pipeline_3d_src[fs_key];
++			pipeline = &device->meta_state.blit.pipeline_3d_src[fs_key];
+ 			break;
+ 		default:
+ 			unreachable(!"bad VkImageType");
+@@ -370,13 +392,13 @@ meta_emit_blit(struct radv_cmd_buffer *cmd_buffer,
+ 						       }, VK_SUBPASS_CONTENTS_INLINE);
+ 		switch (src_image->type) {
+ 		case VK_IMAGE_TYPE_1D:
+-			pipeline = device->meta_state.blit.depth_only_1d_pipeline;
++			pipeline = &device->meta_state.blit.depth_only_1d_pipeline;
+ 			break;
+ 		case VK_IMAGE_TYPE_2D:
+-			pipeline = device->meta_state.blit.depth_only_2d_pipeline;
++			pipeline = &device->meta_state.blit.depth_only_2d_pipeline;
+ 			break;
+ 		case VK_IMAGE_TYPE_3D:
+-			pipeline = device->meta_state.blit.depth_only_3d_pipeline;
++			pipeline = &device->meta_state.blit.depth_only_3d_pipeline;
+ 			break;
+ 		default:
+ 			unreachable(!"bad VkImageType");
+@@ -399,13 +421,13 @@ meta_emit_blit(struct radv_cmd_buffer *cmd_buffer,
+ 						       }, VK_SUBPASS_CONTENTS_INLINE);
+ 		switch (src_image->type) {
+ 		case VK_IMAGE_TYPE_1D:
+-			pipeline = device->meta_state.blit.stencil_only_1d_pipeline;
++			pipeline = &device->meta_state.blit.stencil_only_1d_pipeline;
+ 			break;
+ 		case VK_IMAGE_TYPE_2D:
+-			pipeline = device->meta_state.blit.stencil_only_2d_pipeline;
++			pipeline = &device->meta_state.blit.stencil_only_2d_pipeline;
+ 			break;
+ 		case VK_IMAGE_TYPE_3D:
+-			pipeline = device->meta_state.blit.stencil_only_3d_pipeline;
++			pipeline = &device->meta_state.blit.stencil_only_3d_pipeline;
+ 			break;
+ 		default:
+ 			unreachable(!"bad VkImageType");
+@@ -416,8 +438,16 @@ meta_emit_blit(struct radv_cmd_buffer *cmd_buffer,
+ 		unreachable(!"bad VkImageType");
+ 	}
+ 
++	if (!*pipeline) {
++		VkResult ret = build_pipeline(device, src_iview->aspect_mask, translate_sampler_dim(src_image->type), fs_key, pipeline);
++		if (ret != VK_SUCCESS) {
++			cmd_buffer->record_result = ret;
++			goto fail_pipeline;
++		}
++	}
++
+ 	radv_CmdBindPipeline(radv_cmd_buffer_to_handle(cmd_buffer),
+-			     VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
++			     VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline);
+ 
+ 	radv_meta_push_descriptor_set(cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+ 			              device->meta_state.blit.pipeline_layout,
+@@ -459,6 +489,7 @@ meta_emit_blit(struct radv_cmd_buffer *cmd_buffer,
+ 
+ 	radv_CmdDraw(radv_cmd_buffer_to_handle(cmd_buffer), 3, 1, 0, 0);
+ 
++fail_pipeline:
+ 	radv_CmdEndRenderPass(radv_cmd_buffer_to_handle(cmd_buffer));
+ 
+ 	/* At the point where we emit the draw call, all data from the
+@@ -700,6 +731,14 @@ build_pipeline(struct radv_device *device,
+                VkPipeline *pipeline)
+ {
+ 	VkResult result = VK_SUCCESS;
++
++	mtx_lock(&device->meta_state.mtx);
++
++	if (*pipeline) {
++		mtx_unlock(&device->meta_state.mtx);
++		return VK_SUCCESS;
++	}
++
+ 	struct radv_shader_module fs = {0};
+ 	struct radv_shader_module vs = {.nir = build_nir_vertex_shader()};
+ 	VkRenderPass rp;
+@@ -849,11 +888,12 @@ build_pipeline(struct radv_device *device,
+ 	                                       &device->meta_state.alloc, pipeline);
+ 	ralloc_free(vs.nir);
+ 	ralloc_free(fs.nir);
++	mtx_unlock(&device->meta_state.mtx);
+ 	return result;
+ }
+ 
+ static VkResult
+-radv_device_init_meta_blit_color(struct radv_device *device)
++radv_device_init_meta_blit_color(struct radv_device *device, bool on_demand)
+ {
+ 	VkResult result;
+ 
+@@ -895,6 +935,9 @@ radv_device_init_meta_blit_color(struct radv_device *device)
+ 				goto fail;
+ 		}
+ 
++		if (on_demand)
++			continue;
++
+ 		result = build_pipeline(device, VK_IMAGE_ASPECT_COLOR_BIT, GLSL_SAMPLER_DIM_1D, key, &device->meta_state.blit.pipeline_1d_src[key]);
+ 		if (result != VK_SUCCESS)
+ 			goto fail;
+@@ -915,7 +958,7 @@ fail:
+ }
+ 
+ static VkResult
+-radv_device_init_meta_blit_depth(struct radv_device *device)
++radv_device_init_meta_blit_depth(struct radv_device *device, bool on_demand)
+ {
+ 	VkResult result;
+ 
+@@ -952,6 +995,9 @@ radv_device_init_meta_blit_depth(struct radv_device *device)
+ 			goto fail;
+ 	}
+ 
++	if (on_demand)
++		return VK_SUCCESS;
++
+ 	result = build_pipeline(device, VK_IMAGE_ASPECT_DEPTH_BIT, GLSL_SAMPLER_DIM_1D, 0, &device->meta_state.blit.depth_only_1d_pipeline);
+ 	if (result != VK_SUCCESS)
+ 		goto fail;
+@@ -969,7 +1015,7 @@ fail:
+ }
+ 
+ static VkResult
+-radv_device_init_meta_blit_stencil(struct radv_device *device)
++radv_device_init_meta_blit_stencil(struct radv_device *device, bool on_demand)
+ {
+ 	VkResult result;
+ 
+@@ -1006,6 +1052,8 @@ radv_device_init_meta_blit_stencil(struct radv_device *device)
+ 	if (result != VK_SUCCESS)
+ 		goto fail;
+ 
++	if (on_demand)
++		return VK_SUCCESS;
+ 
+ 	result = build_pipeline(device, VK_IMAGE_ASPECT_STENCIL_BIT, GLSL_SAMPLER_DIM_1D, 0, &device->meta_state.blit.stencil_only_1d_pipeline);
+ 	if (result != VK_SUCCESS)
+@@ -1025,7 +1073,7 @@ fail:
+ }
+ 
+ VkResult
+-radv_device_init_meta_blit_state(struct radv_device *device)
++radv_device_init_meta_blit_state(struct radv_device *device, bool on_demand)
+ {
+ 	VkResult result;
+ 
+@@ -1064,15 +1112,15 @@ radv_device_init_meta_blit_state(struct radv_device *device)
+ 	if (result != VK_SUCCESS)
+ 		goto fail;
+ 
+-	result = radv_device_init_meta_blit_color(device);
++	result = radv_device_init_meta_blit_color(device, on_demand);
+ 	if (result != VK_SUCCESS)
+ 		goto fail;
+ 
+-	result = radv_device_init_meta_blit_depth(device);
++	result = radv_device_init_meta_blit_depth(device, on_demand);
+ 	if (result != VK_SUCCESS)
+ 		goto fail;
+ 
+-	result = radv_device_init_meta_blit_stencil(device);
++	result = radv_device_init_meta_blit_stencil(device, on_demand);
+ 
+ fail:
+ 	if (result != VK_SUCCESS)
+diff --git a/src/amd/vulkan/radv_meta_blit2d.c b/src/amd/vulkan/radv_meta_blit2d.c
+index 6351f76e069..2d5d8219d27 100644
+--- a/src/amd/vulkan/radv_meta_blit2d.c
++++ b/src/amd/vulkan/radv_meta_blit2d.c
+@@ -35,6 +35,22 @@ enum blit2d_src_type {
+ 	BLIT2D_NUM_SRC_TYPES,
+ };
+ 
++static VkResult
++blit2d_init_color_pipeline(struct radv_device *device,
++			   enum blit2d_src_type src_type,
++			   VkFormat format,
++			   uint32_t log2_samples);
++
++static VkResult
++blit2d_init_depth_only_pipeline(struct radv_device *device,
++				enum blit2d_src_type src_type,
++				uint32_t log2_samples);
++
++static VkResult
++blit2d_init_stencil_only_pipeline(struct radv_device *device,
++				  enum blit2d_src_type src_type,
++				  uint32_t log2_samples);
++
+ static void
+ create_iview(struct radv_cmd_buffer *cmd_buffer,
+              struct radv_meta_blit2d_surf *surf,
+@@ -268,6 +284,14 @@ radv_meta_blit2d_normal_dst(struct radv_cmd_buffer *cmd_buffer,
+ 				unsigned fs_key = radv_format_meta_fs_key(dst_temps.iview.vk_format);
+ 				unsigned dst_layout = radv_meta_dst_layout_from_layout(dst->current_layout);
+ 
++				if (device->meta_state.blit2d[log2_samples].pipelines[src_type][fs_key] == VK_NULL_HANDLE) {
++					VkResult ret = blit2d_init_color_pipeline(device, src_type, radv_fs_key_format_exemplars[fs_key], log2_samples);
++					if (ret != VK_SUCCESS) {
++						cmd_buffer->record_result = ret;
++						goto fail_pipeline;
++					}
++				}
++
+ 				radv_CmdBeginRenderPass(radv_cmd_buffer_to_handle(cmd_buffer),
+ 							&(VkRenderPassBeginInfo) {
+ 								.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+@@ -285,6 +309,15 @@ radv_meta_blit2d_normal_dst(struct radv_cmd_buffer *cmd_buffer,
+ 				bind_pipeline(cmd_buffer, src_type, fs_key, log2_samples);
+ 			} else if (aspect_mask == VK_IMAGE_ASPECT_DEPTH_BIT) {
+ 				enum radv_blit_ds_layout ds_layout = radv_meta_blit_ds_to_type(dst->current_layout);
++
++				if (device->meta_state.blit2d[log2_samples].depth_only_pipeline[src_type] == VK_NULL_HANDLE) {
++					VkResult ret = blit2d_init_depth_only_pipeline(device, src_type, log2_samples);
++					if (ret != VK_SUCCESS) {
++						cmd_buffer->record_result = ret;
++						goto fail_pipeline;
++					}
++				}
++
+ 				radv_CmdBeginRenderPass(radv_cmd_buffer_to_handle(cmd_buffer),
+ 							&(VkRenderPassBeginInfo) {
+ 								.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+@@ -303,6 +336,15 @@ radv_meta_blit2d_normal_dst(struct radv_cmd_buffer *cmd_buffer,
+ 
+ 			} else if (aspect_mask == VK_IMAGE_ASPECT_STENCIL_BIT) {
+ 				enum radv_blit_ds_layout ds_layout = radv_meta_blit_ds_to_type(dst->current_layout);
++
++				if (device->meta_state.blit2d[log2_samples].stencil_only_pipeline[src_type] == VK_NULL_HANDLE) {
++					VkResult ret = blit2d_init_stencil_only_pipeline(device, src_type, log2_samples);
++					if (ret != VK_SUCCESS) {
++						cmd_buffer->record_result = ret;
++						goto fail_pipeline;
++					}
++				}
++
+ 				radv_CmdBeginRenderPass(radv_cmd_buffer_to_handle(cmd_buffer),
+ 							&(VkRenderPassBeginInfo) {
+ 								.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+@@ -357,6 +399,7 @@ radv_meta_blit2d_normal_dst(struct radv_cmd_buffer *cmd_buffer,
+ 				radv_CmdDraw(radv_cmd_buffer_to_handle(cmd_buffer), 3, 1, 0, 0);
+ 			radv_CmdEndRenderPass(radv_cmd_buffer_to_handle(cmd_buffer));
+ 
++fail_pipeline:
+ 			/* At the point where we emit the draw call, all data from the
+ 			* descriptor sets, etc. has been used.  We are free to delete it.
+ 			*/
+@@ -735,6 +778,12 @@ blit2d_init_color_pipeline(struct radv_device *device,
+ 	unsigned fs_key = radv_format_meta_fs_key(format);
+ 	const char *name;
+ 
++	mtx_lock(&device->meta_state.mtx);
++	if (device->meta_state.blit2d[log2_samples].pipelines[src_type][fs_key]) {
++		mtx_unlock(&device->meta_state.mtx);
++		return VK_SUCCESS;
++	}
++
+ 	texel_fetch_build_func src_func;
+ 	switch(src_type) {
+ 	case BLIT2D_SRC_TYPE_IMAGE:
+@@ -892,6 +941,7 @@ blit2d_init_color_pipeline(struct radv_device *device,
+ 	ralloc_free(vs.nir);
+ 	ralloc_free(fs.nir);
+ 
++	mtx_unlock(&device->meta_state.mtx);
+ 	return result;
+ }
+ 
+@@ -903,6 +953,12 @@ blit2d_init_depth_only_pipeline(struct radv_device *device,
+ 	VkResult result;
+ 	const char *name;
+ 
++	mtx_lock(&device->meta_state.mtx);
++	if (device->meta_state.blit2d[log2_samples].depth_only_pipeline[src_type]) {
++		mtx_unlock(&device->meta_state.mtx);
++		return VK_SUCCESS;
++	}
++
+ 	texel_fetch_build_func src_func;
+ 	switch(src_type) {
+ 	case BLIT2D_SRC_TYPE_IMAGE:
+@@ -1055,6 +1111,7 @@ blit2d_init_depth_only_pipeline(struct radv_device *device,
+ 	ralloc_free(vs.nir);
+ 	ralloc_free(fs.nir);
+ 
++	mtx_unlock(&device->meta_state.mtx);
+ 	return result;
+ }
+ 
+@@ -1066,6 +1123,12 @@ blit2d_init_stencil_only_pipeline(struct radv_device *device,
+ 	VkResult result;
+ 	const char *name;
+ 
++	mtx_lock(&device->meta_state.mtx);
++	if (device->meta_state.blit2d[log2_samples].stencil_only_pipeline[src_type]) {
++		mtx_unlock(&device->meta_state.mtx);
++		return VK_SUCCESS;
++	}
++
+ 	texel_fetch_build_func src_func;
+ 	switch(src_type) {
+ 	case BLIT2D_SRC_TYPE_IMAGE:
+@@ -1234,6 +1297,7 @@ blit2d_init_stencil_only_pipeline(struct radv_device *device,
+ 	ralloc_free(vs.nir);
+ 	ralloc_free(fs.nir);
+ 
++	mtx_unlock(&device->meta_state.mtx);
+ 	return result;
+ }
+ 
+@@ -1285,7 +1349,7 @@ fail:
+ }
+ 
+ VkResult
+-radv_device_init_meta_blit2d_state(struct radv_device *device)
++radv_device_init_meta_blit2d_state(struct radv_device *device, bool on_demand)
+ {
+ 	VkResult result;
+ 	bool create_3d = device->physical_device->rad_info.chip_class >= GFX9;
+@@ -1303,6 +1367,9 @@ radv_device_init_meta_blit2d_state(struct radv_device *device)
+ 			if (result != VK_SUCCESS)
+ 				goto fail;
+ 
++			if (on_demand)
++				continue;
++
+ 			for (unsigned j = 0; j < NUM_META_FS_KEYS; ++j) {
+ 				result = blit2d_init_color_pipeline(device, src, radv_fs_key_format_exemplars[j], log2_samples);
+ 				if (result != VK_SUCCESS)
+diff --git a/src/amd/vulkan/radv_meta_clear.c b/src/amd/vulkan/radv_meta_clear.c
+index bc8b58dcd66..73b67e7823a 100644
+--- a/src/amd/vulkan/radv_meta_clear.c
++++ b/src/amd/vulkan/radv_meta_clear.c
+@@ -200,7 +200,13 @@ create_color_renderpass(struct radv_device *device,
+ 			uint32_t samples,
+ 			VkRenderPass *pass)
+ {
+-	return radv_CreateRenderPass(radv_device_to_handle(device),
++	mtx_lock(&device->meta_state.mtx);
++	if (*pass) {
++		mtx_unlock (&device->meta_state.mtx);
++		return VK_SUCCESS;
++	}
++
++	VkResult result = radv_CreateRenderPass(radv_device_to_handle(device),
+ 				       &(VkRenderPassCreateInfo) {
+ 					       .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+ 						       .attachmentCount = 1,
+@@ -231,6 +237,8 @@ create_color_renderpass(struct radv_device *device,
+ 					       },
+ 								.dependencyCount = 0,
+ 									 }, &device->meta_state.alloc, pass);
++	mtx_unlock(&device->meta_state.mtx);
++	return result;
+ }
+ 
+ static VkResult
+@@ -243,6 +251,13 @@ create_color_pipeline(struct radv_device *device,
+ 	struct nir_shader *vs_nir;
+ 	struct nir_shader *fs_nir;
+ 	VkResult result;
++
++	mtx_lock(&device->meta_state.mtx);
++	if (*pipeline) {
++		mtx_unlock(&device->meta_state.mtx);
++		return VK_SUCCESS;
++	}
++
+ 	build_color_shaders(&vs_nir, &fs_nir, frag_output);
+ 
+ 	const VkPipelineVertexInputStateCreateInfo vi_state = {
+@@ -284,6 +299,7 @@ create_color_pipeline(struct radv_device *device,
+ 				 device->meta_state.clear_color_p_layout,
+ 				 &extra, &device->meta_state.alloc, pipeline);
+ 
++	mtx_unlock(&device->meta_state.mtx);
+ 	return result;
+ }
+ 
+@@ -349,6 +365,26 @@ emit_color_clear(struct radv_cmd_buffer *cmd_buffer,
+ 		return;
+ 	}
+ 
++	if (device->meta_state.clear[samples_log2].render_pass[fs_key] == VK_NULL_HANDLE) {
++		VkResult ret = create_color_renderpass(device, radv_fs_key_format_exemplars[fs_key],
++		                                       samples,
++		                                       &device->meta_state.clear[samples_log2].render_pass[fs_key]);
++		if (ret != VK_SUCCESS) {
++			cmd_buffer->record_result = ret;
++			return;
++		}
++	}
++
++	if (device->meta_state.clear[samples_log2].color_pipelines[fs_key] == VK_NULL_HANDLE) {
++		VkResult ret = create_color_pipeline(device, samples, 0,
++		                                     &device->meta_state.clear[samples_log2].color_pipelines[fs_key],
++		                                     device->meta_state.clear[samples_log2].render_pass[fs_key]);
++		if (ret != VK_SUCCESS) {
++			cmd_buffer->record_result = ret;
++			return;
++		}
++	}
++
+ 	pipeline = device->meta_state.clear[samples_log2].color_pipelines[fs_key];
+ 	if (!pipeline) {
+ 		radv_finishme("color clears incomplete");
+@@ -449,7 +485,13 @@ create_depthstencil_renderpass(struct radv_device *device,
+ 			       uint32_t samples,
+ 			       VkRenderPass *render_pass)
+ {
+-	return radv_CreateRenderPass(radv_device_to_handle(device),
++	mtx_lock(&device->meta_state.mtx);
++	if (*render_pass) {
++		mtx_unlock(&device->meta_state.mtx);
++		return VK_SUCCESS;
++	}
++
++	VkResult result = radv_CreateRenderPass(radv_device_to_handle(device),
+ 				       &(VkRenderPassCreateInfo) {
+ 					       .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+ 						       .attachmentCount = 1,
+@@ -477,6 +519,8 @@ create_depthstencil_renderpass(struct radv_device *device,
+ 					       },
+ 								.dependencyCount = 0,
+ 									 }, &device->meta_state.alloc, render_pass);
++	mtx_unlock(&device->meta_state.mtx);
++	return result;
+ }
+ 
+ static VkResult
+@@ -489,6 +533,13 @@ create_depthstencil_pipeline(struct radv_device *device,
+ {
+ 	struct nir_shader *vs_nir, *fs_nir;
+ 	VkResult result;
++
++	mtx_lock(&device->meta_state.mtx);
++	if (*pipeline) {
++		mtx_unlock(&device->meta_state.mtx);
++		return VK_SUCCESS;
++	}
++
+ 	build_depthstencil_shader(&vs_nir, &fs_nir);
+ 
+ 	const VkPipelineVertexInputStateCreateInfo vi_state = {
+@@ -536,6 +587,8 @@ create_depthstencil_pipeline(struct radv_device *device,
+ 				 samples, vs_nir, fs_nir, &vi_state, &ds_state, &cb_state,
+ 				 device->meta_state.clear_depth_p_layout,
+ 				 &extra, &device->meta_state.alloc, pipeline);
++
++	mtx_unlock(&device->meta_state.mtx);
+ 	return result;
+ }
+ 
+@@ -579,6 +632,7 @@ pick_depthstencil_pipeline(struct radv_cmd_buffer *cmd_buffer,
+ {
+ 	bool fast = depth_view_can_fast_clear(cmd_buffer, iview, aspects, layout, clear_rect, clear_value);
+ 	int index = DEPTH_CLEAR_SLOW;
++	VkPipeline *pipeline;
+ 
+ 	if (fast) {
+ 		/* we don't know the previous clear values, so we always have
+@@ -588,13 +642,36 @@ pick_depthstencil_pipeline(struct radv_cmd_buffer *cmd_buffer,
+ 
+ 	switch (aspects) {
+ 	case VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT:
+-		return meta_state->clear[samples_log2].depthstencil_pipeline[index];
++		pipeline = &meta_state->clear[samples_log2].depthstencil_pipeline[index];
++		break;
+ 	case VK_IMAGE_ASPECT_DEPTH_BIT:
+-		return meta_state->clear[samples_log2].depth_only_pipeline[index];
++		pipeline = &meta_state->clear[samples_log2].depth_only_pipeline[index];
++		break;
+ 	case VK_IMAGE_ASPECT_STENCIL_BIT:
+-		return meta_state->clear[samples_log2].stencil_only_pipeline[index];
++		pipeline = &meta_state->clear[samples_log2].stencil_only_pipeline[index];
++		break;
++	default:
++		unreachable("expected depth or stencil aspect");
++	}
++
++	if (cmd_buffer->device->meta_state.clear[samples_log2].depthstencil_rp == VK_NULL_HANDLE) {
++		VkResult ret = create_depthstencil_renderpass(cmd_buffer->device, 1u << samples_log2,
++		                                              &cmd_buffer->device->meta_state.clear[samples_log2].depthstencil_rp);
++		if (ret != VK_SUCCESS) {
++			cmd_buffer->record_result = ret;
++			return VK_NULL_HANDLE;
++		}
+ 	}
+-	unreachable("expected depth or stencil aspect");
++
++	if (*pipeline == VK_NULL_HANDLE) {
++		VkResult ret = create_depthstencil_pipeline(cmd_buffer->device, aspects, 1u << samples_log2, index,
++		                                            pipeline, cmd_buffer->device->meta_state.clear[samples_log2].depthstencil_rp);
++		if (ret != VK_SUCCESS) {
++			cmd_buffer->record_result = ret;
++			return VK_NULL_HANDLE;
++		}
++	}
++	return *pipeline;
+ }
+ 
+ static void
+@@ -638,6 +715,8 @@ emit_depthstencil_clear(struct radv_cmd_buffer *cmd_buffer,
+ 							 subpass->depth_stencil_attachment.layout,
+ 							 clear_rect,
+ 							 clear_value);
++	if (!pipeline)
++		return;
+ 
+ 	radv_CmdBindPipeline(cmd_buffer_h, VK_PIPELINE_BIND_POINT_GRAPHICS,
+ 			     pipeline);
+@@ -749,7 +828,7 @@ fail:
+ }
+ 
+ VkResult
+-radv_device_init_meta_clear_state(struct radv_device *device)
++radv_device_init_meta_clear_state(struct radv_device *device, bool on_demand)
+ {
+ 	VkResult res;
+ 	struct radv_meta_state *state = &device->meta_state;
+@@ -782,6 +861,9 @@ radv_device_init_meta_clear_state(struct radv_device *device)
+ 	if (res != VK_SUCCESS)
+ 		goto fail;
+ 
++	if (on_demand)
++		return VK_SUCCESS;
++
+ 	for (uint32_t i = 0; i < ARRAY_SIZE(state->clear); ++i) {
+ 		uint32_t samples = 1 << i;
+ 		for (uint32_t j = 0; j < NUM_META_FS_KEYS; ++j) {
+diff --git a/src/amd/vulkan/radv_meta_decompress.c b/src/amd/vulkan/radv_meta_decompress.c
+index 1a8058c7cc5..41ed7b6d043 100644
+--- a/src/amd/vulkan/radv_meta_decompress.c
++++ b/src/amd/vulkan/radv_meta_decompress.c
+@@ -103,6 +103,18 @@ create_pipeline(struct radv_device *device,
+ {
+ 	VkResult result;
+ 	VkDevice device_h = radv_device_to_handle(device);
++	struct radv_shader_module vs_module = {0};
++
++	mtx_lock(&device->meta_state.mtx);
++	if (*decompress_pipeline) {
++		mtx_unlock(&device->meta_state.mtx);
++		return VK_SUCCESS;
++	}
++
++	if (!vs_module_h) {
++		vs_module.nir = radv_meta_build_nir_vs_generate_vertices();
++		vs_module_h = radv_shader_module_to_handle(&vs_module);
++	}
+ 
+ 	struct radv_shader_module fs_module = {
+ 		.nir = radv_meta_build_nir_fs_noop(),
+@@ -219,6 +231,9 @@ create_pipeline(struct radv_device *device,
+ 
+ cleanup:
+ 	ralloc_free(fs_module.nir);
++	if (vs_module.nir)
++		ralloc_free(vs_module.nir);
++	mtx_unlock(&device->meta_state.mtx);
+ 	return result;
+ }
+ 
+@@ -244,7 +259,7 @@ radv_device_finish_meta_depth_decomp_state(struct radv_device *device)
+ }
+ 
+ VkResult
+-radv_device_init_meta_depth_decomp_state(struct radv_device *device)
++radv_device_init_meta_depth_decomp_state(struct radv_device *device, bool on_demand)
+ {
+ 	struct radv_meta_state *state = &device->meta_state;
+ 	VkResult res = VK_SUCCESS;
+@@ -270,6 +285,9 @@ radv_device_init_meta_depth_decomp_state(struct radv_device *device)
+ 		if (res != VK_SUCCESS)
+ 			goto fail;
+ 
++		if (on_demand)
++			continue;
++
+ 		res = create_pipeline(device, vs_module_h, samples,
+ 				      state->depth_decomp[i].pass,
+ 				      state->depth_decomp[i].p_layout,
+@@ -343,6 +361,18 @@ static void radv_process_depth_image_inplace(struct radv_cmd_buffer *cmd_buffer,
+ 	if (!radv_image_has_htile(image))
+ 		return;
+ 
++	if (!meta_state->depth_decomp[samples_log2].decompress_pipeline) {
++		VkResult ret = create_pipeline(cmd_buffer->device, NULL, samples,
++		                               meta_state->depth_decomp[samples_log2].pass,
++		                               meta_state->depth_decomp[samples_log2].p_layout,
++		                               &meta_state->depth_decomp[samples_log2].decompress_pipeline,
++		                               &meta_state->depth_decomp[samples_log2].resummarize_pipeline);
++		if (ret != VK_SUCCESS) {
++			cmd_buffer->record_result = ret;
++			return;
++		}
++	}
++
+ 	radv_meta_save(&saved_state, cmd_buffer,
+ 		       RADV_META_SAVE_GRAPHICS_PIPELINE |
+ 		       RADV_META_SAVE_PASS);
+diff --git a/src/amd/vulkan/radv_meta_fast_clear.c b/src/amd/vulkan/radv_meta_fast_clear.c
+index d5af7a1b0cf..adf9ad72d1d 100644
+--- a/src/amd/vulkan/radv_meta_fast_clear.c
++++ b/src/amd/vulkan/radv_meta_fast_clear.c
+@@ -488,11 +488,17 @@ radv_device_finish_meta_fast_clear_flush_state(struct radv_device *device)
+ 	                                &state->alloc);
+ }
+ 
+-VkResult
+-radv_device_init_meta_fast_clear_flush_state(struct radv_device *device)
++static VkResult
++radv_device_init_meta_fast_clear_flush_state_internal(struct radv_device *device)
+ {
+ 	VkResult res = VK_SUCCESS;
+ 
++	mtx_lock(&device->meta_state.mtx);
++	if (device->meta_state.fast_clear_flush.cmask_eliminate_pipeline) {
++		mtx_unlock(&device->meta_state.mtx);
++		return VK_SUCCESS;
++	}
++
+ 	struct radv_shader_module vs_module = { .nir = radv_meta_build_nir_vs_generate_vertices() };
+ 	if (!vs_module.nir) {
+ 		/* XXX: Need more accurate error */
+@@ -526,10 +532,21 @@ fail:
+ 
+ cleanup:
+ 	ralloc_free(vs_module.nir);
++	mtx_unlock(&device->meta_state.mtx);
+ 
+ 	return res;
+ }
+ 
++
++VkResult
++radv_device_init_meta_fast_clear_flush_state(struct radv_device *device, bool on_demand)
++{
++	if (on_demand)
++		return VK_SUCCESS;
++
++	return radv_device_init_meta_fast_clear_flush_state_internal(device);
++}
++
+ static void
+ emit_fast_clear_flush(struct radv_cmd_buffer *cmd_buffer,
+ 		      const VkExtent2D *resolve_extent,
+@@ -589,6 +606,14 @@ radv_emit_color_decompress(struct radv_cmd_buffer *cmd_buffer,
+ 
+ 	assert(cmd_buffer->queue_family_index == RADV_QUEUE_GENERAL);
+ 
++	if (!cmd_buffer->device->meta_state.fast_clear_flush.cmask_eliminate_pipeline) {
++		VkResult ret = radv_device_init_meta_fast_clear_flush_state_internal(cmd_buffer->device);
++		if (ret != VK_SUCCESS) {
++			cmd_buffer->record_result = ret;
++			return;
++		}
++	}
++
+ 	radv_meta_save(&saved_state, cmd_buffer,
+ 		       RADV_META_SAVE_GRAPHICS_PIPELINE |
+ 		       RADV_META_SAVE_PASS);
+diff --git a/src/amd/vulkan/radv_meta_resolve.c b/src/amd/vulkan/radv_meta_resolve.c
+index 814eb569888..9357b639cba 100644
+--- a/src/amd/vulkan/radv_meta_resolve.c
++++ b/src/amd/vulkan/radv_meta_resolve.c
+@@ -252,8 +252,11 @@ radv_device_finish_meta_resolve_state(struct radv_device *device)
+ }
+ 
+ VkResult
+-radv_device_init_meta_resolve_state(struct radv_device *device)
++radv_device_init_meta_resolve_state(struct radv_device *device, bool on_demand)
+ {
++	if (on_demand)
++		return VK_SUCCESS;
++
+ 	VkResult res = VK_SUCCESS;
+ 	struct radv_meta_state *state = &device->meta_state;
+ 	struct radv_shader_module vs_module = { .nir = radv_meta_build_nir_vs_generate_vertices() };
+@@ -351,6 +354,36 @@ static void radv_pick_resolve_method_images(struct radv_image *src_image,
+ 	}
+ }
+ 
++static VkResult
++build_resolve_pipeline(struct radv_device *device,
++                       unsigned fs_key)
++{
++	VkResult result = VK_SUCCESS;
++
++	if (device->meta_state.resolve.pipeline[fs_key])
++		return result;
++
++	mtx_lock(&device->meta_state.mtx);
++	if (device->meta_state.resolve.pipeline[fs_key]) {
++		mtx_unlock(&device->meta_state.mtx);
++		return result;
++	}
++
++	struct radv_shader_module vs_module = { .nir = radv_meta_build_nir_vs_generate_vertices() };
++
++	result = create_pass(device, radv_fs_key_format_exemplars[fs_key], &device->meta_state.resolve.pass[fs_key]);
++	if (result != VK_SUCCESS)
++		goto fail;
++
++	VkShaderModule vs_module_h = radv_shader_module_to_handle(&vs_module);
++	result = create_pipeline(device, vs_module_h, &device->meta_state.resolve.pipeline[fs_key], device->meta_state.resolve.pass[fs_key]);
++
++fail:
++	ralloc_free(vs_module.nir);
++	mtx_unlock(&device->meta_state.mtx);
++	return result;
++}
++
+ void radv_CmdResolveImage(
+ 	VkCommandBuffer                             cmd_buffer_h,
+ 	VkImage                                     src_image_h,
+@@ -481,6 +514,12 @@ void radv_CmdResolveImage(
+ 		for (uint32_t layer = 0; layer < region->srcSubresource.layerCount;
+ 		     ++layer) {
+ 
++			VkResult ret = build_resolve_pipeline(device, fs_key);
++			if (ret != VK_SUCCESS) {
++				cmd_buffer->record_result = ret;
++				break;
++			}
++
+ 			struct radv_image_view src_iview;
+ 			radv_image_view_init(&src_iview, cmd_buffer->device,
+ 					     &(VkImageViewCreateInfo) {
+@@ -646,6 +685,12 @@ radv_cmd_buffer_resolve_subpass(struct radv_cmd_buffer *cmd_buffer)
+ 
+ 		radv_cmd_buffer_set_subpass(cmd_buffer, &resolve_subpass, false);
+ 
++		VkResult ret = build_resolve_pipeline(cmd_buffer->device, radv_format_meta_fs_key(dst_img->vk_format));
++		if (ret != VK_SUCCESS) {
++			cmd_buffer->record_result = ret;
++			continue;
++		}
++
+ 		emit_resolve(cmd_buffer,
+ 			     dst_img->vk_format,
+ 			     &(VkOffset2D) { 0, 0 },
+diff --git a/src/amd/vulkan/radv_meta_resolve_cs.c b/src/amd/vulkan/radv_meta_resolve_cs.c
+index 274e64999a5..e57b552cc1e 100644
+--- a/src/amd/vulkan/radv_meta_resolve_cs.c
++++ b/src/amd/vulkan/radv_meta_resolve_cs.c
+@@ -212,6 +212,12 @@ create_resolve_pipeline(struct radv_device *device,
+ 	VkResult result;
+ 	struct radv_shader_module cs = { .nir = NULL };
+ 
++	mtx_lock(&device->meta_state.mtx);
++	if (*pipeline) {
++		mtx_unlock(&device->meta_state.mtx);
++		return VK_SUCCESS;
++	}
++
+ 	cs.nir = build_resolve_compute_shader(device, is_integer, is_srgb, samples);
+ 
+ 	/* compute shader */
+@@ -239,14 +245,16 @@ create_resolve_pipeline(struct radv_device *device,
+ 		goto fail;
+ 
+ 	ralloc_free(cs.nir);
++	mtx_unlock(&device->meta_state.mtx);
+ 	return VK_SUCCESS;
+ fail:
+ 	ralloc_free(cs.nir);
++	mtx_unlock(&device->meta_state.mtx);
+ 	return result;
+ }
+ 
+ VkResult
+-radv_device_init_meta_resolve_compute_state(struct radv_device *device)
++radv_device_init_meta_resolve_compute_state(struct radv_device *device, bool on_demand)
+ {
+ 	struct radv_meta_state *state = &device->meta_state;
+ 	VkResult res;
+@@ -255,6 +263,9 @@ radv_device_init_meta_resolve_compute_state(struct radv_device *device)
+ 	if (res != VK_SUCCESS)
+ 		goto fail;
+ 
++	if (on_demand)
++		return VK_SUCCESS;
++
+ 	for (uint32_t i = 0; i < MAX_SAMPLES_LOG2; ++i) {
+ 		uint32_t samples = 1 << i;
+ 
+@@ -353,16 +364,27 @@ emit_resolve(struct radv_cmd_buffer *cmd_buffer,
+ 			      }
+ 				      });
+ 
+-	VkPipeline pipeline;
++	VkPipeline *pipeline;
+ 	if (vk_format_is_int(src_iview->image->vk_format))
+-		pipeline = device->meta_state.resolve_compute.rc[samples_log2].i_pipeline;
++		pipeline = &device->meta_state.resolve_compute.rc[samples_log2].i_pipeline;
+ 	else if (vk_format_is_srgb(src_iview->image->vk_format))
+-		pipeline = device->meta_state.resolve_compute.rc[samples_log2].srgb_pipeline;
++		pipeline = &device->meta_state.resolve_compute.rc[samples_log2].srgb_pipeline;
+ 	else
+-		pipeline = device->meta_state.resolve_compute.rc[samples_log2].pipeline;
++		pipeline = &device->meta_state.resolve_compute.rc[samples_log2].pipeline;
++
++	if (!*pipeline) {
++		VkResult ret = create_resolve_pipeline(device, samples,
++		                                       vk_format_is_int(src_iview->image->vk_format),
++		                                       vk_format_is_srgb(src_iview->image->vk_format),
++		                                       pipeline);
++		if (ret != VK_SUCCESS) {
++			cmd_buffer->record_result = ret;
++			return;
++		}
++	}
+ 
+ 	radv_CmdBindPipeline(radv_cmd_buffer_to_handle(cmd_buffer),
+-			     VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
++			     VK_PIPELINE_BIND_POINT_COMPUTE, *pipeline);
+ 
+ 	unsigned push_constants[4] = {
+ 		src_offset->x,
+diff --git a/src/amd/vulkan/radv_meta_resolve_fs.c b/src/amd/vulkan/radv_meta_resolve_fs.c
+index 996a95a79c9..08d8d6c0012 100644
+--- a/src/amd/vulkan/radv_meta_resolve_fs.c
++++ b/src/amd/vulkan/radv_meta_resolve_fs.c
+@@ -161,10 +161,18 @@ create_resolve_pipeline(struct radv_device *device,
+ 			int samples_log2,
+ 			VkFormat format)
+ {
++	mtx_lock(&device->meta_state.mtx);
++
++	unsigned fs_key = radv_format_meta_fs_key(format);
++	VkPipeline *pipeline = &device->meta_state.resolve_fragment.rc[samples_log2].pipeline[fs_key];
++	if (*pipeline) {
++		mtx_unlock(&device->meta_state.mtx);
++		return VK_SUCCESS;
++	}
++
+ 	VkResult result;
+ 	bool is_integer = false;
+ 	uint32_t samples = 1 << samples_log2;
+-	unsigned fs_key = radv_format_meta_fs_key(format);
+ 	const VkPipelineVertexInputStateCreateInfo *vi_create_info;
+ 	vi_create_info = &normal_vi_create_info;
+ 	if (vk_format_is_int(format))
+@@ -180,9 +188,6 @@ create_resolve_pipeline(struct radv_device *device,
+ 
+ 	assert(!*rp);
+ 
+-	VkPipeline *pipeline = &device->meta_state.resolve_fragment.rc[samples_log2].pipeline[fs_key];
+-	assert(!*pipeline);
+-
+ 	VkPipelineShaderStageCreateInfo pipeline_shader_stages[] = {
+ 		{
+ 			.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+@@ -307,11 +312,12 @@ create_resolve_pipeline(struct radv_device *device,
+ 	ralloc_free(vs.nir);
+ 	ralloc_free(fs.nir);
+ 
++	mtx_unlock(&device->meta_state.mtx);
+ 	return result;
+ }
+ 
+ VkResult
+-radv_device_init_meta_resolve_fragment_state(struct radv_device *device)
++radv_device_init_meta_resolve_fragment_state(struct radv_device *device, bool on_demand)
+ {
+ 	VkResult res;
+ 
+@@ -319,6 +325,9 @@ radv_device_init_meta_resolve_fragment_state(struct radv_device *device)
+ 	if (res != VK_SUCCESS)
+ 		goto fail;
+ 
++	if (on_demand)
++		return VK_SUCCESS;
++
+ 	for (uint32_t i = 0; i < MAX_SAMPLES_LOG2; ++i) {
+ 		for (unsigned j = 0; j < NUM_META_FS_KEYS; ++j) {
+ 			res = create_resolve_pipeline(device, i, radv_fs_key_format_exemplars[j]);
+@@ -404,10 +413,18 @@ emit_resolve(struct radv_cmd_buffer *cmd_buffer,
+ 			      push_constants);
+ 
+ 	unsigned fs_key = radv_format_meta_fs_key(dest_iview->vk_format);
+-	VkPipeline pipeline_h = device->meta_state.resolve_fragment.rc[samples_log2].pipeline[fs_key];
++	VkPipeline* pipeline = &device->meta_state.resolve_fragment.rc[samples_log2].pipeline[fs_key];
++
++	if (*pipeline == VK_NULL_HANDLE) {
++		VkResult ret = create_resolve_pipeline(device, samples_log2, radv_fs_key_format_exemplars[fs_key]);
++		if (ret != VK_SUCCESS) {
++			cmd_buffer->record_result = ret;
++			return;
++		}
++	}
+ 
+ 	radv_CmdBindPipeline(cmd_buffer_h, VK_PIPELINE_BIND_POINT_GRAPHICS,
+-			     pipeline_h);
++			     *pipeline);
+ 
+ 	radv_CmdSetViewport(radv_cmd_buffer_to_handle(cmd_buffer), 0, 1, &(VkViewport) {
+ 		.x = dest_offset->x,
+diff --git a/src/amd/vulkan/radv_pipeline_cache.c b/src/amd/vulkan/radv_pipeline_cache.c
+index 920afd3938b..6ae08038be2 100644
+--- a/src/amd/vulkan/radv_pipeline_cache.c
++++ b/src/amd/vulkan/radv_pipeline_cache.c
+@@ -456,7 +456,7 @@ struct cache_header {
+ 	uint8_t  uuid[VK_UUID_SIZE];
+ };
+ 
+-void
++bool
+ radv_pipeline_cache_load(struct radv_pipeline_cache *cache,
+ 			 const void *data, size_t size)
+ {
+@@ -464,18 +464,18 @@ radv_pipeline_cache_load(struct radv_pipeline_cache *cache,
+ 	struct cache_header header;
+ 
+ 	if (size < sizeof(header))
+-		return;
++		return false;
+ 	memcpy(&header, data, sizeof(header));
+ 	if (header.header_size < sizeof(header))
+-		return;
++		return false;
+ 	if (header.header_version != VK_PIPELINE_CACHE_HEADER_VERSION_ONE)
+-		return;
++		return false;
+ 	if (header.vendor_id != ATI_VENDOR_ID)
+-		return;
++		return false;
+ 	if (header.device_id != device->physical_device->rad_info.pci_id)
+-		return;
++		return false;
+ 	if (memcmp(header.uuid, device->physical_device->cache_uuid, VK_UUID_SIZE) != 0)
+-		return;
++		return false;
+ 
+ 	char *end = (void *) data + size;
+ 	char *p = (void *) data + header.header_size;
+@@ -497,6 +497,8 @@ radv_pipeline_cache_load(struct radv_pipeline_cache *cache,
+ 		}
+ 		p += size;
+ 	}
++
++	return true;
+ }
+ 
+ VkResult radv_CreatePipelineCache(
+diff --git a/src/amd/vulkan/radv_private.h b/src/amd/vulkan/radv_private.h
+index c423c4a86f4..afe52e50609 100644
+--- a/src/amd/vulkan/radv_private.h
++++ b/src/amd/vulkan/radv_private.h
+@@ -367,7 +367,7 @@ radv_pipeline_cache_init(struct radv_pipeline_cache *cache,
+ 			 struct radv_device *device);
+ void
+ radv_pipeline_cache_finish(struct radv_pipeline_cache *cache);
+-void
++bool
+ radv_pipeline_cache_load(struct radv_pipeline_cache *cache,
+ 			 const void *data, size_t size);
+ 
+@@ -424,6 +424,12 @@ struct radv_meta_state {
+ 
+ 	struct radv_pipeline_cache cache;
+ 
++	/*
++	 * For on-demand pipeline creation, makes sure that
++	 * only one thread tries to build a pipeline at the same time.
++	 */
++	mtx_t mtx;
++
+ 	/**
+ 	 * Use array element `i` for images with `2^i` samples.
+ 	 */
+diff --git a/src/amd/vulkan/radv_query.c b/src/amd/vulkan/radv_query.c
+index 2b2e80f4e5b..9560905121f 100644
+--- a/src/amd/vulkan/radv_query.c
++++ b/src/amd/vulkan/radv_query.c
+@@ -513,12 +513,17 @@ build_pipeline_statistics_query_shader(struct radv_device *device) {
+ 	return b.shader;
+ }
+ 
+-VkResult radv_device_init_meta_query_state(struct radv_device *device)
++static VkResult radv_device_init_meta_query_state_internal(struct radv_device *device)
+ {
+ 	VkResult result;
+ 	struct radv_shader_module occlusion_cs = { .nir = NULL };
+ 	struct radv_shader_module pipeline_statistics_cs = { .nir = NULL };
+ 
++	mtx_lock(&device->meta_state.mtx);
++	if (device->meta_state.query.pipeline_statistics_query_pipeline) {
++		mtx_unlock(&device->meta_state.mtx);
++		return VK_SUCCESS;
++	}
+ 	occlusion_cs.nir = build_occlusion_query_shader(device);
+ 	pipeline_statistics_cs.nir = build_pipeline_statistics_query_shader(device);
+ 
+@@ -613,9 +618,18 @@ fail:
+ 		radv_device_finish_meta_query_state(device);
+ 	ralloc_free(occlusion_cs.nir);
+ 	ralloc_free(pipeline_statistics_cs.nir);
++	mtx_unlock(&device->meta_state.mtx);
+ 	return result;
+ }
+ 
++VkResult radv_device_init_meta_query_state(struct radv_device *device, bool on_demand)
++{
++	if (on_demand)
++		return VK_SUCCESS;
++
++	return radv_device_init_meta_query_state_internal(device);
++}
++
+ void radv_device_finish_meta_query_state(struct radv_device *device)
+ {
+ 	if (device->meta_state.query.pipeline_statistics_query_pipeline)
+@@ -640,7 +654,7 @@ void radv_device_finish_meta_query_state(struct radv_device *device)
+ }
+ 
+ static void radv_query_shader(struct radv_cmd_buffer *cmd_buffer,
+-                              VkPipeline pipeline,
++                              VkPipeline *pipeline,
+                               struct radeon_winsys_bo *src_bo,
+                               struct radeon_winsys_bo *dst_bo,
+                               uint64_t src_offset, uint64_t dst_offset,
+@@ -651,6 +665,14 @@ static void radv_query_shader(struct radv_cmd_buffer *cmd_buffer,
+ 	struct radv_device *device = cmd_buffer->device;
+ 	struct radv_meta_saved_state saved_state;
+ 
++	if (!*pipeline) {
++		VkResult ret = radv_device_init_meta_query_state_internal(device);
++		if (ret != VK_SUCCESS) {
++			cmd_buffer->record_result = ret;
++			return;
++		}
++	}
++
+ 	radv_meta_save(&saved_state, cmd_buffer,
+ 		       RADV_META_SAVE_COMPUTE_PIPELINE |
+ 		       RADV_META_SAVE_CONSTANTS |
+@@ -669,7 +691,7 @@ static void radv_query_shader(struct radv_cmd_buffer *cmd_buffer,
+ 	};
+ 
+ 	radv_CmdBindPipeline(radv_cmd_buffer_to_handle(cmd_buffer),
+-			     VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
++			     VK_PIPELINE_BIND_POINT_COMPUTE, *pipeline);
+ 
+ 	radv_meta_push_descriptor_set(cmd_buffer,
+ 				      VK_PIPELINE_BIND_POINT_COMPUTE,
+@@ -976,7 +998,7 @@ void radv_CmdCopyQueryPoolResults(
+ 				radeon_emit(cs, 4); /* poll interval */
+ 			}
+ 		}
+-		radv_query_shader(cmd_buffer, cmd_buffer->device->meta_state.query.occlusion_query_pipeline,
++		radv_query_shader(cmd_buffer, &cmd_buffer->device->meta_state.query.occlusion_query_pipeline,
+ 		                  pool->bo, dst_buffer->bo, firstQuery * pool->stride,
+ 		                  dst_buffer->offset + dstOffset,
+ 		                  get_max_db(cmd_buffer->device) * 16, stride,
+@@ -995,7 +1017,7 @@ void radv_CmdCopyQueryPoolResults(
+ 				si_emit_wait_fence(cs, false, avail_va, 1, 0xffffffff);
+ 			}
+ 		}
+-		radv_query_shader(cmd_buffer, cmd_buffer->device->meta_state.query.pipeline_statistics_query_pipeline,
++		radv_query_shader(cmd_buffer, &cmd_buffer->device->meta_state.query.pipeline_statistics_query_pipeline,
+ 		                  pool->bo, dst_buffer->bo, firstQuery * pool->stride,
+ 		                  dst_buffer->offset + dstOffset,
+ 		                  pipelinestat_block_size * 2, stride, queryCount, flags,
+-- 
+2.18.0.865.gffc8e1a3cd6-goog
+

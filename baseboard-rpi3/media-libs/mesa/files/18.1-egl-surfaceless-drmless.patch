@@ -1,0 +1,51 @@
+commit f94681b6e2f815f19ca817382848a878a77b44c9
+Author: David Riley <davidriley@chromium.org>
+Date:   Tue Jul 17 17:12:05 2018 -0700
+
+    egl/surfaceless: Allow DRMless fallback.
+    
+    Allow platform_surfaceless to use swrast even if DRM is not available.
+    To be used to allow a fuzzer for virgl to be run on a jailed VM without
+    hardware GL or DRM support.
+    
+    Reviewed-by: Eric Engestrom <eric.engestrom@intel.com>
+    Reviewed-by: Chad Versace <chadversary@chromium.org>
+    Signed-off-by: David Riley <davidriley@chromium.org>
+
+diff --git a/src/egl/drivers/dri2/platform_surfaceless.c b/src/egl/drivers/dri2/platform_surfaceless.c
+index 54bafaee0e..bfc8fb99ea 100644
+--- a/src/egl/drivers/dri2/platform_surfaceless.c
++++ b/src/egl/drivers/dri2/platform_surfaceless.c
+@@ -293,6 +293,7 @@ surfaceless_probe_device(_EGLDisplay *dpy, bool swrast)
+    int fd;
+    int i;
+ 
++   /* Attempt to find DRM device. */
+    for (i = 0; i < limit; ++i) {
+       char *card_path;
+       if (asprintf(&card_path, DRM_RENDER_DEV_NAME, DRM_DIR_NAME, base + i) < 0)
+@@ -326,6 +327,24 @@ surfaceless_probe_device(_EGLDisplay *dpy, bool swrast)
+       dri2_dpy->loader_extensions = NULL;
+    }
+ 
++   /* No DRM device, so attempt to fall back to software path w/o DRM. */
++   if (swrast) {
++      _eglLog(_EGL_DEBUG, "Falling back to surfaceless swrast without DRM.");
++      dri2_dpy->fd = -1;
++      dri2_dpy->driver_name = strdup("swrast");
++      if (!dri2_dpy->driver_name) {
++         return false;
++      }
++
++      if (dri2_load_driver_swrast(dpy)) {
++         dri2_dpy->loader_extensions = swrast_loader_extensions;
++         return true;
++      }
++
++      free(dri2_dpy->driver_name);
++      dri2_dpy->driver_name = NULL;
++   }
++
+    return false;
+ }
+ 

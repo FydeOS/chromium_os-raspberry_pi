@@ -51,9 +51,10 @@ Trybot-Ready: Haixia Shi <hshi@chromium.org>
 (cherry picked from commit 18675d69bcd2a66483fcfc15f4c5fa5db4c257af)
 ---
  src/compiler/glsl/glcpp/glcpp-parse.y | 21 ++++++++++++++++++---
- 1 file changed, 19 insertions(+), 3 deletions(-)
+ 1 file changed, 18 insertions(+), 3 deletions(-)
+
 diff --git a/src/compiler/glsl/glcpp/glcpp-parse.y b/src/compiler/glsl/glcpp/glcpp-parse.y
-index 913bce1fde..c58c8572ed 100644
+index 913bce1fde8b..11fbc3bcc5ff 100644
 --- a/src/compiler/glsl/glcpp/glcpp-parse.y
 +++ b/src/compiler/glsl/glcpp/glcpp-parse.y
 @@ -225,10 +225,12 @@ expanded_line:
@@ -73,8 +74,8 @@ index 913bce1fde..c58c8572ed 100644
  |	LINE_EXPANDED integer_constant integer_constant NEWLINE {
  		parser->has_new_line_number = 1;
 @@ -239,6 +241,19 @@ expanded_line:
-					    "#line %" PRIiMAX " %" PRIiMAX "\n",
-					    $2, $3);
+ 					   "#line %" PRIiMAX " %" PRIiMAX "\n",
+ 					    $2, $3);
  	}
 +|	LINE_EXPANDED '(' expression ')' '(' expression ')' NEWLINE {
 +		if (parser->is_gles && $3.undefined_macro)
@@ -93,5 +94,5 @@ index 913bce1fde..c58c8572ed 100644
  
  define:
 -- 
-2.14.2
+1.9.1
 

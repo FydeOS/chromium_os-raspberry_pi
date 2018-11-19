@@ -1,1 +1,3 @@
 chromeos-base/libchromeos-use-flags native_gpu_memory_buffers
+chromeos-base/chromeos-chrome chrome_media
+chromeos-base/chromeos-base -cros_embedded

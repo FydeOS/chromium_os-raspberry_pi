@@ -1,0 +1,280 @@
+From 659a8cfe587f65ad3e20f8637f626a7a36557816 Mon Sep 17 00:00:00 2001
+From: Bas Nieuwenhuizen <bas@basnieuwenhuizen.nl>
+Date: Sat, 11 Aug 2018 23:26:26 +0200
+Subject: [PATCH 1/3] radv: Make fs key exemplars ordered to be a reverse
+ fs_key lookup.
+
+While at it, share the exemplars and account for a non-occurring
+fs key.
+
+Reviewed-by: Dave Airlie <airlied@redhat.com>
+(cherry picked from commit 806a792b438815ec6ae15cdb0e6fedcaf7db2dd0)
+Signed-off-by: Bas Nieuwenhuizen <basni@chromium.org>
+---
+ src/amd/vulkan/radv_meta_blit.c       | 21 +++------------------
+ src/amd/vulkan/radv_meta_blit2d.c     | 19 ++-----------------
+ src/amd/vulkan/radv_meta_clear.c      | 19 ++-----------------
+ src/amd/vulkan/radv_meta_resolve.c    | 19 ++-----------------
+ src/amd/vulkan/radv_meta_resolve_fs.c | 19 ++-----------------
+ src/amd/vulkan/radv_pipeline.c        | 27 ++++++++++++++++++++++++++-
+ src/amd/vulkan/radv_private.h         |  3 ++-
+ 7 files changed, 39 insertions(+), 88 deletions(-)
+
+diff --git a/src/amd/vulkan/radv_meta_blit.c b/src/amd/vulkan/radv_meta_blit.c
+index 3ff48498d80..db6922d14d8 100644
+--- a/src/amd/vulkan/radv_meta_blit.c
++++ b/src/amd/vulkan/radv_meta_blit.c
+@@ -692,21 +692,6 @@ radv_device_finish_meta_blit_state(struct radv_device *device)
+ 					state->blit.ds_layout, &state->alloc);
+ }
+ 
+-static VkFormat pipeline_formats[] = {
+-   VK_FORMAT_R8G8B8A8_UNORM,
+-   VK_FORMAT_R8G8B8A8_UINT,
+-   VK_FORMAT_R8G8B8A8_SINT,
+-   VK_FORMAT_A2R10G10B10_UINT_PACK32,
+-   VK_FORMAT_A2R10G10B10_SINT_PACK32,
+-   VK_FORMAT_R16G16B16A16_UNORM,
+-   VK_FORMAT_R16G16B16A16_SNORM,
+-   VK_FORMAT_R16G16B16A16_UINT,
+-   VK_FORMAT_R16G16B16A16_SINT,
+-   VK_FORMAT_R32_SFLOAT,
+-   VK_FORMAT_R32G32_SFLOAT,
+-   VK_FORMAT_R32G32B32A32_SFLOAT
+-};
+-
+ static VkResult
+ radv_device_init_meta_blit_color(struct radv_device *device,
+ 				 struct radv_shader_module *vs)
+@@ -718,8 +703,8 @@ radv_device_init_meta_blit_color(struct radv_device *device,
+ 	fs_2d.nir = build_nir_copy_fragment_shader(GLSL_SAMPLER_DIM_2D);
+ 	fs_3d.nir = build_nir_copy_fragment_shader(GLSL_SAMPLER_DIM_3D);
+ 
+-	for (unsigned i = 0; i < ARRAY_SIZE(pipeline_formats); ++i) {
+-		unsigned key = radv_format_meta_fs_key(pipeline_formats[i]);
++	for (unsigned i = 0; i < NUM_META_FS_KEYS; ++i) {
++		unsigned key = radv_format_meta_fs_key(radv_fs_key_format_exemplars[i]);
+ 		for(unsigned j = 0; j < RADV_META_DST_LAYOUT_COUNT; ++j) {
+ 			VkImageLayout layout = radv_meta_dst_layout_to_layout(j);
+ 			result = radv_CreateRenderPass(radv_device_to_handle(device),
+@@ -727,7 +712,7 @@ radv_device_init_meta_blit_color(struct radv_device *device,
+ 							.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+ 								.attachmentCount = 1,
+ 								.pAttachments = &(VkAttachmentDescription) {
+-								.format = pipeline_formats[i],
++								.format = radv_fs_key_format_exemplars[i],
+ 								.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
+ 								.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+ 								.initialLayout = layout,
+diff --git a/src/amd/vulkan/radv_meta_blit2d.c b/src/amd/vulkan/radv_meta_blit2d.c
+index 4a718c639d0..6351f76e069 100644
+--- a/src/amd/vulkan/radv_meta_blit2d.c
++++ b/src/amd/vulkan/radv_meta_blit2d.c
+@@ -1237,21 +1237,6 @@ blit2d_init_stencil_only_pipeline(struct radv_device *device,
+ 	return result;
+ }
+ 
+-static VkFormat pipeline_formats[] = {
+-   VK_FORMAT_R8G8B8A8_UNORM,
+-   VK_FORMAT_R8G8B8A8_UINT,
+-   VK_FORMAT_R8G8B8A8_SINT,
+-   VK_FORMAT_A2R10G10B10_UINT_PACK32,
+-   VK_FORMAT_A2R10G10B10_SINT_PACK32,
+-   VK_FORMAT_R16G16B16A16_UNORM,
+-   VK_FORMAT_R16G16B16A16_SNORM,
+-   VK_FORMAT_R16G16B16A16_UINT,
+-   VK_FORMAT_R16G16B16A16_SINT,
+-   VK_FORMAT_R32_SFLOAT,
+-   VK_FORMAT_R32G32_SFLOAT,
+-   VK_FORMAT_R32G32B32A32_SFLOAT
+-};
+-
+ static VkResult
+ meta_blit2d_create_pipe_layout(struct radv_device *device,
+ 			       int idx,
+@@ -1318,8 +1303,8 @@ radv_device_init_meta_blit2d_state(struct radv_device *device)
+ 			if (result != VK_SUCCESS)
+ 				goto fail;
+ 
+-			for (unsigned j = 0; j < ARRAY_SIZE(pipeline_formats); ++j) {
+-				result = blit2d_init_color_pipeline(device, src, pipeline_formats[j], log2_samples);
++			for (unsigned j = 0; j < NUM_META_FS_KEYS; ++j) {
++				result = blit2d_init_color_pipeline(device, src, radv_fs_key_format_exemplars[j], log2_samples);
+ 				if (result != VK_SUCCESS)
+ 					goto fail;
+ 			}
+diff --git a/src/amd/vulkan/radv_meta_clear.c b/src/amd/vulkan/radv_meta_clear.c
+index 858e3368b65..bc8b58dcd66 100644
+--- a/src/amd/vulkan/radv_meta_clear.c
++++ b/src/amd/vulkan/radv_meta_clear.c
+@@ -748,21 +748,6 @@ fail:
+ 	return false;
+ }
+ 
+-static VkFormat pipeline_formats[] = {
+-	VK_FORMAT_R8G8B8A8_UNORM,
+-	VK_FORMAT_R8G8B8A8_UINT,
+-	VK_FORMAT_R8G8B8A8_SINT,
+-	VK_FORMAT_A2R10G10B10_UINT_PACK32,
+-	VK_FORMAT_A2R10G10B10_SINT_PACK32,
+-	VK_FORMAT_R16G16B16A16_UNORM,
+-	VK_FORMAT_R16G16B16A16_SNORM,
+-	VK_FORMAT_R16G16B16A16_UINT,
+-	VK_FORMAT_R16G16B16A16_SINT,
+-	VK_FORMAT_R32_SFLOAT,
+-	VK_FORMAT_R32G32_SFLOAT,
+-	VK_FORMAT_R32G32B32A32_SFLOAT
+-};
+-
+ VkResult
+ radv_device_init_meta_clear_state(struct radv_device *device)
+ {
+@@ -799,8 +784,8 @@ radv_device_init_meta_clear_state(struct radv_device *device)
+ 
+ 	for (uint32_t i = 0; i < ARRAY_SIZE(state->clear); ++i) {
+ 		uint32_t samples = 1 << i;
+-		for (uint32_t j = 0; j < ARRAY_SIZE(pipeline_formats); ++j) {
+-			VkFormat format = pipeline_formats[j];
++		for (uint32_t j = 0; j < NUM_META_FS_KEYS; ++j) {
++			VkFormat format = radv_fs_key_format_exemplars[j];
+ 			unsigned fs_key = radv_format_meta_fs_key(format);
+ 			assert(!state->clear[i].color_pipelines[fs_key]);
+ 
+diff --git a/src/amd/vulkan/radv_meta_resolve.c b/src/amd/vulkan/radv_meta_resolve.c
+index f3e088b10c4..814eb569888 100644
+--- a/src/amd/vulkan/radv_meta_resolve.c
++++ b/src/amd/vulkan/radv_meta_resolve.c
+@@ -251,21 +251,6 @@ radv_device_finish_meta_resolve_state(struct radv_device *device)
+ 
+ }
+ 
+-static VkFormat pipeline_formats[] = {
+-	VK_FORMAT_R8G8B8A8_UNORM,
+-	VK_FORMAT_R8G8B8A8_UINT,
+-	VK_FORMAT_R8G8B8A8_SINT,
+-	VK_FORMAT_A2R10G10B10_UINT_PACK32,
+-	VK_FORMAT_A2R10G10B10_SINT_PACK32,
+-	VK_FORMAT_R16G16B16A16_UNORM,
+-	VK_FORMAT_R16G16B16A16_SNORM,
+-	VK_FORMAT_R16G16B16A16_UINT,
+-	VK_FORMAT_R16G16B16A16_SINT,
+-	VK_FORMAT_R32_SFLOAT,
+-	VK_FORMAT_R32G32_SFLOAT,
+-	VK_FORMAT_R32G32B32A32_SFLOAT
+-};
+-
+ VkResult
+ radv_device_init_meta_resolve_state(struct radv_device *device)
+ {
+@@ -278,8 +263,8 @@ radv_device_init_meta_resolve_state(struct radv_device *device)
+ 		goto fail;
+ 	}
+ 
+-	for (uint32_t i = 0; i < ARRAY_SIZE(pipeline_formats); ++i) {
+-		VkFormat format = pipeline_formats[i];
++	for (uint32_t i = 0; i < NUM_META_FS_KEYS; ++i) {
++		VkFormat format = radv_fs_key_format_exemplars[i];
+ 		unsigned fs_key = radv_format_meta_fs_key(format);
+ 		res = create_pass(device, format, &state->resolve.pass[fs_key]);
+ 		if (res != VK_SUCCESS)
+diff --git a/src/amd/vulkan/radv_meta_resolve_fs.c b/src/amd/vulkan/radv_meta_resolve_fs.c
+index ef8c1d8b1da..996a95a79c9 100644
+--- a/src/amd/vulkan/radv_meta_resolve_fs.c
++++ b/src/amd/vulkan/radv_meta_resolve_fs.c
+@@ -156,21 +156,6 @@ static const VkPipelineVertexInputStateCreateInfo normal_vi_create_info = {
+ 	.vertexAttributeDescriptionCount = 0,
+ };
+ 
+-static VkFormat pipeline_formats[] = {
+-   VK_FORMAT_R8G8B8A8_UNORM,
+-   VK_FORMAT_R8G8B8A8_UINT,
+-   VK_FORMAT_R8G8B8A8_SINT,
+-   VK_FORMAT_A2R10G10B10_UINT_PACK32,
+-   VK_FORMAT_A2R10G10B10_SINT_PACK32,
+-   VK_FORMAT_R16G16B16A16_UNORM,
+-   VK_FORMAT_R16G16B16A16_SNORM,
+-   VK_FORMAT_R16G16B16A16_UINT,
+-   VK_FORMAT_R16G16B16A16_SINT,
+-   VK_FORMAT_R32_SFLOAT,
+-   VK_FORMAT_R32G32_SFLOAT,
+-   VK_FORMAT_R32G32B32A32_SFLOAT
+-};
+-
+ static VkResult
+ create_resolve_pipeline(struct radv_device *device,
+ 			int samples_log2,
+@@ -335,8 +320,8 @@ radv_device_init_meta_resolve_fragment_state(struct radv_device *device)
+ 		goto fail;
+ 
+ 	for (uint32_t i = 0; i < MAX_SAMPLES_LOG2; ++i) {
+-		for (unsigned j = 0; j < ARRAY_SIZE(pipeline_formats); ++j) {
+-			res = create_resolve_pipeline(device, i, pipeline_formats[j]);
++		for (unsigned j = 0; j < NUM_META_FS_KEYS; ++j) {
++			res = create_resolve_pipeline(device, i, radv_fs_key_format_exemplars[j]);
+ 			if (res != VK_SUCCESS)
+ 				goto fail;
+ 		}
+diff --git a/src/amd/vulkan/radv_pipeline.c b/src/amd/vulkan/radv_pipeline.c
+index b4e4f3211e2..a3d848cbe8f 100644
+--- a/src/amd/vulkan/radv_pipeline.c
++++ b/src/amd/vulkan/radv_pipeline.c
+@@ -513,9 +513,34 @@ format_is_int10(VkFormat format)
+ 	return false;
+ }
+ 
++/*
++ * Ordered so that for each i,
++ * radv_format_meta_fs_key(radv_fs_key_format_exemplars[i]) == i.
++ */
++const VkFormat radv_fs_key_format_exemplars[NUM_META_FS_KEYS] = {
++	VK_FORMAT_R32_SFLOAT,
++	VK_FORMAT_R32G32_SFLOAT,
++	VK_FORMAT_R8G8B8A8_UNORM,
++	VK_FORMAT_R16G16B16A16_UNORM,
++	VK_FORMAT_R16G16B16A16_SNORM,
++	VK_FORMAT_R16G16B16A16_UINT,
++	VK_FORMAT_R16G16B16A16_SINT,
++	VK_FORMAT_R32G32B32A32_SFLOAT,
++	VK_FORMAT_R8G8B8A8_UINT,
++	VK_FORMAT_R8G8B8A8_SINT,
++	VK_FORMAT_A2R10G10B10_UINT_PACK32,
++	VK_FORMAT_A2R10G10B10_SINT_PACK32,
++};
++
+ unsigned radv_format_meta_fs_key(VkFormat format)
+ {
+-	unsigned col_format = si_choose_spi_color_format(format, false, false) - 1;
++	unsigned col_format = si_choose_spi_color_format(format, false, false);
++
++	assert(col_format != V_028714_SPI_SHADER_32_AR);
++	if (col_format >= V_028714_SPI_SHADER_32_AR)
++		--col_format; /* Skip V_028714_SPI_SHADER_32_AR  since there is no such VkFormat */
++
++	--col_format; /* Skip V_028714_SPI_SHADER_ZERO */
+ 	bool is_int8 = format_is_int8(format);
+ 	bool is_int10 = format_is_int10(format);
+ 
+diff --git a/src/amd/vulkan/radv_private.h b/src/amd/vulkan/radv_private.h
+index 5d67271961b..c423c4a86f4 100644
+--- a/src/amd/vulkan/radv_private.h
++++ b/src/amd/vulkan/radv_private.h
+@@ -92,7 +92,7 @@ typedef uint32_t xcb_window_t;
+ #define MAX_DYNAMIC_STORAGE_BUFFERS 8
+ #define MAX_DYNAMIC_BUFFERS (MAX_DYNAMIC_UNIFORM_BUFFERS + MAX_DYNAMIC_STORAGE_BUFFERS)
+ #define MAX_SAMPLES_LOG2 4
+-#define NUM_META_FS_KEYS 13
++#define NUM_META_FS_KEYS 12
+ #define RADV_MAX_DRM_DEVICES 8
+ #define MAX_VIEWS        8
+ 
+@@ -1186,6 +1186,7 @@ mesa_to_vk_shader_stage(gl_shader_stage mesa_stage)
+ 	     stage = __builtin_ffs(__tmp) - 1, __tmp;			\
+ 	     __tmp &= ~(1 << (stage)))
+ 
++extern const VkFormat radv_fs_key_format_exemplars[NUM_META_FS_KEYS];
+ unsigned radv_format_meta_fs_key(VkFormat format);
+ 
+ struct radv_multisample_state {
+-- 
+2.18.0.865.gffc8e1a3cd6-goog
+

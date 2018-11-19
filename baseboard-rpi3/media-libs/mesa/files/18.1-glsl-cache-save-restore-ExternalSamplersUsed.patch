@@ -1,0 +1,37 @@
+From 99c6cae2278011309b7ca3d4735c7b341cbb4eef Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Marek=20Ol=C5=A1=C3=A1k?= <marek.olsak@amd.com>
+Date: Sat, 30 Jun 2018 00:57:08 -0400
+Subject: glsl/cache: save and restore ExternalSamplersUsed
+
+Shaders that need special code for external samplers were broken if
+they were loaded from the cache.
+
+Cc: 18.1 <mesa-stable@lists.freedesktop.org>
+Reviewed-by: Timothy Arceri <tarceri@itsqueeze.com>
+---
+ src/compiler/glsl/serialize.cpp | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/src/compiler/glsl/serialize.cpp b/src/compiler/glsl/serialize.cpp
+index 9c21453..889038f 100644
+--- a/src/compiler/glsl/serialize.cpp
++++ b/src/compiler/glsl/serialize.cpp
+@@ -1044,6 +1044,7 @@ write_shader_metadata(struct blob *metadata, gl_linked_shader *shader)
+    blob_write_bytes(metadata, glprog->sh.SamplerTargets,
+                     sizeof(glprog->sh.SamplerTargets));
+    blob_write_uint32(metadata, glprog->ShadowSamplers);
++   blob_write_uint32(metadata, glprog->ExternalSamplersUsed);
+ 
+    blob_write_bytes(metadata, glprog->sh.ImageAccess,
+                     sizeof(glprog->sh.ImageAccess));
+@@ -1096,6 +1097,7 @@ read_shader_metadata(struct blob_reader *metadata,
+    blob_copy_bytes(metadata, (uint8_t *) glprog->sh.SamplerTargets,
+                    sizeof(glprog->sh.SamplerTargets));
+    glprog->ShadowSamplers = blob_read_uint32(metadata);
++   glprog->ExternalSamplersUsed = blob_read_uint32(metadata);
+ 
+    blob_copy_bytes(metadata, (uint8_t *) glprog->sh.ImageAccess,
+                    sizeof(glprog->sh.ImageAccess));
+-- 
+cgit v1.1
+

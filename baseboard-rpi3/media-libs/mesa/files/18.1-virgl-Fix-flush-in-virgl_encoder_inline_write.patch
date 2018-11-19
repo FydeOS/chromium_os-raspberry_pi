@@ -1,0 +1,31 @@
+From 04e278f79334c36f2afa315d3dcfcbec055a4d2a Mon Sep 17 00:00:00 2001
+From: Lepton Wu <lepton@chromium.org>
+Date: Mon, 16 Jul 2018 18:56:32 -0700
+Subject: [PATCH] virgl: Fix flush in virgl_encoder_inline_write.
+
+The current code is buggy: if there are only 12 dwords left in cbuf,
+we emit a zero data length command which will be rejected by virglrenderer.
+Fix it by calling flush in this case.
+
+Cc: mesa-stable@lists.freedesktop.org
+Reviewed-by: Dave Airlie <airlied@redhat.com>
+---
+ src/gallium/drivers/virgl/virgl_encode.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/gallium/drivers/virgl/virgl_encode.c b/src/gallium/drivers/virgl/virgl_encode.c
+index c7c6b1e7d3..c1af01b6fd 100644
+--- a/src/gallium/drivers/virgl/virgl_encode.c
++++ b/src/gallium/drivers/virgl/virgl_encode.c
+@@ -528,7 +528,7 @@ int virgl_encoder_inline_write(struct virgl_context *ctx,
+ 
+    left_bytes = size;
+    while (left_bytes) {
+-      if (ctx->cbuf->cdw + 12 > VIRGL_MAX_CMDBUF_DWORDS)
++      if (ctx->cbuf->cdw + 12 >= VIRGL_MAX_CMDBUF_DWORDS)
+          ctx->base.flush(&ctx->base, NULL, 0);
+ 
+       thispass = (VIRGL_MAX_CMDBUF_DWORDS - ctx->cbuf->cdw - 12) * 4;
+-- 
+2.18.0.203.gfac676dfb9-goog
+

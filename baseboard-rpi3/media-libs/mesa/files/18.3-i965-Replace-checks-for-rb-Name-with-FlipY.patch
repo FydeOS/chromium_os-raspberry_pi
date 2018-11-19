@@ -1,0 +1,94 @@
+From 179ed882ec56a6f5303a927f6323fef7a84aa3ae Mon Sep 17 00:00:00 2001
+From: Fritz Koenig <frkoenig@google.com>
+Date: Wed, 22 Aug 2018 14:47:16 -0700
+Subject: [PATCH] i965: Replace checks for rb->Name with FlipY
+
+In the GL_MESA_framebuffer_flip_y implementation
+_mesa_is_winsys_fbo checks were replaced with
+FlipY checks.  rb->Name is also used to determine
+if a buffer is winsys.
+---
+ src/mesa/drivers/dri/i965/brw_blorp.c        | 20 +++++++++-----------
+ src/mesa/drivers/dri/i965/intel_pixel_read.c |  4 ++--
+ 2 files changed, 11 insertions(+), 13 deletions(-)
+
+diff --git a/src/mesa/drivers/dri/i965/brw_blorp.c b/src/mesa/drivers/dri/i965/brw_blorp.c
+index 7476cee43a..7c232f6ba9 100644
+--- a/src/mesa/drivers/dri/i965/brw_blorp.c
++++ b/src/mesa/drivers/dri/i965/brw_blorp.c
+@@ -1220,12 +1220,12 @@ do_single_blorp_clear(struct brw_context *brw, struct gl_framebuffer *fb,
+ 
+    x0 = fb->_Xmin;
+    x1 = fb->_Xmax;
+-   if (rb->Name != 0) {
+-      y0 = fb->_Ymin;
+-      y1 = fb->_Ymax;
+-   } else {
++   if (fb->FlipY) {
+       y0 = rb->Height - fb->_Ymax;
+       y1 = rb->Height - fb->_Ymin;
++   } else {
++      y0 = fb->_Ymin;
++      y1 = fb->_Ymax;
+    }
+ 
+    /* If the clear region is empty, just return. */
+@@ -1411,9 +1411,8 @@ brw_blorp_clear_depth_stencil(struct brw_context *brw,
+    if (!(mask & (BUFFER_BITS_DEPTH_STENCIL)))
+       return;
+ 
+-   uint32_t x0, x1, y0, y1, rb_name, rb_height;
++   uint32_t x0, x1, y0, y1, rb_height;
+    if (depth_rb) {
+-      rb_name = depth_rb->Name;
+       rb_height = depth_rb->Height;
+       if (stencil_rb) {
+          assert(depth_rb->Width == stencil_rb->Width);
+@@ -1421,18 +1420,17 @@ brw_blorp_clear_depth_stencil(struct brw_context *brw,
+       }
+    } else {
+       assert(stencil_rb);
+-      rb_name = stencil_rb->Name;
+       rb_height = stencil_rb->Height;
+    }
+ 
+    x0 = fb->_Xmin;
+    x1 = fb->_Xmax;
+-   if (rb_name != 0) {
+-      y0 = fb->_Ymin;
+-      y1 = fb->_Ymax;
+-   } else {
++   if (fb->FlipY) {
+       y0 = rb_height - fb->_Ymax;
+       y1 = rb_height - fb->_Ymin;
++   } else {
++      y0 = fb->_Ymin;
++      y1 = fb->_Ymax;
+    }
+ 
+    /* If the clear region is empty, just return. */
+diff --git a/src/mesa/drivers/dri/i965/intel_pixel_read.c b/src/mesa/drivers/dri/i965/intel_pixel_read.c
+index 6ed7895bc7..8a90b207ad 100644
+--- a/src/mesa/drivers/dri/i965/intel_pixel_read.c
++++ b/src/mesa/drivers/dri/i965/intel_pixel_read.c
+@@ -181,7 +181,7 @@ intel_readpixels_tiled_memcpy(struct gl_context * ctx,
+     * tiled_to_linear a negative pitch so that it walks through the
+     * client's data backwards as it walks through the renderbufer forwards.
+     */
+-   if (rb->Name == 0) {
++   if (ctx->ReadBuffer->FlipY) {
+       yoffset = rb->Height - yoffset - height;
+       pixels += (ptrdiff_t) (height - 1) * dst_pitch;
+       dst_pitch = -dst_pitch;
+@@ -249,7 +249,7 @@ intel_readpixels_blorp(struct gl_context *ctx,
+    return brw_blorp_download_miptree(brw, irb->mt, rb->Format, swizzle,
+                                      irb->mt_level, x, y, irb->mt_layer,
+                                      w, h, 1, GL_TEXTURE_2D, format, type,
+-                                     rb->Name == 0, pixels, packing);
++                                     ctx->ReadBuffer->FlipY, pixels, packing);
+ }
+ 
+ void
+-- 
+2.18.0.1017.ga543ac7ca45-goog
+

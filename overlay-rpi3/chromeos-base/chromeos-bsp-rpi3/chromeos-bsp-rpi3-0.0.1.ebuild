@@ -11,7 +11,9 @@ SLOT="0"
 KEYWORDS="*"
 IUSE=""
 
-RDEPEND="chromeos-base/rpi-boot-bin"
+RDEPEND="
+    chromeos-base/rpi-boot-bin
+"
 
 DEPEND="${RDEPEND}"
 S=${WORKDIR}

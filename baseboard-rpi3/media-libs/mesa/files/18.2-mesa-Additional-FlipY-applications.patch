@@ -1,0 +1,50 @@
+From dc2d11d716408721bb6bc9e04fe8df85ab83942d Mon Sep 17 00:00:00 2001
+From: Fritz Koenig <frkoenig@google.com>
+Date: Mon, 10 Sep 2018 12:11:16 -0700
+Subject: [PATCH] mesa: Additional FlipY applications
+
+Instances where direction was determined based on
+winsys or user fbo and should be determined based on
+FlipY.
+
+Key STATE_FB_WPOS_Y_TRANSFORM for of FlipY instead of
+_mesa_is_user_fbo.  This corrects gl_FragCoord usage
+when applying GL_MESA_framebuffer_flip_y.
+
+Fixes: ab05dd183cc ("i965: implement GL_MESA_framebuffer_flip_y [v3]")
+---
+ src/mesa/main/multisample.c       | 4 ++--
+ src/mesa/program/prog_statevars.c | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/src/mesa/main/multisample.c b/src/mesa/main/multisample.c
+index 8beb1d839e..d494a43ac7 100644
+--- a/src/mesa/main/multisample.c
++++ b/src/mesa/main/multisample.c
+@@ -94,8 +94,8 @@ _mesa_GetMultisamplefv(GLenum pname, GLuint index, GLfloat * val)
+ 
+       ctx->Driver.GetSamplePosition(ctx, ctx->DrawBuffer, index, val);
+ 
+-      /* winsys FBOs are upside down */
+-      if (_mesa_is_winsys_fbo(ctx->DrawBuffer))
++      /* FBOs can be upside down (winsys always are)*/
++      if (ctx->DrawBuffer->FlipY)
+          val[1] = 1.0f - val[1];
+ 
+       return;
+diff --git a/src/mesa/program/prog_statevars.c b/src/mesa/program/prog_statevars.c
+index 4d7f388cfb..3bbe451399 100644
+--- a/src/mesa/program/prog_statevars.c
++++ b/src/mesa/program/prog_statevars.c
+@@ -571,7 +571,7 @@ _mesa_fetch_state(struct gl_context *ctx, const gl_state_index16 state[],
+       case STATE_FB_WPOS_Y_TRANSFORM:
+          /* A driver may negate this conditional by using ZW swizzle
+           * instead of XY (based on e.g. some other state). */
+-         if (_mesa_is_user_fbo(ctx->DrawBuffer)) {
++         if (!ctx->DrawBuffer->FlipY) {
+             /* Identity (XY) followed by flipping Y upside down (ZW). */
+             value[0] = 1.0F;
+             value[1] = 0.0F;
+-- 
+2.19.0.rc2.392.g5ba43deb5a-goog
+

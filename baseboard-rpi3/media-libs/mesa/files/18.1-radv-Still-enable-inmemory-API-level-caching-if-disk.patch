@@ -1,0 +1,39 @@
+From 28b8c18d841795dc158233b7aaf986c7f73068ae Mon Sep 17 00:00:00 2001
+From: Bas Nieuwenhuizen <bas@basnieuwenhuizen.nl>
+Date: Tue, 24 Jul 2018 14:57:42 +0200
+Subject: [PATCH] radv: Still enable inmemory & API level caching if disk cache
+ is not enabled.
+
+That we don't have a background disk cache does not mean we should
+prevent the app caching anything.
+
+CC: <mesa-stable@lists.freedesktop.org>
+Reviewed-by: Samuel Pitoiset <samuel.pitoiset@gmail.com>
+---
+ src/amd/vulkan/radv_pipeline_cache.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/src/amd/vulkan/radv_pipeline_cache.c b/src/amd/vulkan/radv_pipeline_cache.c
+index 6858d37eba8..7e2c305b1a0 100644
+--- a/src/amd/vulkan/radv_pipeline_cache.c
++++ b/src/amd/vulkan/radv_pipeline_cache.c
+@@ -248,7 +248,6 @@ radv_is_cache_disabled(struct radv_device *device)
+ 	 * MESA_GLSL_CACHE_DISABLE=1, and when VK_AMD_shader_info is requested.
+ 	 */
+ 	return (device->instance->debug_flags & RADV_DEBUG_NO_CACHE) ||
+-	       !device->physical_device->disk_cache ||
+ 	       device->keep_shader_info;
+ }
+ 
+@@ -271,7 +270,7 @@ radv_create_shader_variants_from_pipeline_cache(struct radv_device *device,
+ 		/* Don't cache when we want debug info, since this isn't
+ 		 * present in the cache.
+ 		 */
+-		if (radv_is_cache_disabled(device)) {
++		if (radv_is_cache_disabled(device) || !device->physical_device->disk_cache) {
+ 			pthread_mutex_unlock(&cache->mutex);
+ 			return false;
+ 		}
+-- 
+2.18.0.233.g985f88cf7e-goog
+
