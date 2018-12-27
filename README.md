@@ -1,3 +1,7 @@
+# TL;DR:
+If you aren't bothered with all the technicalities and just want the pre-built images, it's [here](https://github.com/FydeOS/chromium_os_for_raspberry_pi/releases), under the **release** tab, no hard feelings :p
+
+<br><br>
 # Table of contents
 <!-- TOC -->
 
