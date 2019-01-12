@@ -56,7 +56,7 @@ If you aren't bothered with all the technicalities and just want the pre-built i
 
 <!-- /TOC -->
 # Introduction
-This document describes how to build and run Google Chromium OS on Raspberry Pi 3B & 3B+, from its source code and the board overlay hosted in this repository.
+This document describes how to build and run Google [Chromium OS](https://www.chromium.org/chromium-os) on Raspberry Pi 3B & 3B+, from its source code and the board overlay hosted in this repository.
 
 This overlay and the document has been tested against Raspberry Pi 3B & 3B+ by the FydeOS team. It **doesn't work** on any earlier version of the Raspberry Pi line-up.
 
