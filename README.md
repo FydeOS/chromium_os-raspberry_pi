@@ -143,7 +143,7 @@ $ git config --global user.name "Your Name"
 The directory structure described here is a recommendation based on the best practice in the Fyde team. You may host the files in a different way as you wish.
 
 ```
-$ mkdir -p /project/chromiumos-R68      # This is the directory to hold Chromium OS source code, name it according to the release you are going to build.
+$ mkdir -p /project/chromiumos-R70      # This is the directory to hold Chromium OS source code, name it according to the release you are going to build.
 $ mkdir -p /project/overlays            # This is the directory to hold this repository.
 ```
 
@@ -162,8 +162,8 @@ You will see a list of Git commit IDs and its name in the form of ```refs/heads/
 Now run these commands to fetch the source code. Find and use a different release name if you would like to build a different release.
 
 ```
-$ cd /project/chromiumos-R68
-$ repo init -u https://chromium.googlesource.com/chromiumos/manifest.git --repo-url https://chromium.googlesource.com/external/repo.git -b stabilize-10718.88.B  # The last R68 stable release
+$ cd /project/chromiumos-R70
+$ repo init -u https://chromium.googlesource.com/chromiumos/manifest.git --repo-url https://chromium.googlesource.com/external/repo.git -b stabilize-10718.88.B  # The last R70 stable release
 $ repo sync -j8         # Raise this number if you have a fast Internet connection
 ```
 
@@ -191,7 +191,7 @@ Now fetch this overlay and put it in the right place.
 $ cd /project/overlays
 $ git clone https://github.com/fydeos/chromium_os_for_raspberry_pi.git
 
-$ cd /project/chromiumos-R68/src/overlays
+$ cd /project/chromiumos-R70/src/overlays
 $ ln -s /project/overlays/chromium_os_for_raspberry_pi/* .
 ```
 
@@ -201,7 +201,7 @@ $ ln -s /project/overlays/chromium_os_for_raspberry_pi/* .
 As mentioned above, a chroot environment will be used to run the actual build process and some other related tasks. To create the chroot environment, run below commands.
 
 ```
-$ cd /project/chromiumos-R68
+$ cd /project/chromiumos-R70
 $ cros_sdk
 ```
 
@@ -211,7 +211,7 @@ It make take 10 to over 30 minutes depends on your Internet connection speed and
 (cr) (stabilize-10718.88.B/(xxxxxx...)) <user>@<host> ~/trunk/src/scripts $
 ```
 
-The chroot environment is located under the ```/project/chromiumos-R68/chroot``` directory.
+The chroot environment is located under the ```/project/chromiumos-R70/chroot``` directory.
 
 Let's exit from the chroot first as we need to do some customization before move on. Type ```exit``` or ```Ctrl + D``` to exit from the chroot shell.
 
@@ -223,7 +223,7 @@ If you would like to remove the chroot and re-create it from scratch, don't dele
 The correct way to remove the chroot is by using below commands.
 
 ```
-$ cd /project/chromiumos-R68
+$ cd /project/chromiumos-R70
 $ cros_sdk --delete
 ```
 
@@ -233,18 +233,18 @@ Programs running inside the chroot will not be able to access files outside of t
 When entering the Chromium OS chroot environment, a file named ```.local_mounts``` will be checked and directories listed in it will be bind mounted inside the chroot. All we need to do is to create this file in the right place and put necessary contents in, by using below command.
 
 ```
-$ echo "/project" > /project/chromiumos-R68/src/scripts/.local_mounts
+$ echo "/project" > /project/chromiumos-R70/src/scripts/.local_mounts
 ```
 
 Now, after entered the chroot, a ```/project``` directory will exist in the chroot and its content is the same as the ```/project``` directory in the host OS, as it actually is bind mounted from the host OS.
 
-If we don't do this, the ```/project/chromiumos-R68/src/overlays/overlay-rpi3``` symbolic link will not be accessible, as the top directory (```/project```) it points to doesn't exist in the chroot.
+If we don't do this, the ```/project/chromiumos-R70/src/overlays/overlay-rpi3``` symbolic link will not be accessible, as the top directory (```/project```) it points to doesn't exist in the chroot.
 
 ## Enter the chroot
 Now we can enter the chroot.
 
 ```
-$ cd /project/chromiumos-R68
+$ cd /project/chromiumos-R70
 $ cros_sdk
 ```
 
@@ -348,7 +348,7 @@ The disk image is usually named ```chromiumos_image.bin```, under abovementioned
 in the chroot, and
 
 ```
-/project/chromiumos-R56/src/build/images/rpi3/latest/chromiumos_image.bin
+/project/chromiumos-R70/src/build/images/rpi3/latest/chromiumos_image.bin
 ```
 in the host OS.
 
