@@ -1,0 +1,128 @@
+From d19ae0476aeb919c12cf7407c8869d7ee8d06bc6 Mon Sep 17 00:00:00 2001
+From: Dave Airlie <airlied@redhat.com>
+Date: Wed, 27 Jun 2018 08:52:20 +1000
+Subject: [PATCH 2/8] ac/radeonsi: refactor out pass manager init to common
+ code.
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Change-Id: I4584987f67eb25f683ec15671e0278ebbb756853
+Reviewed-by: Marek Olšák <marek.olsak@amd.com>
+---
+ src/amd/common/ac_llvm_util.c          | 30 ++++++++++++++++++++++++++++++
+ src/amd/common/ac_llvm_util.h          |  2 ++
+ src/gallium/drivers/radeonsi/si_pipe.c | 27 ++-------------------------
+ 3 files changed, 34 insertions(+), 25 deletions(-)
+
+diff --git a/src/amd/common/ac_llvm_util.c b/src/amd/common/ac_llvm_util.c
+index be2d92b4c0..d628ed8261 100644
+--- a/src/amd/common/ac_llvm_util.c
++++ b/src/amd/common/ac_llvm_util.c
+@@ -28,6 +28,11 @@
+ #include "util/bitscan.h"
+ #include <llvm-c/Core.h>
+ #include <llvm-c/Support.h>
++#include <llvm-c/Transforms/IPO.h>
++#include <llvm-c/Transforms/Scalar.h>
++#if HAVE_LLVM >= 0x0700
++#include <llvm-c/Transforms/Utils.h>
++#endif
+ #include "c11/threads.h"
+ #include "util/u_math.h"
+ 
+@@ -155,6 +160,31 @@ LLVMTargetMachineRef ac_create_target_machine(enum radeon_family family,
+ 	return tm;
+ }
+ 
++LLVMPassManagerRef ac_create_passmgr(LLVMTargetLibraryInfoRef target_library_info,
++				     bool check_ir)
++{
++	LLVMPassManagerRef passmgr = LLVMCreatePassManager();
++	if (!passmgr)
++		return NULL;
++
++	LLVMAddTargetLibraryInfo(target_library_info,
++				 passmgr);
++
++	if (check_ir)
++		LLVMAddVerifierPass(passmgr);
++	LLVMAddAlwaysInlinerPass(passmgr);
++	/* This pass should eliminate all the load and store instructions. */
++	LLVMAddPromoteMemoryToRegisterPass(passmgr);
++	LLVMAddScalarReplAggregatesPass(passmgr);
++	LLVMAddLICMPass(passmgr);
++	LLVMAddAggressiveDCEPass(passmgr);
++	LLVMAddCFGSimplificationPass(passmgr);
++	/* This is recommended by the instruction combining pass. */
++	LLVMAddEarlyCSEMemSSAPass(passmgr);
++	LLVMAddInstructionCombiningPass(passmgr);
++	return passmgr;
++}
++
+ static const char *attr_to_str(enum ac_func_attr attr)
+ {
+    switch (attr) {
+diff --git a/src/amd/common/ac_llvm_util.h b/src/amd/common/ac_llvm_util.h
+index 6e6d15bb56..a909a061d8 100644
+--- a/src/amd/common/ac_llvm_util.h
++++ b/src/amd/common/ac_llvm_util.h
+@@ -111,6 +111,8 @@ ac_get_store_intr_attribs(bool writeonly_memory)
+ unsigned
+ ac_count_scratch_private_memory(LLVMValueRef function);
+ 
++LLVMPassManagerRef ac_create_passmgr(LLVMTargetLibraryInfoRef target_library_info,
++				     bool check_ir);
+ #ifdef __cplusplus
+ }
+ #endif
+diff --git a/src/gallium/drivers/radeonsi/si_pipe.c b/src/gallium/drivers/radeonsi/si_pipe.c
+index 8caab54140..b44762b340 100644
+--- a/src/gallium/drivers/radeonsi/si_pipe.c
++++ b/src/gallium/drivers/radeonsi/si_pipe.c
+@@ -41,12 +41,6 @@
+ #include "vl/vl_decoder.h"
+ #include "driver_ddebug/dd_util.h"
+ 
+-#include <llvm-c/Transforms/IPO.h>
+-#include <llvm-c/Transforms/Scalar.h>
+-#if HAVE_LLVM >= 0x0700
+-#include <llvm-c/Transforms/Utils.h>
+-#endif
+-
+ static const struct debug_named_value debug_options[] = {
+ 	/* Shader logging options: */
+ 	{ "vs", DBG(VS), "Print vertex shaders" },
+@@ -129,27 +123,10 @@ static void si_init_compiler(struct si_screen *sscreen,
+ 	if (!compiler->target_library_info)
+ 		return;
+ 
+-	compiler->passmgr = LLVMCreatePassManager();
++	compiler->passmgr = ac_create_passmgr(compiler->target_library_info,
++					      (sscreen->debug_flags & DBG(CHECK_IR)));
+ 	if (!compiler->passmgr)
+ 		return;
+-
+-	LLVMAddTargetLibraryInfo(compiler->target_library_info,
+-				 compiler->passmgr);
+-
+-	/* Add LLVM passes into the pass manager. */
+-	if (sscreen->debug_flags & DBG(CHECK_IR))
+-		LLVMAddVerifierPass(compiler->passmgr);
+-
+-	LLVMAddAlwaysInlinerPass(compiler->passmgr);
+-	/* This pass should eliminate all the load and store instructions. */
+-	LLVMAddPromoteMemoryToRegisterPass(compiler->passmgr);
+-	LLVMAddScalarReplAggregatesPass(compiler->passmgr);
+-	LLVMAddLICMPass(compiler->passmgr);
+-	LLVMAddAggressiveDCEPass(compiler->passmgr);
+-	LLVMAddCFGSimplificationPass(compiler->passmgr);
+-	/* This is recommended by the instruction combining pass. */
+-	LLVMAddEarlyCSEMemSSAPass(compiler->passmgr);
+-	LLVMAddInstructionCombiningPass(compiler->passmgr);
+ }
+ 
+ static void si_destroy_compiler(struct si_compiler *compiler)
+-- 
+2.15.1
+

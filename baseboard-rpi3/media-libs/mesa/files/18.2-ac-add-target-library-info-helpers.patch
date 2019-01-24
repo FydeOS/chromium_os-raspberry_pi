@@ -1,0 +1,78 @@
+From 4de243f16589338e4d678ba4fa02c4291f2c3d7f Mon Sep 17 00:00:00 2001
+From: Dave Airlie <airlied@redhat.com>
+Date: Wed, 27 Jun 2018 09:34:42 +1000
+Subject: [PATCH 3/8] ac: add target library info helpers
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Change-Id: I649531488305b3c62ae656176da3b4c6efa73540
+Reviewed-by: Bas Nieuwenhuizen <bas@basnieuwenhuizen.nl>
+Reviewed-by: Marek Olšák <marek.olsak@amd.com>
+---
+ src/amd/common/ac_llvm_helper.cpp | 24 +++++++++++++-----------
+ src/amd/common/ac_llvm_util.h     |  3 +++
+ 2 files changed, 16 insertions(+), 11 deletions(-)
+
+diff --git a/src/amd/common/ac_llvm_helper.cpp b/src/amd/common/ac_llvm_helper.cpp
+index 0e68e48649..35973dd1fa 100644
+--- a/src/amd/common/ac_llvm_helper.cpp
++++ b/src/amd/common/ac_llvm_helper.cpp
+@@ -36,23 +36,13 @@
+ #include <llvm/IR/Attributes.h>
+ #include <llvm/IR/CallSite.h>
+ #include <llvm/IR/IRBuilder.h>
++#include <llvm/Analysis/TargetLibraryInfo.h>
+ 
+-#if HAVE_LLVM < 0x0500
+-namespace llvm {
+-typedef AttributeSet AttributeList;
+-}
+-#endif
+ 
+ void ac_add_attr_dereferenceable(LLVMValueRef val, uint64_t bytes)
+ {
+    llvm::Argument *A = llvm::unwrap<llvm::Argument>(val);
+-#if HAVE_LLVM < 0x0500
+-   llvm::AttrBuilder B;
+-   B.addDereferenceableAttr(bytes);
+-   A->addAttr(llvm::AttributeList::get(A->getContext(), A->getArgNo() + 1,  B));
+-#else
+    A->addAttr(llvm::Attribute::getWithDereferenceableBytes(A->getContext(), bytes));
+-#endif
+ }
+ 
+ bool ac_is_sgpr_param(LLVMValueRef arg)
+@@ -109,3 +99,15 @@ LLVMBuilderRef ac_create_builder(LLVMContextRef ctx,
+ 
+ 	return builder;
+ }
++
++LLVMTargetLibraryInfoRef
++ac_create_target_library_info(const char *triple)
++{
++	return reinterpret_cast<LLVMTargetLibraryInfoRef>(new llvm::TargetLibraryInfoImpl(llvm::Triple(triple)));
++}
++
++void
++ac_dispose_target_library_info(LLVMTargetLibraryInfoRef library_info)
++{
++	delete reinterpret_cast<llvm::TargetLibraryInfoImpl *>(library_info);
++}
+diff --git a/src/amd/common/ac_llvm_util.h b/src/amd/common/ac_llvm_util.h
+index a909a061d8..92bfb6abe1 100644
+--- a/src/amd/common/ac_llvm_util.h
++++ b/src/amd/common/ac_llvm_util.h
+@@ -113,6 +113,9 @@ ac_count_scratch_private_memory(LLVMValueRef function);
+ 
+ LLVMPassManagerRef ac_create_passmgr(LLVMTargetLibraryInfoRef target_library_info,
+ 				     bool check_ir);
++LLVMTargetLibraryInfoRef ac_create_target_library_info(const char *triple);
++void ac_dispose_target_library_info(LLVMTargetLibraryInfoRef library_info);
++
+ #ifdef __cplusplus
+ }
+ #endif
+-- 
+2.15.1
+

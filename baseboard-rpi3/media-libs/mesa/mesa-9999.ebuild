@@ -46,7 +46,7 @@ for card in ${VIDEO_CARDS}; do
 done
 
 IUSE="${IUSE_VIDEO_CARDS}
-	+classic debug dri egl +gallium -gbm gles1 gles2 llvm +nptl pic selinux
+	+classic debug dri drm egl +gallium -gbm gles1 gles2 llvm +nptl pic selinux
 	shared-glapi kernel_FreeBSD vulkan wayland xlib-glx X"
 
 LIBDRM_DEPSTRING=">=x11-libs/libdrm-2.4.60"
@@ -59,12 +59,12 @@ REQUIRED_USE="video_cards_amdgpu? ( llvm )
 RDEPEND="
 	X? (
 		!<x11-base/xorg-server-1.7
-		!<=x11-proto/xf86driproto-2.0.3
 		>=x11-libs/libX11-1.3.99.901
 		x11-libs/libXdamage
 		x11-libs/libXext
 		x11-libs/libXxf86vm
 	)
+	llvm? ( virtual/libelf )
 	dev-libs/expat
 	dev-libs/libgcrypt
 	virtual/udev
@@ -77,14 +77,8 @@ DEPEND="${RDEPEND}
 	sys-devel/bison
 	sys-devel/flex
 	virtual/pkgconfig
-	>=x11-proto/dri2proto-2.6
+	x11-base/xorg-proto
 	wayland? ( >=dev-libs/wayland-protocols-1.8 )
-	X? (
-		>=x11-proto/glproto-1.4.11
-		>=x11-proto/xextproto-7.0.99.1
-		x11-proto/xf86driproto
-		x11-proto/xf86vidmodeproto
-	)
 	llvm? ( sys-devel/llvm )
 "
 
@@ -94,11 +88,6 @@ QA_EXECSTACK="usr/lib*/opengl/xorg-x11/lib/libGL.so*"
 QA_WX_LOAD="usr/lib*/opengl/xorg-x11/lib/libGL.so*"
 
 # Think about: ggi, fbcon, no-X configs
-
-pkg_setup() {
-	# workaround toc-issue wrt #386545
-	use ppc64 && append-flags -mminimal-toc
-}
 
 src_prepare() {
 	# apply patches
@@ -115,25 +104,37 @@ src_prepare() {
 			configure.ac || die
 	fi
 
-	epatch "${FILESDIR}"/9.1-mesa-st-no-flush-front.patch
 	epatch "${FILESDIR}"/8.1-array-overflow.patch
-	epatch "${FILESDIR}"/10.3-dri-i965-Return-NULL-if-we-don-t-have-a-miptree.patch
-	epatch "${FILESDIR}"/10.3-drivers-dri-i965-gen6-Clamp-scissor-state-instead-of.patch
 	epatch "${FILESDIR}"/17.0-glcpp-Hack-to-handle-expressions-in-line-di.patch
-	epatch "${FILESDIR}"/17.3-virgl-also-remove-dimension-on-indirect.patch
-	epatch "${FILESDIR}"/17.3-virgl-Support-v2-caps-struct-v2.patch
-	epatch "${FILESDIR}"/17.3-mesa-don-t-clamp-just-based-on-ARB_viewport_array-ex.patch
-	epatch "${FILESDIR}"/17.3-virgl-remap-query-types-to-hw-support.patch
-	epatch "${FILESDIR}"/17.3-virgl-handle-getting-new-capsets.patch
-	epatch "${FILESDIR}"/17.3-virgl-reduce-some-default-capset-limits.patch
-	epatch "${FILESDIR}"/17.3-virgl-add-offset-alignment-values-to-to-v2-caps-stru.patch
-	epatch "${FILESDIR}"/17.3-virgl-Implement-seamless-cube-maps.patch
-	epatch "${FILESDIR}"/17.3-gallium-winsys-kms-Fix-possible-leak-in-map-unmap.patch
-	epatch "${FILESDIR}"/17.3-gallium-winsys-kms-Add-support-for-multi-planes.patch
-	epatch "${FILESDIR}"/18.1-mesa-add-xbgr-support-adjacent-to-xrgb.patch
-	epatch "${FILESDIR}"/18.1-amdgpu-always-allow-GTT-placements-on-APUs.patch
-	epatch "${FILESDIR}"/18.1-dri_util-Add-R10G10B10-A-X-2-translation-between_DRI.patch
-	epatch "${FILESDIR}"/18.1-i965-add-X-A-BGR2101010-to-intel_image_formats.patch
+	epatch "${FILESDIR}"/18.1-radeonsi-fix-occlusion-queries.patch
+	epatch "${FILESDIR}"/18.1-glsl-cache-save-restore-ExternalSamplersUsed.patch
+	epatch "${FILESDIR}"/18.1-virgl-Fix-flush-in-virgl_encoder_inline_write.patch
+	epatch "${FILESDIR}"/18.1-util-disk_cache-Fix-disk_cache_get_function_timestamp-with-disabled-cache.patch
+	epatch "${FILESDIR}"/18.1-radv-Still-enable-inmemory-API-level-caching-if-disk.patch
+	epatch "${FILESDIR}"/18.2-mesa-GL_MESA_framebuffer_flip_y-extension-v4.patch
+	epatch "${FILESDIR}"/18.2-i965-implement-GL_MESA_framebuffer_flip_y-v3.patch
+	epatch "${FILESDIR}"/18.1-egl-surfaceless-swrastloader.patch
+	epatch "${FILESDIR}"/18.1-egl-surfaceless-drmless.patch
+	epatch "${FILESDIR}"/18.2-radv-Make-fs-key-exemplars-ordered-to-be-a-reverse-f.patch
+	epatch "${FILESDIR}"/18.2-radv-Refactor-blit-pipeline-creation.patch
+	epatch "${FILESDIR}"/18.2-radv-Add-on-demand-compilation-of-built-in-shaders.patch
+	epatch "${FILESDIR}"/18.3-i965-Replace-checks-for-rb-Name-with-FlipY.patch
+	epatch "${FILESDIR}"/18.3-glapi-actually-implement-GL_EXT_robustness.patch
+	epatch "${FILESDIR}"/18.2-egl-rewire-the-build-systems-to-use-libwayland-egl.patch
+	epatch "${FILESDIR}"/18.2-egl-remove-wayland-egl-now-that-we-re-using-libwayla.patch
+	epatch "${FILESDIR}"/18.2-mesa-Additional-FlipY-applications.patch
+	epatch "${FILESDIR}"/18.2-ac-move-all-LLVM-module-initialization-into.patch
+	epatch "${FILESDIR}"/18.2-ac-radeonsi-refactor-out-pass-manager-init-to-common.patch
+	epatch "${FILESDIR}"/18.2-ac-add-target-library-info-helpers.patch
+	epatch "${FILESDIR}"/18.2-radeonsi-rename-si_compiler-ac_llvm_compiler.patch
+	epatch "${FILESDIR}"/18.2-ac-radeonsi-port-compiler-init-destroy-out-of-radeon.patch
+	epatch "${FILESDIR}"/18.2-ac-add-reusable-helpers-for-direct-LLVM-compilation.patch
+	epatch "${FILESDIR}"/18.2-radeonsi-use-ac_compile_module_to_binary-to-reduce-c.patch
+	epatch "${FILESDIR}"/18.2-ac-radeonsi-reduce-optimizations-for-complex-compute.patch
+	epatch "${FILESDIR}"/18.2-st-mesa-Also-check-for-PIPE_FORMAT_A8R8G8B8_SRGB-for.patch
+	epatch "${FILESDIR}"/18.3-intel-limit-urb-size-for-SKL-KBL-CFL-GT1.patch
+	epatch "${FILESDIR}"/18.2-gallium-winsys-kms-dont-unmap-what-wasnt-mapped.patch
+
 	base_src_prepare
 
 	# Produce a dummy git_sha1.h file because .git will not be copied to portage tmp directory
@@ -193,7 +194,7 @@ src_configure() {
 
 	LLVM_ENABLE="--disable-llvm"
 	if use llvm && use !video_cards_softpipe; then
-		export LLVM_CONFIG=${SYSROOT}/usr/bin/llvm-config-host
+		export LLVM_CONFIG=${SYSROOT}/usr/lib/llvm/bin/llvm-config-host
 		LLVM_ENABLE="--enable-llvm"
 	fi
 
@@ -201,14 +202,20 @@ src_configure() {
 	if use egl; then
 		egl_platforms="--with-platforms=surfaceless"
 
-		if use X; then
-			egl_platforms="${egl_platforms},x11"
+		if use drm; then
+			egl_platforms="${egl_platforms},drm"
 		fi
 
 		if use wayland; then
 			egl_platforms="${egl_platforms},wayland"
 		fi
+
+		if use X; then
+			egl_platforms="${egl_platforms},x11"
+		fi
 	fi
+
+        append-flags "-UENABLE_SHADER_CACHE"
 
 	# --with-driver=dri|xlib|osmesa || do we need osmesa?
 	econf \

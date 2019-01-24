@@ -1,0 +1,167 @@
+From cf12274ce2dd09ce4f6632a27deff4c8f5bdcf34 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Marek=20Ol=C5=A1=C3=A1k?= <marek.olsak@amd.com>
+Date: Wed, 4 Jul 2018 01:11:47 -0400
+Subject: [PATCH 6/8] ac: add reusable helpers for direct LLVM compilation
+
+This is basically LLVMTargetMachineEmitToMemoryBuffer inlined and reworked.
+
+struct ac_compiler_passes (opaque type) contains the main pass manager.
+
+ac_create_llvm_passes -- the result can go to thread local storage
+ac_destroy_llvm_passes -- can be called by a destructor in TLS
+ac_compile_module_to_binary -- from LLVMModuleRef to ac_shader_binary
+
+The motivation is to do the expensive call addPassesToEmitFile once
+per context or thread.
+
+Change-Id: Ic6f421ec42f58879c7655d6b5e917647d8f0e801
+Reviewed-by: Dave Airlie <airlied@redhat.com>
+---
+ src/amd/common/ac_binary.h        |  8 +++++
+ src/amd/common/ac_llvm_helper.cpp | 62 ++++++++++++++++++++++++++++++++++++---
+ src/amd/common/ac_llvm_util.h     |  9 ++++++
+ 3 files changed, 75 insertions(+), 4 deletions(-)
+
+diff --git a/src/amd/common/ac_binary.h b/src/amd/common/ac_binary.h
+index 4bd86b939f..735e393205 100644
+--- a/src/amd/common/ac_binary.h
++++ b/src/amd/common/ac_binary.h
+@@ -27,6 +27,10 @@
+ #include <stdint.h>
+ #include <stdbool.h>
+ 
++#ifdef __cplusplus
++extern "C" {
++#endif
++
+ struct ac_shader_reloc {
+ 	char name[32];
+ 	uint64_t offset;
+@@ -98,4 +102,8 @@ void ac_shader_binary_read_config(struct ac_shader_binary *binary,
+ 				  bool supports_spill);
+ void ac_shader_binary_clean(struct ac_shader_binary *b);
+ 
++#ifdef __cplusplus
++}
++#endif
++
+ #endif /* AC_BINARY_H */
+diff --git a/src/amd/common/ac_llvm_helper.cpp b/src/amd/common/ac_llvm_helper.cpp
+index 35973dd1fa..4348ebd36e 100644
+--- a/src/amd/common/ac_llvm_helper.cpp
++++ b/src/amd/common/ac_llvm_helper.cpp
+@@ -29,15 +29,18 @@
+ #pragma push_macro("DEBUG")
+ #undef DEBUG
+ 
++#include "ac_binary.h"
+ #include "ac_llvm_util.h"
++
+ #include <llvm-c/Core.h>
+-#include <llvm/Target/TargetOptions.h>
+-#include <llvm/ExecutionEngine/ExecutionEngine.h>
+-#include <llvm/IR/Attributes.h>
+-#include <llvm/IR/CallSite.h>
++#include <llvm/Target/TargetMachine.h>
+ #include <llvm/IR/IRBuilder.h>
+ #include <llvm/Analysis/TargetLibraryInfo.h>
+ 
++#include <llvm/IR/LegacyPassManager.h>
++#if HAVE_LLVM < 0x0700
++#include "llvm/Support/raw_ostream.h"
++#endif
+ 
+ void ac_add_attr_dereferenceable(LLVMValueRef val, uint64_t bytes)
+ {
+@@ -111,3 +114,54 @@ ac_dispose_target_library_info(LLVMTargetLibraryInfoRef library_info)
+ {
+ 	delete reinterpret_cast<llvm::TargetLibraryInfoImpl *>(library_info);
+ }
++
++/* The LLVM compiler is represented as a pass manager containing passes for
++ * optimizations, instruction selection, and code generation.
++ */
++struct ac_compiler_passes {
++	ac_compiler_passes(): ostream(code_string) {}
++
++	llvm::SmallString<0> code_string;  /* ELF shader binary */
++	llvm::raw_svector_ostream ostream; /* stream for appending data to the binary */
++	llvm::legacy::PassManager passmgr; /* list of passes */
++};
++
++struct ac_compiler_passes *ac_create_llvm_passes(LLVMTargetMachineRef tm)
++{
++	struct ac_compiler_passes *p = new ac_compiler_passes();
++	if (!p)
++		return NULL;
++
++	llvm::TargetMachine *TM = reinterpret_cast<llvm::TargetMachine*>(tm);
++
++	if (TM->addPassesToEmitFile(p->passmgr, p->ostream,
++#if HAVE_LLVM >= 0x0700
++				    nullptr,
++#endif
++				    llvm::TargetMachine::CGFT_ObjectFile)) {
++		fprintf(stderr, "amd: TargetMachine can't emit a file of this type!\n");
++		delete p;
++		return NULL;
++	}
++	return p;
++}
++
++void ac_destroy_llvm_passes(struct ac_compiler_passes *p)
++{
++	delete p;
++}
++
++/* This returns false on failure. */
++bool ac_compile_module_to_binary(struct ac_compiler_passes *p, LLVMModuleRef module,
++				 struct ac_shader_binary *binary)
++{
++	p->passmgr.run(*llvm::unwrap(module));
++
++	llvm::StringRef data = p->ostream.str();
++	bool success = ac_elf_read(data.data(), data.size(), binary);
++	p->code_string = ""; /* release the ELF shader binary */
++
++	if (!success)
++		fprintf(stderr, "amd: cannot read an ELF shader binary\n");
++	return success;
++}
+diff --git a/src/amd/common/ac_llvm_util.h b/src/amd/common/ac_llvm_util.h
+index f083db186c..229fa96644 100644
+--- a/src/amd/common/ac_llvm_util.h
++++ b/src/amd/common/ac_llvm_util.h
+@@ -35,6 +35,9 @@
+ extern "C" {
+ #endif
+ 
++struct ac_shader_binary;
++struct ac_compiler_passes;
++
+ enum ac_func_attr {
+ 	AC_FUNC_ATTR_ALWAYSINLINE = (1 << 0),
+ 	AC_FUNC_ATTR_INREG        = (1 << 2),
+@@ -73,6 +76,7 @@ struct ac_llvm_compiler {
+ 	LLVMTargetMachineRef		tm;
+ 	LLVMTargetLibraryInfoRef	target_library_info;
+ 	LLVMPassManagerRef		passmgr;
++	struct ac_compiler_passes	*passes;
+ };
+ 
+ const char *ac_get_llvm_processor_name(enum radeon_family family);
+@@ -131,6 +135,11 @@ bool ac_init_llvm_compiler(struct ac_llvm_compiler *compiler,
+ 			   enum ac_target_machine_options tm_options);
+ void ac_destroy_llvm_compiler(struct ac_llvm_compiler *compiler);
+ 
++struct ac_compiler_passes *ac_create_llvm_passes(LLVMTargetMachineRef tm);
++void ac_destroy_llvm_passes(struct ac_compiler_passes *p);
++bool ac_compile_module_to_binary(struct ac_compiler_passes *p, LLVMModuleRef module,
++				 struct ac_shader_binary *binary);
++
+ #ifdef __cplusplus
+ }
+ #endif
+-- 
+2.15.1
+

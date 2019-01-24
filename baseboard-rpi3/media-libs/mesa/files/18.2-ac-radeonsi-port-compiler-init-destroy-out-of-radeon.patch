@@ -1,0 +1,150 @@
+From 3af0b8822818e75dac9b27de5a52d523fb4f7edd Mon Sep 17 00:00:00 2001
+From: Dave Airlie <airlied@redhat.com>
+Date: Tue, 3 Jul 2018 09:51:42 +1000
+Subject: [PATCH 5/8] ac/radeonsi: port compiler init/destroy out of radeonsi.
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+We want to share this code with radv in the future, so port
+it out of radeonsi.
+
+Add a return value as radv will want that to know if this
+succeeds
+
+Change-Id: I12244f5a7ed16b620aa7d33fd60a2f2b6f1545d3
+Reviewed-by: Marek Olšák <marek.olsak@amd.com>
+---
+ src/amd/common/ac_llvm_util.c          | 43 ++++++++++++++++++++++++++++++++++
+ src/amd/common/ac_llvm_util.h          |  8 +++++++
+ src/gallium/drivers/radeonsi/si_pipe.c | 29 ++++-------------------
+ 3 files changed, 55 insertions(+), 25 deletions(-)
+
+diff --git a/src/amd/common/ac_llvm_util.c b/src/amd/common/ac_llvm_util.c
+index d628ed8261..586d9d06ba 100644
+--- a/src/amd/common/ac_llvm_util.c
++++ b/src/amd/common/ac_llvm_util.c
+@@ -276,3 +276,46 @@ ac_count_scratch_private_memory(LLVMValueRef function)
+ 
+ 	return private_mem_vgprs;
+ }
++
++bool
++ac_init_llvm_compiler(struct ac_llvm_compiler *compiler,
++		      enum radeon_family family,
++		      enum ac_target_machine_options tm_options)
++{
++	const char *triple;
++	memset(compiler, 0, sizeof(*compiler));
++
++	compiler->tm = ac_create_target_machine(family,
++					    tm_options, &triple);
++	if (!compiler->tm)
++		return false;
++
++	compiler->target_library_info =
++		ac_create_target_library_info(triple);
++	if (!compiler->target_library_info)
++		goto fail;
++
++	compiler->passmgr = ac_create_passmgr(compiler->target_library_info,
++					      tm_options & AC_TM_CHECK_IR);
++	if (!compiler->passmgr)
++		goto fail;
++
++	return true;
++fail:
++	ac_destroy_llvm_compiler(compiler);
++	return false;
++}
++
++void
++ac_destroy_llvm_compiler(struct ac_llvm_compiler *compiler)
++{
++	if (compiler->passmgr)
++		LLVMDisposePassManager(compiler->passmgr);
++#if HAVE_LLVM >= 0x0700
++	/* This crashes on LLVM 5.0 and 6.0 and Ubuntu 18.04, so leak it there. */
++	if (compiler->target_library_info)
++		ac_dispose_target_library_info(compiler->target_library_info);
++#endif
++	if (compiler->tm)
++		LLVMDisposeTargetMachine(compiler->tm);
++}
+diff --git a/src/amd/common/ac_llvm_util.h b/src/amd/common/ac_llvm_util.h
+index 1a2bd82b47..f083db186c 100644
+--- a/src/amd/common/ac_llvm_util.h
++++ b/src/amd/common/ac_llvm_util.h
+@@ -59,6 +59,7 @@ enum ac_target_machine_options {
+ 	AC_TM_FORCE_ENABLE_XNACK = (1 << 2),
+ 	AC_TM_FORCE_DISABLE_XNACK = (1 << 3),
+ 	AC_TM_PROMOTE_ALLOCA_TO_SCRATCH = (1 << 4),
++	AC_TM_CHECK_IR = (1 << 5),
+ };
+ 
+ enum ac_float_mode {
+@@ -120,9 +121,16 @@ ac_count_scratch_private_memory(LLVMValueRef function);
+ 
+ LLVMPassManagerRef ac_create_passmgr(LLVMTargetLibraryInfoRef target_library_info,
+ 				     bool check_ir);
++
+ LLVMTargetLibraryInfoRef ac_create_target_library_info(const char *triple);
++
+ void ac_dispose_target_library_info(LLVMTargetLibraryInfoRef library_info);
+ 
++bool ac_init_llvm_compiler(struct ac_llvm_compiler *compiler,
++			   enum radeon_family family,
++			   enum ac_target_machine_options tm_options);
++void ac_destroy_llvm_compiler(struct ac_llvm_compiler *compiler);
++
+ #ifdef __cplusplus
+ }
+ #endif
+diff --git a/src/gallium/drivers/radeonsi/si_pipe.c b/src/gallium/drivers/radeonsi/si_pipe.c
+index 27fdd4347c..49d3d6856d 100644
+--- a/src/gallium/drivers/radeonsi/si_pipe.c
++++ b/src/gallium/drivers/radeonsi/si_pipe.c
+@@ -110,36 +110,15 @@ static void si_init_compiler(struct si_screen *sscreen,
+ 		(sscreen->debug_flags & DBG(SI_SCHED) ? AC_TM_SISCHED : 0) |
+ 		(sscreen->info.chip_class >= GFX9 ? AC_TM_FORCE_ENABLE_XNACK : 0) |
+ 		(sscreen->info.chip_class < GFX9 ? AC_TM_FORCE_DISABLE_XNACK : 0) |
+-		(!sscreen->llvm_has_working_vgpr_indexing ? AC_TM_PROMOTE_ALLOCA_TO_SCRATCH : 0);
++		(!sscreen->llvm_has_working_vgpr_indexing ? AC_TM_PROMOTE_ALLOCA_TO_SCRATCH : 0) |
++		(sscreen->debug_flags & DBG(CHECK_IR) ? AC_TM_CHECK_IR : 0) ;
+ 
+-	const char *triple;
+-	compiler->tm = ac_create_target_machine(sscreen->info.family,
+-						tm_options, &triple);
+-	if (!compiler->tm)
+-		return;
+-
+-	compiler->target_library_info =
+-		gallivm_create_target_library_info(triple);
+-	if (!compiler->target_library_info)
+-		return;
+-
+-	compiler->passmgr = ac_create_passmgr(compiler->target_library_info,
+-					      (sscreen->debug_flags & DBG(CHECK_IR)));
+-	if (!compiler->passmgr)
+-		return;
++	ac_init_llvm_compiler(compiler, sscreen->info.family, tm_options);
+ }
+ 
+ static void si_destroy_compiler(struct ac_llvm_compiler *compiler)
+ {
+-	if (compiler->passmgr)
+-		LLVMDisposePassManager(compiler->passmgr);
+-#if HAVE_LLVM < 0x0500 || HAVE_LLVM >= 0x0700
+-	/* This crashes on LLVM 5.0 and 6.0 and Ubuntu 18.04, so leak it there. */
+-	if (compiler->target_library_info)
+-		gallivm_dispose_target_library_info(compiler->target_library_info);
+-#endif
+-	if (compiler->tm)
+-		LLVMDisposeTargetMachine(compiler->tm);
++	ac_destroy_llvm_compiler(compiler);
+ }
+ 
+ /*
+-- 
+2.15.1
+

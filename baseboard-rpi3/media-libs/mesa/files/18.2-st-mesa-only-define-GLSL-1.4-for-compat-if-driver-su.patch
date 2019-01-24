@@ -1,0 +1,39 @@
+From 8e026fe9f2377a28b51282a9f81cca1280382506 Mon Sep 17 00:00:00 2001
+From: Christian Gmeiner <christian.gmeiner@gmail.com>
+Date: Wed, 16 May 2018 16:02:54 +0200
+Subject: [PATCH 1/5] st/mesa: only define GLSL 1.4 for compat if driver
+ supports it
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Currently GLSL 1.4 is defined for all gallium drivers even only
+GLSL 1.2 is supported as seen on etnaviv.
+
+v1 -> v2:
+ - use _min(..) as suggested by Lucas Stach and Michel Dänzer
+
+Fixes: 4560aad780b ("mesa: add GLSLVersionCompat constant")
+Signed-off-by: Christian Gmeiner <christian.gmeiner@gmail.com>
+Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+Reviewed-by: Timothy Arceri <tarceri@itsqueeze.com>
+---
+ src/mesa/state_tracker/st_extensions.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/mesa/state_tracker/st_extensions.c b/src/mesa/state_tracker/st_extensions.c
+index 19ef736..2d56a88 100644
+--- a/src/mesa/state_tracker/st_extensions.c
++++ b/src/mesa/state_tracker/st_extensions.c
+@@ -936,7 +936,7 @@ void st_init_extensions(struct pipe_screen *screen,
+ 
+    /* Figure out GLSL support and set GLSLVersion to it. */
+    consts->GLSLVersion = screen->get_param(screen, PIPE_CAP_GLSL_FEATURE_LEVEL);
+-   consts->GLSLVersionCompat = 140;
++   consts->GLSLVersionCompat = _min(consts->GLSLVersion, 140);
+ 
+    _mesa_override_glsl_version(consts);
+ 
+-- 
+2.7.4
+

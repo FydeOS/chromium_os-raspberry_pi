@@ -1,0 +1,156 @@
+From 28b1a3e79f73b4e2849067bf51f500d0bd36ca5d Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Marek=20Ol=C5=A1=C3=A1k?= <marek.olsak@amd.com>
+Date: Sat, 30 Jun 2018 00:54:30 -0400
+Subject: [PATCH 1/8] ac: move all LLVM module initialization into
+ ac_create_module
+
+This removes some ugly code around module initialization.
+
+Reviewed-by: Dave Airlie <airlied@redhat.com>
+---
+ src/amd/common/ac_llvm_helper.cpp                   | 10 ++++++++++
+ src/amd/common/ac_llvm_util.h                       |  1 +
+ src/amd/vulkan/radv_nir_to_llvm.c                   | 12 ++----------
+ src/gallium/drivers/radeonsi/si_pipe.c              | 14 +++-----------
+ src/gallium/drivers/radeonsi/si_shader.h            |  2 --
+ src/gallium/drivers/radeonsi/si_shader_tgsi_setup.c |  5 +----
+ 6 files changed, 17 insertions(+), 27 deletions(-)
+
+diff --git a/src/amd/common/ac_llvm_helper.cpp b/src/amd/common/ac_llvm_helper.cpp
+index 1d2369baa7..0e68e48649 100644
+--- a/src/amd/common/ac_llvm_helper.cpp
++++ b/src/amd/common/ac_llvm_helper.cpp
+@@ -73,6 +73,16 @@ bool ac_llvm_is_function(LLVMValueRef v)
+ 	return LLVMGetValueKind(v) == LLVMFunctionValueKind;
+ }
+ 
++LLVMModuleRef ac_create_module(LLVMTargetMachineRef tm, LLVMContextRef ctx)
++{
++   llvm::TargetMachine *TM = reinterpret_cast<llvm::TargetMachine*>(tm);
++   LLVMModuleRef module = LLVMModuleCreateWithNameInContext("mesa-shader", ctx);
++
++   llvm::unwrap(module)->setTargetTriple(TM->getTargetTriple().getTriple());
++   llvm::unwrap(module)->setDataLayout(TM->createDataLayout());
++   return module;
++}
++
+ LLVMBuilderRef ac_create_builder(LLVMContextRef ctx,
+ 				 enum ac_float_mode float_mode)
+ {
+diff --git a/src/amd/common/ac_llvm_util.h b/src/amd/common/ac_llvm_util.h
+index 0aa803c5bc..6e6d15bb56 100644
+--- a/src/amd/common/ac_llvm_util.h
++++ b/src/amd/common/ac_llvm_util.h
+@@ -83,6 +83,7 @@ void ac_dump_module(LLVMModuleRef module);
+ 
+ LLVMValueRef ac_llvm_get_called_value(LLVMValueRef call);
+ bool ac_llvm_is_function(LLVMValueRef v);
++LLVMModuleRef ac_create_module(LLVMTargetMachineRef tm, LLVMContextRef ctx);
+ 
+ LLVMBuilderRef ac_create_builder(LLVMContextRef ctx,
+ 				 enum ac_float_mode float_mode);
+diff --git a/src/amd/vulkan/radv_nir_to_llvm.c b/src/amd/vulkan/radv_nir_to_llvm.c
+index e2d241e495..aab384940e 100644
+--- a/src/amd/vulkan/radv_nir_to_llvm.c
++++ b/src/amd/vulkan/radv_nir_to_llvm.c
+@@ -3040,14 +3040,7 @@ LLVMModuleRef ac_translate_nir_to_llvm(LLVMTargetMachineRef tm,
+ 
+ 	ac_llvm_context_init(&ctx.ac, ctx.context, options->chip_class,
+ 			     options->family);
+-	ctx.ac.module = LLVMModuleCreateWithNameInContext("shader", ctx.context);
+-	LLVMSetTarget(ctx.ac.module, options->supports_spill ? "amdgcn-mesa-mesa3d" : "amdgcn--");
+-
+-	LLVMTargetDataRef data_layout = LLVMCreateTargetDataLayout(tm);
+-	char *data_layout_str = LLVMCopyStringRepOfTargetData(data_layout);
+-	LLVMSetDataLayout(ctx.ac.module, data_layout_str);
+-	LLVMDisposeTargetData(data_layout);
+-	LLVMDisposeMessage(data_layout_str);
++	ctx.ac.module = ac_create_module(tm, ctx.context);
+ 
+ 	enum ac_float_mode float_mode =
+ 		options->unsafe_math ? AC_FLOAT_MODE_UNSAFE_FP_MATH :
+@@ -3488,10 +3481,9 @@ radv_compile_gs_copy_shader(LLVMTargetMachineRef tm,
+ 
+ 	ac_llvm_context_init(&ctx.ac, ctx.context, options->chip_class,
+ 			     options->family);
+-	ctx.ac.module = LLVMModuleCreateWithNameInContext("shader", ctx.context);
++	ctx.ac.module = ac_create_module(tm, ctx.context);
+ 
+ 	ctx.is_gs_copy_shader = true;
+-	LLVMSetTarget(ctx.ac.module, "amdgcn--");
+ 
+ 	enum ac_float_mode float_mode =
+ 		options->unsafe_math ? AC_FLOAT_MODE_UNSAFE_FP_MATH :
+diff --git a/src/gallium/drivers/radeonsi/si_pipe.c b/src/gallium/drivers/radeonsi/si_pipe.c
+index fe0a20ba6c..8caab54140 100644
+--- a/src/gallium/drivers/radeonsi/si_pipe.c
++++ b/src/gallium/drivers/radeonsi/si_pipe.c
+@@ -118,13 +118,14 @@ static void si_init_compiler(struct si_screen *sscreen,
+ 		(sscreen->info.chip_class < GFX9 ? AC_TM_FORCE_DISABLE_XNACK : 0) |
+ 		(!sscreen->llvm_has_working_vgpr_indexing ? AC_TM_PROMOTE_ALLOCA_TO_SCRATCH : 0);
+ 
++	const char *triple;
+ 	compiler->tm = ac_create_target_machine(sscreen->info.family,
+-						tm_options, &compiler->triple);
++						tm_options, &triple);
+ 	if (!compiler->tm)
+ 		return;
+ 
+ 	compiler->target_library_info =
+-		gallivm_create_target_library_info(compiler->triple);
++		gallivm_create_target_library_info(triple);
+ 	if (!compiler->target_library_info)
+ 		return;
+ 
+@@ -149,19 +150,10 @@ static void si_init_compiler(struct si_screen *sscreen,
+ 	/* This is recommended by the instruction combining pass. */
+ 	LLVMAddEarlyCSEMemSSAPass(compiler->passmgr);
+ 	LLVMAddInstructionCombiningPass(compiler->passmgr);
+-
+-	/* Get the data layout. */
+-	LLVMTargetDataRef data_layout = LLVMCreateTargetDataLayout(compiler->tm);
+-	if (!data_layout)
+-		return;
+-	compiler->data_layout = LLVMCopyStringRepOfTargetData(data_layout);
+-	LLVMDisposeTargetData(data_layout);
+ }
+ 
+ static void si_destroy_compiler(struct si_compiler *compiler)
+ {
+-	if (compiler->data_layout)
+-		LLVMDisposeMessage((char*)compiler->data_layout);
+ 	if (compiler->passmgr)
+ 		LLVMDisposePassManager(compiler->passmgr);
+ #if HAVE_LLVM < 0x0500 || HAVE_LLVM >= 0x0700
+diff --git a/src/gallium/drivers/radeonsi/si_shader.h b/src/gallium/drivers/radeonsi/si_shader.h
+index 94366f4120..ce530a93b9 100644
+--- a/src/gallium/drivers/radeonsi/si_shader.h
++++ b/src/gallium/drivers/radeonsi/si_shader.h
+@@ -314,8 +314,6 @@ struct si_shader;
+ /* Per-thread persistent LLVM objects. */
+ struct si_compiler {
+ 	LLVMTargetMachineRef		tm;
+-	const char			*triple;
+-	const char			*data_layout;
+ 	LLVMTargetLibraryInfoRef	target_library_info;
+ 	LLVMPassManagerRef		passmgr;
+ };
+diff --git a/src/gallium/drivers/radeonsi/si_shader_tgsi_setup.c b/src/gallium/drivers/radeonsi/si_shader_tgsi_setup.c
+index a4c2a1f27a..4797c6e910 100644
+--- a/src/gallium/drivers/radeonsi/si_shader_tgsi_setup.c
++++ b/src/gallium/drivers/radeonsi/si_shader_tgsi_setup.c
+@@ -1002,10 +1002,7 @@ void si_llvm_context_init(struct si_shader_context *ctx,
+ 	ctx->compiler = compiler;
+ 
+ 	ctx->gallivm.context = LLVMContextCreate();
+-	ctx->gallivm.module = LLVMModuleCreateWithNameInContext("tgsi",
+-						ctx->gallivm.context);
+-	LLVMSetTarget(ctx->gallivm.module, compiler->triple);
+-	LLVMSetDataLayout(ctx->gallivm.module, compiler->data_layout);
++	ctx->gallivm.module = ac_create_module(compiler->tm, ctx->gallivm.context);
+ 
+ 	bool unsafe_fpmath = (sscreen->debug_flags & DBG(UNSAFE_MATH)) != 0;
+ 	enum ac_float_mode float_mode =
+-- 
+2.15.1
+

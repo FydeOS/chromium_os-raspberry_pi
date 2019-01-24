@@ -13,6 +13,7 @@ IUSE=""
 
 RDEPEND="
     chromeos-base/rpi-boot-bin
+    chromeos-base/auto-expand-partition
 "
 
 DEPEND="${RDEPEND}"
@@ -20,11 +21,15 @@ S=${WORKDIR}
 
 src_install() {
   udev_dorules "${FILESDIR}/udev/10-vchiq-permissions.rules"
-  insinto /lib/firmware
-  doins -r "${FILESDIR}/brcm"
+  udev_dorules "${FILESDIR}/udev/99-rpi3-restart-ui-after-hdmi-connetced.rules"
+  exeinto /lib/udev
+  doexe "${FILESDIR}/udev/restart_ui.sh"
+  insinto /lib
+  doins -r "${FILESDIR}/firmware"
   insinto /etc/init
   doins "${FILESDIR}/bt/bluetooth_uart.conf"
   doins "${FILESDIR}/bt/console-ttyAMA0.override"
+  doins "${FILESDIR}/audio/force_audio_output_to_headphones.conf"
   insinto /firmware/rpi
   doins "${FILESDIR}/kernel-config"/*.txt
 }

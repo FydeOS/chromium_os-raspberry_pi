@@ -1,0 +1,37 @@
+From b0df21016f5e3037b650cb6a21f6af94d8120873 Mon Sep 17 00:00:00 2001
+From: Timothy Arceri <tarceri@itsqueeze.com>
+Date: Mon, 18 Jun 2018 12:36:54 +1000
+Subject: [PATCH 4/5] mesa: add ff fragment shader support for geom and tess
+ shaders
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+This is required for compatibility profile support.
+
+Reviewed-by: Marek Olšák <marek.olsak@amd.com>
+Reviewed-by: Iago Toral Quiroga <itoral@igalia.com>
+---
+ src/mesa/main/ff_fragment_shader.cpp | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/src/mesa/main/ff_fragment_shader.cpp b/src/mesa/main/ff_fragment_shader.cpp
+index a698931..935a216 100644
+--- a/src/mesa/main/ff_fragment_shader.cpp
++++ b/src/mesa/main/ff_fragment_shader.cpp
+@@ -229,7 +229,11 @@ static GLbitfield filter_fp_input_mask( GLbitfield fp_inputs,
+     * since vertex shader state validation comes after fragment state
+     * validation (see additional comments in state.c).
+     */
+-   if (vertexShader)
++   if (ctx->_Shader->CurrentProgram[MESA_SHADER_GEOMETRY] != NULL)
++      vprog = ctx->_Shader->CurrentProgram[MESA_SHADER_GEOMETRY];
++   else if (ctx->_Shader->CurrentProgram[MESA_SHADER_TESS_EVAL] != NULL)
++      vprog = ctx->_Shader->CurrentProgram[MESA_SHADER_TESS_EVAL];
++   else if (vertexShader)
+       vprog = ctx->_Shader->CurrentProgram[MESA_SHADER_VERTEX];
+    else
+       vprog = ctx->VertexProgram.Current;
+-- 
+2.7.4
+

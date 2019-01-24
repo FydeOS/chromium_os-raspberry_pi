@@ -1,0 +1,286 @@
+From e7470c4805ad5e9ecf6d9b8eb0ea01e33ae9b82e Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Marek=20Ol=C5=A1=C3=A1k?= <marek.olsak@amd.com>
+Date: Thu, 19 Jul 2018 22:55:49 -0400
+Subject: [PATCH 8/8] ac,radeonsi: reduce optimizations for complex compute
+ shaders on older APUs (v2)
+
+To make dEQP-GLES31.functional.ssbo.layout.random.all_shared_buffer.23
+finish sooner on the older CPUs. (otherwise it gets killed and we fail
+the test)
+
+Change-Id: Icd64b07ed5743a5205cbd9f52a21a3dfa2fcb3a3
+Acked-by: Dave Airlie <airlied@gmail.com>
+---
+ src/amd/common/ac_llvm_util.c                      | 18 +++++++++++---
+ src/amd/common/ac_llvm_util.h                      | 18 +++++++++++---
+ src/amd/vulkan/radv_shader.c                       |  2 +-
+ src/gallium/drivers/radeonsi/si_pipe.c             | 12 ++++++++-
+ src/gallium/drivers/radeonsi/si_shader.c           | 29 ++++++++++++++++++----
+ src/gallium/drivers/radeonsi/si_shader_internal.h  |  3 ++-
+ .../drivers/radeonsi/si_shader_tgsi_setup.c        |  8 ++++--
+ 7 files changed, 73 insertions(+), 17 deletions(-)
+
+diff --git a/src/amd/common/ac_llvm_util.c b/src/amd/common/ac_llvm_util.c
+index 586d9d06ba..9af995aec2 100644
+--- a/src/amd/common/ac_llvm_util.c
++++ b/src/amd/common/ac_llvm_util.c
+@@ -132,6 +132,7 @@ const char *ac_get_llvm_processor_name(enum radeon_family family)
+ 
+ LLVMTargetMachineRef ac_create_target_machine(enum radeon_family family,
+ 					      enum ac_target_machine_options tm_options,
++					      LLVMCodeGenOptLevel level,
+ 					      const char **out_triple)
+ {
+ 	assert(family >= CHIP_TAHITI);
+@@ -151,7 +152,7 @@ LLVMTargetMachineRef ac_create_target_machine(enum radeon_family family,
+ 	                             triple,
+ 	                             ac_get_llvm_processor_name(family),
+ 				     features,
+-	                             LLVMCodeGenLevelDefault,
++	                             level,
+ 	                             LLVMRelocDefault,
+ 	                             LLVMCodeModelDefault);
+ 
+@@ -285,11 +286,20 @@ ac_init_llvm_compiler(struct ac_llvm_compiler *compiler,
+ 	const char *triple;
+ 	memset(compiler, 0, sizeof(*compiler));
+ 
+-	compiler->tm = ac_create_target_machine(family,
+-					    tm_options, &triple);
++	compiler->tm = ac_create_target_machine(family, tm_options,
++			    LLVMCodeGenLevelDefault, 
++			    &triple);
+ 	if (!compiler->tm)
+ 		return false;
+ 
++	if (tm_options & AC_TM_CREATE_LOW_OPT) {
++		compiler->low_opt_tm =
++			ac_create_target_machine(family, tm_options,
++						 LLVMCodeGenLevelLess, NULL);
++		if (!compiler->low_opt_tm)
++			goto fail;
++	}
++
+ 	compiler->target_library_info =
+ 		ac_create_target_library_info(triple);
+ 	if (!compiler->target_library_info)
+@@ -316,6 +326,8 @@ ac_destroy_llvm_compiler(struct ac_llvm_compiler *compiler)
+ 	if (compiler->target_library_info)
+ 		ac_dispose_target_library_info(compiler->target_library_info);
+ #endif
++	if (compiler->low_opt_tm)
++		LLVMDisposeTargetMachine(compiler->low_opt_tm);
+ 	if (compiler->tm)
+ 		LLVMDisposeTargetMachine(compiler->tm);
+ }
+diff --git a/src/amd/common/ac_llvm_util.h b/src/amd/common/ac_llvm_util.h
+index 229fa96644..0bde2cfd18 100644
+--- a/src/amd/common/ac_llvm_util.h
++++ b/src/amd/common/ac_llvm_util.h
+@@ -63,6 +63,7 @@ enum ac_target_machine_options {
+ 	AC_TM_FORCE_DISABLE_XNACK = (1 << 3),
+ 	AC_TM_PROMOTE_ALLOCA_TO_SCRATCH = (1 << 4),
+ 	AC_TM_CHECK_IR = (1 << 5),
++	AC_TM_CREATE_LOW_OPT = (1 << 6),
+ };
+ 
+ enum ac_float_mode {
+@@ -73,17 +74,26 @@ enum ac_float_mode {
+ 
+ /* Per-thread persistent LLVM objects. */
+ struct ac_llvm_compiler {
+-	LLVMTargetMachineRef		tm;
+ 	LLVMTargetLibraryInfoRef	target_library_info;
+ 	LLVMPassManagerRef		passmgr;
++
++	/* Default compiler. */
++	LLVMTargetMachineRef		tm;
+ 	struct ac_compiler_passes	*passes;
++
++	/* Optional compiler for faster compilation with fewer optimizations.
++	 * LLVM modules can be created with "tm" too. There is no difference.
++	 */
++	LLVMTargetMachineRef		low_opt_tm; /* uses -O1 instead of -O2 */
++	struct ac_compiler_passes	*low_opt_passes;
+ };
+ 
+ const char *ac_get_llvm_processor_name(enum radeon_family family);
+-LLVMTargetMachineRef ac_create_target_machine(enum radeon_family family,
+-					      enum ac_target_machine_options tm_options,
+-					      const char **out_triple);
+ 
++LLVMTargetMachineRef ac_create_target_machine(enum radeon_family family,
++                                             enum ac_target_machine_options tm_options,
++					     LLVMCodeGenOptLevel level,
++                                             const char **out_triple);
+ LLVMTargetRef ac_get_llvm_target(const char *triple);
+ void ac_add_attr_dereferenceable(LLVMValueRef val, uint64_t bytes);
+ bool ac_is_sgpr_param(LLVMValueRef param);
+diff --git a/src/amd/vulkan/radv_shader.c b/src/amd/vulkan/radv_shader.c
+index 27b3fbed16..e9c6b913cb 100644
+--- a/src/amd/vulkan/radv_shader.c
++++ b/src/amd/vulkan/radv_shader.c
+@@ -491,7 +491,7 @@ shader_variant_create(struct radv_device *device,
+ 		tm_options |= AC_TM_SUPPORTS_SPILL;
+ 	if (device->instance->perftest_flags & RADV_PERFTEST_SISCHED)
+ 		tm_options |= AC_TM_SISCHED;
+-	tm = ac_create_target_machine(chip_family, tm_options, NULL);
++	tm = ac_create_target_machine(chip_family, tm_options, LLVMCodeGenLevelDefault, NULL);
+ 
+ 	if (gs_copy_shader) {
+ 		assert(shader_count == 1);
+diff --git a/src/gallium/drivers/radeonsi/si_pipe.c b/src/gallium/drivers/radeonsi/si_pipe.c
+index 4e4353edac..4e2179c303 100644
+--- a/src/gallium/drivers/radeonsi/si_pipe.c
++++ b/src/gallium/drivers/radeonsi/si_pipe.c
+@@ -106,20 +106,30 @@ static const struct debug_named_value debug_options[] = {
+ static void si_init_compiler(struct si_screen *sscreen,
+ 			     struct ac_llvm_compiler *compiler)
+ {
++	/* Only create the less-optimizing version of the compiler on APUs
++	 * predating Ryzen (Raven). */
++	bool create_low_opt_compiler = !sscreen->info.has_dedicated_vram &&
++				       sscreen->info.chip_class <= VI;
++
+ 	enum ac_target_machine_options tm_options =
+ 		(sscreen->debug_flags & DBG(SI_SCHED) ? AC_TM_SISCHED : 0) |
+ 		(sscreen->info.chip_class >= GFX9 ? AC_TM_FORCE_ENABLE_XNACK : 0) |
+ 		(sscreen->info.chip_class < GFX9 ? AC_TM_FORCE_DISABLE_XNACK : 0) |
+ 		(!sscreen->llvm_has_working_vgpr_indexing ? AC_TM_PROMOTE_ALLOCA_TO_SCRATCH : 0) |
+-		(sscreen->debug_flags & DBG(CHECK_IR) ? AC_TM_CHECK_IR : 0) ;
++		(sscreen->debug_flags & DBG(CHECK_IR) ? AC_TM_CHECK_IR : 0) |
++		(create_low_opt_compiler ? AC_TM_CREATE_LOW_OPT : 0);
+ 
+ 	ac_init_llvm_compiler(compiler, sscreen->info.family, tm_options);
+ 	compiler->passes = ac_create_llvm_passes(compiler->tm);
++
++	if (compiler->low_opt_tm)
++		compiler->low_opt_passes = ac_create_llvm_passes(compiler->low_opt_tm);
+ }
+ 
+ static void si_destroy_compiler(struct ac_llvm_compiler *compiler)
+ {
+ 	ac_destroy_llvm_passes(compiler->passes);
++	ac_destroy_llvm_passes(compiler->low_opt_passes);
+ 	ac_destroy_llvm_compiler(compiler);
+ }
+ 
+diff --git a/src/gallium/drivers/radeonsi/si_shader.c b/src/gallium/drivers/radeonsi/si_shader.c
+index df731dee36..23619d4fdb 100644
+--- a/src/gallium/drivers/radeonsi/si_shader.c
++++ b/src/gallium/drivers/radeonsi/si_shader.c
+@@ -5644,7 +5644,8 @@ static int si_compile_llvm(struct si_screen *sscreen,
+ 			   LLVMModuleRef mod,
+ 			   struct pipe_debug_callback *debug,
+ 			   unsigned processor,
+-			   const char *name)
++			   const char *name,
++			   bool less_optimized)
+ {
+ 	int r = 0;
+ 	unsigned count = p_atomic_inc_return(&sscreen->num_compilations);
+@@ -5666,7 +5667,8 @@ static int si_compile_llvm(struct si_screen *sscreen,
+ 	}
+ 
+ 	if (!si_replace_shader(count, binary)) {
+-		r = si_llvm_compile(mod, binary, compiler, debug);
++		r = si_llvm_compile(mod, binary, compiler, debug,
++				    less_optimized);
+ 		if (r)
+ 			return r;
+ 	}
+@@ -5847,7 +5849,7 @@ si_generate_gs_copy_shader(struct si_screen *sscreen,
+ 			    &ctx.shader->config, ctx.compiler,
+ 			    ctx.gallivm.module,
+ 			    debug, PIPE_SHADER_GEOMETRY,
+-			    "GS Copy Shader");
++			    "GS Copy Shader", false);
+ 	if (!r) {
+ 		if (si_can_dump_shader(sscreen, PIPE_SHADER_GEOMETRY))
+ 			fprintf(stderr, "GS Copy Shader:\n");
+@@ -6747,6 +6749,22 @@ static void si_build_wrapper_function(struct si_shader_context *ctx,
+ 	LLVMBuildRetVoid(builder);
+ }
+ 
++static bool si_should_optimize_less(struct ac_llvm_compiler *compiler,
++				    struct si_shader_selector *sel)
++{
++	if (!compiler->low_opt_passes)
++		return false;
++
++	/* Assume a slow CPU. */
++	assert(!sel->screen->info.has_dedicated_vram &&
++	       sel->screen->info.chip_class <= VI);
++
++	/* For a crazy dEQP test containing 2597 memory opcodes, mostly
++	 * buffer stores. */
++	return sel->type == PIPE_SHADER_COMPUTE &&
++	       sel->info.num_memory_instructions > 1000;
++}
++
+ int si_compile_tgsi_shader(struct si_screen *sscreen,
+ 			   struct ac_llvm_compiler *compiler,
+ 			   struct si_shader *shader,
+@@ -6979,7 +6997,8 @@ int si_compile_tgsi_shader(struct si_screen *sscreen,
+ 
+ 	/* Compile to bytecode. */
+ 	r = si_compile_llvm(sscreen, &shader->binary, &shader->config, compiler,
+-			    ctx.gallivm.module, debug, ctx.type, "TGSI shader");
++			    ctx.gallivm.module, debug, ctx.type, "TGSI shader",
++			    si_should_optimize_less(compiler, shader->selector));
+ 	si_llvm_dispose(&ctx);
+ 	if (r) {
+ 		fprintf(stderr, "LLVM failed to compile shader\n");
+@@ -7146,7 +7165,7 @@ si_get_shader_part(struct si_screen *sscreen,
+ 	si_llvm_optimize_module(&ctx);
+ 
+ 	if (si_compile_llvm(sscreen, &result->binary, &result->config, compiler,
+-			    ctx.ac.module, debug, ctx.type, name)) {
++			    ctx.ac.module, debug, ctx.type, name, false)) {
+ 		FREE(result);
+ 		result = NULL;
+ 		goto out;
+diff --git a/src/gallium/drivers/radeonsi/si_shader_internal.h b/src/gallium/drivers/radeonsi/si_shader_internal.h
+index 5e75681478..a937625c2e 100644
+--- a/src/gallium/drivers/radeonsi/si_shader_internal.h
++++ b/src/gallium/drivers/radeonsi/si_shader_internal.h
+@@ -222,7 +222,8 @@ si_shader_context_from_abi(struct ac_shader_abi *abi)
+ 
+ unsigned si_llvm_compile(LLVMModuleRef M, struct ac_shader_binary *binary,
+ 			 struct ac_llvm_compiler *compiler,
+-			 struct pipe_debug_callback *debug);
++			 struct pipe_debug_callback *debug,
++			 bool less_optimized);
+ 
+ LLVMTypeRef tgsi2llvmtype(struct lp_build_tgsi_context *bld_base,
+ 			  enum tgsi_opcode_type type);
+diff --git a/src/gallium/drivers/radeonsi/si_shader_tgsi_setup.c b/src/gallium/drivers/radeonsi/si_shader_tgsi_setup.c
+index 2fad270b05..b79d178be1 100644
+--- a/src/gallium/drivers/radeonsi/si_shader_tgsi_setup.c
++++ b/src/gallium/drivers/radeonsi/si_shader_tgsi_setup.c
+@@ -95,8 +95,12 @@ static void si_diagnostic_handler(LLVMDiagnosticInfoRef di, void *context)
+  */
+ unsigned si_llvm_compile(LLVMModuleRef M, struct ac_shader_binary *binary,
+ 			 struct ac_llvm_compiler *compiler,
+-			 struct pipe_debug_callback *debug)
++			 struct pipe_debug_callback *debug,
++			 bool less_optimized)
+ {
++	struct ac_compiler_passes *passes =
++		less_optimized && compiler->low_opt_passes ?
++			compiler->low_opt_passes : compiler->passes;
+ 	struct si_llvm_diagnostics diag;
+ 	LLVMContextRef llvm_ctx;
+ 
+@@ -109,7 +113,7 @@ unsigned si_llvm_compile(LLVMModuleRef M, struct ac_shader_binary *binary,
+ 	LLVMContextSetDiagnosticHandler(llvm_ctx, si_diagnostic_handler, &diag);
+ 
+ 	/* Compile IR. */
+-	if (!ac_compile_module_to_binary(compiler->passes, M, binary))
++	if (!ac_compile_module_to_binary(passes, M, binary))
+ 		diag.retval = 1;
+ 
+ 	if (diag.retval != 0)
+-- 
+2.15.1
+

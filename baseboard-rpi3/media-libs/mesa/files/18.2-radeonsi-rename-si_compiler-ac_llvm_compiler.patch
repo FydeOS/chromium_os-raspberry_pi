@@ -1,0 +1,348 @@
+From d86285dab29de817f531d09da68a3f02c45c9e88 Mon Sep 17 00:00:00 2001
+From: Dave Airlie <airlied@redhat.com>
+Date: Tue, 3 Jul 2018 09:39:27 +1000
+Subject: [PATCH 4/8] radeonsi: rename si_compiler -> ac_llvm_compiler
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+As precursor to moving init to common code, just rename the struct
+and move it.
+
+Change-Id: Ica55a51737658e19791785b0111a3fa30410f257
+Reviewed-by: Bas Nieuwenhuizen <bas@basnieuwenhuizen.nl>
+Reviewed-by: Marek Olšák <marek.olsak@amd.com>
+---
+ src/amd/common/ac_llvm_util.h                      |  7 +++++++
+ src/gallium/drivers/radeonsi/si_compute.c          |  2 +-
+ src/gallium/drivers/radeonsi/si_pipe.c             |  4 ++--
+ src/gallium/drivers/radeonsi/si_pipe.h             |  6 +++---
+ src/gallium/drivers/radeonsi/si_shader.c           | 24 +++++++++++-----------
+ src/gallium/drivers/radeonsi/si_shader.h           | 16 +++++----------
+ src/gallium/drivers/radeonsi/si_shader_internal.h  |  6 +++---
+ .../drivers/radeonsi/si_shader_tgsi_setup.c        |  4 ++--
+ src/gallium/drivers/radeonsi/si_state_shaders.c    |  4 ++--
+ 9 files changed, 37 insertions(+), 36 deletions(-)
+
+diff --git a/src/amd/common/ac_llvm_util.h b/src/amd/common/ac_llvm_util.h
+index 92bfb6abe1..1a2bd82b47 100644
+--- a/src/amd/common/ac_llvm_util.h
++++ b/src/amd/common/ac_llvm_util.h
+@@ -67,6 +67,13 @@ enum ac_float_mode {
+ 	AC_FLOAT_MODE_UNSAFE_FP_MATH,
+ };
+ 
++/* Per-thread persistent LLVM objects. */
++struct ac_llvm_compiler {
++	LLVMTargetMachineRef		tm;
++	LLVMTargetLibraryInfoRef	target_library_info;
++	LLVMPassManagerRef		passmgr;
++};
++
+ const char *ac_get_llvm_processor_name(enum radeon_family family);
+ LLVMTargetMachineRef ac_create_target_machine(enum radeon_family family,
+ 					      enum ac_target_machine_options tm_options,
+diff --git a/src/gallium/drivers/radeonsi/si_compute.c b/src/gallium/drivers/radeonsi/si_compute.c
+index e20bae0afc..490ebbddec 100644
+--- a/src/gallium/drivers/radeonsi/si_compute.c
++++ b/src/gallium/drivers/radeonsi/si_compute.c
+@@ -86,7 +86,7 @@ static void si_create_compute_state_async(void *job, int thread_index)
+ 	struct si_compute *program = (struct si_compute *)job;
+ 	struct si_shader *shader = &program->shader;
+ 	struct si_shader_selector sel;
+-	struct si_compiler *compiler;
++	struct ac_llvm_compiler *compiler;
+ 	struct pipe_debug_callback *debug = &program->compiler_ctx_state.debug;
+ 
+ 	assert(!debug->debug_message || debug->async);
+diff --git a/src/gallium/drivers/radeonsi/si_pipe.c b/src/gallium/drivers/radeonsi/si_pipe.c
+index b44762b340..27fdd4347c 100644
+--- a/src/gallium/drivers/radeonsi/si_pipe.c
++++ b/src/gallium/drivers/radeonsi/si_pipe.c
+@@ -104,7 +104,7 @@ static const struct debug_named_value debug_options[] = {
+ };
+ 
+ static void si_init_compiler(struct si_screen *sscreen,
+-			     struct si_compiler *compiler)
++			     struct ac_llvm_compiler *compiler)
+ {
+ 	enum ac_target_machine_options tm_options =
+ 		(sscreen->debug_flags & DBG(SI_SCHED) ? AC_TM_SISCHED : 0) |
+@@ -129,7 +129,7 @@ static void si_init_compiler(struct si_screen *sscreen,
+ 		return;
+ }
+ 
+-static void si_destroy_compiler(struct si_compiler *compiler)
++static void si_destroy_compiler(struct ac_llvm_compiler *compiler)
+ {
+ 	if (compiler->passmgr)
+ 		LLVMDisposePassManager(compiler->passmgr);
+diff --git a/src/gallium/drivers/radeonsi/si_pipe.h b/src/gallium/drivers/radeonsi/si_pipe.h
+index 6917d5e606..bc6799beaf 100644
+--- a/src/gallium/drivers/radeonsi/si_pipe.h
++++ b/src/gallium/drivers/radeonsi/si_pipe.h
+@@ -523,12 +523,12 @@ struct si_screen {
+ 	/* Use at most 3 normal compiler threads on quadcore and better.
+ 	 * Hyperthreaded CPUs report the number of threads, but we want
+ 	 * the number of cores. We only need this many threads for shader-db. */
+-	struct si_compiler		compiler[24]; /* used by the queue only */
++	struct ac_llvm_compiler		compiler[24]; /* used by the queue only */
+ 
+ 	struct util_queue		shader_compiler_queue_low_priority;
+ 	/* Use at most 2 low priority threads on quadcore and better.
+ 	 * We want to minimize the impact on multithreaded Mesa. */
+-	struct si_compiler		compiler_lowp[10];
++	struct ac_llvm_compiler		compiler_lowp[10];
+ };
+ 
+ struct si_blend_color {
+@@ -770,7 +770,7 @@ struct si_context {
+ 	void				*vs_blit_texcoord;
+ 	struct si_screen		*screen;
+ 	struct pipe_debug_callback	debug;
+-	struct si_compiler		compiler; /* only non-threaded compilation */
++	struct ac_llvm_compiler		compiler; /* only non-threaded compilation */
+ 	struct si_shader_ctx_state	fixed_func_tcs_shader;
+ 	struct r600_resource		*wait_mem_scratch;
+ 	unsigned			wait_mem_number;
+diff --git a/src/gallium/drivers/radeonsi/si_shader.c b/src/gallium/drivers/radeonsi/si_shader.c
+index e8d08cd8e7..df731dee36 100644
+--- a/src/gallium/drivers/radeonsi/si_shader.c
++++ b/src/gallium/drivers/radeonsi/si_shader.c
+@@ -77,7 +77,7 @@ enum si_arg_regfile {
+ 
+ static void si_init_shader_ctx(struct si_shader_context *ctx,
+ 			       struct si_screen *sscreen,
+-			       struct si_compiler *compiler);
++			       struct ac_llvm_compiler *compiler);
+ 
+ static void si_llvm_emit_barrier(const struct lp_build_tgsi_action *action,
+ 				 struct lp_build_tgsi_context *bld_base,
+@@ -5640,7 +5640,7 @@ void si_shader_dump(struct si_screen *sscreen, const struct si_shader *shader,
+ static int si_compile_llvm(struct si_screen *sscreen,
+ 			   struct ac_shader_binary *binary,
+ 			   struct si_shader_config *conf,
+-			   struct si_compiler *compiler,
++			   struct ac_llvm_compiler *compiler,
+ 			   LLVMModuleRef mod,
+ 			   struct pipe_debug_callback *debug,
+ 			   unsigned processor,
+@@ -5718,7 +5718,7 @@ static void si_llvm_build_ret(struct si_shader_context *ctx, LLVMValueRef ret)
+ /* Generate code for the hardware VS shader stage to go with a geometry shader */
+ struct si_shader *
+ si_generate_gs_copy_shader(struct si_screen *sscreen,
+-			   struct si_compiler *compiler,
++			   struct ac_llvm_compiler *compiler,
+ 			   struct si_shader_selector *gs_selector,
+ 			   struct pipe_debug_callback *debug)
+ {
+@@ -5966,7 +5966,7 @@ static void si_dump_shader_key(unsigned processor, const struct si_shader *shade
+ 
+ static void si_init_shader_ctx(struct si_shader_context *ctx,
+ 			       struct si_screen *sscreen,
+-			       struct si_compiler *compiler)
++			       struct ac_llvm_compiler *compiler)
+ {
+ 	struct lp_build_tgsi_context *bld_base;
+ 
+@@ -6748,7 +6748,7 @@ static void si_build_wrapper_function(struct si_shader_context *ctx,
+ }
+ 
+ int si_compile_tgsi_shader(struct si_screen *sscreen,
+-			   struct si_compiler *compiler,
++			   struct ac_llvm_compiler *compiler,
+ 			   struct si_shader *shader,
+ 			   bool is_monolithic,
+ 			   struct pipe_debug_callback *debug)
+@@ -7089,7 +7089,7 @@ si_get_shader_part(struct si_screen *sscreen,
+ 		   enum pipe_shader_type type,
+ 		   bool prolog,
+ 		   union si_shader_part_key *key,
+-		   struct si_compiler *compiler,
++		   struct ac_llvm_compiler *compiler,
+ 		   struct pipe_debug_callback *debug,
+ 		   void (*build)(struct si_shader_context *,
+ 				 union si_shader_part_key *),
+@@ -7335,7 +7335,7 @@ static void si_build_vs_prolog_function(struct si_shader_context *ctx,
+ }
+ 
+ static bool si_get_vs_prolog(struct si_screen *sscreen,
+-			     struct si_compiler *compiler,
++			     struct ac_llvm_compiler *compiler,
+ 			     struct si_shader *shader,
+ 			     struct pipe_debug_callback *debug,
+ 			     struct si_shader *main_part,
+@@ -7363,7 +7363,7 @@ static bool si_get_vs_prolog(struct si_screen *sscreen,
+  * Select and compile (or reuse) vertex shader parts (prolog & epilog).
+  */
+ static bool si_shader_select_vs_parts(struct si_screen *sscreen,
+-				      struct si_compiler *compiler,
++				      struct ac_llvm_compiler *compiler,
+ 				      struct si_shader *shader,
+ 				      struct pipe_debug_callback *debug)
+ {
+@@ -7452,7 +7452,7 @@ static void si_build_tcs_epilog_function(struct si_shader_context *ctx,
+  * Select and compile (or reuse) TCS parts (epilog).
+  */
+ static bool si_shader_select_tcs_parts(struct si_screen *sscreen,
+-				       struct si_compiler *compiler,
++				       struct ac_llvm_compiler *compiler,
+ 				       struct si_shader *shader,
+ 				       struct pipe_debug_callback *debug)
+ {
+@@ -7484,7 +7484,7 @@ static bool si_shader_select_tcs_parts(struct si_screen *sscreen,
+  * Select and compile (or reuse) GS parts (prolog).
+  */
+ static bool si_shader_select_gs_parts(struct si_screen *sscreen,
+-				      struct si_compiler *compiler,
++				      struct ac_llvm_compiler *compiler,
+ 				      struct si_shader *shader,
+ 				      struct pipe_debug_callback *debug)
+ {
+@@ -7897,7 +7897,7 @@ static void si_build_ps_epilog_function(struct si_shader_context *ctx,
+  * Select and compile (or reuse) pixel shader parts (prolog & epilog).
+  */
+ static bool si_shader_select_ps_parts(struct si_screen *sscreen,
+-				      struct si_compiler *compiler,
++				      struct ac_llvm_compiler *compiler,
+ 				      struct si_shader *shader,
+ 				      struct pipe_debug_callback *debug)
+ {
+@@ -8028,7 +8028,7 @@ static void si_fix_resource_usage(struct si_screen *sscreen,
+ 	}
+ }
+ 
+-int si_shader_create(struct si_screen *sscreen, struct si_compiler *compiler,
++int si_shader_create(struct si_screen *sscreen, struct ac_llvm_compiler *compiler,
+ 		     struct si_shader *shader,
+ 		     struct pipe_debug_callback *debug)
+ {
+diff --git a/src/gallium/drivers/radeonsi/si_shader.h b/src/gallium/drivers/radeonsi/si_shader.h
+index ce530a93b9..0ffc0f8817 100644
+--- a/src/gallium/drivers/radeonsi/si_shader.h
++++ b/src/gallium/drivers/radeonsi/si_shader.h
+@@ -139,6 +139,7 @@
+ 
+ #include "ac_binary.h"
+ #include "ac_llvm_build.h"
++#include "ac_llvm_util.h"
+ 
+ #include <stdio.h>
+ 
+@@ -311,18 +312,11 @@ enum {
+ 
+ struct si_shader;
+ 
+-/* Per-thread persistent LLVM objects. */
+-struct si_compiler {
+-	LLVMTargetMachineRef		tm;
+-	LLVMTargetLibraryInfoRef	target_library_info;
+-	LLVMPassManagerRef		passmgr;
+-};
+-
+ /* State of the context creating the shader object. */
+ struct si_compiler_ctx_state {
+ 	/* Should only be used by si_init_shader_selector_async and
+ 	 * si_build_shader_variant if thread_index == -1 (non-threaded). */
+-	struct si_compiler		*compiler;
++	struct ac_llvm_compiler		*compiler;
+ 
+ 	/* Used if thread_index == -1 or if debug.async is true. */
+ 	struct pipe_debug_callback	debug;
+@@ -653,15 +647,15 @@ struct si_shader_part {
+ /* si_shader.c */
+ struct si_shader *
+ si_generate_gs_copy_shader(struct si_screen *sscreen,
+-			   struct si_compiler *compiler,
++			   struct ac_llvm_compiler *compiler,
+ 			   struct si_shader_selector *gs_selector,
+ 			   struct pipe_debug_callback *debug);
+ int si_compile_tgsi_shader(struct si_screen *sscreen,
+-			   struct si_compiler *compiler,
++			   struct ac_llvm_compiler *compiler,
+ 			   struct si_shader *shader,
+ 			   bool is_monolithic,
+ 			   struct pipe_debug_callback *debug);
+-int si_shader_create(struct si_screen *sscreen, struct si_compiler *compiler,
++int si_shader_create(struct si_screen *sscreen, struct ac_llvm_compiler *compiler,
+ 		     struct si_shader *shader,
+ 		     struct pipe_debug_callback *debug);
+ void si_shader_destroy(struct si_shader *shader);
+diff --git a/src/gallium/drivers/radeonsi/si_shader_internal.h b/src/gallium/drivers/radeonsi/si_shader_internal.h
+index 0a347172d6..5e75681478 100644
+--- a/src/gallium/drivers/radeonsi/si_shader_internal.h
++++ b/src/gallium/drivers/radeonsi/si_shader_internal.h
+@@ -179,7 +179,7 @@ struct si_shader_context {
+ 	/* CS */
+ 	int param_block_size;
+ 
+-	struct si_compiler *compiler;
++	struct ac_llvm_compiler *compiler;
+ 
+ 	/* Preloaded descriptors. */
+ 	LLVMValueRef esgs_ring;
+@@ -221,7 +221,7 @@ si_shader_context_from_abi(struct ac_shader_abi *abi)
+ }
+ 
+ unsigned si_llvm_compile(LLVMModuleRef M, struct ac_shader_binary *binary,
+-			 struct si_compiler *compiler,
++			 struct ac_llvm_compiler *compiler,
+ 			 struct pipe_debug_callback *debug);
+ 
+ LLVMTypeRef tgsi2llvmtype(struct lp_build_tgsi_context *bld_base,
+@@ -236,7 +236,7 @@ LLVMValueRef si_llvm_bound_index(struct si_shader_context *ctx,
+ 
+ void si_llvm_context_init(struct si_shader_context *ctx,
+ 			  struct si_screen *sscreen,
+-			  struct si_compiler *compiler);
++			  struct ac_llvm_compiler *compiler);
+ void si_llvm_context_set_tgsi(struct si_shader_context *ctx,
+ 			      struct si_shader *shader);
+ 
+diff --git a/src/gallium/drivers/radeonsi/si_shader_tgsi_setup.c b/src/gallium/drivers/radeonsi/si_shader_tgsi_setup.c
+index 4797c6e910..8261ce72b5 100644
+--- a/src/gallium/drivers/radeonsi/si_shader_tgsi_setup.c
++++ b/src/gallium/drivers/radeonsi/si_shader_tgsi_setup.c
+@@ -94,7 +94,7 @@ static void si_diagnostic_handler(LLVMDiagnosticInfoRef di, void *context)
+  * @returns 0 for success, 1 for failure
+  */
+ unsigned si_llvm_compile(LLVMModuleRef M, struct ac_shader_binary *binary,
+-			 struct si_compiler *compiler,
++			 struct ac_llvm_compiler *compiler,
+ 			 struct pipe_debug_callback *debug)
+ {
+ 	struct si_llvm_diagnostics diag;
+@@ -988,7 +988,7 @@ static void emit_immediate(struct lp_build_tgsi_context *bld_base,
+ 
+ void si_llvm_context_init(struct si_shader_context *ctx,
+ 			  struct si_screen *sscreen,
+-			  struct si_compiler *compiler)
++			  struct ac_llvm_compiler *compiler)
+ {
+ 	struct lp_type type;
+ 
+diff --git a/src/gallium/drivers/radeonsi/si_state_shaders.c b/src/gallium/drivers/radeonsi/si_state_shaders.c
+index 2e215b91ce..3775514308 100644
+--- a/src/gallium/drivers/radeonsi/si_state_shaders.c
++++ b/src/gallium/drivers/radeonsi/si_state_shaders.c
+@@ -1488,7 +1488,7 @@ static void si_build_shader_variant(struct si_shader *shader,
+ {
+ 	struct si_shader_selector *sel = shader->selector;
+ 	struct si_screen *sscreen = sel->screen;
+-	struct si_compiler *compiler;
++	struct ac_llvm_compiler *compiler;
+ 	struct pipe_debug_callback *debug = &shader->compiler_ctx_state.debug;
+ 	int r;
+ 
+@@ -1835,7 +1835,7 @@ static void si_init_shader_selector_async(void *job, int thread_index)
+ {
+ 	struct si_shader_selector *sel = (struct si_shader_selector *)job;
+ 	struct si_screen *sscreen = sel->screen;
+-	struct si_compiler *compiler;
++	struct ac_llvm_compiler *compiler;
+ 	struct pipe_debug_callback *debug = &sel->compiler_ctx_state.debug;
+ 
+ 	assert(!debug->debug_message || debug->async);
+-- 
+2.15.1
+

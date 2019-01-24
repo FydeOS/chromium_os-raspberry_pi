@@ -1,0 +1,26 @@
+Needed when building by clang with gas (clang -no-integrated-as).
+
+--- a/crypto/modes/asm/ghash-armv4.pl
++++ b/crypto/modes/asm/ghash-armv4.pl
+@@ -121,21 +121,16 @@
+ }
+ 
+ $code=<<___;
+ #include "arm_arch.h"
+ 
+ .text
+ .code	32
+ 
+-#ifdef __clang__
+-#define ldrplb	ldrbpl
+-#define ldrneb	ldrbne
+-#endif
+-
+ .type	rem_4bit,%object
+ .align	5
+ rem_4bit:
+ .short	0x0000,0x1C20,0x3840,0x2460
+ .short	0x7080,0x6CA0,0x48C0,0x54E0
+ .short	0xE100,0xFD20,0xD940,0xC560
+ .short	0x9180,0x8DA0,0xA9C0,0xB5E0
+ .size	rem_4bit,.-rem_4bit

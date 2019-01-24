@@ -1,0 +1,42 @@
+# Certs listed by serial at https://www.comodo.com/Comodo-Fraud-Incident-2011-03-23.html
+serial 047ecbe9fca55f7bd09eae36e10cae1e
+serial 00f5c86af36162f13a64f54f6dc9587c06
+serial 00d7558fdaf5f1105bb213282b707729a3
+serial 392a434f0e07df1f8aa305de34e0c229
+serial 3e75ced46b693021218830ae86a82a71
+serial 00e9028b9578e415dc1a710a2b88154447
+serial 009239d5348f40d1695a745470e1f23f43
+serial 00b0b7133ed096f9b56fae91c874bd3ac0
+serial 00d8f35f4eb7872b2dab0692e315382fb0
+# Certs listed by hash in the Chrome source - DigiNotar's cross-signed roots
+# Subject: CN=DigiNotar Root CA
+# Issuer: CN=Entrust.net x2 and self-signed
+sha1 410f36363258f30b347d12ce4863e433437806a8
+# Subject: CN=DigiNotar Cyber CA
+# Issuer: CN=GTE CyberTrust Global Root
+sha1 c4f9663716cd5e71d6950b5f33ce041c95b435d1
+# Subject: CN=DigiNotar Services 1024 CA
+# Issuer: CN=Entrust.net
+sha1 e23b8d105f87710a68d9248050ebefc627be4ca6
+# Subject: CN=DigiNotar PKIoverheid CA Organisatie - G2
+# Issuer: CN=Staat der Nederlanden Organisatie CA - G2
+sha1 7b2e16bc39bcd72b456e9f055d1de615b74945db
+# Subject: CN=DigiNotar PKIoverheid CA Overheid en Bedrijven
+# Issuer: CN=Staat der Nederlanden Overheid CA
+sha1 e8f91200c65cee16e039b9f883841661635f81c5
+# Subject: O=Digicert Sdn. Bhd.
+# Issuer: CN=GTE CyberTrust Global Root
+# Expires: Jul 17 15:16:54 2012 GMT
+sha1 0129bcd5b448ae8d2496d1c3e19723919088e152
+# Subject: O=Digicert Sdn. Bhd.
+# Issuer: CN=Entrust.net Certification Authority (2048)
+# Expires: Jul 16 17:53:37 2015 GMT
+sha1 d33c5b41e45cc4b3be9ad6952c4ecc2528032981
+# Issuer: CN=Trustwave Organization Issuing CA, Level 2
+# Covers two certificates, the latter of which expires Apr 15 21:09:30
+# 2021 GMT.
+sha1 e12d89f56d2276f830e6ceafa66c725c0b41a932
+# Cyberoam CA certificate. Private key leaked, but this certificate would
+# only have been installed by Cyberoam customers. The certificate expires
+# in 2036, but we can probably remove in a couple of years (2014).
+sha1 d9f5c6ce57ffaa39cc7ed172bd53e0d307834bd1

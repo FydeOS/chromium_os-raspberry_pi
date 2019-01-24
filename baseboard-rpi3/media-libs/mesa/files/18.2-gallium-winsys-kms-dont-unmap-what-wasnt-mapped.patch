@@ -1,0 +1,88 @@
+From 370595019c0da3513097f55a85a4db71af290485 Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Thu, 16 Aug 2018 16:37:25 -0400
+Subject: [PATCH] UPSTREAM: gallium/winsys/kms: don't unmap what wasn't mapped
+
+At the moment, depending on pipe transfer flags, the dumb
+buffer map address can end up at either kms_sw_dt->ro_mapped
+or kms_sw_dt->mapped.
+
+When it's time to unmap the dumb buffer, both locations get unmapped,
+even though one is probably initialized to 0.
+
+That leads to the code segment getting unmapped at runtime and
+crashes when trying to call into unrelated code.
+
+This commit addresses the problem by using MAP_FAILED instead of
+NULL for ro_mapped and mapped when the dumb buffer is unmapped,
+and only unmapping mapped addresses at unmap time.
+
+Bugzilla: https://bugs.freedesktop.org/show_bug.cgi?id=107098
+Signed-off-by: Ray Strode <rstrode@redhat.com>
+Fixes: d891f28df9a ("gallium/winsys/kms: Fix possible leak in map/unmap.")
+Cc: Lepton Wu <lepton@chromium.org>
+Reviewed-by: Emil Velikov <emil.velikov@collabora.com>
+(cherry picked from commit 9baff597ce021f7691187b0d1d1bbc16d07b13e1)
+
+BUG=none
+TEST=llvmpipe does not crash on scarlet anymore
+
+Change-Id: I4b218d1dd0419ff3ef691179b75c6fcf91244882
+Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+---
+ .../winsys/sw/kms-dri/kms_dri_sw_winsys.c      | 18 +++++++++++++-----
+ 1 file changed, 13 insertions(+), 5 deletions(-)
+
+diff --git a/src/gallium/winsys/sw/kms-dri/kms_dri_sw_winsys.c b/src/gallium/winsys/sw/kms-dri/kms_dri_sw_winsys.c
+index 3fe1b1a7313..9564d9424b1 100644
+--- a/src/gallium/winsys/sw/kms-dri/kms_dri_sw_winsys.c
++++ b/src/gallium/winsys/sw/kms-dri/kms_dri_sw_winsys.c
+@@ -176,6 +176,8 @@ kms_sw_displaytarget_create(struct sw_winsys *ws,
+ 
+    list_inithead(&kms_sw_dt->planes);
+    kms_sw_dt->ref_count = 1;
++   kms_sw_dt->mapped = MAP_FAILED;
++   kms_sw_dt->ro_mapped = MAP_FAILED;
+ 
+    kms_sw_dt->format = format;
+ 
+@@ -262,7 +264,7 @@ kms_sw_displaytarget_map(struct sw_winsys *ws,
+ 
+    prot = (flags == PIPE_TRANSFER_READ) ? PROT_READ : (PROT_READ | PROT_WRITE);
+    void **ptr = (flags == PIPE_TRANSFER_READ) ? &kms_sw_dt->ro_mapped : &kms_sw_dt->mapped;
+-   if (!*ptr) {
++   if (*ptr == MAP_FAILED) {
+       void *tmp = mmap(0, kms_sw_dt->size, prot, MAP_SHARED,
+                        kms_sw->fd, map_req.offset);
+       if (tmp == MAP_FAILED)
+@@ -332,6 +334,8 @@ kms_sw_displaytarget_add_from_prime(struct kms_sw_winsys *kms_sw, int fd,
+       FREE(kms_sw_dt);
+       return NULL;
+    }
++   kms_sw_dt->mapped = MAP_FAILED;
++   kms_sw_dt->ro_mapped = MAP_FAILED;
+    kms_sw_dt->size = lseek_ret;
+    kms_sw_dt->ref_count = 1;
+    kms_sw_dt->handle = handle;
+@@ -368,10 +372,14 @@ kms_sw_displaytarget_unmap(struct sw_winsys *ws,
+    DEBUG_PRINT("KMS-DEBUG: unmapped buffer %u (was %p)\n", kms_sw_dt->handle, kms_sw_dt->mapped);
+    DEBUG_PRINT("KMS-DEBUG: unmapped buffer %u (was %p)\n", kms_sw_dt->handle, kms_sw_dt->ro_mapped);
+ 
+-   munmap(kms_sw_dt->mapped, kms_sw_dt->size);
+-   kms_sw_dt->mapped = NULL;
+-   munmap(kms_sw_dt->ro_mapped, kms_sw_dt->size);
+-   kms_sw_dt->ro_mapped = NULL;
++   if (kms_sw_dt->mapped != MAP_FAILED) {
++      munmap(kms_sw_dt->mapped, kms_sw_dt->size);
++      kms_sw_dt->mapped = MAP_FAILED;
++   }
++   if (kms_sw_dt->ro_mapped != MAP_FAILED) {
++      munmap(kms_sw_dt->ro_mapped, kms_sw_dt->size);
++      kms_sw_dt->ro_mapped = MAP_FAILED;
++   }
+ }
+ 
+ static struct sw_displaytarget *
+-- 
+2.19.1.1215.g8438c0b245-goog
+

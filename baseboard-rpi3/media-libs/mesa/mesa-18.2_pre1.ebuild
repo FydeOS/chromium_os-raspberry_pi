@@ -49,13 +49,13 @@ for card in ${VIDEO_CARDS}; do
 done
 
 IUSE="${IUSE_VIDEO_CARDS}
-	+classic debug dri egl +gallium -gbm gles1 gles2 llvm +nptl pic selinux
-	shared-glapi kernel_FreeBSD vulkan wayland xlib-glx X"
+	+classic debug dri drm egl +gallium -gbm gles1 gles2 llvm +nptl pic
+	selinux shared-glapi kernel_FreeBSD vulkan wayland xlib-glx X"
 
 LIBDRM_DEPSTRING=">=x11-libs/libdrm-2.4.60"
 
-REQUIRED_USE="video_cards_amdgpu? ( llvm )
-    video_cards_vc4? ( gallium )
+REQUIRED_USE="video_cards_vc4? ( gallium )
+    video_cards_amdgpu? ( llvm )
 	video_cards_llvmpipe? ( llvm )"
 
 # keep correct libdrm and dri2proto dep
@@ -63,7 +63,6 @@ REQUIRED_USE="video_cards_amdgpu? ( llvm )
 RDEPEND="
 	X? (
 		!<x11-base/xorg-server-1.7
-		!<=x11-proto/xf86driproto-2.0.3
 		>=x11-libs/libX11-1.3.99.901
 		x11-libs/libXdamage
 		x11-libs/libXext
@@ -82,14 +81,8 @@ DEPEND="${RDEPEND}
 	sys-devel/bison
 	sys-devel/flex
 	virtual/pkgconfig
-	>=x11-proto/dri2proto-2.6
+	x11-base/xorg-proto
 	wayland? ( >=dev-libs/wayland-protocols-1.8 )
-	X? (
-		>=x11-proto/glproto-1.4.11
-		>=x11-proto/xextproto-7.0.99.1
-		x11-proto/xf86driproto
-		x11-proto/xf86vidmodeproto
-	)
 	llvm? ( sys-devel/llvm )
 "
 
@@ -131,7 +124,25 @@ src_prepare() {
 	epatch "${FILESDIR}"/18.2-radv-Add-on-demand-compilation-of-built-in-shaders.patch
 	epatch "${FILESDIR}"/18.3-glapi-actually-implement-GL_EXT_robustness.patch
 	epatch "${FILESDIR}"/18.3-i965-Replace-checks-for-rb-Name-with-FlipY.patch
+	epatch "${FILESDIR}"/18.2-egl-rewire-the-build-systems-to-use-libwayland-egl.patch
+	epatch "${FILESDIR}"/18.2-egl-remove-wayland-egl-now-that-we-re-using-libwayla.patch
 	epatch "${FILESDIR}"/18.2-mesa-Additional-FlipY-applications.patch
+	epatch "${FILESDIR}"/18.2-ac-move-all-LLVM-module-initialization-into.patch
+	epatch "${FILESDIR}"/18.2-ac-radeonsi-refactor-out-pass-manager-init-to-common.patch
+	epatch "${FILESDIR}"/18.2-ac-add-target-library-info-helpers.patch
+	epatch "${FILESDIR}"/18.2-radeonsi-rename-si_compiler-ac_llvm_compiler.patch
+	epatch "${FILESDIR}"/18.2-ac-radeonsi-port-compiler-init-destroy-out-of-radeon.patch
+	epatch "${FILESDIR}"/18.2-ac-add-reusable-helpers-for-direct-LLVM-compilation.patch
+	epatch "${FILESDIR}"/18.2-radeonsi-use-ac_compile_module_to_binary-to-reduce-c.patch
+	epatch "${FILESDIR}"/18.2-ac-radeonsi-reduce-optimizations-for-complex-compute.patch
+	epatch "${FILESDIR}"/18.2-st-mesa-Also-check-for-PIPE_FORMAT_A8R8G8B8_SRGB-for.patch
+	epatch "${FILESDIR}"/18.3-intel-limit-urb-size-for-SKL-KBL-CFL-GT1.patch
+	epatch "${FILESDIR}"/18.2-gallium-winsys-kms-dont-unmap-what-wasnt-mapped.patch
+	epatch "${FILESDIR}"/18.2-st-mesa-only-define-GLSL-1.4-for-compat-if-driver-su.patch
+	epatch "${FILESDIR}"/18.2-gallium-add-PIPE_CAP_GLSL_FEATURE_LEVEL_COMPATIBILIT.patch
+	epatch "${FILESDIR}"/18.2-st-mesa-use-PIPE_CAP_GLSL_FEATURE_LEVEL_COMPATIBILIT.patch
+	epatch "${FILESDIR}"/18.2-mesa-add-ff-fragment-shader-support-for-geom-and-tes.patch
+	epatch "${FILESDIR}"/18.2-radeonsi-enable-OpenGL-3.3-compat-profile.patch
 
 	base_src_prepare
 
@@ -176,7 +187,6 @@ src_configure() {
 		gallium_driver_enable video_cards_freedreno freedreno
 
 		gallium_driver_enable video_cards_virgl virgl
-
         #for rpi vc4
         gallium_driver_enable video_cards_vc4 vc4
 	fi
@@ -200,12 +210,16 @@ src_configure() {
 	if use egl; then
 		egl_platforms="--with-platforms=surfaceless"
 
-		if use X; then
-			egl_platforms="${egl_platforms},x11"
+		if use drm; then
+			egl_platforms="${egl_platforms},drm"
 		fi
 
 		if use wayland; then
 			egl_platforms="${egl_platforms},wayland"
+		fi
+
+		if use X; then
+			egl_platforms="${egl_platforms},x11"
 		fi
 	fi
 
@@ -274,7 +288,7 @@ src_install() {
 	insinto "/usr/$(get_libdir)/dri/"
 	insopts -m0755
 	# install the gallium drivers we use
-	local gallium_drivers_files=( nouveau_dri.so r300_dri.so r600_dri.so msm_dri.so swrast_dri.so )
+	local gallium_drivers_files=( nouveau_dri.so r300_dri.so r600_dri.so msm_dri.so swrast_dri.so vc4_dri.so )
 	for x in ${gallium_drivers_files[@]}; do
 		if [ -f "${S}/$(get_libdir)/gallium/${x}" ]; then
 			doins "${S}/$(get_libdir)/gallium/${x}"

@@ -1,0 +1,90 @@
+From 147e22810836d5983073ad774c46cc82995f035f Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Marek=20Ol=C5=A1=C3=A1k?= <marek.olsak@amd.com>
+Date: Wed, 4 Jul 2018 01:28:17 -0400
+Subject: [PATCH 7/8] radeonsi: use ac_compile_module_to_binary to reduce
+ compile times
+
+Compile times of simple shaders are reduced by ~20%.
+Compile times of prologs and epilogs are reduced by up to 40%.
+
+Change-Id: I0845624157ca054a31a1d0c7f878365df7715fe5
+Reviewed-by: Dave Airlie <airlied@redhat.com>
+---
+ src/gallium/drivers/radeonsi/si_pipe.c             |  2 ++
+ .../drivers/radeonsi/si_shader_tgsi_setup.c        | 33 ++--------------------
+ 2 files changed, 4 insertions(+), 31 deletions(-)
+
+diff --git a/src/gallium/drivers/radeonsi/si_pipe.c b/src/gallium/drivers/radeonsi/si_pipe.c
+index 49d3d6856d..4e4353edac 100644
+--- a/src/gallium/drivers/radeonsi/si_pipe.c
++++ b/src/gallium/drivers/radeonsi/si_pipe.c
+@@ -114,10 +114,12 @@ static void si_init_compiler(struct si_screen *sscreen,
+ 		(sscreen->debug_flags & DBG(CHECK_IR) ? AC_TM_CHECK_IR : 0) ;
+ 
+ 	ac_init_llvm_compiler(compiler, sscreen->info.family, tm_options);
++	compiler->passes = ac_create_llvm_passes(compiler->tm);
+ }
+ 
+ static void si_destroy_compiler(struct ac_llvm_compiler *compiler)
+ {
++	ac_destroy_llvm_passes(compiler->passes);
+ 	ac_destroy_llvm_compiler(compiler);
+ }
+ 
+diff --git a/src/gallium/drivers/radeonsi/si_shader_tgsi_setup.c b/src/gallium/drivers/radeonsi/si_shader_tgsi_setup.c
+index 8261ce72b5..2fad270b05 100644
+--- a/src/gallium/drivers/radeonsi/si_shader_tgsi_setup.c
++++ b/src/gallium/drivers/radeonsi/si_shader_tgsi_setup.c
+@@ -98,12 +98,7 @@ unsigned si_llvm_compile(LLVMModuleRef M, struct ac_shader_binary *binary,
+ 			 struct pipe_debug_callback *debug)
+ {
+ 	struct si_llvm_diagnostics diag;
+-	char *err;
+ 	LLVMContextRef llvm_ctx;
+-	LLVMMemoryBufferRef out_buffer;
+-	unsigned buffer_size;
+-	const char *buffer_data;
+-	LLVMBool mem_err;
+ 
+ 	diag.debug = debug;
+ 	diag.retval = 0;
+@@ -113,34 +108,10 @@ unsigned si_llvm_compile(LLVMModuleRef M, struct ac_shader_binary *binary,
+ 
+ 	LLVMContextSetDiagnosticHandler(llvm_ctx, si_diagnostic_handler, &diag);
+ 
+-	/* Compile IR*/
+-	mem_err = LLVMTargetMachineEmitToMemoryBuffer(compiler->tm, M,
+-						      LLVMObjectFile, &err,
+-						      &out_buffer);
+-
+-	/* Process Errors/Warnings */
+-	if (mem_err) {
+-		fprintf(stderr, "%s: %s", __FUNCTION__, err);
+-		pipe_debug_message(debug, SHADER_INFO,
+-				   "LLVM emit error: %s", err);
+-		FREE(err);
++	/* Compile IR. */
++	if (!ac_compile_module_to_binary(compiler->passes, M, binary))
+ 		diag.retval = 1;
+-		goto out;
+-	}
+-
+-	/* Extract Shader Code*/
+-	buffer_size = LLVMGetBufferSize(out_buffer);
+-	buffer_data = LLVMGetBufferStart(out_buffer);
+-
+-	if (!ac_elf_read(buffer_data, buffer_size, binary)) {
+-		fprintf(stderr, "radeonsi: cannot read an ELF shader binary\n");
+-		diag.retval = 1;
+-	}
+-
+-	/* Clean up */
+-	LLVMDisposeMemoryBuffer(out_buffer);
+ 
+-out:
+ 	if (diag.retval != 0)
+ 		pipe_debug_message(debug, SHADER_INFO, "LLVM compile failed");
+ 	return diag.retval;
+-- 
+2.15.1
+

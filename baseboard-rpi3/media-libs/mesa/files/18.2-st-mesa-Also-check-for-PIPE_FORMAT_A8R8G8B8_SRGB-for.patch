@@ -1,0 +1,41 @@
+From 39126ddbfb9c61f13defb79b8c6e9e50c34ad2f7 Mon Sep 17 00:00:00 2001
+From: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+Date: Fri, 22 Jun 2018 15:59:10 +0200
+Subject: [PATCH] st/mesa: Also check for PIPE_FORMAT_A8R8G8B8_SRGB for
+ texture_sRGB
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+and PIPE_FORMAT_R8G8B8A8_SRGB, as well.
+
+The reason for this is that when Virgl runs with GLES on the host, it
+cannot directly upload textures in BGRA.
+
+So to avoid a conversion step, consider the RGB sRGB formats as well for
+this extension.
+
+Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+Reviewed-by: Marek Olšák <marek.olsak@amd.com>
+---
+ src/mesa/state_tracker/st_extensions.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/src/mesa/state_tracker/st_extensions.c b/src/mesa/state_tracker/st_extensions.c
+index 19ef736e5b..f9efc4a6d6 100644
+--- a/src/mesa/state_tracker/st_extensions.c
++++ b/src/mesa/state_tracker/st_extensions.c
+@@ -810,7 +810,9 @@ void st_init_extensions(struct pipe_screen *screen,
+       { { o(EXT_texture_sRGB),
+           o(EXT_texture_sRGB_decode) },
+         { PIPE_FORMAT_A8B8G8R8_SRGB,
+-          PIPE_FORMAT_B8G8R8A8_SRGB },
++	  PIPE_FORMAT_B8G8R8A8_SRGB,
++	  PIPE_FORMAT_A8R8G8B8_SRGB,
++	  PIPE_FORMAT_R8G8B8A8_SRGB},
+         GL_TRUE }, /* at least one format must be supported */
+ 
+       { { o(EXT_texture_type_2_10_10_10_REV) },
+-- 
+2.19.0.444.g18242da7ef-goog
+

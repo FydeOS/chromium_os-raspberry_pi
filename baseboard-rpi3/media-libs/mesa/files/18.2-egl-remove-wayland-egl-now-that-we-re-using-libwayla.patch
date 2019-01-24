@@ -1,0 +1,587 @@
+From b9361c9df051be632ef7b6481afe5b6c3c5efe4f Mon Sep 17 00:00:00 2001
+From: Eric Engestrom <eric.engestrom@intel.com>
+Date: Tue, 29 May 2018 15:41:29 +0100
+Subject: [PATCH] egl: remove wayland-egl now that we're using libwayland-egl
+
+Cc: Emil Velikov <emil.l.velikov@gmail.com>
+Cc: Daniel Stone <daniels@collabora.com>
+Reviewed-by: Matt Turner <mattst88@gmail.com>
+Signed-off-by: Eric Engestrom <eric.engestrom@intel.com>
+---
+ src/egl/wayland/wayland-egl/Makefile.am       |  24 --
+ src/egl/wayland/wayland-egl/meson.build       |  50 ----
+ .../wayland-egl/wayland-egl-abi-check.c       | 235 ------------------
+ .../wayland/wayland-egl/wayland-egl-backend.h |  63 -----
+ .../wayland-egl/wayland-egl-symbols-check     |  24 --
+ src/egl/wayland/wayland-egl/wayland-egl.c     | 109 --------
+ src/egl/wayland/wayland-egl/wayland-egl.pc.in |  11 -
+ 7 files changed, 516 deletions(-)
+ delete mode 100644 src/egl/wayland/wayland-egl/Makefile.am
+ delete mode 100644 src/egl/wayland/wayland-egl/meson.build
+ delete mode 100644 src/egl/wayland/wayland-egl/wayland-egl-abi-check.c
+ delete mode 100644 src/egl/wayland/wayland-egl/wayland-egl-backend.h
+ delete mode 100755 src/egl/wayland/wayland-egl/wayland-egl-symbols-check
+ delete mode 100644 src/egl/wayland/wayland-egl/wayland-egl.c
+ delete mode 100644 src/egl/wayland/wayland-egl/wayland-egl.pc.in
+
+diff --git a/src/egl/wayland/wayland-egl/Makefile.am b/src/egl/wayland/wayland-egl/Makefile.am
+deleted file mode 100644
+index 31dcca9e10..0000000000
+--- a/src/egl/wayland/wayland-egl/Makefile.am
++++ /dev/null
+@@ -1,24 +0,0 @@
+-pkgconfigdir = $(libdir)/pkgconfig
+-pkgconfig_DATA = wayland-egl.pc
+-
+-AM_CFLAGS = $(DEFINES) \
+-	    $(VISIBILITY_CFLAGS) \
+-	    $(WAYLAND_CLIENT_CFLAGS)
+-
+-lib_LTLIBRARIES = libwayland-egl.la
+-noinst_HEADERS = wayland-egl-backend.h
+-libwayland_egl_la_SOURCES = wayland-egl.c
+-libwayland_egl_la_LDFLAGS = \
+-	-no-undefined \
+-	-version-info 1 \
+-	$(GC_SECTIONS) \
+-	$(LD_NO_UNDEFINED)
+-
+-TESTS = wayland-egl-symbols-check \
+-        wayland-egl-abi-check
+-
+-EXTRA_DIST = wayland-egl-symbols-check meson.build
+-
+-check_PROGRAMS = wayland-egl-abi-check
+-
+-include $(top_srcdir)/install-lib-links.mk
+diff --git a/src/egl/wayland/wayland-egl/meson.build b/src/egl/wayland/wayland-egl/meson.build
+deleted file mode 100644
+index d0a7521da9..0000000000
+--- a/src/egl/wayland/wayland-egl/meson.build
++++ /dev/null
+@@ -1,50 +0,0 @@
+-# Copyright © 2017 Intel Corporation
+-
+-# Permission is hereby granted, free of charge, to any person obtaining a copy
+-# of this software and associated documentation files (the "Software"), to deal
+-# in the Software without restriction, including without limitation the rights
+-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+-# copies of the Software, and to permit persons to whom the Software is
+-# furnished to do so, subject to the following conditions:
+-
+-# The above copyright notice and this permission notice shall be included in
+-# all copies or substantial portions of the Software.
+-
+-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+-# SOFTWARE.
+-
+-
+-libwayland_egl = shared_library(
+-  'wayland-egl',
+-  'wayland-egl.c',
+-  c_args : [c_vis_args],
+-  link_args : ld_args_gc_sections,
+-  dependencies : dep_wayland_client,
+-  version : '1.0.0',
+-  install : true,
+-)
+-
+-pkg.generate(
+-  name : 'wayland-egl',
+-  description : 'Mesa wayland-egl library',
+-  libraries : libwayland_egl,
+-  version : meson.project_version(),
+-  requires : 'wayland-client',
+-)
+-
+-if with_tests
+-  test('wayland-egl-symbols-check',
+-    find_program('wayland-egl-symbols-check'),
+-    env : env_test,
+-    args : libwayland_egl
+-  )
+-  test(
+-    'wayland-egl-abi-check',
+-    executable('wayland-egl-abi-check', 'wayland-egl-abi-check.c')
+-  )
+-endif
+diff --git a/src/egl/wayland/wayland-egl/wayland-egl-abi-check.c b/src/egl/wayland/wayland-egl/wayland-egl-abi-check.c
+deleted file mode 100644
+index 62c51a2260..0000000000
+--- a/src/egl/wayland/wayland-egl/wayland-egl-abi-check.c
++++ /dev/null
+@@ -1,235 +0,0 @@
+-/*
+- * Copyright (c) 2017, NVIDIA CORPORATION. All rights reserved.
+- *
+- * Permission is hereby granted, free of charge, to any person obtaining a
+- * copy of this software and associated documentation files (the "Software"),
+- * to deal in the Software without restriction, including without limitation
+- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+- * and/or sell copies of the Software, and to permit persons to whom the
+- * Software is furnished to do so, subject to the following conditions:
+- *
+- * The above copyright notice and this permission notice shall be included in
+- * all copies or substantial portions of the Software.
+- *
+- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+- * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+- * DEALINGS IN THE SOFTWARE.
+- */
+-
+-#include <stddef.h> /* offsetof */
+-#include <stdio.h>  /* printf */
+-
+-#include "wayland-egl-backend.h" /* Current struct wl_egl_window implementation */
+-
+-/*
+- * Following are previous implementations of wl_egl_window.
+- *
+- * DO NOT EVER CHANGE!
+- */
+-
+-/* From: 214fc6e850 - Benjamin Franzke : egl: Implement libwayland-egl */
+-struct wl_egl_window_v0 {
+-    struct wl_surface *surface;
+-
+-    int width;
+-    int height;
+-    int dx;
+-    int dy;
+-
+-    int attached_width;
+-    int attached_height;
+-};
+-
+-/* From: ca3ed3e024 - Ander Conselvan de Oliveira : egl/wayland: Don't invalidate drawable on swap buffers */
+-struct wl_egl_window_v1 {
+-    struct wl_surface *surface;
+-
+-    int width;
+-    int height;
+-    int dx;
+-    int dy;
+-
+-    int attached_width;
+-    int attached_height;
+-
+-    void *private;
+-    void (*resize_callback)(struct wl_egl_window *, void *);
+-};
+-
+-/* From: 690ead4a13 - Stencel, Joanna : egl/wayland-egl: Fix for segfault in dri2_wl_destroy_surface. */
+-#define WL_EGL_WINDOW_VERSION_v2 2
+-struct wl_egl_window_v2 {
+-    struct wl_surface *surface;
+-
+-    int width;
+-    int height;
+-    int dx;
+-    int dy;
+-
+-    int attached_width;
+-    int attached_height;
+-
+-    void *private;
+-    void (*resize_callback)(struct wl_egl_window *, void *);
+-    void (*destroy_window_callback)(void *);
+-};
+-
+-/* From: 2d5d61bc49 - Miguel A. Vico : wayland-egl: Make wl_egl_window a versioned struct */
+-#define WL_EGL_WINDOW_VERSION_v3 3
+-struct wl_egl_window_v3 {
+-    const intptr_t version;
+-
+-    int width;
+-    int height;
+-    int dx;
+-    int dy;
+-
+-    int attached_width;
+-    int attached_height;
+-
+-    void *private;
+-    void (*resize_callback)(struct wl_egl_window *, void *);
+-    void (*destroy_window_callback)(void *);
+-
+-    struct wl_surface *surface;
+-};
+-
+-
+-/* This program checks we keep a backwards-compatible struct wl_egl_window
+- * definition whenever it is modified in wayland-egl-backend.h.
+- *
+- * The previous definition should be added above as a new struct
+- * wl_egl_window_vN, and the appropriate checks should be added below
+- */
+-
+-#define MEMBER_SIZE(type, member) sizeof(((type *)0)->member)
+-
+-#define CHECK_RENAMED_MEMBER(a_ver, b_ver, a_member, b_member)                      \
+-    do {                                                                            \
+-        if (offsetof(struct wl_egl_window ## a_ver, a_member) !=                    \
+-            offsetof(struct wl_egl_window ## b_ver, b_member)) {                    \
+-            printf("Backards incompatible change detected!\n   "                    \
+-                   "offsetof(struct wl_egl_window" #a_ver "::" #a_member ") != "    \
+-                   "offsetof(struct wl_egl_window" #b_ver "::" #b_member ")\n");    \
+-            return 1;                                                               \
+-        }                                                                           \
+-                                                                                    \
+-        if (MEMBER_SIZE(struct wl_egl_window ## a_ver, a_member) !=                 \
+-            MEMBER_SIZE(struct wl_egl_window ## b_ver, b_member)) {                 \
+-            printf("Backards incompatible change detected!\n   "                    \
+-                   "MEMBER_SIZE(struct wl_egl_window" #a_ver "::" #a_member ") != " \
+-                   "MEMBER_SIZE(struct wl_egl_window" #b_ver "::" #b_member ")\n"); \
+-            return 1;                                                               \
+-        }                                                                           \
+-    } while (0)
+-
+-#define CHECK_MEMBER(a_ver, b_ver, member) CHECK_RENAMED_MEMBER(a_ver, b_ver, member, member)
+-#define CHECK_MEMBER_CURRENT(a_ver, member) CHECK_MEMBER(a_ver,, member)
+-
+-#define CHECK_SIZE(a_ver, b_ver)                                                    \
+-    do {                                                                            \
+-        if (sizeof(struct wl_egl_window ## a_ver) >                                 \
+-            sizeof(struct wl_egl_window ## b_ver)) {                                \
+-            printf("Backards incompatible change detected!\n   "                    \
+-                   "sizeof(struct wl_egl_window" #a_ver ") > "                      \
+-                   "sizeof(struct wl_egl_window" #b_ver ")\n");                     \
+-            return 1;                                                               \
+-        }                                                                           \
+-    } while (0)
+-
+-#define CHECK_SIZE_CURRENT(a_ver)                                                   \
+-    do {                                                                            \
+-        if (sizeof(struct wl_egl_window ## a_ver) !=                                \
+-            sizeof(struct wl_egl_window)) {                                         \
+-            printf("Backards incompatible change detected!\n   "                    \
+-                   "sizeof(struct wl_egl_window" #a_ver ") != "                     \
+-                   "sizeof(struct wl_egl_window)\n");                               \
+-            return 1;                                                               \
+-        }                                                                           \
+-    } while (0)
+-
+-#define CHECK_VERSION(a_ver, b_ver)                                                 \
+-    do {                                                                            \
+-        if ((WL_EGL_WINDOW_VERSION ## a_ver) >=                                     \
+-            (WL_EGL_WINDOW_VERSION ## b_ver)) {                                     \
+-            printf("Backards incompatible change detected!\n   "                    \
+-                   "WL_EGL_WINDOW_VERSION" #a_ver " >= "                            \
+-                   "WL_EGL_WINDOW_VERSION" #b_ver "\n");                            \
+-            return 1;                                                               \
+-        }                                                                           \
+-    } while (0)
+-
+-#define CHECK_VERSION_CURRENT(a_ver)                                                \
+-    do {                                                                            \
+-        if ((WL_EGL_WINDOW_VERSION ## a_ver) !=                                     \
+-            (WL_EGL_WINDOW_VERSION)) {                                              \
+-            printf("Backards incompatible change detected!\n   "                    \
+-                   "WL_EGL_WINDOW_VERSION" #a_ver " != "                            \
+-                   "WL_EGL_WINDOW_VERSION\n");                                      \
+-            return 1;                                                               \
+-        }                                                                           \
+-    } while (0)
+-
+-int main(int argc, char **argv)
+-{
+-    /* Check wl_egl_window_v1 ABI against wl_egl_window_v0 */
+-    CHECK_MEMBER(_v0, _v1, surface);
+-    CHECK_MEMBER(_v0, _v1, width);
+-    CHECK_MEMBER(_v0, _v1, height);
+-    CHECK_MEMBER(_v0, _v1, dx);
+-    CHECK_MEMBER(_v0, _v1, dy);
+-    CHECK_MEMBER(_v0, _v1, attached_width);
+-    CHECK_MEMBER(_v0, _v1, attached_height);
+-
+-    CHECK_SIZE(_v0, _v1);
+-
+-    /* Check wl_egl_window_v2 ABI against wl_egl_window_v1 */
+-    CHECK_MEMBER(_v1, _v2, surface);
+-    CHECK_MEMBER(_v1, _v2, width);
+-    CHECK_MEMBER(_v1, _v2, height);
+-    CHECK_MEMBER(_v1, _v2, dx);
+-    CHECK_MEMBER(_v1, _v2, dy);
+-    CHECK_MEMBER(_v1, _v2, attached_width);
+-    CHECK_MEMBER(_v1, _v2, attached_height);
+-    CHECK_MEMBER(_v1, _v2, private);
+-    CHECK_MEMBER(_v1, _v2, resize_callback);
+-
+-    CHECK_SIZE(_v1, _v2);
+-
+-    /* Check wl_egl_window_v3 ABI against wl_egl_window_v2 */
+-    CHECK_RENAMED_MEMBER(_v2, _v3, surface, version);
+-    CHECK_MEMBER        (_v2, _v3, width);
+-    CHECK_MEMBER        (_v2, _v3, height);
+-    CHECK_MEMBER        (_v2, _v3, dx);
+-    CHECK_MEMBER        (_v2, _v3, dy);
+-    CHECK_MEMBER        (_v2, _v3, attached_width);
+-    CHECK_MEMBER        (_v2, _v3, attached_height);
+-    CHECK_MEMBER        (_v2, _v3, private);
+-    CHECK_MEMBER        (_v2, _v3, resize_callback);
+-    CHECK_MEMBER        (_v2, _v3, destroy_window_callback);
+-
+-    CHECK_SIZE   (_v2, _v3);
+-    CHECK_VERSION(_v2, _v3);
+-
+-    /* Check current wl_egl_window ABI against wl_egl_window_v3 */
+-    CHECK_MEMBER_CURRENT(_v3, version);
+-    CHECK_MEMBER_CURRENT(_v3, width);
+-    CHECK_MEMBER_CURRENT(_v3, height);
+-    CHECK_MEMBER_CURRENT(_v3, dx);
+-    CHECK_MEMBER_CURRENT(_v3, dy);
+-    CHECK_MEMBER_CURRENT(_v3, attached_width);
+-    CHECK_MEMBER_CURRENT(_v3, attached_height);
+-    CHECK_MEMBER_CURRENT(_v3, private);
+-    CHECK_MEMBER_CURRENT(_v3, resize_callback);
+-    CHECK_MEMBER_CURRENT(_v3, destroy_window_callback);
+-    CHECK_MEMBER_CURRENT(_v3, surface);
+-
+-    CHECK_SIZE_CURRENT   (_v3);
+-    CHECK_VERSION_CURRENT(_v3);
+-
+-    return 0;
+-}
+diff --git a/src/egl/wayland/wayland-egl/wayland-egl-backend.h b/src/egl/wayland/wayland-egl/wayland-egl-backend.h
+deleted file mode 100644
+index 82f025cb5b..0000000000
+--- a/src/egl/wayland/wayland-egl/wayland-egl-backend.h
++++ /dev/null
+@@ -1,63 +0,0 @@
+-/*
+- * Copyright © 2011 Benjamin Franzke
+- *
+- * Permission is hereby granted, free of charge, to any person obtaining a
+- * copy of this software and associated documentation files (the "Software"),
+- * to deal in the Software without restriction, including without limitation
+- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+- * and/or sell copies of the Software, and to permit persons to whom the
+- * Software is furnished to do so, subject to the following conditions:
+- *
+- * The above copyright notice and this permission notice (including the next
+- * paragraph) shall be included in all copies or substantial portions of the
+- * Software.
+- *
+- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+- * NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+- * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+- * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+- * DEALINGS IN THE SOFTWARE.
+- *
+- * Authors:
+- *    Benjamin Franzke <benjaminfranzke@googlemail.com>
+- */
+-
+-#ifndef _WAYLAND_EGL_PRIV_H
+-#define _WAYLAND_EGL_PRIV_H
+-
+-#include <stdint.h>
+-
+-#ifdef  __cplusplus
+-extern "C" {
+-#endif
+-
+-#define WL_EGL_WINDOW_VERSION 3
+-
+-struct wl_surface;
+-
+-struct wl_egl_window {
+-	const intptr_t version;
+-
+-	int width;
+-	int height;
+-	int dx;
+-	int dy;
+-
+-	int attached_width;
+-	int attached_height;
+-
+-	void *private;
+-	void (*resize_callback)(struct wl_egl_window *, void *);
+-	void (*destroy_window_callback)(void *);
+-
+-	struct wl_surface *surface;
+-};
+-
+-#ifdef  __cplusplus
+-}
+-#endif
+-
+-#endif
+diff --git a/src/egl/wayland/wayland-egl/wayland-egl-symbols-check b/src/egl/wayland/wayland-egl/wayland-egl-symbols-check
+deleted file mode 100755
+index a5fab77582..0000000000
+--- a/src/egl/wayland/wayland-egl/wayland-egl-symbols-check
++++ /dev/null
+@@ -1,24 +0,0 @@
+-#!/bin/sh
+-set -eu
+-
+-LIB=${1-.libs/libwayland-egl.so}
+-
+-if ! [ -f "$LIB" ]
+-then
+-  exit 1
+-fi
+-
+-FUNCS=$($NM -D --defined-only $LIB | grep -o "T .*" | cut -c 3- | while read func; do
+-( grep -q "^$func$" || echo $func )  <<EOF
+-wl_egl_window_resize
+-wl_egl_window_create
+-wl_egl_window_destroy
+-wl_egl_window_get_attached_size
+-_fini
+-_init
+-EOF
+-done)
+-
+-test ! -n "$FUNCS" || echo $FUNCS
+-test ! -n "$FUNCS"
+-
+diff --git a/src/egl/wayland/wayland-egl/wayland-egl.c b/src/egl/wayland/wayland-egl/wayland-egl.c
+deleted file mode 100644
+index e7cea895ec..0000000000
+--- a/src/egl/wayland/wayland-egl/wayland-egl.c
++++ /dev/null
+@@ -1,109 +0,0 @@
+-/*
+- * Copyright © 2011 Kristian Høgsberg
+- * Copyright © 2011 Benjamin Franzke
+- *
+- * Permission is hereby granted, free of charge, to any person obtaining a
+- * copy of this software and associated documentation files (the "Software"),
+- * to deal in the Software without restriction, including without limitation
+- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+- * and/or sell copies of the Software, and to permit persons to whom the
+- * Software is furnished to do so, subject to the following conditions:
+- *
+- * The above copyright notice and this permission notice (including the next
+- * paragraph) shall be included in all copies or substantial portions of the
+- * Software.
+- *
+- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+- * NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+- * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+- * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+- * DEALINGS IN THE SOFTWARE.
+- *
+- * Authors:
+- *    Kristian Høgsberg <krh@bitplanet.net>
+- *    Benjamin Franzke <benjaminfranzke@googlemail.com>
+- */
+-
+-#include <stdlib.h>
+-#include <string.h>
+-
+-#include "wayland-egl.h"
+-#include "wayland-egl-backend.h"
+-
+-/* GCC visibility */
+-#if defined(__GNUC__)
+-#define WL_EGL_EXPORT __attribute__ ((visibility("default")))
+-#else
+-#define WL_EGL_EXPORT
+-#endif
+-
+-WL_EGL_EXPORT void
+-wl_egl_window_resize(struct wl_egl_window *egl_window,
+-		     int width, int height,
+-		     int dx, int dy)
+-{
+-	if (width <= 0 || height <= 0)
+-		return;
+-
+-	egl_window->width  = width;
+-	egl_window->height = height;
+-	egl_window->dx     = dx;
+-	egl_window->dy     = dy;
+-
+-	if (egl_window->resize_callback)
+-		egl_window->resize_callback(egl_window, egl_window->private);
+-}
+-
+-WL_EGL_EXPORT struct wl_egl_window *
+-wl_egl_window_create(struct wl_surface *surface,
+-		     int width, int height)
+-{
+-	struct wl_egl_window *egl_window;
+-
+-	if (width <= 0 || height <= 0)
+-		return NULL;
+-
+-	egl_window = calloc(1, sizeof *egl_window);
+-	if (!egl_window)
+-		return NULL;
+-
+-	/* Cast away the constness to set the version number.
+-	 *
+-	 * We want the const notation since it gives an explicit
+-	 * feedback to the backend implementation, should it try to
+-	 * change it.
+-	 *
+-	 * The latter in itself is not too surprising as these days APIs
+-	 * tend to provide bidirectional version field.
+-	 */
+-	intptr_t *version = (intptr_t *)&egl_window->version;
+-	*version = WL_EGL_WINDOW_VERSION;
+-
+-	egl_window->surface = surface;
+-
+-	egl_window->width  = width;
+-	egl_window->height = height;
+-
+-	return egl_window;
+-}
+-
+-WL_EGL_EXPORT void
+-wl_egl_window_destroy(struct wl_egl_window *egl_window)
+-{
+-	if (egl_window->destroy_window_callback)
+-		egl_window->destroy_window_callback(egl_window->private);
+-	free(egl_window);
+-}
+-
+-WL_EGL_EXPORT void
+-wl_egl_window_get_attached_size(struct wl_egl_window *egl_window,
+-				int *width, int *height)
+-{
+-	if (width)
+-		*width = egl_window->attached_width;
+-	if (height)
+-		*height = egl_window->attached_height;
+-}
+diff --git a/src/egl/wayland/wayland-egl/wayland-egl.pc.in b/src/egl/wayland/wayland-egl/wayland-egl.pc.in
+deleted file mode 100644
+index 8a40cfac5a..0000000000
+--- a/src/egl/wayland/wayland-egl/wayland-egl.pc.in
++++ /dev/null
+@@ -1,11 +0,0 @@
+-prefix=@prefix@
+-exec_prefix=@exec_prefix@
+-libdir=@libdir@
+-includedir=@includedir@
+-
+-Name: wayland-egl
+-Description: Mesa wayland-egl library
+-Version: @VERSION@
+-Requires: wayland-client
+-Libs: -L${libdir} -lwayland-egl
+-Cflags: -I${includedir}
+-- 
+2.19.0.rc2.392.g5ba43deb5a-goog
+

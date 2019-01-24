@@ -1,0 +1,195 @@
+From 1db4ec05462914096b1f243e9b2af7e71cf38622 Mon Sep 17 00:00:00 2001
+From: Eric Engestrom <eric.engestrom@intel.com>
+Date: Tue, 29 May 2018 15:41:28 +0100
+Subject: [PATCH 1/2] egl: rewire the build systems to use libwayland-egl
+
+Cc: Emil Velikov <emil.l.velikov@gmail.com>
+Cc: Daniel Stone <daniels@collabora.com>
+Reviewed-by: Matt Turner <mattst88@gmail.com>
+Signed-off-by: Eric Engestrom <eric.engestrom@intel.com>
+---
+ configure.ac                                       |  6 ++++--
+ meson.build                                        |  3 +++
+ src/Makefile.am                                    |  5 -----
+ src/egl/Makefile.am                                |  3 ++-
+ src/egl/drivers/dri2/platform_wayland.c            |  7 +++----
+ src/egl/meson.build                                | 10 ++--------
+ src/gallium/state_trackers/omx/tizonia/Makefile.am |  2 +-
+ 7 files changed, 15 insertions(+), 21 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index 600127af8f..875c47fcd4 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -90,6 +90,7 @@ LIBOMXIL_TIZONIA_REQUIRED=0.10.0
+ LIBVA_REQUIRED=0.39.0
+ VDPAU_REQUIRED=1.1
+ WAYLAND_REQUIRED=1.11
++WAYLAND_EGL_REQUIRED=1.15
+ WAYLAND_PROTOCOLS_REQUIRED=1.8
+ XCB_REQUIRED=1.9.3
+ XCBDRI2_REQUIRED=1.8
+@@ -1808,6 +1809,9 @@ for plat in $platforms; do
+         PKG_CHECK_MODULES([WAYLAND_CLIENT], [wayland-client >= $WAYLAND_REQUIRED])
+         PKG_CHECK_MODULES([WAYLAND_SERVER], [wayland-server >= $WAYLAND_REQUIRED])
+         PKG_CHECK_MODULES([WAYLAND_PROTOCOLS], [wayland-protocols >= $WAYLAND_PROTOCOLS_REQUIRED])
++        if test "x$enable_egl" = xyes; then
++          PKG_CHECK_MODULES([WAYLAND_EGL], [wayland-egl >= $WAYLAND_EGL_REQUIRED])
++        fi
+         WAYLAND_PROTOCOLS_DATADIR=`$PKG_CONFIG --variable=pkgdatadir wayland-protocols`
+ 
+         PKG_CHECK_MODULES([WAYLAND_SCANNER], [wayland-scanner],
+@@ -3022,8 +3026,6 @@ AC_CONFIG_FILES([Makefile
+                  src/egl/Makefile
+                  src/egl/main/egl.pc
+                  src/egl/wayland/wayland-drm/Makefile
+-                 src/egl/wayland/wayland-egl/Makefile
+-                 src/egl/wayland/wayland-egl/wayland-egl.pc
+                  src/gallium/Makefile
+                  src/gallium/auxiliary/Makefile
+                  src/gallium/auxiliary/pipe-loader/Makefile
+diff --git a/meson.build b/meson.build
+index 1d1b2a979b..4d4ca5d557 100644
+--- a/meson.build
++++ b/meson.build
+@@ -1201,6 +1201,9 @@ if with_platform_wayland
+   dep_wl_protocols = dependency('wayland-protocols', version : '>= 1.8')
+   dep_wayland_client = dependency('wayland-client', version : '>=1.11')
+   dep_wayland_server = dependency('wayland-server', version : '>=1.11')
++  if with_egl
++    dep_wayland_egl = dependency('wayland-egl', version : '>=1.15')
++  endif
+   wayland_dmabuf_xml = join_paths(
+     dep_wl_protocols.get_pkgconfig_variable('pkgdatadir'), 'unstable',
+     'linux-dmabuf', 'linux-dmabuf-unstable-v1.xml'
+diff --git a/src/Makefile.am b/src/Makefile.am
+index fd5ae44550..9bb3bce3c0 100644
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -95,11 +95,6 @@ if HAVE_GBM
+ SUBDIRS += gbm
+ endif
+ 
+-## Optionally required by EGL
+-if HAVE_PLATFORM_WAYLAND
+-SUBDIRS += egl/wayland/wayland-egl
+-endif
+-
+ if HAVE_EGL
+ SUBDIRS += egl
+ endif
+diff --git a/src/egl/Makefile.am b/src/egl/Makefile.am
+index 086a4a1e63..be3547d968 100644
+--- a/src/egl/Makefile.am
++++ b/src/egl/Makefile.am
+@@ -84,6 +84,8 @@ drivers/dri2/egl_dri2.lo: drivers/dri2/linux-dmabuf-unstable-v1-client-protocol.
+ AM_CFLAGS += $(WAYLAND_CLIENT_CFLAGS)
+ libEGL_common_la_LIBADD += $(WAYLAND_CLIENT_LIBS)
+ libEGL_common_la_LIBADD += $(LIBDRM_LIBS)
++AM_CFLAGS += $(WAYLAND_EGL_CFLAGS)
++libEGL_common_la_LIBADD += $(WAYLAND_EGL_LIBS)
+ AM_CFLAGS += $(WAYLAND_SERVER_CFLAGS)
+ libEGL_common_la_LIBADD += $(top_builddir)/src/egl/wayland/wayland-drm/libwayland-drm.la
+ libEGL_common_la_LIBADD += $(WAYLAND_SERVER_LIBS)
+@@ -114,7 +116,6 @@ AM_CFLAGS += \
+ 	-I$(top_builddir)/src/egl/drivers/dri2 \
+ 	-I$(top_srcdir)/src/egl/drivers/dri2 \
+ 	-I$(top_srcdir)/src/gbm/backends/dri \
+-	-I$(top_srcdir)/src/egl/wayland/wayland-egl \
+ 	-I$(top_builddir)/src/egl/wayland/wayland-drm \
+ 	-I$(top_srcdir)/src/egl/wayland/wayland-drm \
+ 	-DDEFAULT_DRIVER_DIR=\"$(DRI_DRIVER_SEARCH_DIR)\" \
+diff --git a/src/egl/drivers/dri2/platform_wayland.c b/src/egl/drivers/dri2/platform_wayland.c
+index 63da21cdf5..11026f9fbf 100644
+--- a/src/egl/drivers/dri2/platform_wayland.c
++++ b/src/egl/drivers/dri2/platform_wayland.c
+@@ -45,12 +45,11 @@
+ #include "util/u_vector.h"
+ #include "eglglobals.h"
+ 
++#include <wayland-egl-backend.h>
+ #include <wayland-client.h>
+ #include "wayland-drm-client-protocol.h"
+ #include "linux-dmabuf-unstable-v1-client-protocol.h"
+ 
+-#include "wayland/wayland-egl/wayland-egl-backend.h"
+-
+ #ifndef DRM_FORMAT_MOD_INVALID
+ #define DRM_FORMAT_MOD_INVALID ((1ULL << 56) - 1)
+ #endif
+@@ -298,7 +297,7 @@ dri2_wl_create_window_surface(_EGLDriver *drv, _EGLDisplay *disp,
+                       dri2_surf->wl_queue);
+ 
+    dri2_surf->wl_win = window;
+-   dri2_surf->wl_win->private = dri2_surf;
++   dri2_surf->wl_win->driver_private = dri2_surf;
+    dri2_surf->wl_win->destroy_window_callback = destroy_window_callback;
+    if (dri2_dpy->flush)
+       dri2_surf->wl_win->resize_callback = resize_callback;
+@@ -384,7 +383,7 @@ dri2_wl_destroy_surface(_EGLDriver *drv, _EGLDisplay *disp, _EGLSurface *surf)
+       wl_callback_destroy(dri2_surf->throttle_callback);
+ 
+    if (dri2_surf->wl_win) {
+-      dri2_surf->wl_win->private = NULL;
++      dri2_surf->wl_win->driver_private = NULL;
+       dri2_surf->wl_win->resize_callback = NULL;
+       dri2_surf->wl_win->destroy_window_callback = NULL;
+    }
+diff --git a/src/egl/meson.build b/src/egl/meson.build
+index 9050d763a6..dc67b7b153 100644
+--- a/src/egl/meson.build
++++ b/src/egl/meson.build
+@@ -116,7 +116,7 @@ if with_platform_surfaceless
+   files_egl += files('drivers/dri2/platform_surfaceless.c')
+ endif
+ if with_platform_wayland
+-  deps_for_egl += [dep_wayland_client, dep_wayland_server]
++  deps_for_egl += [dep_wayland_client, dep_wayland_server, dep_wayland_egl]
+   link_for_egl += libwayland_drm
+   files_egl += files('drivers/dri2/platform_wayland.c')
+   files_egl += [
+@@ -124,9 +124,7 @@ if with_platform_wayland
+     linux_dmabuf_unstable_v1_client_protocol_h,
+     wayland_drm_client_protocol_h,
+   ]
+-  incs_for_egl += include_directories(
+-    'wayland/wayland-egl', 'wayland/wayland-drm',
+-  )
++  incs_for_egl += include_directories('wayland/wayland-drm')
+ endif
+ if with_platform_android
+   deps_for_egl += dep_android
+@@ -198,10 +196,6 @@ pkg.generate(
+   extra_cflags : gl_pkgconfig_c_flags,
+ )
+ 
+-if with_platform_wayland
+-  subdir('wayland/wayland-egl')
+-endif
+-
+ if with_tests
+   if with_glvnd
+     # TODO: add glvnd symbol check
+diff --git a/src/gallium/state_trackers/omx/tizonia/Makefile.am b/src/gallium/state_trackers/omx/tizonia/Makefile.am
+index 0eac85a319..ac72affa32 100644
+--- a/src/gallium/state_trackers/omx/tizonia/Makefile.am
++++ b/src/gallium/state_trackers/omx/tizonia/Makefile.am
+@@ -29,7 +29,6 @@ AM_CFLAGS = \
+ 	-I$(top_srcdir)/src/mesa/drivers/dri/common \
+ 	-I$(top_srcdir)/src/egl \
+ 	-I$(top_srcdir)/src/egl/drivers/dri2 \
+-	-I$(top_srcdir)/src/egl/wayland/wayland-egl \
+ 	-I$(top_srcdir)/src/egl/main \
+ 	-I$(top_srcdir)/src/gbm/main \
+ 	-I$(top_srcdir)/src/loader \
+@@ -38,6 +37,7 @@ AM_CFLAGS = \
+ 	-I$(top_srcdir)/src/gallium/state_trackers/omx \
+ 	$(GALLIUM_CFLAGS) \
+ 	$(LIBDRM_CFLAGS) \
++	$(WAYLAND_EGL_CFLAGS) \
+ 	$(VISIBILITY_CFLAGS) \
+ 	$(VL_CFLAGS) \
+ 	$(XCB_DRI3_CFLAGS) \
+-- 
+2.19.0.rc2.392.g5ba43deb5a-goog
+

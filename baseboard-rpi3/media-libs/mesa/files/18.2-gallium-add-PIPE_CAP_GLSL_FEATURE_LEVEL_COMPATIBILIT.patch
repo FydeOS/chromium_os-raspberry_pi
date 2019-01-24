@@ -1,0 +1,273 @@
+From eb92e64d2f31b59c6c1917696f262831d4fb587d Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Marek=20Ol=C5=A1=C3=A1k?= <marek.olsak@amd.com>
+Date: Thu, 15 Feb 2018 01:32:08 +0100
+Subject: [PATCH] gallium: add PIPE_CAP_GLSL_FEATURE_LEVEL_COMPATIBILITY
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Reviewed-by: Nicolai Hähnle <nicolai.haehnle@amd.com>
+Reviewed-by: Timothy Arceri <tarceri@itsqueeze.com>
+
+Change-Id: Iee8eff60450c4f88b2b29ea89de7b8421f532d08
+
+Backport: Apply changes to vc5_screen.c instead of v3d.
+---
+ src/gallium/docs/source/screen.rst               | 6 ++++++
+ src/gallium/drivers/etnaviv/etnaviv_screen.c     | 1 +
+ src/gallium/drivers/freedreno/freedreno_screen.c | 1 +
+ src/gallium/drivers/i915/i915_screen.c           | 1 +
+ src/gallium/drivers/llvmpipe/lp_screen.c         | 2 ++
+ src/gallium/drivers/nouveau/nv30/nv30_screen.c   | 1 +
+ src/gallium/drivers/nouveau/nv50/nv50_screen.c   | 2 ++
+ src/gallium/drivers/nouveau/nvc0/nvc0_screen.c   | 2 ++
+ src/gallium/drivers/r300/r300_screen.c           | 1 +
+ src/gallium/drivers/r600/r600_pipe.c             | 3 +++
+ src/gallium/drivers/radeonsi/si_get.c            | 3 +++
+ src/gallium/drivers/softpipe/sp_screen.c         | 2 ++
+ src/gallium/drivers/svga/svga_screen.c           | 3 +++
+ src/gallium/drivers/swr/swr_screen.cpp           | 2 ++
+ src/gallium/drivers/vc4/vc4_screen.c             | 1 +
+ src/gallium/drivers/vc5/vc5_screen.c             | 3 +++
+ src/gallium/drivers/virgl/virgl_screen.c         | 2 ++
+ src/gallium/include/pipe/p_defines.h             | 1 +
+ 18 files changed, 37 insertions(+)
+
+diff --git a/src/gallium/docs/source/screen.rst b/src/gallium/docs/source/screen.rst
+index 5bc6ee9..0f18b7a 100644
+--- a/src/gallium/docs/source/screen.rst
++++ b/src/gallium/docs/source/screen.rst
+@@ -93,6 +93,12 @@ The integer capabilities:
+   shader.
+ * ``PIPE_CAP_GLSL_FEATURE_LEVEL``: Whether the driver supports features
+   equivalent to a specific GLSL version. E.g. for GLSL 1.3, report 130.
++* ``PIPE_CAP_GLSL_FEATURE_LEVEL_COMPATIBILITY``: Whether the driver supports
++  features equivalent to a specific GLSL version including all legacy OpenGL
++  features only present in the OpenGL compatibility profile.
++  The only legacy features that Gallium drivers must implement are
++  the legacy shader inputs and outputs (colors, texcoords, fog, clipvertex,
++  edgeflag).
+ * ``PIPE_CAP_QUADS_FOLLOW_PROVOKING_VERTEX_CONVENTION``: Whether quads adhere to
+   the flatshade_first setting in ``pipe_rasterizer_state``.
+ * ``PIPE_CAP_USER_VERTEX_BUFFERS``: Whether the driver supports user vertex
+diff --git a/src/gallium/drivers/etnaviv/etnaviv_screen.c b/src/gallium/drivers/etnaviv/etnaviv_screen.c
+index cada836..244726e 100644
+--- a/src/gallium/drivers/etnaviv/etnaviv_screen.c
++++ b/src/gallium/drivers/etnaviv/etnaviv_screen.c
+@@ -154,6 +154,7 @@ etna_screen_get_param(struct pipe_screen *pscreen, enum pipe_cap param)
+    case PIPE_CAP_MIN_MAP_BUFFER_ALIGNMENT:
+       return 4; /* XXX could easily be supported */
+    case PIPE_CAP_GLSL_FEATURE_LEVEL:
++   case PIPE_CAP_GLSL_FEATURE_LEVEL_COMPATIBILITY:
+       return 120;
+ 
+    case PIPE_CAP_NPOT_TEXTURES:
+diff --git a/src/gallium/drivers/freedreno/freedreno_screen.c b/src/gallium/drivers/freedreno/freedreno_screen.c
+index c59995c..f97c46b 100644
+--- a/src/gallium/drivers/freedreno/freedreno_screen.c
++++ b/src/gallium/drivers/freedreno/freedreno_screen.c
+@@ -261,6 +261,7 @@ fd_screen_get_param(struct pipe_screen *pscreen, enum pipe_cap param)
+ 		return 64;
+ 
+ 	case PIPE_CAP_GLSL_FEATURE_LEVEL:
++	case PIPE_CAP_GLSL_FEATURE_LEVEL_COMPATIBILITY:
+ 		if (glsl120)
+ 			return 120;
+ 		return is_ir3(screen) ? 140 : 120;
+diff --git a/src/gallium/drivers/i915/i915_screen.c b/src/gallium/drivers/i915/i915_screen.c
+index 1b8c0ad..b08d228 100644
+--- a/src/gallium/drivers/i915/i915_screen.c
++++ b/src/gallium/drivers/i915/i915_screen.c
+@@ -342,6 +342,7 @@ i915_get_param(struct pipe_screen *screen, enum pipe_cap cap)
+       return 64;
+ 
+    case PIPE_CAP_GLSL_FEATURE_LEVEL:
++   case PIPE_CAP_GLSL_FEATURE_LEVEL_COMPATIBILITY:
+       return 120;
+ 
+    case PIPE_CAP_CONSTANT_BUFFER_OFFSET_ALIGNMENT:
+diff --git a/src/gallium/drivers/llvmpipe/lp_screen.c b/src/gallium/drivers/llvmpipe/lp_screen.c
+index af1aff4..f12ad09 100644
+--- a/src/gallium/drivers/llvmpipe/lp_screen.c
++++ b/src/gallium/drivers/llvmpipe/lp_screen.c
+@@ -205,6 +205,8 @@ llvmpipe_get_param(struct pipe_screen *screen, enum pipe_cap param)
+       return 1;
+    case PIPE_CAP_GLSL_FEATURE_LEVEL:
+       return 330;
++   case PIPE_CAP_GLSL_FEATURE_LEVEL_COMPATIBILITY:
++      return 140;
+    case PIPE_CAP_QUADS_FOLLOW_PROVOKING_VERTEX_CONVENTION:
+       return 0;
+    case PIPE_CAP_COMPUTE:
+diff --git a/src/gallium/drivers/nouveau/nv30/nv30_screen.c b/src/gallium/drivers/nouveau/nv30/nv30_screen.c
+index a24176a..99249d2 100644
+--- a/src/gallium/drivers/nouveau/nv30/nv30_screen.c
++++ b/src/gallium/drivers/nouveau/nv30/nv30_screen.c
+@@ -64,6 +64,7 @@ nv30_screen_get_param(struct pipe_screen *pscreen, enum pipe_cap param)
+    case PIPE_CAP_MAX_TEXTURE_CUBE_LEVELS:
+       return 13;
+    case PIPE_CAP_GLSL_FEATURE_LEVEL:
++   case PIPE_CAP_GLSL_FEATURE_LEVEL_COMPATIBILITY:
+       return 120;
+    case PIPE_CAP_ENDIANNESS:
+       return PIPE_ENDIAN_LITTLE;
+diff --git a/src/gallium/drivers/nouveau/nv50/nv50_screen.c b/src/gallium/drivers/nouveau/nv50/nv50_screen.c
+index b278a2f..2495a54 100644
+--- a/src/gallium/drivers/nouveau/nv50/nv50_screen.c
++++ b/src/gallium/drivers/nouveau/nv50/nv50_screen.c
+@@ -109,6 +109,8 @@ nv50_screen_get_param(struct pipe_screen *pscreen, enum pipe_cap param)
+       return 128 * 1024 * 1024;
+    case PIPE_CAP_GLSL_FEATURE_LEVEL:
+       return 330;
++   case PIPE_CAP_GLSL_FEATURE_LEVEL_COMPATIBILITY:
++      return 140;
+    case PIPE_CAP_MAX_RENDER_TARGETS:
+       return 8;
+    case PIPE_CAP_MAX_DUAL_SOURCE_RENDER_TARGETS:
+diff --git a/src/gallium/drivers/nouveau/nvc0/nvc0_screen.c b/src/gallium/drivers/nouveau/nvc0/nvc0_screen.c
+index e1c7b3a..f679cbd 100644
+--- a/src/gallium/drivers/nouveau/nvc0/nvc0_screen.c
++++ b/src/gallium/drivers/nouveau/nvc0/nvc0_screen.c
+@@ -134,6 +134,8 @@ nvc0_screen_get_param(struct pipe_screen *pscreen, enum pipe_cap param)
+       return 128 * 1024 * 1024;
+    case PIPE_CAP_GLSL_FEATURE_LEVEL:
+       return 430;
++   case PIPE_CAP_GLSL_FEATURE_LEVEL_COMPATIBILITY:
++      return 140;
+    case PIPE_CAP_MAX_RENDER_TARGETS:
+       return 8;
+    case PIPE_CAP_MAX_DUAL_SOURCE_RENDER_TARGETS:
+diff --git a/src/gallium/drivers/r300/r300_screen.c b/src/gallium/drivers/r300/r300_screen.c
+index 8a6e0c2..459349e 100644
+--- a/src/gallium/drivers/r300/r300_screen.c
++++ b/src/gallium/drivers/r300/r300_screen.c
+@@ -120,6 +120,7 @@ static int r300_get_param(struct pipe_screen* pscreen, enum pipe_cap param)
+             return 16;
+ 
+         case PIPE_CAP_GLSL_FEATURE_LEVEL:
++        case PIPE_CAP_GLSL_FEATURE_LEVEL_COMPATIBILITY:
+             return 120;
+ 
+         /* r300 cannot do swizzling of compressed textures. Supported otherwise. */
+diff --git a/src/gallium/drivers/r600/r600_pipe.c b/src/gallium/drivers/r600/r600_pipe.c
+index 1a293ea..ff73069 100644
+--- a/src/gallium/drivers/r600/r600_pipe.c
++++ b/src/gallium/drivers/r600/r600_pipe.c
+@@ -343,6 +343,9 @@ static int r600_get_param(struct pipe_screen* pscreen, enum pipe_cap param)
+ 		   return 330;
+ 		return 140;
+ 
++	case PIPE_CAP_GLSL_FEATURE_LEVEL_COMPATIBILITY:
++		return 140;
++
+ 	/* Supported except the original R600. */
+ 	case PIPE_CAP_INDEP_BLEND_ENABLE:
+ 	case PIPE_CAP_INDEP_BLEND_FUNC:
+diff --git a/src/gallium/drivers/radeonsi/si_get.c b/src/gallium/drivers/radeonsi/si_get.c
+index d4e0eab..0b75359 100644
+--- a/src/gallium/drivers/radeonsi/si_get.c
++++ b/src/gallium/drivers/radeonsi/si_get.c
+@@ -230,6 +230,9 @@ static int si_get_param(struct pipe_screen *pscreen, enum pipe_cap param)
+ 			return 450;
+ 		return 420;
+ 
++	case PIPE_CAP_GLSL_FEATURE_LEVEL_COMPATIBILITY:
++		return 140;
++
+ 	case PIPE_CAP_MAX_TEXTURE_BUFFER_SIZE:
+ 		return MIN2(sscreen->info.max_alloc_size, INT_MAX);
+ 
+diff --git a/src/gallium/drivers/softpipe/sp_screen.c b/src/gallium/drivers/softpipe/sp_screen.c
+index f9c786a..f9c916d9 100644
+--- a/src/gallium/drivers/softpipe/sp_screen.c
++++ b/src/gallium/drivers/softpipe/sp_screen.c
+@@ -151,6 +151,8 @@ softpipe_get_param(struct pipe_screen *screen, enum pipe_cap param)
+       return 0;
+    case PIPE_CAP_GLSL_FEATURE_LEVEL:
+       return 330;
++   case PIPE_CAP_GLSL_FEATURE_LEVEL_COMPATIBILITY:
++      return 140;
+    case PIPE_CAP_QUADS_FOLLOW_PROVOKING_VERTEX_CONVENTION:
+    case PIPE_CAP_TGSI_TEX_TXF_LZ:
+       return 0;
+diff --git a/src/gallium/drivers/svga/svga_screen.c b/src/gallium/drivers/svga/svga_screen.c
+index 82d7c98..2744f31 100644
+--- a/src/gallium/drivers/svga/svga_screen.c
++++ b/src/gallium/drivers/svga/svga_screen.c
+@@ -278,6 +278,9 @@ svga_get_param(struct pipe_screen *screen, enum pipe_cap param)
+    case PIPE_CAP_GLSL_FEATURE_LEVEL:
+       return sws->have_vgpu10 ? 330 : 120;
+ 
++   case PIPE_CAP_GLSL_FEATURE_LEVEL_COMPATIBILITY:
++      return sws->have_vgpu10 ? 140 : 120;
++
+    case PIPE_CAP_PREFER_BLIT_BASED_TEXTURE_TRANSFER:
+       return 0;
+ 
+diff --git a/src/gallium/drivers/swr/swr_screen.cpp b/src/gallium/drivers/swr/swr_screen.cpp
+index 738792b..091d322 100644
+--- a/src/gallium/drivers/swr/swr_screen.cpp
++++ b/src/gallium/drivers/swr/swr_screen.cpp
+@@ -183,6 +183,8 @@ swr_get_param(struct pipe_screen *screen, enum pipe_cap param)
+       return 7;
+    case PIPE_CAP_GLSL_FEATURE_LEVEL:
+       return 330;
++   case PIPE_CAP_GLSL_FEATURE_LEVEL_COMPATIBILITY:
++      return 140;
+    case PIPE_CAP_CONSTANT_BUFFER_OFFSET_ALIGNMENT:
+       return 16;
+    case PIPE_CAP_MIN_MAP_BUFFER_ALIGNMENT:
+diff --git a/src/gallium/drivers/vc4/vc4_screen.c b/src/gallium/drivers/vc4/vc4_screen.c
+index 81c8049..e18b207 100644
+--- a/src/gallium/drivers/vc4/vc4_screen.c
++++ b/src/gallium/drivers/vc4/vc4_screen.c
+@@ -161,6 +161,7 @@ vc4_screen_get_param(struct pipe_screen *pscreen, enum pipe_cap param)
+                 return 256;
+ 
+         case PIPE_CAP_GLSL_FEATURE_LEVEL:
++	case PIPE_CAP_GLSL_FEATURE_LEVEL_COMPATIBILITY:
+                 return 120;
+ 
+         case PIPE_CAP_MAX_VIEWPORTS:
+diff --git a/src/gallium/drivers/vc5/vc5_screen.c b/src/gallium/drivers/vc5/vc5_screen.c
+index a287a5e..3b1e302 100644
+--- a/src/gallium/drivers/vc5/vc5_screen.c
++++ b/src/gallium/drivers/vc5/vc5_screen.c
+@@ -124,6 +124,9 @@ vc5_screen_get_param(struct pipe_screen *pscreen, enum pipe_cap param)
+         case PIPE_CAP_GLSL_FEATURE_LEVEL:
+                 return 400;
+ 
++	case PIPE_CAP_GLSL_FEATURE_LEVEL_COMPATIBILITY:
++		return 140;
++
+         case PIPE_CAP_MAX_VIEWPORTS:
+                 return 1;
+ 
+diff --git a/src/gallium/drivers/virgl/virgl_screen.c b/src/gallium/drivers/virgl/virgl_screen.c
+index ab35b1f..149dd94 100644
+--- a/src/gallium/drivers/virgl/virgl_screen.c
++++ b/src/gallium/drivers/virgl/virgl_screen.c
+@@ -133,6 +133,8 @@ virgl_get_param(struct pipe_screen *screen, enum pipe_cap param)
+       return 1;
+    case PIPE_CAP_GLSL_FEATURE_LEVEL:
+       return vscreen->caps.caps.v1.glsl_level;
++   case PIPE_CAP_GLSL_FEATURE_LEVEL_COMPATIBILITY:
++      return MIN2(vscreen->caps.caps.v1.glsl_level, 140);
+    case PIPE_CAP_QUADS_FOLLOW_PROVOKING_VERTEX_CONVENTION:
+       return 0;
+    case PIPE_CAP_COMPUTE:
+diff --git a/src/gallium/include/pipe/p_defines.h b/src/gallium/include/pipe/p_defines.h
+index 6b2f33b..6cc73a3 100644
+--- a/src/gallium/include/pipe/p_defines.h
++++ b/src/gallium/include/pipe/p_defines.h
+@@ -686,6 +686,7 @@ enum pipe_cap
+    PIPE_CAP_VERTEX_COLOR_UNCLAMPED,
+    PIPE_CAP_VERTEX_COLOR_CLAMPED,
+    PIPE_CAP_GLSL_FEATURE_LEVEL,
++   PIPE_CAP_GLSL_FEATURE_LEVEL_COMPATIBILITY,
+    PIPE_CAP_QUADS_FOLLOW_PROVOKING_VERTEX_CONVENTION,
+    PIPE_CAP_USER_VERTEX_BUFFERS,
+    PIPE_CAP_VERTEX_BUFFER_OFFSET_4BYTE_ALIGNED_ONLY,
+-- 
+2.7.4
+

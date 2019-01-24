@@ -1,0 +1,63 @@
+From: Lionel Landwerlin <lionel.g.landwerlin@intel.com>
+Date: Thu, 30 Aug 2018 01:39:02 +0100
+Subject: FROMLIST: intel: limit urb size for SKL/KBL/CFL GT1
+
+The documentation puts the URB size for SKL GT1 as "128K - 192K". I
+guess this means we can't tell which one it is, so we have to go for
+the lower bound. This change also changes the max VS URB entries which
+is lower on GT1 skus.
+
+Fixes a CTS test :
+
+  dEQP-GLES31.functional.geometry_shading.layered.render_with_default_layer_3d
+
+Signed-off-by: Lionel Landwerlin <lionel.g.landwerlin@intel.com>
+Bugzilla: https://bugs.freedesktop.org/show_bug.cgi?id=107505
+Archived-At: https://lists.freedesktop.org/archives/mesa-dev/2018-August/203974.html
+[chadv: Resolve backport conflicts]
+---
+ src/intel/dev/gen_device_info.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/src/intel/dev/gen_device_info.c b/src/intel/dev/gen_device_info.c
+index 653cece6d70..ec5769aa4b2 100644
+--- a/src/intel/dev/gen_device_info.c
++++ b/src/intel/dev/gen_device_info.c
+@@ -602,7 +602,8 @@ static const struct gen_device_info gen_device_info_skl_gt1 = {
+    .num_subslices = { 2, },
+    .num_eu_per_subslice = 6,
+    .l3_banks = 2,
+-   .urb.size = 192,
++   .urb.size = 128,
++   .urb.max_entries[MESA_SHADER_VERTEX] = 928,
+ };
+ 
+ static const struct gen_device_info gen_device_info_skl_gt2 = {
+@@ -663,11 +664,12 @@ static const struct gen_device_info gen_device_info_kbl_gt1 = {
+    .gt = 1,
+ 
+    .max_cs_threads = 7 * 6,
+-   .urb.size = 192,
+    .num_slices = 1,
+    .num_subslices = { 2, },
+    .num_eu_per_subslice = 6,
+    .l3_banks = 2,
++   .urb.size = 128,
++   .urb.max_entries[MESA_SHADER_VERTEX] = 928,
+ };
+ 
+ static const struct gen_device_info gen_device_info_kbl_gt1_5 = {
+@@ -747,7 +749,10 @@ static const struct gen_device_info gen_device_info_cfl_gt1 = {
+    .num_subslices = { 2, },
+    .num_eu_per_subslice = 6,
+    .l3_banks = 2,
++   .urb.size = 128,
++   .urb.max_entries[MESA_SHADER_VERTEX] = 928,
+ };
++
+ static const struct gen_device_info gen_device_info_cfl_gt2 = {
+    GEN9_FEATURES,
+    .is_coffeelake = true,
+-- 
+2.19.0.605.g01d371f741-goog
+

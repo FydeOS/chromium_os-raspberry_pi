@@ -1,0 +1,244 @@
+From: Elly Jones <ellyjones@chromium.org>
+Subject: [PATCH] add blacklist-by-sha1 support
+
+We can add certs to the blacklist by serial (with 'serial <n>') or by sha256sum
+with ('sha256 <n>').
+
+BUG=chromium:203154
+TEST=script (added to package tests),security_OpenSSLBlacklist
+TEST=`FEATURES=test emerge openssl`
+
+--- a/crypto/x509/x509_vfy.c
++++ b/crypto/x509/x509_vfy.c
+@@ -150,6 +150,125 @@
+     return xtmp;
+ }
+ 
++/* A version of fgets() that returns the first sz - 1 characters of the next
++ * line from 'in'. The rest of the line is discarded. */
++static int gets_trunc(BIO *in, char *buf, int sz)
++{
++	char b;
++	int i = 0;
++
++	if (sz < 1)
++		return i;
++
++	while (BIO_read(in, &b, 1)) {
++		if (i < sz - 1)
++			buf[i++] = b;
++		if (!b || b == '\n')
++			break;
++	}
++
++	buf[i] = '\0';
++
++	return i;
++}
++
++/* Converts a byte string into a hex string, null-terminated. The 'out' buffer
++ * must be at least 2 * insize + 1 bytes long. */
++static void hexify(unsigned char *in, char *out, int insize)
++{
++	int i;
++	static const char hex[] = "0123456789abcdef";
++	for (i = 0; i < insize; i++) {
++		out[i * 2] = hex[in[i] >> 4];
++		out[i * 2 + 1] = hex[in[i] & 0xf];
++	}
++	out[i * 2] = '\0';
++}
++
++static int is_blacklisted(X509 *x)
++{
++	/* See http://tools.ietf.org/html/rfc5280#section-4.1.2.2:
++	 * "Certificate users MUST be able to handle serialNumber values up to
++	 *  20 octets.  Conforming CAs MUST NOT use serialNumber values longer
++	 *  than 20 octets."
++	 */
++	static const int MAX_SERIAL = 20;
++	static const int MAX_BLACKLIST_LINE = 1024;
++
++	unsigned char md[EVP_MAX_MD_SIZE];
++	char hexsha256[EVP_MAX_MD_SIZE * 2 + 1];
++	char hexsha1[EVP_MAX_MD_SIZE * 2 + 1];
++	char hexserial[MAX_SERIAL * 2 + 1];
++	const EVP_MD *sha256 = EVP_sha256();
++	const EVP_MD *sha1 = EVP_sha1();
++	unsigned int n;
++	char line[MAX_BLACKLIST_LINE];
++	BIO *file;
++	int ret = 0;
++	ASN1_INTEGER *serial = NULL;
++	unsigned int serial_len;
++	const char *path = getenv("OPENSSL_BLACKLIST_PATH");
++
++	if (!path)
++		path = OPENSSLDIR "/blacklist";
++
++	file = BIO_new_file(path, "r");
++	if (!file)
++		return 0;
++
++	if (!X509_digest(x, sha256, md, &n))
++		goto out;
++	hexify(md, hexsha256, n);
++	if (!X509_digest(x, sha1, md, &n))
++		goto out;
++	hexify(md, hexsha1, n);
++	serial = X509_get_serialNumber(x);
++	serial_len = serial->length;
++	if (serial_len > sizeof(hexserial) / 2)
++		/* We only match the first MAX_SERIAL bytes of the serial. */
++		serial_len = sizeof(hexserial) / 2;
++	hexify(serial->data, hexserial, serial_len);
++
++	while (gets_trunc(file, line, sizeof(line))) {
++		char *p, *str = line;
++		char *cmd = strsep(&str, " ");
++		char *arg = strsep(&str, " ");
++		if (!cmd || !arg || cmd[0] == '#')
++			continue;
++		if ((p = strchr(arg, '\n')))
++			*p = '\0';
++		if (!strcmp(cmd, "sha256") && !strcmp(arg, hexsha256)) {
++			ret = 1;
++			goto out;
++		}
++		if (!strcmp(cmd, "sha1") && !strcmp(arg, hexsha1)) {
++			ret = 1;
++			goto out;
++		}
++		if (!strcmp(cmd, "serial") && !strcmp(arg, hexserial)) {
++			ret = 1;
++			goto out;
++		}
++	}
++
++out:
++	BIO_free(file);
++	return ret;
++}
++
++static int check_blacklist(X509_STORE_CTX *ctx)
++{
++	int i;
++	X509 *x;
++
++	for (i = 0; i < ctx->last_untrusted; i++) {
++		x = sk_X509_value(ctx->chain, i);
++		if (is_blacklisted(x))
++			return 0;
++	}
++	return 1;
++}
++
+ int X509_verify_cert(X509_STORE_CTX *ctx)
+ {
+     X509 *x, *xtmp, *xtmp2, *chain_ss = NULL;
+@@ -307,6 +426,14 @@ int X509_verify_cert(X509_STORE_CTX *ctx)
+         }
+ 
+         /* we now have our chain, lets check it... */
++
++	ok = check_blacklist(ctx);
++	if (!ok) {
++		ctx->error = X509_V_ERR_CERT_REJECTED;
++		ok = -1;
++		goto err;
++	}
++
+         if ((trust = check_trust(ctx)) == X509_TRUST_REJECTED) {
+             /* Callback already issued */
+             ok = 0;
+--- a/test/Makefile
++++ b/test/Makefile
+@@ -218,6 +218,10 @@
+ 	@sh ./treq 2>/dev/null
+ 	@sh ./treq testreq2.pem 2>/dev/null
+ 
++alltests: test_blacklist
++test_blacklist:
++	@sh ./tblacklist
++
+ test_pkcs7: ../apps/openssl$(EXE_EXT) tpkcs7 tpkcs7d testp7.pem pkcs7-1.pem
+ 	@sh ./tpkcs7 2>/dev/null
+ 	@sh ./tpkcs7d 2>/dev/null
+--- /dev/null
++++ b/test/tblacklist
+@@ -0,0 +1,75 @@
++#!/bin/sh
++# Test /etc/ssl/blacklist
++
++td=$(mktemp -d "openssl-test.XXXXXXXX")
++
++cat >> "$td/thawte.pem" << EOF
++-----BEGIN CERTIFICATE-----
++MIIDIzCCAoygAwIBAgIEMAAAAjANBgkqhkiG9w0BAQUFADBfMQswCQYDVQQGEwJV
++UzEXMBUGA1UEChMOVmVyaVNpZ24sIEluYy4xNzA1BgNVBAsTLkNsYXNzIDMgUHVi
++bGljIFByaW1hcnkgQ2VydGlmaWNhdGlvbiBBdXRob3JpdHkwHhcNMDQwNTEzMDAw
++MDAwWhcNMTQwNTEyMjM1OTU5WjBMMQswCQYDVQQGEwJaQTElMCMGA1UEChMcVGhh
++d3RlIENvbnN1bHRpbmcgKFB0eSkgTHRkLjEWMBQGA1UEAxMNVGhhd3RlIFNHQyBD
++QTCBnzANBgkqhkiG9w0BAQEFAAOBjQAwgYkCgYEA1NNn0I0Vf67NMf59HZGhPwtx
++PKzMyGT7Y/wySweUvW+Aui/hBJPAM/wJMyPpC3QrccQDxtLN4i/1CWPN/0ilAL/g
++5/OIty0y3pg25gqtAHvEZEo7hHUD8nCSfQ5i9SGraTaEMXWQ+L/HbIgbBpV8yeWo
++3nWhLHpo39XKHIdYYBkCAwEAAaOB/jCB+zASBgNVHRMBAf8ECDAGAQH/AgEAMAsG
++A1UdDwQEAwIBBjARBglghkgBhvhCAQEEBAMCAQYwKAYDVR0RBCEwH6QdMBsxGTAX
++BgNVBAMTEFByaXZhdGVMYWJlbDMtMTUwMQYDVR0fBCowKDAmoCSgIoYgaHR0cDov
++L2NybC52ZXJpc2lnbi5jb20vcGNhMy5jcmwwMgYIKwYBBQUHAQEEJjAkMCIGCCsG
++AQUFBzABhhZodHRwOi8vb2NzcC50aGF3dGUuY29tMDQGA1UdJQQtMCsGCCsGAQUF
++BwMBBggrBgEFBQcDAgYJYIZIAYb4QgQBBgpghkgBhvhFAQgBMA0GCSqGSIb3DQEB
++BQUAA4GBAFWsY+reod3SkF+fC852vhNRj5PZBSvIG3dLrWlQoe7e3P3bB+noOZTc
++q3J5Lwa/q4FwxKjt6lM07e8eU9kGx1Yr0Vz00YqOtCuxN5BICEIlxT6Ky3/rbwTR
++bcV0oveifHtgPHfNDs5IAn8BL7abN+AqKjbc1YXWrOU/VG+WHgWv
++-----END CERTIFICATE-----
++EOF
++
++cat >> "$td/google.pem" << EOF
++-----BEGIN CERTIFICATE-----
++MIIDITCCAoqgAwIBAgIQL9+89q6RUm0PmqPfQDQ+mjANBgkqhkiG9w0BAQUFADBM
++MQswCQYDVQQGEwJaQTElMCMGA1UEChMcVGhhd3RlIENvbnN1bHRpbmcgKFB0eSkg
++THRkLjEWMBQGA1UEAxMNVGhhd3RlIFNHQyBDQTAeFw0wOTEyMTgwMDAwMDBaFw0x
++MTEyMTgyMzU5NTlaMGgxCzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlh
++MRYwFAYDVQQHFA1Nb3VudGFpbiBWaWV3MRMwEQYDVQQKFApHb29nbGUgSW5jMRcw
++FQYDVQQDFA53d3cuZ29vZ2xlLmNvbTCBnzANBgkqhkiG9w0BAQEFAAOBjQAwgYkC
++gYEA6PmGD5D6htffvXImttdEAoN4c9kCKO+IRTn7EOh8rqk41XXGOOsKFQebg+jN
++gtXj9xVoRaELGYW84u+E593y17iYwqG7tcFR39SDAqc9BkJb4SLD3muFXxzW2k6L
++05vuuWciKh0R73mkszeK9P4Y/bz5RiNQl/Os/CRGK1w7t0UCAwEAAaOB5zCB5DAM
++BgNVHRMBAf8EAjAAMDYGA1UdHwQvMC0wK6ApoCeGJWh0dHA6Ly9jcmwudGhhd3Rl
++LmNvbS9UaGF3dGVTR0NDQS5jcmwwKAYDVR0lBCEwHwYIKwYBBQUHAwEGCCsGAQUF
++BwMCBglghkgBhvhCBAEwcgYIKwYBBQUHAQEEZjBkMCIGCCsGAQUFBzABhhZodHRw
++Oi8vb2NzcC50aGF3dGUuY29tMD4GCCsGAQUFBzAChjJodHRwOi8vd3d3LnRoYXd0
++ZS5jb20vcmVwb3NpdG9yeS9UaGF3dGVfU0dDX0NBLmNydDANBgkqhkiG9w0BAQUF
++AAOBgQCfQ89bxFApsb/isJr/aiEdLRLDLE5a+RLizrmCUi3nHX4adpaQedEkUjh5
++u2ONgJd8IyAPkU0Wueru9G2Jysa9zCRo1kNbzipYvzwY4OA8Ys+WAi0oR1A04Se6
++z5nRUP8pJcA2NhUzUnC+MY+f6H/nEQyNv4SgQhqAibAxWEEHXw==
++-----END CERTIFICATE-----
++EOF
++
++# These are from 'openssl x509 -in google.pem -text -fingerprint -sha256'
++google_sha256='f641c36cfef49bc071359ecf88eed9317b738b5989416ad401720c0a4e2e6352'
++google_sha1='405062e5befde4af97e9382af16cc87c8fb7c4e2'
++google_serial='2fdfbcf6ae91526d0f9aa3df40343e9a'
++blacklist="$td/blacklist"
++export OPENSSL_BLACKLIST_PATH="$blacklist"
++
++die () {
++	echo "$@"
++	exit 1
++}
++
++verify () {
++	openssl verify -CAfile "$td/thawte.pem" "$td/google.pem" > "$td/$1.out" 2> "$td/$1.err"
++}
++
++# First, ensure that the cert verifies with no changes.
++verify good || die "failed to verify good signature"
++echo "serial $google_serial" > "$blacklist"
++verify serial && die "verified with blacklisted serial"
++echo "sha256 $google_sha256" > "$blacklist"
++verify sha256 && die "verified with blacklisted sha256"
++echo "sha1 $google_sha1" > "$blacklist"
++verify sha1 && die "verified with blacklisted sha1"
++rm -rf "$td"
++exit 0

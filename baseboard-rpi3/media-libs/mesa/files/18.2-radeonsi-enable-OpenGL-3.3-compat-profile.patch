@@ -1,0 +1,29 @@
+From 904a80cfa8570ccf9f93c97a222586303767a684 Mon Sep 17 00:00:00 2001
+From: Timothy Arceri <tarceri@itsqueeze.com>
+Date: Mon, 18 Jun 2018 15:23:20 +1000
+Subject: [PATCH 5/5] radeonsi: enable OpenGL 3.3 compat profile
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Reviewed-by: Marek Olšák <marek.olsak@amd.com>
+---
+ src/gallium/drivers/radeonsi/si_get.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/gallium/drivers/radeonsi/si_get.c b/src/gallium/drivers/radeonsi/si_get.c
+index 0b75359..ba3e02a 100644
+--- a/src/gallium/drivers/radeonsi/si_get.c
++++ b/src/gallium/drivers/radeonsi/si_get.c
+@@ -231,7 +231,7 @@ static int si_get_param(struct pipe_screen *pscreen, enum pipe_cap param)
+ 		return 420;
+ 
+ 	case PIPE_CAP_GLSL_FEATURE_LEVEL_COMPATIBILITY:
+-		return 140;
++		return 330;
+ 
+ 	case PIPE_CAP_MAX_TEXTURE_BUFFER_SIZE:
+ 		return MIN2(sscreen->info.max_alloc_size, INT_MAX);
+-- 
+2.7.4
+
