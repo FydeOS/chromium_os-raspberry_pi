@@ -5,6 +5,13 @@ If you aren't bothered with all the technicalities and just want the pre-built i
 
 # Changelog
 
+### 2019-01-24
+##### Update to Chromium OS r72
+* The overlays are now updated to build Chromium OS r72, with Chromium OS manifest pointing to `release-R72-11316.B` and Chromium at `72.0.3626.54` tag.
+* Added optional SD card expansion script, courtesy of FydeOS.
+* Added missing firmware from latest official Raspbian release.
+* Fixed various build issues from previous release.
+
 ### 2018-11-19
 ##### Update to Chromium OS r70
 * The overlays are now updated to build Chromium OS r70
