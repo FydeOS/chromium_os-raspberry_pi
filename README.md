@@ -1,9 +1,18 @@
+[<img src="https://img.shields.io/badge/Join%20Slack%20Channel-Chromium%20OS%20for%20Raspberry%20Pi-yellowgreen.svg?style=popout-square&logo=slack&colorA=870611&colorB=333333">](https://chromium-os-for-sbc.slack.com/messages/CFPSV215F/)
+
+
+<br>
+
+
 # TL;DR:
 If you aren't bothered with all the technicalities and just want the pre-built images, it's [here](https://github.com/FydeOS/chromium_os_for_raspberry_pi/releases), under the **release** tab, no hard feelings :p
 
 <br>
 
 # Changelog
+### 2019-01-28
+##### Add [Slack channel](https://chromium-os-for-sbc.slack.com/messages/CFPSV215F/) for better community experience.
+
 
 ### 2019-01-24
 ##### Update to Chromium OS r72
