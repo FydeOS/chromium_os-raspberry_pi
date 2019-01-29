@@ -1,4 +1,4 @@
-[<img src="https://img.shields.io/badge/Join%20Slack%20Channel-Chromium%20OS%20for%20Raspberry%20Pi-yellowgreen.svg?style=popout-square&logo=slack&colorA=870611&colorB=333333">](https://chromium-os-for-sbc.slack.com/messages/CFPSV215F/)
+[<img src="https://img.shields.io/badge/Join%20Slack%20Channel-Chromium%20OS%20for%20Raspberry%20Pi-yellowgreen.svg?style=popout-square&logo=slack&colorA=870611&colorB=333333">](https://join.slack.com/t/chromium-os-for-sbc/shared_invite/enQtNTM1ODU4MDQ4OTgxLTAwMmU0MTIxODA1ZmMzZjc2NzZlYjcwYjQyZDkwMDU5ZjY5ZDBlM2UxMWYwNzdmYzNhNTc1YzRhYzhhY2MwMDM)
 
 
 <br>
@@ -10,6 +10,9 @@ If you aren't bothered with all the technicalities and just want the pre-built i
 <br>
 
 # Changelog
+### 2019-01-29
+##### Fix Slack invitation link, oops 😅
+
 ### 2019-01-28
 ##### Add [Slack channel](https://chromium-os-for-sbc.slack.com/messages/CFPSV215F/) for better community experience.
 
