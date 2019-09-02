@@ -1,8 +1,8 @@
 # Copyright 2015 The Chromium OS Authors. All rights reserved.
 # Distributed under the terms of the GNU General Public License v2
 
-CHROMEOS_KERNEL_CONFIG="/mnt/host/source/src/overlays/chipset-bcm2837/kconfig/rpi_4_14_deconf"
-CHROMEOS_KERNEL_ARCH="arm64"
+CHROMEOS_KERNEL_CONFIG="/mnt/host/source/src/overlays/chipset-bcm2837/kconfig/rpi_4_19_deconf"
+CHROMEOS_KERNEL_ARCH="arm"
 # Turn on the video cards this board uses.
 VIDEO_CARDS="vc4"
 

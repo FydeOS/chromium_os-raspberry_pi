@@ -1,0 +1,56 @@
+From 82f6a746e8b47fb6e3f96d7f5f69973f50eec9ca Mon Sep 17 00:00:00 2001
+From: Anuj Phogat <anuj.phogat@gmail.com>
+Date: Fri, 29 Mar 2019 13:13:01 -0700
+Subject: [PATCH] intel: Add support for Comet Lake
+
+Signed-off-by: Anuj Phogat <anuj.phogat@gmail.com>
+Reviewed-by: Jordan Justen <jordan.l.justen@intel.com>
+---
+ include/pci_ids/i965_pci_ids.h  | 18 ++++++++++++++++++
+ src/intel/dev/gen_device_info.c |  1 +
+ 2 files changed, 19 insertions(+)
+
+diff --git a/include/pci_ids/i965_pci_ids.h b/include/pci_ids/i965_pci_ids.h
+index 196cbb947ef7..cc173ea4010d 100644
+--- a/include/pci_ids/i965_pci_ids.h
++++ b/include/pci_ids/i965_pci_ids.h
+@@ -191,6 +191,24 @@ CHIPSET(0x3EA4, cfl_gt1, "Intel(R) HD Graphics (Whiskey Lake 3x8 GT1)")
+ CHIPSET(0x3EA0, cfl_gt2, "Intel(R) HD Graphics (Whiskey Lake 3x8 GT2)")
+ CHIPSET(0x3EA3, cfl_gt2, "Intel(R) HD Graphics (Whiskey Lake 3x8 GT2)")
+ CHIPSET(0x3EA2, cfl_gt3, "Intel(R) HD Graphics (Whiskey Lake 3x8 GT3)")
++CHIPSET(0x9B21, cfl_gt1, "Intel(R) HD Graphics (Comet Lake 2x6 GT1)")
++CHIPSET(0x9BA0, cfl_gt1, "Intel(R) HD Graphics (Comet Lake 2x6 GT1)")
++CHIPSET(0x9BA2, cfl_gt1, "Intel(R) HD Graphics (Comet Lake 2x6 GT1)")
++CHIPSET(0x9BA4, cfl_gt1, "Intel(R) HD Graphics (Comet Lake 2x6 GT1)")
++CHIPSET(0x9BA5, cfl_gt1, "Intel(R) HD Graphics (Comet Lake 2x6 GT1)")
++CHIPSET(0x9BA8, cfl_gt1, "Intel(R) HD Graphics (Comet Lake 2x6 GT1)")
++CHIPSET(0x9BAA, cfl_gt1, "Intel(R) HD Graphics (Comet Lake 2x6 GT1)")
++CHIPSET(0x9BAB, cfl_gt1, "Intel(R) HD Graphics (Comet Lake 2x6 GT1)")
++CHIPSET(0x9BAC, cfl_gt1, "Intel(R) HD Graphics (Comet Lake 2x6 GT1)")
++CHIPSET(0x9B41, cfl_gt2, "Intel(R) HD Graphics (Comet Lake 3x8 GT2)")
++CHIPSET(0x9BC0, cfl_gt2, "Intel(R) HD Graphics (Comet Lake 3x8 GT2)")
++CHIPSET(0x9BC2, cfl_gt2, "Intel(R) HD Graphics (Comet Lake 3x8 GT2)")
++CHIPSET(0x9BC4, cfl_gt2, "Intel(R) HD Graphics (Comet Lake 3x8 GT2)")
++CHIPSET(0x9BC5, cfl_gt2, "Intel(R) HD Graphics (Comet Lake 3x8 GT2)")
++CHIPSET(0x9BC8, cfl_gt2, "Intel(R) HD Graphics (Comet Lake 3x8 GT2)")
++CHIPSET(0x9BCA, cfl_gt2, "Intel(R) HD Graphics (Comet Lake 3x8 GT2)")
++CHIPSET(0x9BCB, cfl_gt2, "Intel(R) HD Graphics (Comet Lake 3x8 GT2)")
++CHIPSET(0x9BCC, cfl_gt2, "Intel(R) HD Graphics (Comet Lake 3x8 GT2)")
+ CHIPSET(0x5A49, cnl_2x8, "Intel(R) HD Graphics (Cannonlake 2x8 GT0.5)")
+ CHIPSET(0x5A4A, cnl_2x8, "Intel(R) HD Graphics (Cannonlake 2x8 GT0.5)")
+ CHIPSET(0x5A41, cnl_3x8, "Intel(R) HD Graphics (Cannonlake 3x8 GT1)")
+diff --git a/src/intel/dev/gen_device_info.c b/src/intel/dev/gen_device_info.c
+index 4837bda47aa2..3689491a8e29 100644
+--- a/src/intel/dev/gen_device_info.c
++++ b/src/intel/dev/gen_device_info.c
+@@ -61,6 +61,7 @@ gen_device_name_to_pci_device_id(const char *name)
+       { "glk", 0x3185 },
+       { "cfl", 0x3E9B },
+       { "whl", 0x3EA1 },
++      { "cml", 0x9b41 },
+       { "cnl", 0x5a52 },
+       { "icl", 0x8a52 },
+    };
+-- 
+1.9.1
+

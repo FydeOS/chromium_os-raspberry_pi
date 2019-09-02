@@ -4,7 +4,7 @@
 EAPI="5"
 EGIT_REPO_URI="https://github.com/FydeOS/rpi-boot-bin.git"
 
-inherit git-2
+inherit git-r3
 DESCRIPTION="rpi boot bin files"
 HOMEPAGE="http://fydeos.com"
 

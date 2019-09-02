@@ -14,6 +14,7 @@ IUSE=""
 RDEPEND="
     chromeos-base/rpi-boot-bin
     chromeos-base/auto-expand-partition
+    chromeos-base/device-appid
 "
 
 DEPEND="${RDEPEND}"

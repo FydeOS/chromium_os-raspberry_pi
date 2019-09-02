@@ -1,6 +1,7 @@
+From b1848e43d8954f39eda2e7715ff472d4128ac82e Mon Sep 17 00:00:00 2001
 From: Lionel Landwerlin <lionel.g.landwerlin@intel.com>
 Date: Thu, 30 Aug 2018 01:39:02 +0100
-Subject: FROMLIST: intel: limit urb size for SKL/KBL/CFL GT1
+Subject: [PATCH] FROMLIST: intel: limit urb size for SKL/KBL/CFL GT1
 
 The documentation puts the URB size for SKL GT1 as "128K - 192K". I
 guess this means we can't tell which one it is, so we have to go for
@@ -15,25 +16,30 @@ Signed-off-by: Lionel Landwerlin <lionel.g.landwerlin@intel.com>
 Bugzilla: https://bugs.freedesktop.org/show_bug.cgi?id=107505
 Archived-At: https://lists.freedesktop.org/archives/mesa-dev/2018-August/203974.html
 [chadv: Resolve backport conflicts]
+
+[krh - Thu Feb 21 2019]
+Resolve backport conflicts again - simulator_id was added upstream.
+This patch didn't make 19.0, but Lionel expects to land it soon and
+backport to a 19.x release.
 ---
  src/intel/dev/gen_device_info.c | 9 +++++++--
  1 file changed, 7 insertions(+), 2 deletions(-)
 
 diff --git a/src/intel/dev/gen_device_info.c b/src/intel/dev/gen_device_info.c
-index 653cece6d70..ec5769aa4b2 100644
+index 5dbd0607572..f7f4a6d21b3 100644
 --- a/src/intel/dev/gen_device_info.c
 +++ b/src/intel/dev/gen_device_info.c
-@@ -602,7 +602,8 @@ static const struct gen_device_info gen_device_info_skl_gt1 = {
+@@ -619,7 +619,8 @@ static const struct gen_device_info gen_device_info_skl_gt1 = {
     .num_subslices = { 2, },
     .num_eu_per_subslice = 6,
     .l3_banks = 2,
 -   .urb.size = 192,
 +   .urb.size = 128,
 +   .urb.max_entries[MESA_SHADER_VERTEX] = 928,
+    .simulator_id = 12,
  };
  
- static const struct gen_device_info gen_device_info_skl_gt2 = {
-@@ -663,11 +664,12 @@ static const struct gen_device_info gen_device_info_kbl_gt1 = {
+@@ -686,12 +687,13 @@ static const struct gen_device_info gen_device_info_kbl_gt1 = {
     .gt = 1,
  
     .max_cs_threads = 7 * 6,
@@ -42,15 +48,16 @@ index 653cece6d70..ec5769aa4b2 100644
     .num_subslices = { 2, },
     .num_eu_per_subslice = 6,
     .l3_banks = 2,
+    .simulator_id = 16,
 +   .urb.size = 128,
 +   .urb.max_entries[MESA_SHADER_VERTEX] = 928,
  };
  
  static const struct gen_device_info gen_device_info_kbl_gt1_5 = {
-@@ -747,7 +749,10 @@ static const struct gen_device_info gen_device_info_cfl_gt1 = {
-    .num_subslices = { 2, },
+@@ -778,7 +780,10 @@ static const struct gen_device_info gen_device_info_cfl_gt1 = {
     .num_eu_per_subslice = 6,
     .l3_banks = 2,
+    .simulator_id = 24,
 +   .urb.size = 128,
 +   .urb.max_entries[MESA_SHADER_VERTEX] = 928,
  };
@@ -59,5 +66,5 @@ index 653cece6d70..ec5769aa4b2 100644
     GEN9_FEATURES,
     .is_coffeelake = true,
 -- 
-2.19.0.605.g01d371f741-goog
+2.20.1
 

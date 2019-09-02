@@ -26,18 +26,27 @@ install_raspberrypi_bootloader() {
   local efi_size=$(( efi_size_sectors * 512 ))
   local mount_opts=loop,offset=${efi_offset},sizelimit=${efi_size}
   local efi_dir=$(mktemp -d)
-  local kernel_img=$(ls "${ROOT}/boot/Image"*)
+  local arch=$2
+  local kernel_img=""
+  local target_img=""
+  if [ "${arch}" == "arm" ]; then
+    kernel_img=$(ls "${ROOT}/boot/zImage-"*)
+    target_img="${efi_dir}/kernel7.img"
+  else
+    kernel_img=$(ls "${ROOT}/boot/Image"*)
+    target_img="${efi_dir}/kernel8.img"
+  fi
   sudo mount -o "${mount_opts}"  "$1" "${efi_dir}"
 
   info "Installing firmware, kernel and overlays"
   sudo cp -r "${ROOT}/firmware/rpi/"* "${efi_dir}/"
-  sudo cp ${kernel_img} "${efi_dir}/kernel8.img"
+  sudo cp ${kernel_img} ${target_img}
   sudo umount "${efi_dir}"
   rmdir "${efi_dir}"
 }
 
 board_setup() {
-  install_raspberrypi_bootloader "$1"
+  install_raspberrypi_bootloader "$1" arm
   install_hybrid_mbr "$1"
 }
 

@@ -1,27 +1,185 @@
 diff --git a/vc4.c b/vc4.c
-old mode 100644
-new mode 100755
-index 71e73ea..f3030b3
+index 6edd967..0231b53 100644
 --- a/vc4.c
 +++ b/vc4.c
-@@ -17,7 +17,10 @@
+@@ -17,46 +17,104 @@
+ #include "helpers.h"
  #include "util.h"
  
- static const uint32_t render_target_formats[] = { DRM_FORMAT_ARGB8888, DRM_FORMAT_RGB565,
+-static const uint32_t render_target_formats[] = { DRM_FORMAT_ARGB8888, DRM_FORMAT_RGB565,
 -						  DRM_FORMAT_XRGB8888 };
-+						  DRM_FORMAT_XRGB8888, DRM_FORMAT_ABGR8888, DRM_FORMAT_XBGR8888,
-+                          DRM_FORMAT_BGR565, DRM_FORMAT_ARGB1555, DRM_FORMAT_XRGB1555,
-+                          DRM_FORMAT_YUV422, DRM_FORMAT_YVU422, DRM_FORMAT_YUV420,
-+                          DRM_FORMAT_YVU420, DRM_FORMAT_NV12, DRM_FORMAT_NV16 };
++#define VC4_TILING_NONE 0
++#define VC4_TILING_T 1
  
++static const uint32_t render_target_formats[] = { DRM_FORMAT_RGB565, DRM_FORMAT_BGR565,
++              DRM_FORMAT_ARGB8888, DRM_FORMAT_XRGB8888, DRM_FORMAT_ABGR8888, DRM_FORMAT_XBGR8888
++              };
++
++static const uint32_t texture_target_formats[] = {
++          		DRM_FORMAT_YVU420, DRM_FORMAT_NV12
++  						};
++/*
++static const uint32_t tileable_target_formats[] = {
++							DRM_FORMAT_RGB565, DRM_FORMAT_BGR565,
++              DRM_FORMAT_ARGB8888, DRM_FORMAT_XRGB8888, 
++							DRM_FORMAT_ABGR8888, DRM_FORMAT_XBGR8888,
++							};
++*/
  static int vc4_init(struct driver *drv)
  {
-@@ -64,7 +67,7 @@ static void *vc4_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t m
- 	struct drm_vc4_mmap_bo bo_map;
++  struct format_metadata metadata;
++  uint64_t texture_use_flags = BO_USE_TEXTURE_MASK;
++  metadata.tiling = VC4_TILING_NONE;
++  metadata.priority = 1;
++  metadata.modifier = DRM_FORMAT_MOD_LINEAR; 
+ 	drv_add_combinations(drv, render_target_formats, ARRAY_SIZE(render_target_formats),
+-			     &LINEAR_METADATA, BO_USE_RENDER_MASK);
+-
+-	return drv_modify_linear_combinations(drv);
++			     &metadata, BO_USE_RENDER_MASK );
++  drv_add_combinations(drv, texture_target_formats, ARRAY_SIZE(texture_target_formats),
++           &metadata, texture_use_flags);
++
++  drv_modify_combination(drv, DRM_FORMAT_XRGB8888, &metadata, BO_USE_CURSOR | BO_USE_SCANOUT);
++  drv_modify_combination(drv, DRM_FORMAT_ARGB8888, &metadata, BO_USE_CURSOR | BO_USE_SCANOUT);
++  /*
++  texture_use_flags &= ~BO_USE_RENDERSCRIPT;
++  texture_use_flags &= ~BO_USE_SW_WRITE_OFTEN;
++  texture_use_flags &= ~BO_USE_SW_READ_OFTEN;
++  metadata.priority = 2;
++  metadata.tiling = VC4_TILING_T;
++  metadata.modifier = DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED;
++  drv_add_combinations(drv, tileable_target_formats , ARRAY_SIZE(tileable_target_formats),
++					&metadata, texture_use_flags);   
++
++  drv_modify_combination(drv, DRM_FORMAT_XRGB8888, &metadata, BO_USE_SCANOUT);
++  drv_modify_combination(drv, DRM_FORMAT_ARGB8888, &metadata, BO_USE_SCANOUT);
++  */
++	return 0;
+ }
  
- 	memset(&bo_map, 0, sizeof(bo_map));
--	bo_map.handle = bo->handles[0].u32;
-+	bo_map.handle = bo->handles[plane].u32;
+-static int vc4_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t format,
+-			 uint64_t use_flags)
++static int vc4_bo_create_for_modifiers(struct bo *bo, uint32_t width, uint32_t height,
++               uint32_t format, uint64_t modifier)
+ {
+-	int ret;
+-	size_t plane;
+-	uint32_t stride;
+-	struct drm_vc4_create_bo bo_create;
+-
+-	/*
+-	 * Since the ARM L1 cache line size is 64 bytes, align to that as a
+-	 * performance optimization.
+-	 */
+-	stride = drv_stride_from_format(format, width, 0);
+-	stride = ALIGN(stride, 64);
+-	drv_bo_from_format(bo, stride, height, format);
+-
+-	memset(&bo_create, 0, sizeof(bo_create));
+-	bo_create.size = bo->total_size;
+-
+-	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VC4_CREATE_BO, &bo_create);
+-	if (ret) {
+-		drv_log("DRM_IOCTL_VC4_GEM_CREATE failed (size=%zu)\n", bo->total_size);
+-		return -errno;
+-	}
++  int ret;
++  size_t plane;
++  uint32_t stride;
++  struct drm_vc4_create_bo bo_create;
++  struct drm_vc4_set_tiling set_tiling;
++  memset(&bo_create, 0, sizeof(bo_create));
++  memset(&set_tiling, 0, sizeof(set_tiling));
++  stride = drv_stride_from_format(format, width, 0);
++  stride = ALIGN(stride, 64);
++  drv_bo_from_format(bo, stride, height, format);
++  bo_create.size = bo->total_size;
++  bo->format_modifiers[0] = modifier;
++ 
++  bo->tiling = modifier == DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED ? VC4_TILING_T : VC4_TILING_NONE;
++  ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VC4_CREATE_BO, &bo_create);
++  if (ret) {
++    drv_log("DRM_IOCTL_VC4_GEM_CREATE failed (size=%zu)\n", bo->total_size);
++    return -errno;
++  }
++
++  for (plane = 0; plane < bo->num_planes; plane++)
++    bo->handles[plane].u32 = bo_create.handle;
++
++  if (bo->tiling == VC4_TILING_T) { 
++    set_tiling.handle = bo->handles[0].u32;
++    set_tiling.modifier = modifier;
++    ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VC4_SET_TILING, &set_tiling);
++    if (ret) {
++      drv_log("DRM_IOCTL_VC4_SET_TILING failed ret=%d\n", ret);
++      return -errno;
++    }
++  }
++  return 0;
++}
  
- 	ret = drmCommandWriteRead(bo->drv->fd, DRM_VC4_MMAP_BO, &bo_map, sizeof(bo_map));
- 	if (ret) {
+-	for (plane = 0; plane < bo->num_planes; plane++)
+-		bo->handles[plane].u32 = bo_create.handle;
+ 
+-	return 0;
++static int vc4_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint32_t height,
++           uint32_t format, const uint64_t *modifiers, uint32_t count)
++{
++  /*
++  static const uint64_t modifier_order[] = { 
++    DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED,
++    DRM_FORMAT_MOD_LINEAR
++  };
++  uint64_t modifier;
++  modifier = drv_pick_modifier(modifiers, count, modifier_order, ARRAY_SIZE(modifier_order));
++  */
++  return vc4_bo_create_for_modifiers(bo, width, height, format, DRM_FORMAT_MOD_LINEAR/*modifier*/);
+ }
+ 
+ static void *vc4_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags)
+@@ -78,11 +136,43 @@ static void *vc4_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t m
+ 		    bo_map.offset);
+ }
+ 
++static int vc4_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t format,
++			 uint64_t use_flags)
++{
++  /*
++  struct combination *combo;
++  combo = drv_get_combination(bo->drv, format, use_flags);
++  if (!combo)
++    return -EINVAL;*/
++	return vc4_bo_create_for_modifiers(bo, width, height, format, DRM_FORMAT_MOD_LINEAR /*combo->metadata.modifier*/);
++}
++
++static int vc4_bo_import(struct bo *bo, struct drv_import_fd_data *data)
++{
++  int ret;
++  struct drm_vc4_get_tiling get_tiling;
++  ret = drv_prime_bo_import(bo, data);
++  if (ret)
++    return ret;
++  memset(&get_tiling, 0, sizeof(get_tiling));
++  get_tiling.handle = bo->handles[0].u32;
++  ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VC4_GET_TILING, &get_tiling);
++  if (ret) {
++    drv_gem_bo_destroy(bo);
++    drv_log("DRM_IOCTL_VC4_GET_TILING failed.\n");
++    return ret;
++  }
++  bo->format_modifiers[0] = get_tiling.modifier;
++  bo->tiling = get_tiling.modifier == DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED ? VC4_TILING_T: VC4_TILING_NONE; 
++  return 0;
++}
++
+ const struct backend backend_vc4 = {
+ 	.name = "vc4",
+ 	.init = vc4_init,
+ 	.bo_create = vc4_bo_create,
+-	.bo_import = drv_prime_bo_import,
++  .bo_create_with_modifiers = vc4_bo_create_with_modifiers,
++	.bo_import = vc4_bo_import,
+ 	.bo_destroy = drv_gem_bo_destroy,
+ 	.bo_map = vc4_bo_map,
+ 	.bo_unmap = drv_bo_munmap,

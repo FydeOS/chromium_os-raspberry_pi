@@ -1,0 +1,25 @@
+diff --git a/login_manager/init/scripts/write-machine-info b/login_manager/init/scripts/write-machine-info
+index aee0e26b8..fcd8d9a34 100755
+--- a/login_manager/init/scripts/write-machine-info
++++ b/login_manager/init/scripts/write-machine-info
+@@ -47,12 +47,12 @@ chromiumos_serial_number() {
+ # $MACHINE_INFO file before a user session starts.
+ touch "${MACHINE_INFO}"
+ chmod 0644 "${MACHINE_INFO}"
+-if crossystem "mainfw_type?nonchrome"; then
+-  echo "serial_number=\"$(chromiumos_serial_number)\""
+-else
++#if crossystem "mainfw_type?nonchrome"; then
++  echo "serial_number=\"$(chromiumos_serial_number)\"" >> "${MACHINE_INFO}"
++#else
+   # Dump full information in the VPD, including the serial number.
+-  dump_vpd_log --full --stdout
+-  # Dynamic information.
+-  echo "customization_id=\"$(mosys platform customization)\""
+-  echo "rlz_brand_code=\"$(mosys platform brand)\""
+-fi >> "${MACHINE_INFO}"
++#  dump_vpd_log --full --stdout
++#  # Dynamic information.
++#  echo "customization_id=\"$(mosys platform customization)\""
++#  echo "rlz_brand_code=\"$(mosys platform brand)\""
++#fi >> "${MACHINE_INFO}"

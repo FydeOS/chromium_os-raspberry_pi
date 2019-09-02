@@ -31,7 +31,10 @@ RDEPEND="
 
 DEPEND="${RDEPEND}
 	virtual/pkgconfig
-	video_cards_amdgpu? ( media-libs/mesa )"
+	video_cards_amdgpu? (
+		media-libs/mesa
+		x11-drivers/opengles-headers
+	)"
 
 src_prepare() {
 	default
@@ -45,6 +48,9 @@ src_configure() {
 	use video_cards_exynos && append-cppflags -DDRV_EXYNOS && export DRV_EXYNOS=1
 	use video_cards_intel && append-cppflags -DDRV_I915 && export DRV_I915=1
 	use video_cards_marvell && append-cppflags -DDRV_MARVELL && export DRV_MARVELL=1
+	if [[ ${MTK_MINIGBM_PLATFORM} == "MT8183" ]] ; then
+		append-cppflags -DMTK_MT8183 && export MTK_MT8183=1
+	fi
 	use video_cards_mediatek && append-cppflags -DDRV_MEDIATEK && export DRV_MEDIATEK=1
 	use video_cards_msm && append-cppflags -DDRV_MSM && export DRV_MSM=1
 	use video_cards_radeon && append-cppflags -DDRV_RADEON && export DRV_RADEON=1
