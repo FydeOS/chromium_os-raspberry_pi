@@ -22,9 +22,8 @@ S=${WORKDIR}
 
 src_install() {
   udev_dorules "${FILESDIR}/udev/10-vchiq-permissions.rules"
-  udev_dorules "${FILESDIR}/udev/99-rpi3-restart-ui-after-hdmi-connetced.rules"
+  udev_dorules "${FILESDIR}/udev/50-media.rules"
   exeinto /lib/udev
-  doexe "${FILESDIR}/udev/restart_ui.sh"
   insinto /lib
   doins -r "${FILESDIR}/firmware"
   insinto /etc/init

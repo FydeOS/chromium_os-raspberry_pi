@@ -1,0 +1,8 @@
+ACTION!="add", GOTO="media_end"
+SUBSYSTEM!="video4linux", GOTO="media_end"
+
+KERNEL=="video10", SYMLINK+="video-dec"
+KERNEL=="video11", SYMLINK+="video-enc"
+KERNEL=="video12", SYMLINK+="image-proc"
+
+LABEL="media_end"

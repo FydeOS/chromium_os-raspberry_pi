@@ -10,6 +10,13 @@ If you aren't bothered with all the technicalities and just want the pre-built i
 <br>
 
 # Changelog
+### 2019-09-12
+##### Update to Chromium OS m77
+* No hardware accelerate video decode support yet :(
+ [ref](https://cs.chromium.org/chromium/src/media/gpu/gpu_video_decode_accelerator_factory.cc)
+* `cras` will cause 100% cpu usage at switching between videos. Reset it by : `sudo restart cras`
+* A Speed-up in booting.
+
 ### 2019-01-29
 ##### Fix Slack invitation link, oops 😅
 
