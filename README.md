@@ -170,7 +170,7 @@ $ git config --global user.name "Your Name"
 The directory structure described here is a recommendation based on the best practice in the Fyde team. You may host the files in a different way as you wish.
 
 ```
-$ mkdir -p /project/chromiumos-R70      # This is the directory to hold Chromium OS source code, name it according to the release you are going to build.
+$ mkdir -p /project/chromiumos-pi      # This is the directory to hold Chromium OS source code, name it according to the release you are going to build.
 $ mkdir -p /project/overlays            # This is the directory to hold this repository.
 ```
 
@@ -184,12 +184,12 @@ First you need to find out the reference name of the release you would like to b
 $ git ls-remote https://chromium.googlesource.com/a/chromiumos/manifest.git | grep release
 ```
 
-You will see a list of Git commit IDs and its name in the form of ```refs/heads/release-Rxx-xxxx.B```. That ```release-Rxx-XXXX.B``` string is what you need for fetching the code of that specific Chromium OS release. For example, ```release-R56-9000.B``` for release 56.
+You will see a list of Git commit IDs and its name in the form of ```refs/heads/release-Rxx-xxxx.B```. That ```release-Rxx-XXXX.B``` string is what you need for fetching the code of that specific Chromium OS release. For example, ```release-R77-XXXX.B``` for release r77.
 
 Now run these commands to fetch the source code. Find and use a different release name if you would like to build a different release.
 
 ```
-$ cd /project/chromiumos-R70
+$ cd /project/chromiumos-pi
 $ repo init -u https://chromium.googlesource.com/chromiumos/manifest.git --repo-url https://chromium.googlesource.com/external/repo.git -b release-R77-12371.B  # The last R77 stable release as of SEP 2019
 $ repo sync -j8         # Raise this number if you have a fast Internet connection
 ```
@@ -218,7 +218,7 @@ Now fetch this overlay and put it in the right place.
 $ cd /project/overlays
 $ git clone https://github.com/fydeos/chromium_os_for_raspberry_pi.git
 
-$ cd /project/chromiumos-R70/src/overlays
+$ cd /project/chromiumos-pi/src/overlays
 $ ln -s /project/overlays/chromium_os_for_raspberry_pi/* .
 ```
 
@@ -364,7 +364,7 @@ It may take 10 to 30 minutes, mainly depends on the speed of your disk. It is mu
 ### Find your image
 After the command finished successfully, you will have disk images generated, saved under ```/mnt/host/source/src/build/images/rpi/``` directory in the chroot, or ```/project/chromiumos-pi/src/build/images/rpi``` in the host OS. These two are the same directory, just bind mounted in the chroot.
 
-Each invoke of the build_image command will create a directory named similar to ```R56-9000.104.<date time>-a1``` under above directory. There is a symlink named ```latest``` under above directory, that always point to the image directory of the last successful build.
+Each invoke of the build_image command will create a directory named similar to ```R77-XXXX.XXX.<date time>-a1``` under above directory. There is a symlink named ```latest``` under above directory, that always point to the image directory of the last successful build.
 
 The disk image is usually named ```chromiumos_image.bin```, under abovementioned directory. So full path to the latest image is
 
