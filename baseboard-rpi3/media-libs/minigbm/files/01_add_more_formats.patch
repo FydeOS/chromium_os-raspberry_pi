@@ -1,3 +1,405 @@
+diff --git a/Android.mk b/Android.mk
+index 564f416..1858ccc 100644
+--- a/Android.mk
++++ b/Android.mk
+@@ -26,6 +26,7 @@ MINIGBM_SRC := \
+ 	tegra.c \
+ 	udl.c \
+ 	vc4.c \
++  v3d.c \
+ 	vgem.c \
+ 	virtio_gpu.c
+ 
+diff --git a/Makefile b/Makefile
+index 35f92f2..996c79f 100644
+--- a/Makefile
++++ b/Makefile
+@@ -34,6 +34,9 @@ endif
+ ifdef DRV_VC4
+ 	CFLAGS += $(shell $(PKG_CONFIG) --cflags libdrm_vc4)
+ endif
++ifdef DRV_V3D
++#  CFLAGS += $(shell $(PKG_CONFIG) --cflags libdrm_v3d)
++endif
+ 
+ CPPFLAGS += $(PC_CFLAGS)
+ LDLIBS += $(PC_LIBS)
+diff --git a/drv.c b/drv.c
+index b920d45..83602ab 100644
+--- a/drv.c
++++ b/drv.c
+@@ -61,6 +61,9 @@ extern const struct backend backend_udl;
+ #ifdef DRV_VC4
+ extern const struct backend backend_vc4;
+ #endif
++#ifdef DRV_V3D
++extern const struct backend backend_v3d;
++#endif
+ extern const struct backend backend_vgem;
+ extern const struct backend backend_virtio_gpu;
+ 
+@@ -110,6 +113,9 @@ static const struct backend *drv_get_backend(int fd)
+ 		&backend_udl,
+ #ifdef DRV_VC4
+ 		&backend_vc4,
++#endif
++#ifdef DRV_V3D
++    &backend_v3d,
+ #endif
+ 		&backend_vgem,     &backend_virtio_gpu,
+ 	};
+diff --git a/v3d.c b/v3d.c
+new file mode 100644
+index 0000000..fa0a945
+--- /dev/null
++++ b/v3d.c
+@@ -0,0 +1,93 @@
++/*
++ * Copyright 2019 The FydeOS Authors. All rights reserved.
++ * Use of this source code is governed by a BSD-style license that can be
++ * found in the LICENSE file.
++ * Author: Yang Tsao <yang@fydeos.io>
++ */
++
++#ifdef DRV_V3D
++
++#include <errno.h>
++#include <stdio.h>
++#include <string.h>
++#include <sys/mman.h>
++#include <xf86drm.h>
++
++#include "drv_priv.h"
++#include "helpers.h"
++#include "util.h"
++#include "v3d_drm.h"
++
++static const uint32_t render_target_formats[] = { DRM_FORMAT_RGB565, DRM_FORMAT_BGR565, 
++	DRM_FORMAT_ARGB8888, DRM_FORMAT_XRGB8888, DRM_FORMAT_ABGR8888, DRM_FORMAT_XBGR8888 };
++
++static int v3d_init(struct driver *drv) {
++  drv_add_combinations(drv, render_target_formats, ARRAY_SIZE(render_target_formats),
++           &LINEAR_METADATA, BO_USE_RENDER_MASK );
++  drv_modify_combination(drv, DRM_FORMAT_ARGB8888, &LINEAR_METADATA, BO_USE_CURSOR | BO_USE_SCANOUT);
++  return 0;  
++}
++
++static int v3d_bo_create_for_modifiers(struct bo *bo, uint32_t width, uint32_t height,
++               uint32_t format, uint64_t modifier) {
++  int ret;
++  size_t plane;
++  uint32_t stride;
++  struct drm_v3d_create_bo bo_create;
++  memset(&bo_create, 0, sizeof(bo_create));
++
++  stride = drv_stride_from_format(format, width, 0);
++  //stride = ALIGN(stride, 64);
++  drv_bo_from_format(bo, stride, height, format);
++  bo_create.size = bo->total_size;
++  bo->format_modifiers[0] = modifier;
++
++  ret = drmIoctl(bo->drv->fd, DRM_IOCTL_V3D_CREATE_BO, &bo_create);
++  if (ret) {
++    drv_log("DRM_IOCTL_V3D_CREATE_BO failed (size=%zu)\n", bo->total_size);
++    return -errno;
++  }
++
++  for (plane = 0; plane < bo->num_planes; plane++)
++    bo->handles[plane].u32 = bo_create.handle;
++  return 0;
++}
++
++static int v3d_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint32_t height,
++           uint32_t format, const uint64_t *modifiers, uint32_t count) {
++  return v3d_bo_create_for_modifiers(bo, width, height, format, DRM_FORMAT_MOD_LINEAR/*modifier*/);
++}
++
++static int v3d_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t format,
++       uint64_t use_flags) {
++  return v3d_bo_create_for_modifiers(bo, width, height, format, DRM_FORMAT_MOD_LINEAR/*modifier*/);
++}
++
++static void *v3d_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags) {
++  int ret;
++  struct drm_v3d_mmap_bo bo_map;
++  memset(&bo_map, 0, sizeof(bo_map));
++  bo_map.handle = bo->handles[0].u32;
++
++  ret = drmIoctl(bo->drv->fd, DRM_IOCTL_V3D_MMAP_BO, &bo_map);
++  if (ret) {
++    drv_log("DRM_V3D_MMAP_BO failed\n");
++    return MAP_FAILED;
++  }
++  vma->length = bo->total_size;
++  return mmap(NULL, bo->total_size, drv_get_prot(map_flags), MAP_SHARED, bo->drv->fd,
++        bo_map.offset);
++}
++
++const struct backend backend_v3d = {
++  .name = "v3d",
++  .init = v3d_init,
++  .bo_create = v3d_bo_create,
++  .bo_create_with_modifiers = v3d_bo_create_with_modifiers,
++  .bo_import = drv_prime_bo_import,
++  .bo_destroy = drv_gem_bo_destroy,
++  .bo_map = v3d_bo_map,
++  .bo_unmap = drv_bo_munmap,
++};
++
++#endif // DEV_V3D
+diff --git a/v3d_drm.h b/v3d_drm.h
+new file mode 100644
+index 0000000..c8a508a
+--- /dev/null
++++ b/v3d_drm.h
+@@ -0,0 +1,247 @@
++/*
++ * Copyright © 2014-2018 Broadcom
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining a
++ * copy of this software and associated documentation files (the "Software"),
++ * to deal in the Software without restriction, including without limitation
++ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
++ * and/or sell copies of the Software, and to permit persons to whom the
++ * Software is furnished to do so, subject to the following conditions:
++ *
++ * The above copyright notice and this permission notice (including the next
++ * paragraph) shall be included in all copies or substantial portions of the
++ * Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
++ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
++ * IN THE SOFTWARE.
++ */
++
++#ifndef _V3D_DRM_H_
++#define _V3D_DRM_H_
++
++#include "drm.h"
++
++#if defined(__cplusplus)
++extern "C" {
++#endif
++
++#define DRM_V3D_SUBMIT_CL                         0x00
++#define DRM_V3D_WAIT_BO                           0x01
++#define DRM_V3D_CREATE_BO                         0x02
++#define DRM_V3D_MMAP_BO                           0x03
++#define DRM_V3D_GET_PARAM                         0x04
++#define DRM_V3D_GET_BO_OFFSET                     0x05
++#define DRM_V3D_SUBMIT_TFU                        0x06
++#define DRM_V3D_SUBMIT_CSD                        0x07
++
++#define DRM_IOCTL_V3D_SUBMIT_CL           DRM_IOWR(DRM_COMMAND_BASE + DRM_V3D_SUBMIT_CL, struct drm_v3d_submit_cl)
++#define DRM_IOCTL_V3D_WAIT_BO             DRM_IOWR(DRM_COMMAND_BASE + DRM_V3D_WAIT_BO, struct drm_v3d_wait_bo)
++#define DRM_IOCTL_V3D_CREATE_BO           DRM_IOWR(DRM_COMMAND_BASE + DRM_V3D_CREATE_BO, struct drm_v3d_create_bo)
++#define DRM_IOCTL_V3D_MMAP_BO             DRM_IOWR(DRM_COMMAND_BASE + DRM_V3D_MMAP_BO, struct drm_v3d_mmap_bo)
++#define DRM_IOCTL_V3D_GET_PARAM           DRM_IOWR(DRM_COMMAND_BASE + DRM_V3D_GET_PARAM, struct drm_v3d_get_param)
++#define DRM_IOCTL_V3D_GET_BO_OFFSET       DRM_IOWR(DRM_COMMAND_BASE + DRM_V3D_GET_BO_OFFSET, struct drm_v3d_get_bo_offset)
++#define DRM_IOCTL_V3D_SUBMIT_TFU          DRM_IOW(DRM_COMMAND_BASE + DRM_V3D_SUBMIT_TFU, struct drm_v3d_submit_tfu)
++#define DRM_IOCTL_V3D_SUBMIT_CSD          DRM_IOW(DRM_COMMAND_BASE + DRM_V3D_SUBMIT_CSD, struct drm_v3d_submit_csd)
++
++/**
++ * struct drm_v3d_submit_cl - ioctl argument for submitting commands to the 3D
++ * engine.
++ *
++ * This asks the kernel to have the GPU execute an optional binner
++ * command list, and a render command list.
++ */
++struct drm_v3d_submit_cl {
++	/* Pointer to the binner command list.
++	 *
++	 * This is the first set of commands executed, which runs the
++	 * coordinate shader to determine where primitives land on the screen,
++	 * then writes out the state updates and draw calls necessary per tile
++	 * to the tile allocation BO.
++	 */
++	__u32 bcl_start;
++
++	 /** End address of the BCL (first byte after the BCL) */
++	__u32 bcl_end;
++
++	/* Offset of the render command list.
++	 *
++	 * This is the second set of commands executed, which will either
++	 * execute the tiles that have been set up by the BCL, or a fixed set
++	 * of tiles (in the case of RCL-only blits).
++	 */
++	__u32 rcl_start;
++
++	 /** End address of the RCL (first byte after the RCL) */
++	__u32 rcl_end;
++
++	/** An optional sync object to wait on before starting the BCL. */
++	__u32 in_sync_bcl;
++	/** An optional sync object to wait on before starting the RCL. */
++	__u32 in_sync_rcl;
++	/** An optional sync object to place the completion fence in. */
++	__u32 out_sync;
++
++	/* Offset of the tile alloc memory
++	 *
++	 * This is optional on V3D 3.3 (where the CL can set the value) but
++	 * required on V3D 4.1.
++	 */
++	__u32 qma;
++
++	/** Size of the tile alloc memory. */
++	__u32 qms;
++
++	/** Offset of the tile state data array. */
++	__u32 qts;
++
++	/* Pointer to a u32 array of the BOs that are referenced by the job.
++	 */
++	__u64 bo_handles;
++
++	/* Number of BO handles passed in (size is that times 4). */
++	__u32 bo_handle_count;
++
++	/* Pad, must be zero-filled. */
++	__u32 pad;
++};
++
++/**
++ * struct drm_v3d_wait_bo - ioctl argument for waiting for
++ * completion of the last DRM_V3D_SUBMIT_CL on a BO.
++ *
++ * This is useful for cases where multiple processes might be
++ * rendering to a BO and you want to wait for all rendering to be
++ * completed.
++ */
++struct drm_v3d_wait_bo {
++	__u32 handle;
++	__u32 pad;
++	__u64 timeout_ns;
++};
++
++/**
++ * struct drm_v3d_create_bo - ioctl argument for creating V3D BOs.
++ *
++ * There are currently no values for the flags argument, but it may be
++ * used in a future extension.
++ */
++struct drm_v3d_create_bo {
++	__u32 size;
++	__u32 flags;
++	/** Returned GEM handle for the BO. */
++	__u32 handle;
++	/**
++	 * Returned offset for the BO in the V3D address space.  This offset
++	 * is private to the DRM fd and is valid for the lifetime of the GEM
++	 * handle.
++	 *
++	 * This offset value will always be nonzero, since various HW
++	 * units treat 0 specially.
++	 */
++	__u32 offset;
++};
++
++/**
++ * struct drm_v3d_mmap_bo - ioctl argument for mapping V3D BOs.
++ *
++ * This doesn't actually perform an mmap.  Instead, it returns the
++ * offset you need to use in an mmap on the DRM device node.  This
++ * means that tools like valgrind end up knowing about the mapped
++ * memory.
++ *
++ * There are currently no values for the flags argument, but it may be
++ * used in a future extension.
++ */
++struct drm_v3d_mmap_bo {
++	/** Handle for the object being mapped. */
++	__u32 handle;
++	__u32 flags;
++	/** offset into the drm node to use for subsequent mmap call. */
++	__u64 offset;
++};
++
++enum drm_v3d_param {
++	DRM_V3D_PARAM_V3D_UIFCFG,
++	DRM_V3D_PARAM_V3D_HUB_IDENT1,
++	DRM_V3D_PARAM_V3D_HUB_IDENT2,
++	DRM_V3D_PARAM_V3D_HUB_IDENT3,
++	DRM_V3D_PARAM_V3D_CORE0_IDENT0,
++	DRM_V3D_PARAM_V3D_CORE0_IDENT1,
++	DRM_V3D_PARAM_V3D_CORE0_IDENT2,
++	DRM_V3D_PARAM_SUPPORTS_TFU,
++	DRM_V3D_PARAM_SUPPORTS_CSD,
++};
++
++struct drm_v3d_get_param {
++	__u32 param;
++	__u32 pad;
++	__u64 value;
++};
++
++/**
++ * Returns the offset for the BO in the V3D address space for this DRM fd.
++ * This is the same value returned by drm_v3d_create_bo, if that was called
++ * from this DRM fd.
++ */
++struct drm_v3d_get_bo_offset {
++	__u32 handle;
++	__u32 offset;
++};
++
++struct drm_v3d_submit_tfu {
++	__u32 icfg;
++	__u32 iia;
++	__u32 iis;
++	__u32 ica;
++	__u32 iua;
++	__u32 ioa;
++	__u32 ios;
++	__u32 coef[4];
++	/* First handle is the output BO, following are other inputs.
++	 * 0 for unused.
++	 */
++	__u32 bo_handles[4];
++	/* sync object to block on before running the TFU job.  Each TFU
++	 * job will execute in the order submitted to its FD.  Synchronization
++	 * against rendering jobs requires using sync objects.
++	 */
++	__u32 in_sync;
++	/* Sync object to signal when the TFU job is done. */
++	__u32 out_sync;
++};
++
++/* Submits a compute shader for dispatch.  This job will block on any
++ * previous compute shaders submitted on this fd, and any other
++ * synchronization must be performed with in_sync/out_sync.
++ */
++struct drm_v3d_submit_csd {
++	__u32 cfg[7];
++	__u32 coef[4];
++
++	/* Pointer to a u32 array of the BOs that are referenced by the job.
++	 */
++	__u64 bo_handles;
++
++	/* Number of BO handles passed in (size is that times 4). */
++	__u32 bo_handle_count;
++
++	/* sync object to block on before running the CSD job.  Each
++	 * CSD job will execute in the order submitted to its FD.
++	 * Synchronization against rendering/TFU jobs or CSD from
++	 * other fds requires using sync objects.
++	 */
++	__u32 in_sync;
++	/* Sync object to signal when the CSD job is done. */
++	__u32 out_sync;
++};
++
++#if defined(__cplusplus)
++}
++#endif
++
++#endif /* _V3D_DRM_H_ */
 diff --git a/vc4.c b/vc4.c
 index 6edd967..0231b53 100644
 --- a/vc4.c

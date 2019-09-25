@@ -13,6 +13,7 @@ IUSE=""
 
 RDEPEND="
     chromeos-base/rpi-boot-bin
+    chromeos-base/rpi-firmware
     chromeos-base/auto-expand-partition
     chromeos-base/device-appid
 "
@@ -23,9 +24,6 @@ S=${WORKDIR}
 src_install() {
   udev_dorules "${FILESDIR}/udev/10-vchiq-permissions.rules"
   udev_dorules "${FILESDIR}/udev/50-media.rules"
-  exeinto /lib/udev
-  insinto /lib
-  doins -r "${FILESDIR}/firmware"
   insinto /etc/init
   doins "${FILESDIR}/bt/bluetooth_uart.conf"
   doins "${FILESDIR}/bt/console-ttyAMA0.override"

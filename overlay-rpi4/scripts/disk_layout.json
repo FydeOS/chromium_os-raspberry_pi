@@ -1,0 +1,20 @@
+{
+  "_comment": "See http://www.chromium.org/chromium-os/building-chromium-os/disk-layout-format",
+  "parent": "legacy_disk_layout.json",
+  "layouts":{
+    "common":[
+      {
+        "num": 2,
+        "size": "24 MiB"
+      },
+      {
+        "num": 4,
+        "size": "24 MiB"
+      },
+      {
+        "num": 12,
+        "size": "64 MiB"
+      }
+    ]
+  }
+}

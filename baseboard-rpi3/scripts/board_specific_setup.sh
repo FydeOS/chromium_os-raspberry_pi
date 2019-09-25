@@ -46,7 +46,8 @@ install_raspberrypi_bootloader() {
 }
 
 board_setup() {
-  install_raspberrypi_bootloader "$1" arm
+  info "install kernel and loader for ${CHROMEOS_KERNEL_ARCH}"
+  install_raspberrypi_bootloader "$1" $CHROMEOS_KERNEL_ARCH
   install_hybrid_mbr "$1"
 }
 
