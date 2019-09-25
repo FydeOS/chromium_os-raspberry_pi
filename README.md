@@ -11,6 +11,11 @@ If you aren't bothered with all the technicalities and just want the pre-built i
 <br>
 
 # Changelog
+### 2019-09-25
+##### Added Raspberry Pi 4B support
+* Same known issues with the 3B/3B+ release
+* A separate overlay needs to be created for Raspberry Pi 4, named "overlay-rpi4". If you are building the image yourself make sure you use `--board=rpi4` rather than rpi3
+
 ### 2019-09-12
 ##### Updated Chromium OS platform manifest to [release-R77-12371.B](https://chromium.googlesource.com/chromiumos/manifest/+/refs/heads/release-R77-12371.B)
 * No hardware acceleration support for decoding video streaming, yet. [ref](https://cs.chromium.org/chromium/src/media/gpu/gpu_video_decode_accelerator_factory.cc)
@@ -37,7 +42,11 @@ If you aren't bothered with all the technicalities and just want the pre-built i
 * The overlays are now updated to build Chromium OS r70
 * Fix poor graphic performance with full hardware accelecration enabled.
 * Add firmware support for Raspberry Pi 3B+. Note that although kernel patches for brcm are in place, there are still issues with wifi with this release.
-* You can build packages with "cros_embedded" (or uncomment the USE flags in `overlay-rpi3/make.conf`) to produce a more efficient image.
+* You can build packages with "cros_embedded" (or uncomment the USE flags in `overlay-
+
+
+
+/make.conf`) to produce a more efficient image.
 
 <br><br>
 # Table of contents (for cool kids)
