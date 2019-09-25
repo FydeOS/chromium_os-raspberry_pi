@@ -1,5 +1,6 @@
-[<img src="https://img.shields.io/badge/Join%20Slack%20Channel-Chromium%20OS%20for%20Raspberry%20Pi-yellowgreen.svg?style=popout-square&logo=slack&colorA=870611&colorB=333333">](https://join.slack.com/t/chromium-os-for-sbc/shared_invite/enQtNTM1ODU4MDQ4OTgxLTAwMmU0MTIxODA1ZmMzZjc2NzZlYjcwYjQyZDkwMDU5ZjY5ZDBlM2UxMWYwNzdmYzNhNTc1YzRhYzhhY2MwMDM)
+[<img src="https://img.shields.io/badge/Join%20Telegram%20Group-FydeOS-yellowgreen.svg?style=popout-square&logo=telegram&colorA=870611&colorB=333333">](https://t.me/hi_fydeos)
 
+[<img src="https://img.shields.io/badge/Join%20Slack%20Channel-Chromium%20OS%20for%20Raspberry%20Pi%20(less%20active)-yellowgreen.svg?style=popout-square&logo=slack&colorA=870611&colorB=333333">](https://join.slack.com/t/chromium-os-for-sbc/shared_invite/enQtNTM1ODU4MDQ4OTgxLTAwMmU0MTIxODA1ZmMzZjc2NzZlYjcwYjQyZDkwMDU5ZjY5ZDBlM2UxMWYwNzdmYzNhNTc1YzRhYzhhY2MwMDM)
 
 <br>
 
@@ -11,11 +12,11 @@ If you aren't bothered with all the technicalities and just want the pre-built i
 
 # Changelog
 ### 2019-09-12
-##### Update to Chromium OS m77
-* No hardware accelerate video decode support yet :(
- [ref](https://cs.chromium.org/chromium/src/media/gpu/gpu_video_decode_accelerator_factory.cc)
-* `cras` will cause 100% cpu usage at switching between videos. Reset it by : `sudo restart cras`
-* A Speed-up in booting.
+##### Updated Chromium OS platform manifest to [release-R77-12371.B](https://chromium.googlesource.com/chromiumos/manifest/+/refs/heads/release-R77-12371.B)
+* No hardware acceleration support for decoding video streaming, yet. [ref](https://cs.chromium.org/chromium/src/media/gpu/gpu_video_decode_accelerator_factory.cc)
+* Removed unused code
+* Fixed static version naming in the README
+* Added Telegram group link
 
 ### 2019-01-29
 ##### Fix Slack invitation link, oops 😅
@@ -169,7 +170,7 @@ $ git config --global user.name "Your Name"
 The directory structure described here is a recommendation based on the best practice in the Fyde team. You may host the files in a different way as you wish.
 
 ```
-$ mkdir -p /project/chromiumos-R70      # This is the directory to hold Chromium OS source code, name it according to the release you are going to build.
+$ mkdir -p /project/chromiumos-pi      # This is the directory to hold Chromium OS source code, name it according to the release you are going to build.
 $ mkdir -p /project/overlays            # This is the directory to hold this repository.
 ```
 
@@ -183,13 +184,13 @@ First you need to find out the reference name of the release you would like to b
 $ git ls-remote https://chromium.googlesource.com/a/chromiumos/manifest.git | grep release
 ```
 
-You will see a list of Git commit IDs and its name in the form of ```refs/heads/release-Rxx-xxxx.B```. That ```release-Rxx-XXXX.B``` string is what you need for fetching the code of that specific Chromium OS release. For example, ```release-R56-9000.B``` for release 56.
+You will see a list of Git commit IDs and its name in the form of ```refs/heads/release-Rxx-xxxx.B```. That ```release-Rxx-XXXX.B``` string is what you need for fetching the code of that specific Chromium OS release. For example, ```release-R77-XXXX.B``` for release r77.
 
 Now run these commands to fetch the source code. Find and use a different release name if you would like to build a different release.
 
 ```
-$ cd /project/chromiumos-R70
-$ repo init -u https://chromium.googlesource.com/chromiumos/manifest.git --repo-url https://chromium.googlesource.com/external/repo.git -b stabilize-10718.88.B  # The last R70 stable release
+$ cd /project/chromiumos-pi
+$ repo init -u https://chromium.googlesource.com/chromiumos/manifest.git --repo-url https://chromium.googlesource.com/external/repo.git -b release-R77-12371.B  # The last R77 stable release as of SEP 2019
 $ repo sync -j8         # Raise this number if you have a fast Internet connection
 ```
 
@@ -217,7 +218,7 @@ Now fetch this overlay and put it in the right place.
 $ cd /project/overlays
 $ git clone https://github.com/fydeos/chromium_os_for_raspberry_pi.git
 
-$ cd /project/chromiumos-R70/src/overlays
+$ cd /project/chromiumos-pi/src/overlays
 $ ln -s /project/overlays/chromium_os_for_raspberry_pi/* .
 ```
 
@@ -227,17 +228,17 @@ $ ln -s /project/overlays/chromium_os_for_raspberry_pi/* .
 As mentioned above, a chroot environment will be used to run the actual build process and some other related tasks. To create the chroot environment, run below commands.
 
 ```
-$ cd /project/chromiumos-R70
+$ cd /project/chromiumos-pi
 $ cros_sdk
 ```
 
 It make take 10 to over 30 minutes depends on your Internet connection speed and disk speed. Once finished, it will enter into the chroot. The shell prompt string looks like below so it is very easy to tell whether you are currently in the chroot or not.
 
 ```
-(cr) (stabilize-10718.88.B/(xxxxxx...)) <user>@<host> ~/trunk/src/scripts $
+(cr) (release-R77-12371.B/(xxxxxx...)) <user>@<host> ~/trunk/src/scripts $
 ```
 
-The chroot environment is located under the ```/project/chromiumos-R70/chroot``` directory.
+The chroot environment is located under the ```/project/chromiumos-pi/chroot``` directory.
 
 Let's exit from the chroot first as we need to do some customization before move on. Type ```exit``` or ```Ctrl + D``` to exit from the chroot shell.
 
@@ -249,7 +250,7 @@ If you would like to remove the chroot and re-create it from scratch, don't dele
 The correct way to remove the chroot is by using below commands.
 
 ```
-$ cd /project/chromiumos-R70
+$ cd /project/chromiumos-pi
 $ cros_sdk --delete
 ```
 
@@ -259,18 +260,18 @@ Programs running inside the chroot will not be able to access files outside of t
 When entering the Chromium OS chroot environment, a file named ```.local_mounts``` will be checked and directories listed in it will be bind mounted inside the chroot. All we need to do is to create this file in the right place and put necessary contents in, by using below command.
 
 ```
-$ echo "/project" > /project/chromiumos-R70/src/scripts/.local_mounts
+$ echo "/project" > /project/chromiumos-pi/src/scripts/.local_mounts
 ```
 
 Now, after entered the chroot, a ```/project``` directory will exist in the chroot and its content is the same as the ```/project``` directory in the host OS, as it actually is bind mounted from the host OS.
 
-If we don't do this, the ```/project/chromiumos-R70/src/overlays/overlay-rpi3``` symbolic link will not be accessible, as the top directory (```/project```) it points to doesn't exist in the chroot.
+If we don't do this, the ```/project/chromiumos-pi/src/overlays/overlay-rpi3``` symbolic link will not be accessible, as the top directory (```/project```) it points to doesn't exist in the chroot.
 
 ## Enter the chroot
 Now we can enter the chroot.
 
 ```
-$ cd /project/chromiumos-R70
+$ cd /project/chromiumos-pi
 $ cros_sdk
 ```
 
@@ -361,9 +362,9 @@ After the build_packages command finished successfully, you can start building t
 It may take 10 to 30 minutes, mainly depends on the speed of your disk. It is much faster on SSD than on HDD.
 
 ### Find your image
-After the command finished successfully, you will have disk images generated, saved under ```/mnt/host/source/src/build/images/rpi/``` directory in the chroot, or ```/project/chromiumos-R56/src/build/images/rpi``` in the host OS. These two are the same directory, just bind mounted in the chroot.
+After the command finished successfully, you will have disk images generated, saved under ```/mnt/host/source/src/build/images/rpi/``` directory in the chroot, or ```/project/chromiumos-pi/src/build/images/rpi``` in the host OS. These two are the same directory, just bind mounted in the chroot.
 
-Each invoke of the build_image command will create a directory named similar to ```R56-9000.104.<date time>-a1``` under above directory. There is a symlink named ```latest``` under above directory, that always point to the image directory of the last successful build.
+Each invoke of the build_image command will create a directory named similar to ```R77-XXXX.XXX.<date time>-a1``` under above directory. There is a symlink named ```latest``` under above directory, that always point to the image directory of the last successful build.
 
 The disk image is usually named ```chromiumos_image.bin```, under abovementioned directory. So full path to the latest image is
 
@@ -374,7 +375,7 @@ The disk image is usually named ```chromiumos_image.bin```, under abovementioned
 in the chroot, and
 
 ```
-/project/chromiumos-R70/src/build/images/rpi3/latest/chromiumos_image.bin
+/project/chromiumos-pi/src/build/images/rpi3/latest/chromiumos_image.bin
 ```
 in the host OS.
 
