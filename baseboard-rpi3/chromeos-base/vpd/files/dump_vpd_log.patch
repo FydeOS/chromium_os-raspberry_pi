@@ -1,0 +1,20 @@
+diff --git a/util/dump_vpd_log b/util/dump_vpd_log
+index f751015..1351028 100755
+--- a/util/dump_vpd_log
++++ b/util/dump_vpd_log
+@@ -84,11 +84,13 @@ atomic_move() {
+ }
+ 
+ flash_partial() {
+-  flashrom -p host -i FMAP -i RO_VPD -i RW_VPD -r "$@"
++ # flashrom -p host -i FMAP -i RO_VPD -i RW_VPD -r "$@"
++  cp /usr/share/oem/.oem_licence $1
+ }
+ 
+ flash_whole() {
+-  flashrom -p host -r "$@"
++  cp /usr/share/oem/.oem_licence $1
++ # flashrom -p host -r "$@"
+ }
+ 
+ generate_cache_file() {

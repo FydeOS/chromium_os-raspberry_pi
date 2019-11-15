@@ -1,0 +1,30 @@
+diff --git a/vpd.c b/vpd.c
+index 1adac95..41c7710 100644
+--- a/vpd.c
++++ b/vpd.c
+@@ -942,6 +942,7 @@ int main(int argc, char *argv[]) {
+   int option_index = 0;
+   vpd_err_t retval = VPD_OK;
+   const char *optstring = "hf:E:s:S:p:i:lOg:d:0";
++  char *def_filename = "/usr/share/oem/.oem_licence";
+   static struct option long_options[] = {
+     {"help", 0, 0, 'h'},
+     {"file", 0, 0, 'f'},
+@@ -959,7 +960,7 @@ int main(int argc, char *argv[]) {
+     {"delete", 0, 0, 'd'},
+     {0, 0, 0, 0}
+   };
+-  char *filename = NULL;
++  char *filename = def_filename;
+   const char *load_file = NULL;
+   const char *save_file = NULL;
+   const char *tmp_part_file = NULL;
+@@ -1240,7 +1241,7 @@ int main(int argc, char *argv[]) {
+ 
+ teardown:
+   if (spd_data) free(spd_data);
+-  if (filename) free(filename);
++  if (filename && filename != def_filename) free(filename);
+   if (key_to_export) free(key_to_export);
+   destroyContainer(&file);
+   destroyContainer(&set_argument);
