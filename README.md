@@ -46,11 +46,7 @@ If you aren't bothered with all the technicalities and just want the pre-built i
 * The overlays are now updated to build Chromium OS r70
 * Fix poor graphic performance with full hardware accelecration enabled.
 * Add firmware support for Raspberry Pi 3B+. Note that although kernel patches for brcm are in place, there are still issues with wifi with this release.
-* You can build packages with "cros_embedded" (or uncomment the USE flags in `overlay-
-
-
-
-/make.conf`) to produce a more efficient image.
+* You can build packages with "cros_embedded" (or uncomment the USE flags in `overlay-/make.conf`) to produce a more efficient image.
 
 <br><br>
 # Table of contents (for cool kids)
