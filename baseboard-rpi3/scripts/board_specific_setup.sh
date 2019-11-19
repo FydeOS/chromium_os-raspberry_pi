@@ -26,13 +26,9 @@ install_raspberrypi_bootloader() {
   local efi_size=$(( efi_size_sectors * 512 ))
   local mount_opts=loop,offset=${efi_offset},sizelimit=${efi_size}
   local efi_dir=$(mktemp -d)
-  local arch=$2
-  local kernel_img=""
-  local target_img=""
-  if [ "${arch}" == "arm" ]; then
-    kernel_img=$(ls "${ROOT}/boot/zImage-"*)
-    target_img="${efi_dir}/kernel7.img"
-  else
+  local kernel_img=$(ls "${ROOT}/boot/zImage-"*)
+  local target_img="${efi_dir}/kernel7.img"
+  if [ -z "$kernel_img" ]; then
     kernel_img=$(ls "${ROOT}/boot/Image"*)
     target_img="${efi_dir}/kernel8.img"
   fi
@@ -46,8 +42,7 @@ install_raspberrypi_bootloader() {
 }
 
 board_setup() {
-  info "install kernel and loader for ${CHROMEOS_KERNEL_ARCH}"
-  install_raspberrypi_bootloader "$1" $CHROMEOS_KERNEL_ARCH
+  install_raspberrypi_bootloader "$1" 
   install_hybrid_mbr "$1"
 }
 

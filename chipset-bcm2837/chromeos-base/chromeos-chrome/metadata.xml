@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "http://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+<use>
+	<flag name='app_shell'>Build app_shell</flag>
+	<flag name='asan'>Build with Address Sanitizer support</flag>
+	<flag name='build_tests'>Build test targets</flag>
+	<flag name='cfi'>Build Chrome with CFI (Control Flow Integrity) enabled</flag>
+	<flag name='chrome_debug'>Build with debug symbols (-g)</flag>
+	<flag name='chrome_debug_tests'>Don't strip test targets</flag>
+	<flag name='chrome_internal'>Add chrome branding</flag>
+	<flag name='chrome_media'>Build with additional codecs and containers</flag>
+	<flag name='chrome_pdf'>Build pdf reader</flag>
+	<flag name='chrome_remoting'>Build chrome remoting feature</flag>
+	<flag name='clang'>Build with CC and C++ set to clang</flag>
+	<flag name='clang_tidy'>Build with clang-tidy static analyzer; warnings get written to Chrome build log.</flag>
+	<flag name='component_build'>Build components as shared libraries (faster link)</flag>
+	<flag name='evdev_gestures'>Build Chrome with ChromeOS touchpad gestures support.</flag>
+	<flag name='gold'>Use gold linker</flag>
+	<flag name='highdpi'>Add high DPI resources</flag>
+	<flag name='jumbo'>Coalesce translation units together, making builds faster (not automatically tested).</flag>
+	<flag name='lld'>Use lld linker</flag>
+	<flag name='nacl'>Build Native Client (NaCL) support</flag>
+	<flag name='build_native_assistant'>Build native Google Assistant support</flag>
+	<flag name='neon'>Use neon instructions (ARM only)</flag>
+	<flag name='oobe_config'>Build utilities to save and restore OOBE config</flag>
+	<flag name='ozone'>Build Chrome for the Ozone metaplatform.</flag>
+	<flag name='pgo_generate'>Generate profile-guided optimization data</flag>
+	<flag name='pgo_use'>Use profile data for profile-guided optimization</flag>
+	<flag name='reorder'>Re-order symbols using profile data</flag>
+	<flag name='runhooks'>Run build hooks</flag>
+	<flag name='v4l2_codec'>Use Video4Linux2 codec</flag>
+	<flag name='vaapi'>Use VA-API</flag>
+	<flag name='v4lplugin'>Use Video4Linux plugin shared libraries</flag>
+	<flag name='verbose'>Verbose build output</flag>
+</use>
+</pkgmetadata>

@@ -1,0 +1,28 @@
+diff --git a/third_party/widevine/cdm/widevine.gni b/third_party/widevine/cdm/widevine.gni
+index 1fe47e92ffb1..c6df424c352f 100644
+--- a/third_party/widevine/cdm/widevine.gni
++++ b/third_party/widevine/cdm/widevine.gni
+@@ -10,7 +10,10 @@ declare_args() {
+   # on Android.
+   # Can be optionally enabled in Chromium on non-Android platforms. Please see
+   # //src/third_party/widevine/LICENSE file for details.
+-  enable_widevine = is_chrome_branded || is_android
++  #---***FYDEOS BEGIN***---
++  #enable_widevine = is_chrome_branded || is_android
++  enable_widevine = true
++  #---***FYDEOS END***---
+ }
+ 
+ # Widevine CDM is available as a library CDM on the following platforms and
+@@ -36,7 +39,10 @@ enable_widevine_cdm_component =
+     enable_library_widevine_cdm && (is_win || is_mac)
+ 
+ # Widevine CDM is bundled as part of Google Chrome builds.
+-bundle_widevine_cdm = enable_library_widevine_cdm && is_chrome_branded
++#---***FYDEOS BEGIN***---
++#bundle_widevine_cdm = enable_library_widevine_cdm && is_chrome_branded
++bundle_widevine_cdm = true
++#---***FYDEOS END***---
+ 
+ enable_widevine_cdm_host_verification =
+     enable_library_widevine_cdm && enable_cdm_host_verification

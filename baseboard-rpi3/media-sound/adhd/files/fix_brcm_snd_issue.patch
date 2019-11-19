@@ -12,7 +12,7 @@ index 0acf7ef3..070dd007 100644
  		clock_gettime(CLOCK_MONOTONIC_RAW, &last_wake);
  		ATLOG(atlog, AUDIO_THREAD_WAKE, rc, 0, 0);
 diff --git a/cras/src/tools/cras_monitor/cras_monitor.c b/cras/src/tools/cras_monitor/cras_monitor.c
-index d021669a..bd63cab4 100644
+index d021669a..0b2808f9 100644
 --- a/cras/src/tools/cras_monitor/cras_monitor.c
 +++ b/cras/src/tools/cras_monitor/cras_monitor.c
 @@ -166,12 +166,20 @@ static void input_node_gain_changed(void *context, cras_node_id_t node_id,
@@ -36,3 +36,11 @@ index d021669a..bd63cab4 100644
  }
  
  static void server_connection_callback(struct cras_client *client,
+@@ -308,6 +316,7 @@ int main(int argc, char **argv)
+ 		rc = read(STDIN_FILENO, &c, 1);
+ 		if (rc < 0 || c == 'q')
+ 			return 0;
++    sleep(1);
+ 	}
+ 
+ destroy_exit:

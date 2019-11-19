@@ -10,7 +10,7 @@ EGIT_REPO_URI="https://gitlab.freedesktop.org/mesa/mesa.git"
 EGIT_BRANCH="19.2"
 EGIT_COMMIT="71fafc13b9491f4ccc75fa821008fb863ffdb033"
 
-inherit base multilib flag-o-matic meson toolchain-funcs git-r3
+inherit base multilib flag-o-matic meson toolchain-funcs git-2
 
 FOLDER="${PV/_rc*/}"
 [[ ${PV/_rc*/} == ${PV} ]] || FOLDER+="/RC"

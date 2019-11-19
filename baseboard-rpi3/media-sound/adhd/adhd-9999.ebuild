@@ -187,6 +187,8 @@ src_install() {
 	# Install asound.conf for CRAS alsa plugin
 	insinto /etc
 	doins "${FILESDIR}"/asound.conf
+  insinto /etc/init
+  doins ${FILESDIR}/cras_monitor.conf
 }
 
 pkg_preinst() {

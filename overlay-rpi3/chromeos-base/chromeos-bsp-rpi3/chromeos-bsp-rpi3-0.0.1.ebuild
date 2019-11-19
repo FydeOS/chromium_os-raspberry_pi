@@ -16,6 +16,8 @@ RDEPEND="
     chromeos-base/rpi-firmware
     chromeos-base/auto-expand-partition
     chromeos-base/device-appid
+    sys-apps/haveged
+    chromeos-base/libwidevine
 "
 
 DEPEND="${RDEPEND}"
