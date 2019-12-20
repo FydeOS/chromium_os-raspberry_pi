@@ -1,18 +1,19 @@
 # Copyright (c) 2018 The Fyde OS Authors. All rights reserved.
 # Distributed under the terms of the BSD
 
-EAPI="4"
+EAPI="5"
 
-DESCRIPTION="vistual bsp"
+DESCRIPTION="empty project"
 HOMEPAGE="http://fydeos.com"
 
 LICENSE="BSD-Google"
 SLOT="0"
 KEYWORDS="*"
-IUSE=""
+IUSE="+kiosk_demo"
 
 RDEPEND="
-  chromeos-base/baseboard-bsp
-  chromeos-base/chromeos-bsp-rpi3"
+  kiosk_demo? ( chromeos-base/fyde-kiosk-demo
+                chromeos-base/power_wash_command )
+"
 
 DEPEND="${RDEPEND}"

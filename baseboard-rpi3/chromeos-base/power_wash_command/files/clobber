@@ -1,0 +1,3 @@
+#!/bin/bash
+echo 'clobber' > /mnt/stateful_partition/.update_available
+echo 'please reboot to powerwash the stateful_partition'

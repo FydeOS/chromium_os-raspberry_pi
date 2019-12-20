@@ -11,6 +11,8 @@ SLOT="0"
 KEYWORDS="*"
 IUSE=""
 
-RDEPEND="chromeos-base/chromeos-bsp-rpi4"
+RDEPEND="
+  chromeos-base/baseboard-bsp
+  chromeos-base/chromeos-bsp-rpi4"
 
 DEPEND="${RDEPEND}"

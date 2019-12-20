@@ -3,7 +3,7 @@
 
 EAPI="4"
 
-DESCRIPTION="vistual bsp"
+DESCRIPTION="add power wash command to usr/local/sbin"
 HOMEPAGE="http://fydeos.com"
 
 LICENSE="BSD-Google"
@@ -11,8 +11,13 @@ SLOT="0"
 KEYWORDS="*"
 IUSE=""
 
-RDEPEND="
-  chromeos-base/baseboard-bsp
-  chromeos-base/chromeos-bsp-rpi3"
+RDEPEND=""
 
 DEPEND="${RDEPEND}"
+
+S=${WORKDIR}
+
+src_install() {
+  exeinto /usr/sbin
+  doexe ${FILESDIR}/clobber 
+}
