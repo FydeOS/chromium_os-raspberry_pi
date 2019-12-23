@@ -2,8 +2,8 @@
 # Distributed under the terms of the BSD
 
 EAPI="4"
-
-DESCRIPTION="vistual bsp"
+inherit chrome-dev-flag 
+DESCRIPTION="append chrome command line flags"
 HOMEPAGE="http://fydeos.com"
 
 LICENSE="BSD-Google"
@@ -11,9 +11,4 @@ SLOT="0"
 KEYWORDS="*"
 IUSE=""
 
-RDEPEND="
-  chromeos-base/baseboard-bsp
-  chromeos-base/fyde-chromedev-flags
-  chromeos-base/chromeos-bsp-rpi4"
-
-DEPEND="${RDEPEND}"
+S=${WORKDIR}

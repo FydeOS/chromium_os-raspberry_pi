@@ -1,3 +1,2 @@
-chromeos-base/vpd::chromiumos
 media-sound/adhd::chromiumos
 media-libs/minigbm::chromiumos
