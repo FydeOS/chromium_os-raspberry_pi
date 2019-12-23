@@ -1,7 +1,5 @@
 [<img src="https://img.shields.io/badge/Join%20Telegram%20Group-FydeOS-yellowgreen.svg?style=popout-square&logo=telegram&colorA=870611&colorB=333333">](https://t.me/hi_fydeos)
 
-[<img src="https://img.shields.io/badge/Join%20Slack%20Channel-Chromium%20OS%20for%20Raspberry%20Pi%20(less%20active)-yellowgreen.svg?style=popout-square&logo=slack&colorA=870611&colorB=333333">](https://join.slack.com/t/chromium-os-for-sbc/shared_invite/enQtNTM1ODU4MDQ4OTgxLTAwMmU0MTIxODA1ZmMzZjc2NzZlYjcwYjQyZDkwMDU5ZjY5ZDBlM2UxMWYwNzdmYzNhNTc1YzRhYzhhY2MwMDM)
-
 <br>
 
 
@@ -11,6 +9,12 @@ If you aren't bothered with all the technicalities and just want the pre-built i
 <br>
 
 # Changelog
+### 2019-11-19
+##### Maintainence and enhancement
+* Added support for vpd(vital product information) storage capability
+* Fix system freeze and crash casued by `cras` 
+
+
 ### 2019-09-25
 ##### Added Raspberry Pi 4B support
 * Same known issues with the 3B/3B+ release
@@ -42,11 +46,7 @@ If you aren't bothered with all the technicalities and just want the pre-built i
 * The overlays are now updated to build Chromium OS r70
 * Fix poor graphic performance with full hardware accelecration enabled.
 * Add firmware support for Raspberry Pi 3B+. Note that although kernel patches for brcm are in place, there are still issues with wifi with this release.
-* You can build packages with "cros_embedded" (or uncomment the USE flags in `overlay-
-
-
-
-/make.conf`) to produce a more efficient image.
+* You can build packages with "cros_embedded" (or uncomment the USE flags in `overlay-/make.conf`) to produce a more efficient image.
 
 <br><br>
 # Table of contents (for cool kids)
@@ -55,9 +55,8 @@ If you aren't bothered with all the technicalities and just want the pre-built i
 - [Table of contents](#table-of-contents)
 - [Change log](#changelog)
 - [Introduction](#introduction)
+    - [Goal of this project](#goal-of-this-project)
     - [About this repository](#about-this-repository)
-        - [Branches in this repository](#branches-in-this-repository)
-        - [Goal of this repository](#goal-of-this-repository)
     - [Typography Conventions](#typography-conventions)
 - [System requirement](#system-requirement)
 - [Prepare the system](#prepare-the-system)
@@ -92,9 +91,14 @@ If you aren't bothered with all the technicalities and just want the pre-built i
 
 <!-- /TOC -->
 # Introduction
-This document describes how to build and run Google [Chromium OS](https://www.chromium.org/chromium-os) on Raspberry Pi 3B & 3B+, from its source code and the board overlay hosted in this repository.
+This document describes how to build and run Google [Chromium OS](https://www.chromium.org/chromium-os) on Raspberry Pi 3B, 3B+ and 4B, from its source code and the board overlay hosted in this repository.
 
-This overlay and the document has been tested against Raspberry Pi 3B & 3B+ by the FydeOS team. It **doesn't work** on any earlier version of the Raspberry Pi line-up.
+These overlays and the document has been tested against Raspberry Pi 3B, 3B+ and 4B by the FydeOS team. It **doesn't work** on any earlier version of the Raspberry Pi line-up.
+
+## Goal of this project
+* To provide a open source code base that everybody can use to build and improve Chromium OS for Raspberry Pi.
+* To make as less change to the original Chromium OS code and process as possible, so that people can study and get used to the Chromium OS development process.
+* This project does not aim to provide support for Chromium OS itself. If you find bugs and glitches, please report to [crbugs](https://bugs.chromium.org/p/chromium/issues/list); if you have further queries regarding Chromium OS, plase revert to one of the official Chromium related [Google groups](https://www.chromium.org/developers/technical-discussion-groups).
 
 ## About this repository
 The code and document in this repository is the result of works by the people of the Flint team. We previously worked on this overlay internally and released a few disk images for Raspberry Pi to the public. Now we open this to the public.
@@ -103,10 +107,6 @@ The code and document in this repository is the result of works by the people of
 There was a big change regarding the graphics stack in Chrome OS. Before release 57, Xorg/X11 was used. Beginning from release 57, Chrome OS moved to the Freon graphics stack, which is a modern display system developed solely for Chrome OS by Google.
 
 * master - this branch can be used to build a Chromium OS image with Freon as the graphics stack. It has been tested against our current release version. You are welcome to test it with future releases and send feedback and/or PRs.
-
-### Goal of this repository
-* To provide a open source code base that everybody can use to build and improve Chromium OS for Raspberry Pi.
-* To make as less change to the original Chromium OS code and process as possible, so that people can study and get used to the Chromium OS development process. We may provide scripts later to ease the process.
 
 ## Typography Conventions
 Shell commands running in the host OS are prefixed with the ```$``` sign, like below.
