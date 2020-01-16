@@ -4,14 +4,22 @@
 
 
 # TL;DR:
-If you aren't bothered with all the technicalities and just want the pre-built images, it's [here](https://github.com/FydeOS/chromium_os_for_raspberry_pi/releases), under the **release** tab, no hard feelings :p
+If you aren't bothered with all the technicalities and just want the pre-built images, it's [here](https://github.com/FydeOS/chromium_os-raspberry_pi/releases), under the **release** tab, no hard feelings :p
 
 <br>
 
 # Changelog
+
+### 2020-01-16
+##### Maintainence and enhancement
+* Rename the project to `chromium_os-raspberry_pi` to comply with our standard usage of `-` and `_`: `_` as separators for within words and `-` for words connector / preposition replacement
+* Added support for kiosk mode
+* Updated README for building with local chromium source.
+* Added corresponding projects [chromium-raspberry_pi](https://github.com/FydeOS/chromium-raspberry_pi) and [kiosk-demo-app](https://github.com/FydeOS/kiosk-demo-app) for building with kiosk mode enabled
+
 ### 2019-11-19
 ##### Maintainence and enhancement
-* Added support for vpd(vital product information) storage capability
+* Added support for vpd(vital product information) storage capability.
 * Fix system freeze and crash casued by `cras` 
 
 
@@ -68,6 +76,7 @@ If you aren't bothered with all the technicalities and just want the pre-built i
     - [Fetch Chromium OS source code](#fetch-chromium-os-source-code)
     - [Request for Google API key](#request-for-google-api-key)
 - [Setup Raspberry Pi overlay](#setup-raspberry-pi-overlay)
+- [Setup local chromium source](#setup-local-chromium-source)
 - [Build Chromium OS for Raspberry Pi](#build-chromium-os-for-raspberry-pi)
     - [Create the chroot](#create-the-chroot)
         - [Delete the chroot](#delete-the-chroot)
@@ -75,7 +84,7 @@ If you aren't bothered with all the technicalities and just want the pre-built i
     - [Enter the chroot](#enter-the-chroot)
     - [Set password for the chronos user](#set-password-for-the-chronos-user)
     - [Setup Raspberry Pi board](#setup-raspberry-pi-board)
-        - [Re-initialize the board](#re-initialize-the-board)
+        - [Re-initialise the board](#re-initialise-the-board)
     - [Build packages](#build-packages)
         - [When interrupted](#when-interrupted)
         - [Read the output](#read-the-output)
@@ -101,22 +110,30 @@ These overlays and the document has been tested against Raspberry Pi 3B, 3B+ and
 * This project does not aim to provide support for Chromium OS itself. If you find bugs and glitches, please report to [crbugs](https://bugs.chromium.org/p/chromium/issues/list); if you have further queries regarding Chromium OS, plase revert to one of the official Chromium related [Google groups](https://www.chromium.org/developers/technical-discussion-groups).
 
 ## About this repository
-The code and document in this repository is the result of works by the people of the Flint team. We previously worked on this overlay internally and released a few disk images for Raspberry Pi to the public. Now we open this to the public.
+The code and document in this repository is the result of works by the people of the FydeOS team. We previously worked on this overlay internally and released a few disk images for Raspberry Pi to the public. Now we open this to the public.
 
-### Branches in this repository
+### Branches and tags in this repository
 There was a big change regarding the graphics stack in Chrome OS. Before release 57, Xorg/X11 was used. Beginning from release 57, Chrome OS moved to the Freon graphics stack, which is a modern display system developed solely for Chrome OS by Google.
 
-* master - this branch can be used to build a Chromium OS image with Freon as the graphics stack. It has been tested against our current release version. You are welcome to test it with future releases and send feedback and/or PRs.
+#### branches
+ - master - this branch can be used to build a Chromium OS image with Freon as the graphics stack. It has been tested against our current release version. You are welcome to test it with future releases and send feedback and/or PRs.
+ - r`<number>` - these branches are for archiving purposes and used to store legacy code. You may find that the <number> would be far behind the current releases provided by official Chromium Project. Using these branches are not encouraged.
+
+#### tags
+ - When we do release a prebuilt image, the commit would be tagged with a release number correspond to the repo manifest. For example, if the repo manifest release is `release-R80-12739.B`, then our release tag would be `r80`.
+ - Often we will be doing more than one releases for each repo manifest release number, so we will append meaningful string to the tag name to identify such. For example: `r80-hardware_acceleration`
+
 
 ## Typography Conventions
 Shell commands running in the host OS are prefixed with the ```$``` sign, like below.
-```
+```bash
 $ cd /mydir
 ```
 
 Shell commands running in the Chromium OS chroot environment are prefixed with ```(cr) $```, like below.
-```
-(cr) $ cd /mydir         # This is a comment for the command. It should not be included in your command.
+```bash
+# This is a comment for the command. It should not be included in your command.
+(cr) $ cd /mydir
 ```
 
 
@@ -178,9 +195,12 @@ $ git config --global user.name "Your Name"
 ## Create directory structure
 The directory structure described here is a recommendation based on the best practice in the Fyde team. You may host the files in a different way as you wish.
 
-```
-$ mkdir -p /project/chromiumos-pi      # This is the directory to hold Chromium OS source code, name it according to the release you are going to build.
-$ mkdir -p /project/overlays            # This is the directory to hold this repository.
+```bash
+# This is the directory to hold Chromium OS source code, name it according to the release you are going to build.
+$ mkdir -p /project/cros-pi      
+
+# This is the directory to hold this repository.
+$ mkdir -p /project/overlays
 ```
 
 If you are building a different release, make sure you use the actual directory name on your own system, the name here mentioned is just an example.
@@ -197,10 +217,14 @@ You will see a list of Git commit IDs and its name in the form of ```refs/heads/
 
 Now run these commands to fetch the source code. Find and use a different release name if you would like to build a different release.
 
-```
-$ cd /project/chromiumos-pi
-$ repo init -u https://chromium.googlesource.com/chromiumos/manifest.git --repo-url https://chromium.googlesource.com/external/repo.git -b release-R77-12371.B  # The last R77 stable release as of SEP 2019
-$ repo sync -j8         # Raise this number if you have a fast Internet connection
+```bash
+$ cd /project/cros-pi
+
+# The last R77 stable release as of SEP 2019
+$ repo init -u https://chromium.googlesource.com/chromiumos/manifest.git --repo-url https://chromium.googlesource.com/external/repo.git -b release-R77-12371.B
+
+# Raise this number if you have a fast Internet connection
+$ repo sync -j8
 ```
 
 Fetching of Chromium OS source code may take 10 to more than 30 minutes depends on your connection speed.
@@ -223,13 +247,97 @@ Then the Chromium OS build script will read necessary information from this file
 # Setup Raspberry Pi overlay
 Now fetch this overlay and put it in the right place.
 
-```
+```bash
 $ cd /project/overlays
-$ git clone https://github.com/fydeos/chromium_os_for_raspberry_pi.git
+$ git clone https://github.com/fydeos/chromium_os-raspberry_pi.git
 
-$ cd /project/chromiumos-pi/src/overlays
-$ ln -s /project/overlays/chromium_os_for_raspberry_pi/* .
+$ cd /project/cros-pi/src/overlays
+$ ln -s /project/overlays/chromium_os-raspberry_pi/* .
 ```
+
+# Setup local chromium source
+If you wish to build chromium browser on your local setup (so that you have the option to incorporate your own modifications) you need to prepare the necessary files prior to entering the cros_sdk.
+
+As far as this project is concerned, the chromium source that we use to build our releases can be found in the [chromium-raspberry_pi](https://github.com/FydeOS/chromium-raspberry_pi) project. You may also choose to use Google's vanilla chromium repository which can be found [here](https://chromium.googlesource.com/chromium/src.git/).
+
+Note that we use a much simpler way to manage releases, with our [chromium-raspberry_pi](https://github.com/FydeOS/chromium-raspberry_pi) project you need to select the correct branch corresponding to the [repo manifest](#fetch-chromium-os-source-code) you used in previous step to sync your Chromium OS code. For example, if you are building r77, you will then need to look out for "`chromium-m77-<branch identifier>`" branch under [chromium-raspberry_pi](https://github.com/FydeOS/chromium-raspberry_pi). The letter "m" stands for "milestone" and it correlates to the release number for Chromium OS(r77 in this case). Choosing an unmatched chromium milestone branch and chromium os repo with result in endless build errors.
+
+With Google's repository, you need to choose a correct release tag rather than branch. For example, if you are building r77, you can browse all existing chromium release tags on [this page](https://chromium.googlesource.com/chromium/src.git/) and deduce that the latest tag would be [77.0.3865.129](https://chromium.googlesource.com/chromium/src.git/+/refs/tags/77.0.3865.129).
+
+Having understood the above, now create a directory parallel to your Chromium OS repo to house the chromium source:
+
+```bash
+$ mkdir chromium_source
+$ cd chromium_source
+$ mkdir src
+$ cd src
+```
+
+Now clone the desired chromium project:
+
+```bash
+# use our chromium repo
+$ git clone git@github.com:FydeOS/chromium-raspberry_pi.git 
+
+# use google's vanilla chromium
+$ git clone https://chromium.googlesource.com/chromium/src.git 
+```
+Note that chromium is a HUGE project, cloning the entire repo will require ~12GiB of disk space and will require about 2 hours to complete if you have a decent internet speed.
+
+Then choose the correct branch/tag
+
+```bash
+#with our chromium repo
+$ git checkout chromium-m77-feat-kiosk_mode
+
+#with Google's repo and you wish to build for r77
+$ git checkout 77.0.3865.129
+```
+Now you need to create a config file known to gclient for syncing the chromium dependecies:
+
+```bash
+$ cd ..
+# now you should be in /path/to/chromium_source
+$ touch .gclient
+```
+
+The .gclient file should have the following content, note that you may replace the `url` value to Google's per your setup.
+```
+solutions = [{'custom_deps': {},
+  'custom_vars': {},
+  'deps_file': '.DEPS.git',
+  'managed': True,
+  'name': 'src',
+  'url': 'git@github.com:FydeOS/chromium-raspberry_pi.git'}]
+target_os = ['chromeos']
+```
+
+Now you can start syncing:
+
+```bash
+$ gclient sync
+```
+
+Note, due to an existing issue with WebRTC, during syncing you may encounter a git related error complaining fetch failure. A temporary fix is to manually edit the `src/third_party/webrtc/.git/config` file under the WebRTC folder:
+
+```
+[core]
+        repositoryformatversion = 0
+        filemode = true
+        bare = false
+        logallrefupdates = true
+[remote "origin"]
+        url = https://webrtc.googlesource.com/src.git
+        fetch = +refs/heads/*:refs/remotes/origin/*
+        fetch = +refs/branch-heads/*:refs/remotes/branch-heads/*
+[branch "master"]
+        remote = origin
+        merge = refs/heads/master
+```
+
+Once gclient sync is completed, chromium source folder is now fully setup.
+
+
 
 # Build Chromium OS for Raspberry Pi
 
@@ -237,9 +345,18 @@ $ ln -s /project/overlays/chromium_os_for_raspberry_pi/* .
 As mentioned above, a chroot environment will be used to run the actual build process and some other related tasks. To create the chroot environment, run below commands.
 
 ```
-$ cd /project/chromiumos-pi
+$ cd /project/cros-pi
 $ cros_sdk
 ```
+
+If you wish to build your own chromium and you have follow the steps to set it up, you need to specify it when entering the cros_sdk by:
+
+
+```bash
+$ cd /project/cros-pi
+$ cros_sdk --chrome-root /path/to/your/chromium_source/src
+```
+
 
 It make take 10 to over 30 minutes depends on your Internet connection speed and disk speed. Once finished, it will enter into the chroot. The shell prompt string looks like below so it is very easy to tell whether you are currently in the chroot or not.
 
@@ -247,7 +364,7 @@ It make take 10 to over 30 minutes depends on your Internet connection speed and
 (cr) (release-R77-12371.B/(xxxxxx...)) <user>@<host> ~/trunk/src/scripts $
 ```
 
-The chroot environment is located under the ```/project/chromiumos-pi/chroot``` directory.
+The chroot environment is located under the ```/project/cros-pi/chroot``` directory.
 
 Let's exit from the chroot first as we need to do some customization before move on. Type ```exit``` or ```Ctrl + D``` to exit from the chroot shell.
 
@@ -259,7 +376,7 @@ If you would like to remove the chroot and re-create it from scratch, don't dele
 The correct way to remove the chroot is by using below commands.
 
 ```
-$ cd /project/chromiumos-pi
+$ cd /project/cros-pi
 $ cros_sdk --delete
 ```
 
@@ -269,18 +386,18 @@ Programs running inside the chroot will not be able to access files outside of t
 When entering the Chromium OS chroot environment, a file named ```.local_mounts``` will be checked and directories listed in it will be bind mounted inside the chroot. All we need to do is to create this file in the right place and put necessary contents in, by using below command.
 
 ```
-$ echo "/project" > /project/chromiumos-pi/src/scripts/.local_mounts
+$ echo "/project" > /project/cros-pi/src/scripts/.local_mounts
 ```
 
 Now, after entered the chroot, a ```/project``` directory will exist in the chroot and its content is the same as the ```/project``` directory in the host OS, as it actually is bind mounted from the host OS.
 
-If we don't do this, the ```/project/chromiumos-pi/src/overlays/overlay-rpi3``` symbolic link will not be accessible, as the top directory (```/project```) it points to doesn't exist in the chroot.
+If we don't do this, the ```/project/cros-pi/src/overlays/overlay-rpi3``` symbolic link will not be accessible, as the top directory (```/project```) it points to doesn't exist in the chroot.
 
 ## Enter the chroot
 Now we can enter the chroot.
 
 ```
-$ cd /project/chromiumos-pi
+$ cd /project/cros-pi
 $ cros_sdk
 ```
 
@@ -327,8 +444,8 @@ Again, it may take 10 to over 30 minutes depends on the speed of your Internet c
 
 After it's done, a directory structure for the "rpi" board will be created under ```/build/rpi3``` of the chroot.
 
-### Re-initialize the board
-It is usually not necessary to re-initialize the board as what you have already built will be lost, and you will have to spend hours to rebuild all packages from scratch. But if you really need to do so, just re-run the same setup_board command with the ```---force``` option.
+### Re-initialise the board
+It is usually not necessary to re-initialise the board as what you have already built will be lost, and you will have to spend hours to rebuild all packages from scratch. But if you really need to do so, just re-run the same setup_board command with the ```---force``` option.
 
 ```
 (cr) $ ./setup_board --board=rpi3 --force
@@ -371,7 +488,7 @@ After the build_packages command finished successfully, you can start building t
 It may take 10 to 30 minutes, mainly depends on the speed of your disk. It is much faster on SSD than on HDD.
 
 ### Find your image
-After the command finished successfully, you will have disk images generated, saved under ```/mnt/host/source/src/build/images/rpi/``` directory in the chroot, or ```/project/chromiumos-pi/src/build/images/rpi``` in the host OS. These two are the same directory, just bind mounted in the chroot.
+After the command finished successfully, you will have disk images generated, saved under ```/mnt/host/source/src/build/images/rpi3/``` directory in the chroot, or ```/project/cros-pi/src/build/images/rpi3``` in the host OS. These two are the same directory, just bind mounted in the chroot.
 
 Each invoke of the build_image command will create a directory named similar to ```R77-XXXX.XXX.<date time>-a1``` under above directory. There is a symlink named ```latest``` under above directory, that always point to the image directory of the last successful build.
 
@@ -384,7 +501,7 @@ The disk image is usually named ```chromiumos_image.bin```, under abovementioned
 in the chroot, and
 
 ```
-/project/chromiumos-pi/src/build/images/rpi3/latest/chromiumos_image.bin
+/project/cros-pi/src/build/images/rpi3/latest/chromiumos_image.bin
 ```
 in the host OS.
 
