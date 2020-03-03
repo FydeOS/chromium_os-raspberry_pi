@@ -1,21 +1,21 @@
 diff --git a/cras/src/server/audio_thread.c b/cras/src/server/audio_thread.c
-index 0acf7ef3..070dd007 100644
+index 68ecb0e..7df8313 100644
 --- a/cras/src/server/audio_thread.c
 +++ b/cras/src/server/audio_thread.c
-@@ -855,6 +855,8 @@ static void *audio_io_thread(void *arg)
- 		      wait_ts ? wait_ts->tv_nsec : 0, longest_wake.tv_nsec);
+@@ -882,6 +882,8 @@ static void *audio_io_thread(void *arg)
  		if (wait_ts)
  			check_busyloop(wait_ts);
-+   	if (wait_ts && wait_ts->tv_sec == 0 && wait_ts->tv_nsec == 0 )
-+   		wait_ts->tv_sec = 1;
- 		rc = ppoll(thread->pollfds, thread->num_pollfds, wait_ts, NULL);
- 		clock_gettime(CLOCK_MONOTONIC_RAW, &last_wake);
- 		ATLOG(atlog, AUDIO_THREAD_WAKE, rc, 0, 0);
+ 
++		if (wait_ts && wait_ts->tv_sec == 0 && wait_ts->tv_nsec == 0)
++			wait_ts->tv_sec = 1;
+ 		/* Sync atlog with shared memory. */
+ 		__sync_synchronize();
+ 		atlog->sync_write_pos = atlog->write_pos;
 diff --git a/cras/src/tools/cras_monitor/cras_monitor.c b/cras/src/tools/cras_monitor/cras_monitor.c
-index d021669a..0b2808f9 100644
+index d021669..424dc36 100644
 --- a/cras/src/tools/cras_monitor/cras_monitor.c
 +++ b/cras/src/tools/cras_monitor/cras_monitor.c
-@@ -166,12 +166,20 @@ static void input_node_gain_changed(void *context, cras_node_id_t node_id,
+@@ -166,12 +166,21 @@ static void input_node_gain_changed(void *context, cras_node_id_t node_id,
  	free((void *)node_name);
  }
  
@@ -24,23 +24,24 @@ index d021669a..0b2808f9 100644
  				       enum CRAS_STREAM_DIRECTION dir,
  				       uint32_t num_active_streams)
  {
-+  struct cras_client *client = (struct cras_client *)context;
++	struct cras_client *client = (struct cras_client *)context;
  	printf("num active %s streams: %u\n", string_for_direction(dir),
  	       num_active_streams);
-+  if (last_active_streams == 0 && num_active_streams == 1){
-+    cras_client_set_suspend(client, 1);
-+    usleep(5000);
-+    cras_client_set_suspend(client, 0);
-+  }
-+  last_active_streams = num_active_streams;
++	if (last_active_streams == 0 && num_active_streams == 1) {
++		cras_client_set_suspend(client, 1);
++		usleep(5000);
++		cras_client_set_suspend(client, 0);
++	}
++	last_active_streams = num_active_streams;
++
  }
  
  static void server_connection_callback(struct cras_client *client,
-@@ -308,6 +316,7 @@ int main(int argc, char **argv)
+@@ -308,6 +317,7 @@ int main(int argc, char **argv)
  		rc = read(STDIN_FILENO, &c, 1);
  		if (rc < 0 || c == 'q')
  			return 0;
-+    sleep(1);
++		sleep(1);
  	}
  
  destroy_exit:

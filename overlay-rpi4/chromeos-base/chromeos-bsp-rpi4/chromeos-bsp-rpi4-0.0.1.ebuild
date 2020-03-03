@@ -12,13 +12,8 @@ KEYWORDS="*"
 IUSE=""
 
 RDEPEND="
-    chromeos-base/rpi-boot-bin
-    chromeos-base/auto-expand-partition
     chromeos-base/device-appid
-    chromeos-base/rpi-firmware
     chromeos-base/snd_bcm2835-spec
-    chromeos-base/libwidevine
-    sys-apps/haveged
 "
 
 DEPEND="${RDEPEND}"

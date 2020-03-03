@@ -12,12 +12,7 @@ KEYWORDS="*"
 IUSE=""
 
 RDEPEND="
-    chromeos-base/rpi-boot-bin
-    chromeos-base/rpi-firmware
-    chromeos-base/auto-expand-partition
     chromeos-base/device-appid
-    sys-apps/haveged
-    chromeos-base/libwidevine
 "
 
 DEPEND="${RDEPEND}"
@@ -30,6 +25,9 @@ src_install() {
   doins "${FILESDIR}/bt/bluetooth_uart.conf"
   doins "${FILESDIR}/bt/console-ttyAMA0.override"
   doins "${FILESDIR}/audio/force_audio_output_to_headphones.conf"
+  insinto /usr/share/alsa/ucm
+  doins -r ${FILESDIR}/audio/bcm2835\ ALSA
+  doins -r ${FILESDIR}/audio/vc4-hdmi
   insinto /firmware/rpi
   doins "${FILESDIR}/kernel-config"/*.txt
 }

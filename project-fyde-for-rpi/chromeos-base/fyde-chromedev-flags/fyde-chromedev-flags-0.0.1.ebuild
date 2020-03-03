@@ -9,6 +9,14 @@ HOMEPAGE="http://fydeos.com"
 LICENSE="BSD-Google"
 SLOT="0"
 KEYWORDS="*"
-IUSE=""
+IUSE="kiosk_demo"
 
 S=${WORKDIR}
+
+CHROME_DEV_FLAGS="${CHROME_DEV_FLAGS}"
+
+src_prepare() {
+    if use kiosk_demo; then
+      CHROME_DEV_FLAGS="${CHROME_DEV_FLAGS} --force-kiosk-mode"
+    fi
+}

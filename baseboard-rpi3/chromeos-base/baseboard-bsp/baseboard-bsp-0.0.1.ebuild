@@ -9,11 +9,14 @@ HOMEPAGE="http://fydeos.com"
 LICENSE="BSD-Google"
 SLOT="0"
 KEYWORDS="*"
-IUSE="+kiosk_demo"
+IUSE=""
 
 RDEPEND="
-  kiosk_demo? ( chromeos-base/fyde-kiosk-demo
-                chromeos-base/power_wash_command )
+  chromeos-base/rpi-boot-bin
+  chromeos-base/rpi-firmware
+  sys-apps/haveged
 "
 
 DEPEND="${RDEPEND}"
+
+S=$WORKDIR

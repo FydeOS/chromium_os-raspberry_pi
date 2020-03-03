@@ -7,9 +7,13 @@ EAPI=6
 MESON_AUTO_DEPEND=no
 
 EGIT_REPO_URI="https://gitlab.freedesktop.org/mesa/mesa.git"
+EGIT_NONBARE=1
 EGIT_BRANCH="19.2"
-EGIT_COMMIT="71fafc13b9491f4ccc75fa821008fb863ffdb033"
-
+ECLASS_DEBUG_OUTPUT=on
+EGIT_MASTER=$EGIT_BRANCH
+EGIT_OPTIONS="--depth=1"
+#EGIT_COMMIT="02fcd9d803af7dd35ae62dc3007e6ffaf09d0ef1"
+EGIT_COMMIT="$EGIT_BRANCH"
 inherit base multilib flag-o-matic meson toolchain-funcs git-2
 
 FOLDER="${PV/_rc*/}"

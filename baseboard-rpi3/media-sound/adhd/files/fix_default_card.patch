@@ -1,0 +1,24 @@
+diff --git a/cras/src/server/cras_alsa_io.c b/cras/src/server/cras_alsa_io.c
+index 5498733..b3b8d3f 100644
+--- a/cras/src/server/cras_alsa_io.c
++++ b/cras/src/server/cras_alsa_io.c
+@@ -580,15 +580,17 @@ static int flush_buffer(struct cras_iodev *iodev)
+ static struct cras_ionode *first_plugged_node(struct cras_iodev *iodev)
+ {
+ 	struct cras_ionode *n;
++	struct cras_ionode *result = NULL;
+ 
+ 	/* When this is called at iodev creation, none of the nodes
+ 	 * are selected. Just pick the first plugged one and let Chrome
+ 	 * choose it later. */
+ 	DL_FOREACH (iodev->nodes, n) {
+ 		if (n->plugged)
+-			return n;
++		    result = n;
++		//	return n;
+ 	}
+-	return iodev->nodes;
++	return result? result : iodev->nodes;
+ }
+ 
+ static void update_active_node(struct cras_iodev *iodev, unsigned node_idx,

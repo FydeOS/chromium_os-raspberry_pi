@@ -36,6 +36,13 @@ install_raspberrypi_bootloader() {
 
   info "Installing firmware, kernel and overlays"
   sudo cp -r "${ROOT}/firmware/rpi/"* "${efi_dir}/"
+  if [ -d ${ROOT}/usr/src/linux/arch/arm ]; then
+    sudo cp ${ROOT}/usr/src/linux/arch/arm/boot/dts/*.dtb "${efi_dir}/"
+    sudo cp -r ${ROOT}/usr/src/linux/arch/arm/boot/dts/overlays "${efi_dir}/"
+  else
+    sudo cp ${ROOT}/usr/src/linux/arch/arm64/boot/dts/broadcom/*.dtb "${efi_dir}/"
+    sudo cp -r ${ROOT}/usr/src/linux/arch/arm64/boot/dts/overlays "${efi_dir}/"
+  fi
   sudo cp ${kernel_img} ${target_img}
   sudo umount "${efi_dir}"
   rmdir "${efi_dir}"

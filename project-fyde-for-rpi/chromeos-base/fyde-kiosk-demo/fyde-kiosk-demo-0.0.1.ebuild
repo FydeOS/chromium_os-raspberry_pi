@@ -20,6 +20,8 @@ DEPEND="${RDEPEND}"
 src_install() {
   insinto /usr/local/share/kiosk_app
   doins ${FILESDIR}/config.json
+  insinto /etc/init
+  doins ${FILESDIR}/system-services.override
   insinto /usr/local/share/kiosk_app/kiosk-demo-app
   doins -r *  
 }

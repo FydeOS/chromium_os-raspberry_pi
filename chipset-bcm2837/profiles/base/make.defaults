@@ -1,7 +1,7 @@
 # Copyright 2015 The Chromium OS Authors. All rights reserved.
 # Distributed under the terms of the GNU General Public License v2
 
-CHROMEOS_KERNEL_CONFIG="/mnt/host/source/src/overlays/chipset-bcm2837/kconfig/rpi_4_19_deconf_test_audio"
+CHROMEOS_KERNEL_CONFIG="/mnt/host/source/src/overlays/chipset-bcm2837/kconfig/rpi_5_4_32bit_deconf"
 CHROMEOS_KERNEL_ARCH="arm"
 # Turn on the video cards this board uses.
 VIDEO_CARDS="vc4"
@@ -9,6 +9,6 @@ VIDEO_CARDS="vc4"
 # Initial value just for style purposes.
 USE=""
 
-USE="${USE} hardfp kernel-upstream-mainline -transparent_hugepage -acpi_ac"
+USE="${USE} hardfp kernel-upstream-mainline boot_dts_device_tree -transparent_hugepage -acpi_ac"
 USE="${USE} mosys_eventlog neon -opengl opengles"
 USE="${USE} watchdog"

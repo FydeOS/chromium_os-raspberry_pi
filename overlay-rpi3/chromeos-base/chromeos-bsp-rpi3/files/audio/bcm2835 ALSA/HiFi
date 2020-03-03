@@ -1,0 +1,14 @@
+SectionVerb {
+
+        EnableSequence [
+        ]
+
+        DisableSequence [
+        ]
+
+        # ALSA PCM
+        Value {
+                # ALSA PCM device for HiFi
+                PlaybackPCM "hw:bcm2835,0"
+        }
+}

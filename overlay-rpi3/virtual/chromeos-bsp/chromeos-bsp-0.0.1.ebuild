@@ -13,7 +13,7 @@ IUSE=""
 
 RDEPEND="
   chromeos-base/baseboard-bsp
-  chromeos-base/fyde-chromedev-flags
+  virtual/fyde-packages
   chromeos-base/chromeos-bsp-rpi3"
 
 DEPEND="${RDEPEND}"
