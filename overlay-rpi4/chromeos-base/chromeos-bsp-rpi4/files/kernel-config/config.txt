@@ -12,6 +12,6 @@ dtoverlay=vc4-fkms-v3d,cma-256
 force_turbo=1               # we need more power
 enable_uart=1               # for debug
 #start_debug=1
-arm_64bit=1
+#arm_64bit=1
 #total_mem=4096
 #enable_gic=1

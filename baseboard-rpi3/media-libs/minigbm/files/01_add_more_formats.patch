@@ -877,16 +877,16 @@ index 0000000..fa0a945
 +  stride = drv_stride_from_format(format, width, 0);
 +  //stride = ALIGN(stride, 64);
 +  drv_bo_from_format(bo, stride, height, format);
-+  bo_create.size = bo->total_size;
-+  bo->format_modifiers[0] = modifier;
++  bo_create.size = bo->meta.total_size;
++  bo->meta.format_modifiers[0] = modifier;
 +
 +  ret = drmIoctl(bo->drv->fd, DRM_IOCTL_V3D_CREATE_BO, &bo_create);
 +  if (ret) {
-+    drv_log("DRM_IOCTL_V3D_CREATE_BO failed (size=%zu)\n", bo->total_size);
++    drv_log("DRM_IOCTL_V3D_CREATE_BO failed (size=%zu)\n", bo->meta.total_size);
 +    return -errno;
 +  }
 +
-+  for (plane = 0; plane < bo->num_planes; plane++)
++  for (plane = 0; plane < bo->meta.num_planes; plane++)
 +    bo->handles[plane].u32 = bo_create.handle;
 +  return 0;
 +}
@@ -912,8 +912,8 @@ index 0000000..fa0a945
 +    drv_log("DRM_V3D_MMAP_BO failed\n");
 +    return MAP_FAILED;
 +  }
-+  vma->length = bo->total_size;
-+  return mmap(NULL, bo->total_size, drv_get_prot(map_flags), MAP_SHARED, bo->drv->fd,
++  vma->length = bo->meta.total_size;
++  return mmap(NULL, bo->meta.total_size, drv_get_prot(map_flags), MAP_SHARED, bo->drv->fd,
 +        bo_map.offset);
 +}
 +
@@ -1282,7 +1282,7 @@ index 7af16c2..184afac 100644
 +  bo->meta.tiling = modifier == DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED ? VC4_TILING_T : VC4_TILING_NONE;
 +  ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VC4_CREATE_BO, &bo_create);
 +  if (ret) {
-+    drv_log("DRM_IOCTL_VC4_GEM_CREATE failed (size=%zu)\n", bo->meta.total_size);
++    drv_log("DRM_IOCTL_VC4_GEM_CREATE failed (size=%zu), ret:%d\n", bo->meta.total_size, ret);
 +    return -errno;
 +  }
 +
