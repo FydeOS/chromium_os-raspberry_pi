@@ -13,6 +13,7 @@ IUSE=""
 
 RDEPEND="
     chromeos-base/device-appid
+    chromeos-base/snd_bcm2835-spec
 "
 
 DEPEND="${RDEPEND}"
@@ -24,7 +25,7 @@ src_install() {
   insinto /etc/init
   doins "${FILESDIR}/bt/bluetooth_uart.conf"
   doins "${FILESDIR}/bt/console-ttyAMA0.override"
-  doins "${FILESDIR}/audio/force_audio_output_to_headphones.conf"
+  #doins "${FILESDIR}/audio/force_audio_output_to_headphones.conf"
   insinto /usr/share/alsa/ucm
   doins -r ${FILESDIR}/audio/bcm2835\ ALSA
   doins -r ${FILESDIR}/audio/vc4-hdmi

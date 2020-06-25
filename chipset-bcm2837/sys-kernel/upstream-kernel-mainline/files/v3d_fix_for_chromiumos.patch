@@ -12,18 +12,22 @@ index 91b0769b69ef..47b29ee1d253 100644
  	DRM_IOCTL_DEF_DRV(V3D_CREATE_BO, v3d_create_bo_ioctl, DRM_RENDER_ALLOW),
  	DRM_IOCTL_DEF_DRV(V3D_MMAP_BO, v3d_mmap_bo_ioctl, DRM_RENDER_ALLOW),
 diff --git a/drivers/gpu/drm/vc4/vc4_bo.c b/drivers/gpu/drm/vc4/vc4_bo.c
-index 72d30d90b856..dab8ade8ebdb 100644
+index 72d30d90b856..e3c4254375fd 100644
 --- a/drivers/gpu/drm/vc4/vc4_bo.c
 +++ b/drivers/gpu/drm/vc4/vc4_bo.c
-@@ -820,9 +820,10 @@ int vc4_create_bo_ioctl(struct drm_device *dev, void *data,
+@@ -820,6 +820,7 @@ int vc4_create_bo_ioctl(struct drm_device *dev, void *data,
  	int ret;
  
  	ret = vc4_grab_bin_bo(vc4, vc4file);
-+  /*
++  ret = 0;
  	if (ret)
  		return ret;
--
-+  */
- 	/*
- 	 * We can't allocate from the BO cache, because the BOs don't
- 	 * get zeroed, and that might leak data between users.
+ 
+@@ -885,6 +886,7 @@ vc4_create_shader_bo_ioctl(struct drm_device *dev, void *data,
+ 	}
+ 
+ 	ret = vc4_grab_bin_bo(vc4, vc4file);
++  ret = 0;
+ 	if (ret)
+ 		return ret;
+ 

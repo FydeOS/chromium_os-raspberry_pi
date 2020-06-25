@@ -3,6 +3,8 @@
 # found in the LICENSE file.
 
 EAPI=7
+CROS_WORKON_COMMIT="f33550846e57d68fcd970c56f70c0292ac797c34"
+CROS_WORKON_TREE="4c42023357a7212471fba72c32de53c258b4bd08"
 CROS_WORKON_PROJECT="chromiumos/third_party/adhd"
 CROS_WORKON_LOCALNAME="adhd"
 CROS_WORKON_USE_VCSID=1
@@ -13,7 +15,7 @@ DESCRIPTION="Google A/V Daemon"
 HOMEPAGE="http://www.chromium.org"
 SRC_URI=""
 LICENSE="BSD-Google"
-KEYWORDS="~*"
+KEYWORDS="*"
 IUSE="asan +cras-apm fuzzer generated_cros_config selinux systemd unibuild"
 
 COMMON_DEPEND="
@@ -71,6 +73,7 @@ check_format_error() {
 }
 
 src_prepare() {
+  epatch ${FILESDIR}/fix_brcm_snd_issue.patch
 	cd cras
 	eautoreconf
 	default
@@ -148,8 +151,6 @@ src_install() {
 		fuzzer_install "${S}/OWNERS.fuzz" cras/src/cras_hfp_slc_fuzzer \
 			--dict "${S}/cras/src/fuzz/cras_hfp_slc.dict"
 	fi
-  insinto /etc/init
-  doins ${FILESDIR}/cras_monitor.conf
 }
 
 pkg_preinst() {

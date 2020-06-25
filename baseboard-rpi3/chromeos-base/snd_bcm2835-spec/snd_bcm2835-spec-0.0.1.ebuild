@@ -18,6 +18,8 @@ DEPEND="${RDEPEND}"
 S=$WORKDIR
 
 src_install() {
-  insinto /etc/modprobe.d
-  doins ${FILESDIR}/snd_bcm2835.conf  
+  #insinto /etc/modprobe.d
+  #doins ${FILESDIR}/snd_bcm2835.conf  
+  insinto /etc/init
+  doins "${FILESDIR}/force_audio_output_to_headphones.conf"
 }

@@ -1,26 +1,37 @@
+diff --git a/ash/public/cpp/ash_features.cc b/ash/public/cpp/ash_features.cc
+index 9e58270812e1..261a710a3246 100644
+--- a/ash/public/cpp/ash_features.cc
++++ b/ash/public/cpp/ash_features.cc
+@@ -105,7 +105,7 @@ const base::Feature kUnifiedMessageCenterRefactor{
+     "UnifiedMessageCenterRefactor", base::FEATURE_ENABLED_BY_DEFAULT};
+ 
+ const base::Feature kEnableBackgroundBlur{"EnableBackgroundBlur",
+-                                          base::FEATURE_ENABLED_BY_DEFAULT};
++                                          base::FEATURE_DISABLED_BY_DEFAULT};
+ 
+ const base::Feature kSwipingFromLeftEdgeToGoBack{
+     "SwipingFromLeftEdgeToGoBack", base::FEATURE_ENABLED_BY_DEFAULT};
 diff --git a/third_party/widevine/cdm/widevine.gni b/third_party/widevine/cdm/widevine.gni
-index 1fe47e92ffb1..c6df424c352f 100644
+index fcd08e04e2fe..ad7db6854321 100644
 --- a/third_party/widevine/cdm/widevine.gni
 +++ b/third_party/widevine/cdm/widevine.gni
-@@ -10,7 +10,10 @@ declare_args() {
-   # on Android.
+@@ -10,7 +10,9 @@ declare_args() {
+   # on Android and Fuchsia platforms.
    # Can be optionally enabled in Chromium on non-Android platforms. Please see
    # //src/third_party/widevine/LICENSE file for details.
--  enable_widevine = is_chrome_branded || is_android
+-  enable_widevine = is_chrome_branded || is_android || is_fuchsia
 +  #---***FYDEOS BEGIN***---
-+  #enable_widevine = is_chrome_branded || is_android
 +  enable_widevine = true
 +  #---***FYDEOS END***---
  }
  
  # Widevine CDM is available as a library CDM on the following platforms and
-@@ -36,7 +39,10 @@ enable_widevine_cdm_component =
-     enable_library_widevine_cdm && (is_win || is_mac)
+@@ -36,7 +38,9 @@ enable_widevine_cdm_component =
+     enable_library_widevine_cdm && (is_win || is_mac || is_desktop_linux)
  
  # Widevine CDM is bundled as part of Google Chrome builds.
 -bundle_widevine_cdm = enable_library_widevine_cdm && is_chrome_branded
 +#---***FYDEOS BEGIN***---
-+#bundle_widevine_cdm = enable_library_widevine_cdm && is_chrome_branded
 +bundle_widevine_cdm = true
 +#---***FYDEOS END***---
  

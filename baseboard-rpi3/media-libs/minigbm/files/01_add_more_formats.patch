@@ -1,841 +1,45 @@
 diff --git a/Android.mk b/Android.mk
-index 564f416..0fd1746 100644
+index 3eab7ae..00e5bae 100644
 --- a/Android.mk
 +++ b/Android.mk
-@@ -26,8 +26,10 @@ MINIGBM_SRC := \
+@@ -27,6 +27,7 @@ MINIGBM_SRC := \
  	tegra.c \
  	udl.c \
  	vc4.c \
 +  v3d.c \
  	vgem.c \
--	virtio_gpu.c
-+	virtio_gpu.c \
-+  vmwgfx.c
+ 	virtio_gpu.c
  
- MINIGBM_CPPFLAGS := -std=c++14
- MINIGBM_CFLAGS := \
-diff --git a/Makefile b/Makefile
-index 35f92f2..cf430e8 100644
---- a/Makefile
-+++ b/Makefile
-@@ -34,6 +34,12 @@ endif
- ifdef DRV_VC4
- 	CFLAGS += $(shell $(PKG_CONFIG) --cflags libdrm_vc4)
- endif
-+ifdef DRV_VMWGFX
-+	CFLAGS += $(shell $(PKG_CONFIG) --cflags libdrm_vmware)
-+endif
-+ifdef DRV_V3D
-+#  CFLAGS += $(shell $(PKG_CONFIG) --cflags libdrm_v3d)
-+endif
- 
- CPPFLAGS += $(PC_CFLAGS)
- LDLIBS += $(PC_LIBS)
 diff --git a/drv.c b/drv.c
-index 872b5d4..4b24710 100644
+index 920cf4d..133eeaf 100644
 --- a/drv.c
 +++ b/drv.c
-@@ -61,6 +61,12 @@ extern const struct backend backend_udl;
+@@ -64,6 +64,9 @@ extern const struct backend backend_udl;
  #ifdef DRV_VC4
  extern const struct backend backend_vc4;
  #endif
-+#ifdef DRV_VMWGFX
-+extern const struct backend backend_vmwgfx;
-+#endif
 +#ifdef DRV_V3D
 +extern const struct backend backend_v3d;
 +#endif
  extern const struct backend backend_vgem;
  extern const struct backend backend_virtio_gpu;
  
-@@ -110,6 +116,12 @@ static const struct backend *drv_get_backend(int fd)
+@@ -116,6 +119,9 @@ static const struct backend *drv_get_backend(int fd)
  		&backend_udl,
  #ifdef DRV_VC4
  		&backend_vc4,
 +#endif
 +#ifdef DRV_V3D
 +    &backend_v3d,
-+#endif
-+#ifdef DRV_VMWGFX
-+   &backend_vmwgfx,
  #endif
  		&backend_vgem,	   &backend_virtio_gpu,
  	};
-diff --git a/helpers.c b/helpers.c
-index ad8a9f0..850653d 100644
---- a/helpers.c
-+++ b/helpers.c
-@@ -53,14 +53,14 @@ static const struct planar_layout packed_4bpp_layout = {
- 	.vertical_subsampling = { 1 },
- 	.bytes_per_pixel = { 4 }
- };
--
-+/*
- static const struct planar_layout packed_8bpp_layout = {
- 	.num_planes = 1,
- 	.horizontal_subsampling = { 1 },
- 	.vertical_subsampling = { 1 },
- 	.bytes_per_pixel = { 8 }
- };
--
-+*/
- static const struct planar_layout biplanar_yuv_420_layout = {
- 	.num_planes = 2,
- 	.horizontal_subsampling = { 1, 2 },
-@@ -153,10 +153,10 @@ static const struct planar_layout *layout_from_format(uint32_t format)
- 	case DRM_FORMAT_XRGB2101010:
- 	case DRM_FORMAT_XRGB8888:
- 		return &packed_4bpp_layout;
--
-+/*
- 	case DRM_FORMAT_ABGR16161616F:
- 		return &packed_8bpp_layout;
--
-+*/
- 	default:
- 		drv_log("UNKNOWN FORMAT %d\n", format);
- 		return NULL;
-diff --git a/i915.c b/i915.c
-index 025b6b5..82e381f 100644
---- a/i915.c
-+++ b/i915.c
-@@ -23,7 +23,7 @@
- #define I915_CACHELINE_SIZE 64
- #define I915_CACHELINE_MASK (I915_CACHELINE_SIZE - 1)
- 
--static const uint32_t render_target_formats[] = { DRM_FORMAT_ABGR16161616F, DRM_FORMAT_ABGR2101010,
-+static const uint32_t render_target_formats[] = { /*DRM_FORMAT_ABGR16161616F,*/ DRM_FORMAT_ABGR2101010,
- 						  DRM_FORMAT_ABGR8888,	    DRM_FORMAT_ARGB1555,
- 						  DRM_FORMAT_ARGB2101010,   DRM_FORMAT_ARGB8888,
- 						  DRM_FORMAT_RGB565,	    DRM_FORMAT_XBGR2101010,
-diff --git a/include/includeCheck.h b/include/includeCheck.h
-new file mode 100644
-index 0000000..8cce7f1
---- /dev/null
-+++ b/include/includeCheck.h
-@@ -0,0 +1,3 @@
-+/*
-+ * Intentionally empty file.
-+ */
-diff --git a/include/svga3d_types.h b/include/svga3d_types.h
-new file mode 100644
-index 0000000..2abe412
---- /dev/null
-+++ b/include/svga3d_types.h
-@@ -0,0 +1,651 @@
-+/* SPDX-License-Identifier: GPL-2.0 OR MIT */
-+/**********************************************************
-+ * Copyright 2012-2015 VMware, Inc.
-+ *
-+ * Permission is hereby granted, free of charge, to any person
-+ * obtaining a copy of this software and associated documentation
-+ * files (the "Software"), to deal in the Software without
-+ * restriction, including without limitation the rights to use, copy,
-+ * modify, merge, publish, distribute, sublicense, and/or sell copies
-+ * of the Software, and to permit persons to whom the Software is
-+ * furnished to do so, subject to the following conditions:
-+ *
-+ * The above copyright notice and this permission notice shall be
-+ * included in all copies or substantial portions of the Software.
-+ *
-+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
-+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
-+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-+ * SOFTWARE.
-+ *
-+ **********************************************************/
-+
-+/*
-+ * svga3d_types.h --
-+ *
-+ *       SVGA 3d hardware definitions for basic types
-+ */
-+
-+#ifndef _SVGA3D_TYPES_H_
-+#define _SVGA3D_TYPES_H_
-+
-+#define INCLUDE_ALLOW_MODULE
-+#define INCLUDE_ALLOW_USERLEVEL
-+#define INCLUDE_ALLOW_VMCORE
-+
-+#include "includeCheck.h"
-+#include "svga_types.h"
-+
-+/*
-+ * Generic Types
-+ */
-+
-+#define SVGA3D_INVALID_ID ((uint32)-1)
-+
-+/*
-+ * Surface formats.
-+ */
-+typedef enum SVGA3dSurfaceFormat {
-+	SVGA3D_FORMAT_INVALID = 0,
-+
-+	SVGA3D_X8R8G8B8 = 1,
-+	SVGA3D_FORMAT_MIN = 1,
-+
-+	SVGA3D_A8R8G8B8 = 2,
-+
-+	SVGA3D_R5G6B5 = 3,
-+	SVGA3D_X1R5G5B5 = 4,
-+	SVGA3D_A1R5G5B5 = 5,
-+	SVGA3D_A4R4G4B4 = 6,
-+
-+	SVGA3D_Z_D32 = 7,
-+	SVGA3D_Z_D16 = 8,
-+	SVGA3D_Z_D24S8 = 9,
-+	SVGA3D_Z_D15S1 = 10,
-+
-+	SVGA3D_LUMINANCE8 = 11,
-+	SVGA3D_LUMINANCE4_ALPHA4 = 12,
-+	SVGA3D_LUMINANCE16 = 13,
-+	SVGA3D_LUMINANCE8_ALPHA8 = 14,
-+
-+	SVGA3D_DXT1 = 15,
-+	SVGA3D_DXT2 = 16,
-+	SVGA3D_DXT3 = 17,
-+	SVGA3D_DXT4 = 18,
-+	SVGA3D_DXT5 = 19,
-+
-+	SVGA3D_BUMPU8V8 = 20,
-+	SVGA3D_BUMPL6V5U5 = 21,
-+	SVGA3D_BUMPX8L8V8U8 = 22,
-+	SVGA3D_FORMAT_DEAD1 = 23,
-+
-+	SVGA3D_ARGB_S10E5 = 24, /* 16-bit floating-point ARGB */
-+	SVGA3D_ARGB_S23E8 = 25, /* 32-bit floating-point ARGB */
-+
-+	SVGA3D_A2R10G10B10 = 26,
-+
-+	/* signed formats */
-+	SVGA3D_V8U8 = 27,
-+	SVGA3D_Q8W8V8U8 = 28,
-+	SVGA3D_CxV8U8 = 29,
-+
-+	/* mixed formats */
-+	SVGA3D_X8L8V8U8 = 30,
-+	SVGA3D_A2W10V10U10 = 31,
-+
-+	SVGA3D_ALPHA8 = 32,
-+
-+	/* Single- and dual-component floating point formats */
-+	SVGA3D_R_S10E5 = 33,
-+	SVGA3D_R_S23E8 = 34,
-+	SVGA3D_RG_S10E5 = 35,
-+	SVGA3D_RG_S23E8 = 36,
-+
-+	SVGA3D_BUFFER = 37,
-+
-+	SVGA3D_Z_D24X8 = 38,
-+
-+	SVGA3D_V16U16 = 39,
-+
-+	SVGA3D_G16R16 = 40,
-+	SVGA3D_A16B16G16R16 = 41,
-+
-+	/* Packed Video formats */
-+	SVGA3D_UYVY = 42,
-+	SVGA3D_YUY2 = 43,
-+
-+	/* Planar video formats */
-+	SVGA3D_NV12 = 44,
-+
-+	/* Video format with alpha */
-+	SVGA3D_AYUV = 45,
-+
-+	SVGA3D_R32G32B32A32_TYPELESS = 46,
-+	SVGA3D_R32G32B32A32_UINT = 47,
-+	SVGA3D_R32G32B32A32_SINT = 48,
-+	SVGA3D_R32G32B32_TYPELESS = 49,
-+	SVGA3D_R32G32B32_FLOAT = 50,
-+	SVGA3D_R32G32B32_UINT = 51,
-+	SVGA3D_R32G32B32_SINT = 52,
-+	SVGA3D_R16G16B16A16_TYPELESS = 53,
-+	SVGA3D_R16G16B16A16_UINT = 54,
-+	SVGA3D_R16G16B16A16_SNORM = 55,
-+	SVGA3D_R16G16B16A16_SINT = 56,
-+	SVGA3D_R32G32_TYPELESS = 57,
-+	SVGA3D_R32G32_UINT = 58,
-+	SVGA3D_R32G32_SINT = 59,
-+	SVGA3D_R32G8X24_TYPELESS = 60,
-+	SVGA3D_D32_FLOAT_S8X24_UINT = 61,
-+	SVGA3D_R32_FLOAT_X8X24 = 62,
-+	SVGA3D_X32_G8X24_UINT = 63,
-+	SVGA3D_R10G10B10A2_TYPELESS = 64,
-+	SVGA3D_R10G10B10A2_UINT = 65,
-+	SVGA3D_R11G11B10_FLOAT = 66,
-+	SVGA3D_R8G8B8A8_TYPELESS = 67,
-+	SVGA3D_R8G8B8A8_UNORM = 68,
-+	SVGA3D_R8G8B8A8_UNORM_SRGB = 69,
-+	SVGA3D_R8G8B8A8_UINT = 70,
-+	SVGA3D_R8G8B8A8_SINT = 71,
-+	SVGA3D_R16G16_TYPELESS = 72,
-+	SVGA3D_R16G16_UINT = 73,
-+	SVGA3D_R16G16_SINT = 74,
-+	SVGA3D_R32_TYPELESS = 75,
-+	SVGA3D_D32_FLOAT = 76,
-+	SVGA3D_R32_UINT = 77,
-+	SVGA3D_R32_SINT = 78,
-+	SVGA3D_R24G8_TYPELESS = 79,
-+	SVGA3D_D24_UNORM_S8_UINT = 80,
-+	SVGA3D_R24_UNORM_X8 = 81,
-+	SVGA3D_X24_G8_UINT = 82,
-+	SVGA3D_R8G8_TYPELESS = 83,
-+	SVGA3D_R8G8_UNORM = 84,
-+	SVGA3D_R8G8_UINT = 85,
-+	SVGA3D_R8G8_SINT = 86,
-+	SVGA3D_R16_TYPELESS = 87,
-+	SVGA3D_R16_UNORM = 88,
-+	SVGA3D_R16_UINT = 89,
-+	SVGA3D_R16_SNORM = 90,
-+	SVGA3D_R16_SINT = 91,
-+	SVGA3D_R8_TYPELESS = 92,
-+	SVGA3D_R8_UNORM = 93,
-+	SVGA3D_R8_UINT = 94,
-+	SVGA3D_R8_SNORM = 95,
-+	SVGA3D_R8_SINT = 96,
-+	SVGA3D_P8 = 97,
-+	SVGA3D_R9G9B9E5_SHAREDEXP = 98,
-+	SVGA3D_R8G8_B8G8_UNORM = 99,
-+	SVGA3D_G8R8_G8B8_UNORM = 100,
-+	SVGA3D_BC1_TYPELESS = 101,
-+	SVGA3D_BC1_UNORM_SRGB = 102,
-+	SVGA3D_BC2_TYPELESS = 103,
-+	SVGA3D_BC2_UNORM_SRGB = 104,
-+	SVGA3D_BC3_TYPELESS = 105,
-+	SVGA3D_BC3_UNORM_SRGB = 106,
-+	SVGA3D_BC4_TYPELESS = 107,
-+	SVGA3D_ATI1 = 108, /* DX9-specific BC4_UNORM */
-+	SVGA3D_BC4_SNORM = 109,
-+	SVGA3D_BC5_TYPELESS = 110,
-+	SVGA3D_ATI2 = 111, /* DX9-specific BC5_UNORM */
-+	SVGA3D_BC5_SNORM = 112,
-+	SVGA3D_R10G10B10_XR_BIAS_A2_UNORM = 113,
-+	SVGA3D_B8G8R8A8_TYPELESS = 114,
-+	SVGA3D_B8G8R8A8_UNORM_SRGB = 115,
-+	SVGA3D_B8G8R8X8_TYPELESS = 116,
-+	SVGA3D_B8G8R8X8_UNORM_SRGB = 117,
-+
-+	/* Advanced depth formats. */
-+	SVGA3D_Z_DF16 = 118,
-+	SVGA3D_Z_DF24 = 119,
-+	SVGA3D_Z_D24S8_INT = 120,
-+
-+	/* Planar video formats. */
-+	SVGA3D_YV12 = 121,
-+
-+	SVGA3D_R32G32B32A32_FLOAT = 122,
-+	SVGA3D_R16G16B16A16_FLOAT = 123,
-+	SVGA3D_R16G16B16A16_UNORM = 124,
-+	SVGA3D_R32G32_FLOAT = 125,
-+	SVGA3D_R10G10B10A2_UNORM = 126,
-+	SVGA3D_R8G8B8A8_SNORM = 127,
-+	SVGA3D_R16G16_FLOAT = 128,
-+	SVGA3D_R16G16_UNORM = 129,
-+	SVGA3D_R16G16_SNORM = 130,
-+	SVGA3D_R32_FLOAT = 131,
-+	SVGA3D_R8G8_SNORM = 132,
-+	SVGA3D_R16_FLOAT = 133,
-+	SVGA3D_D16_UNORM = 134,
-+	SVGA3D_A8_UNORM = 135,
-+	SVGA3D_BC1_UNORM = 136,
-+	SVGA3D_BC2_UNORM = 137,
-+	SVGA3D_BC3_UNORM = 138,
-+	SVGA3D_B5G6R5_UNORM = 139,
-+	SVGA3D_B5G5R5A1_UNORM = 140,
-+	SVGA3D_B8G8R8A8_UNORM = 141,
-+	SVGA3D_B8G8R8X8_UNORM = 142,
-+	SVGA3D_BC4_UNORM = 143,
-+	SVGA3D_BC5_UNORM = 144,
-+
-+	SVGA3D_FORMAT_MAX
-+} SVGA3dSurfaceFormat;
-+
-+/*
-+ * SVGA3d Surface Flags --
-+ */
-+#define SVGA3D_SURFACE_CUBEMAP (1 << 0)
-+
-+/*
-+ * HINT flags are not enforced by the device but are useful for
-+ * performance.
-+ */
-+#define SVGA3D_SURFACE_HINT_STATIC (CONST64U(1) << 1)
-+#define SVGA3D_SURFACE_HINT_DYNAMIC (CONST64U(1) << 2)
-+#define SVGA3D_SURFACE_HINT_INDEXBUFFER (CONST64U(1) << 3)
-+#define SVGA3D_SURFACE_HINT_VERTEXBUFFER (CONST64U(1) << 4)
-+#define SVGA3D_SURFACE_HINT_TEXTURE (CONST64U(1) << 5)
-+#define SVGA3D_SURFACE_HINT_RENDERTARGET (CONST64U(1) << 6)
-+#define SVGA3D_SURFACE_HINT_DEPTHSTENCIL (CONST64U(1) << 7)
-+#define SVGA3D_SURFACE_HINT_WRITEONLY (CONST64U(1) << 8)
-+#define SVGA3D_SURFACE_MASKABLE_ANTIALIAS (CONST64U(1) << 9)
-+#define SVGA3D_SURFACE_AUTOGENMIPMAPS (CONST64U(1) << 10)
-+
-+#define SVGA3D_SURFACE_DECODE_RENDERTARGET (CONST64U(1) << 11)
-+
-+/*
-+ * Is this surface using a base-level pitch for it's mob backing?
-+ *
-+ * This flag is not intended to be set by guest-drivers, but is instead
-+ * set by the device when the surface is bound to a mob with a specified
-+ * pitch.
-+ */
-+#define SVGA3D_SURFACE_MOB_PITCH (CONST64U(1) << 12)
-+
-+#define SVGA3D_SURFACE_INACTIVE (CONST64U(1) << 13)
-+#define SVGA3D_SURFACE_HINT_RT_LOCKABLE (CONST64U(1) << 14)
-+#define SVGA3D_SURFACE_VOLUME (CONST64U(1) << 15)
-+
-+/*
-+ * Required to be set on a surface to bind it to a screen target.
-+ */
-+#define SVGA3D_SURFACE_SCREENTARGET (CONST64U(1) << 16)
-+
-+/*
-+ * Align images in the guest-backing mob to 16-bytes.
-+ */
-+#define SVGA3D_SURFACE_ALIGN16 (CONST64U(1) << 17)
-+
-+#define SVGA3D_SURFACE_1D (CONST64U(1) << 18)
-+#define SVGA3D_SURFACE_ARRAY (CONST64U(1) << 19)
-+
-+/*
-+ * Bind flags.
-+ * These are enforced for any surface defined with DefineGBSurface_v2.
-+ */
-+#define SVGA3D_SURFACE_BIND_VERTEX_BUFFER (CONST64U(1) << 20)
-+#define SVGA3D_SURFACE_BIND_INDEX_BUFFER (CONST64U(1) << 21)
-+#define SVGA3D_SURFACE_BIND_CONSTANT_BUFFER (CONST64U(1) << 22)
-+#define SVGA3D_SURFACE_BIND_SHADER_RESOURCE (CONST64U(1) << 23)
-+#define SVGA3D_SURFACE_BIND_RENDER_TARGET (CONST64U(1) << 24)
-+#define SVGA3D_SURFACE_BIND_DEPTH_STENCIL (CONST64U(1) << 25)
-+#define SVGA3D_SURFACE_BIND_STREAM_OUTPUT (CONST64U(1) << 26)
-+
-+/*
-+ * The STAGING flags notes that the surface will not be used directly by the
-+ * drawing pipeline, i.e. that it will not be bound to any bind point.
-+ * Staging surfaces may be used by copy operations to move data in and out
-+ * of other surfaces.  No bind flags may be set on surfaces with this flag.
-+ *
-+ * The HINT_INDIRECT_UPDATE flag suggests that the surface will receive
-+ * updates indirectly, i.e. the surface will not be updated directly, but
-+ * will receive copies from staging surfaces.
-+ */
-+#define SVGA3D_SURFACE_STAGING_UPLOAD (CONST64U(1) << 27)
-+#define SVGA3D_SURFACE_STAGING_DOWNLOAD (CONST64U(1) << 28)
-+#define SVGA3D_SURFACE_HINT_INDIRECT_UPDATE (CONST64U(1) << 29)
-+
-+/*
-+ * Setting this flag allow this surface to be used with the
-+ * SVGA_3D_CMD_DX_TRANSFER_FROM_BUFFER command.  It is only valid for
-+ * buffer surfaces, and no bind flags are allowed to be set on surfaces
-+ * with this flag.
-+ */
-+#define SVGA3D_SURFACE_TRANSFER_FROM_BUFFER (CONST64U(1) << 30)
-+
-+/*
-+ * Reserved for video operations.
-+ */
-+#define SVGA3D_SURFACE_RESERVED1 (CONST64U(1) << 31)
-+
-+/*
-+ * Specifies that a surface is multisample, and therefore requires the full
-+ * mob-backing to store all the samples.
-+ */
-+#define SVGA3D_SURFACE_MULTISAMPLE (CONST64U(1) << 32)
-+
-+#define SVGA3D_SURFACE_FLAG_MAX (CONST64U(1) << 33)
-+
-+/*
-+ * Surface flags types:
-+ *
-+ * SVGA3dSurface1Flags:  Lower 32-bits of flags.
-+ * SVGA3dSurface2Flags:  Upper 32-bits of flags.
-+ * SVGA3dSurfaceAllFlags: Full 64-bits of flags.
-+ */
-+typedef uint32 SVGA3dSurface1Flags;
-+typedef uint32 SVGA3dSurface2Flags;
-+typedef uint64 SVGA3dSurfaceAllFlags;
-+
-+#define SVGA3D_SURFACE_FLAGS1_MASK ((uint64_t)MAX_UINT32)
-+#define SVGA3D_SURFACE_FLAGS2_MASK (MAX_UINT64 & ~SVGA3D_SURFACE_FLAGS1_MASK)
-+
-+#define SVGA3D_SURFACE_HB_DISALLOWED_MASK                                                          \
-+	(SVGA3D_SURFACE_MOB_PITCH | SVGA3D_SURFACE_SCREENTARGET | SVGA3D_SURFACE_ALIGN16 |         \
-+	 SVGA3D_SURFACE_BIND_CONSTANT_BUFFER | SVGA3D_SURFACE_BIND_STREAM_OUTPUT |                 \
-+	 SVGA3D_SURFACE_STAGING_UPLOAD | SVGA3D_SURFACE_STAGING_DOWNLOAD |                         \
-+	 SVGA3D_SURFACE_HINT_INDIRECT_UPDATE | SVGA3D_SURFACE_TRANSFER_FROM_BUFFER |               \
-+	 SVGA3D_SURFACE_MULTISAMPLE)
-+
-+#define SVGA3D_SURFACE_HB_PRESENT_DISALLOWED_MASK (SVGA3D_SURFACE_1D | SVGA3D_SURFACE_MULTISAMPLE)
-+
-+#define SVGA3D_SURFACE_2D_DISALLOWED_MASK                                                          \
-+	(SVGA3D_SURFACE_CUBEMAP | SVGA3D_SURFACE_MASKABLE_ANTIALIAS |                              \
-+	 SVGA3D_SURFACE_AUTOGENMIPMAPS | SVGA3D_SURFACE_VOLUME | SVGA3D_SURFACE_1D |               \
-+	 SVGA3D_SURFACE_BIND_VERTEX_BUFFER | SVGA3D_SURFACE_BIND_INDEX_BUFFER |                    \
-+	 SVGA3D_SURFACE_BIND_CONSTANT_BUFFER | SVGA3D_SURFACE_BIND_DEPTH_STENCIL |                 \
-+	 SVGA3D_SURFACE_BIND_STREAM_OUTPUT | SVGA3D_SURFACE_TRANSFER_FROM_BUFFER |                 \
-+	 SVGA3D_SURFACE_MULTISAMPLE)
-+
-+#define SVGA3D_SURFACE_BASICOPS_DISALLOWED_MASK                                                    \
-+	(SVGA3D_SURFACE_CUBEMAP | SVGA3D_SURFACE_AUTOGENMIPMAPS | SVGA3D_SURFACE_VOLUME |          \
-+	 SVGA3D_SURFACE_1D | SVGA3D_SURFACE_MULTISAMPLE)
-+
-+#define SVGA3D_SURFACE_SCREENTARGET_DISALLOWED_MASK                                                \
-+	(SVGA3D_SURFACE_CUBEMAP | SVGA3D_SURFACE_AUTOGENMIPMAPS | SVGA3D_SURFACE_VOLUME |          \
-+	 SVGA3D_SURFACE_1D | SVGA3D_SURFACE_BIND_VERTEX_BUFFER |                                   \
-+	 SVGA3D_SURFACE_BIND_INDEX_BUFFER | SVGA3D_SURFACE_BIND_CONSTANT_BUFFER |                  \
-+	 SVGA3D_SURFACE_BIND_DEPTH_STENCIL | SVGA3D_SURFACE_BIND_STREAM_OUTPUT |                   \
-+	 SVGA3D_SURFACE_INACTIVE | SVGA3D_SURFACE_STAGING_UPLOAD |                                 \
-+	 SVGA3D_SURFACE_STAGING_DOWNLOAD | SVGA3D_SURFACE_HINT_INDIRECT_UPDATE |                   \
-+	 SVGA3D_SURFACE_TRANSFER_FROM_BUFFER | SVGA3D_SURFACE_MULTISAMPLE)
-+
-+#define SVGA3D_SURFACE_BUFFER_DISALLOWED_MASK                                                      \
-+	(SVGA3D_SURFACE_CUBEMAP | SVGA3D_SURFACE_AUTOGENMIPMAPS | SVGA3D_SURFACE_VOLUME |          \
-+	 SVGA3D_SURFACE_1D | SVGA3D_SURFACE_MASKABLE_ANTIALIAS | SVGA3D_SURFACE_ARRAY |            \
-+	 SVGA3D_SURFACE_MULTISAMPLE | SVGA3D_SURFACE_MOB_PITCH)
-+
-+#define SVGA3D_SURFACE_MULTISAMPLE_DISALLOWED_MASK                                                 \
-+	(SVGA3D_SURFACE_CUBEMAP | SVGA3D_SURFACE_AUTOGENMIPMAPS | SVGA3D_SURFACE_VOLUME |          \
-+	 SVGA3D_SURFACE_1D | SVGA3D_SURFACE_SCREENTARGET | SVGA3D_SURFACE_MOB_PITCH)
-+
-+#define SVGA3D_SURFACE_DX_ONLY_MASK                                                                \
-+	(SVGA3D_SURFACE_BIND_STREAM_OUTPUT | SVGA3D_SURFACE_STAGING_UPLOAD |                       \
-+	 SVGA3D_SURFACE_STAGING_DOWNLOAD | SVGA3D_SURFACE_TRANSFER_FROM_BUFFER)
-+
-+#define SVGA3D_SURFACE_STAGING_MASK                                                                \
-+	(SVGA3D_SURFACE_STAGING_UPLOAD | SVGA3D_SURFACE_STAGING_DOWNLOAD)
-+
-+#define SVGA3D_SURFACE_BIND_MASK                                                                   \
-+	(SVGA3D_SURFACE_BIND_VERTEX_BUFFER | SVGA3D_SURFACE_BIND_INDEX_BUFFER |                    \
-+	 SVGA3D_SURFACE_BIND_CONSTANT_BUFFER | SVGA3D_SURFACE_BIND_SHADER_RESOURCE |               \
-+	 SVGA3D_SURFACE_BIND_RENDER_TARGET | SVGA3D_SURFACE_BIND_DEPTH_STENCIL |                   \
-+	 SVGA3D_SURFACE_BIND_STREAM_OUTPUT)
-+
-+typedef enum {
-+	SVGA3DFORMAT_OP_TEXTURE = 0x00000001,
-+	SVGA3DFORMAT_OP_VOLUMETEXTURE = 0x00000002,
-+	SVGA3DFORMAT_OP_CUBETEXTURE = 0x00000004,
-+	SVGA3DFORMAT_OP_OFFSCREEN_RENDERTARGET = 0x00000008,
-+	SVGA3DFORMAT_OP_SAME_FORMAT_RENDERTARGET = 0x00000010,
-+	SVGA3DFORMAT_OP_ZSTENCIL = 0x00000040,
-+	SVGA3DFORMAT_OP_ZSTENCIL_WITH_ARBITRARY_COLOR_DEPTH = 0x00000080,
-+
-+	/*
-+	 * This format can be used as a render target if the current display mode
-+	 * is the same depth if the alpha channel is ignored. e.g. if the device
-+	 * can render to A8R8G8B8 when the display mode is X8R8G8B8, then the
-+	 * format op list entry for A8R8G8B8 should have this cap.
-+	 */
-+	SVGA3DFORMAT_OP_SAME_FORMAT_UP_TO_ALPHA_RENDERTARGET = 0x00000100,
-+
-+	/*
-+	 * This format contains DirectDraw support (including Flip).  This flag
-+	 * should not to be set on alpha formats.
-+	 */
-+	SVGA3DFORMAT_OP_DISPLAYMODE = 0x00000400,
-+
-+	/*
-+	 * The rasterizer can support some level of Direct3D support in this format
-+	 * and implies that the driver can create a Context in this mode (for some
-+	 * render target format).  When this flag is set, the SVGA3DFORMAT_OP_DISPLAYMODE
-+	 * flag must also be set.
-+	 */
-+	SVGA3DFORMAT_OP_3DACCELERATION = 0x00000800,
-+
-+	/*
-+	 * This is set for a private format when the driver has put the bpp in
-+	 * the structure.
-+	 */
-+	SVGA3DFORMAT_OP_PIXELSIZE = 0x00001000,
-+
-+	/*
-+	 * Indicates that this format can be converted to any RGB format for which
-+	 * SVGA3DFORMAT_OP_MEMBEROFGROUP_ARGB is specified.
-+	 */
-+	SVGA3DFORMAT_OP_CONVERT_TO_ARGB = 0x00002000,
-+
-+	/*
-+	 * Indicates that this format can be used to create offscreen plain surfaces.
-+	 */
-+	SVGA3DFORMAT_OP_OFFSCREENPLAIN = 0x00004000,
-+
-+	/*
-+	 * Indicated that this format can be read as an SRGB texture (meaning that the
-+	 * sampler will linearize the looked up data).
-+	 */
-+	SVGA3DFORMAT_OP_SRGBREAD = 0x00008000,
-+
-+	/*
-+	 * Indicates that this format can be used in the bumpmap instructions.
-+	 */
-+	SVGA3DFORMAT_OP_BUMPMAP = 0x00010000,
-+
-+	/*
-+	 * Indicates that this format can be sampled by the displacement map sampler.
-+	 */
-+	SVGA3DFORMAT_OP_DMAP = 0x00020000,
-+
-+	/*
-+	 * Indicates that this format cannot be used with texture filtering.
-+	 */
-+	SVGA3DFORMAT_OP_NOFILTER = 0x00040000,
-+
-+	/*
-+	 * Indicates that format conversions are supported to this RGB format if
-+	 * SVGA3DFORMAT_OP_CONVERT_TO_ARGB is specified in the source format.
-+	 */
-+	SVGA3DFORMAT_OP_MEMBEROFGROUP_ARGB = 0x00080000,
-+
-+	/*
-+	 * Indicated that this format can be written as an SRGB target
-+	 * (meaning that the pixel pipe will DE-linearize data on output to format)
-+	 */
-+	SVGA3DFORMAT_OP_SRGBWRITE = 0x00100000,
-+
-+	/*
-+	 * Indicates that this format cannot be used with alpha blending.
-+	 */
-+	SVGA3DFORMAT_OP_NOALPHABLEND = 0x00200000,
-+
-+	/*
-+	 * Indicates that the device can auto-generated sublevels for resources
-+	 * of this format.
-+	 */
-+	SVGA3DFORMAT_OP_AUTOGENMIPMAP = 0x00400000,
-+
-+	/*
-+	 * Indicates that this format can be used by vertex texture sampler.
-+	 */
-+	SVGA3DFORMAT_OP_VERTEXTEXTURE = 0x00800000,
-+
-+	/*
-+	 * Indicates that this format supports neither texture coordinate
-+	 * wrap modes, nor mipmapping.
-+	 */
-+	SVGA3DFORMAT_OP_NOTEXCOORDWRAPNORMIP = 0x01000000
-+} SVGA3dFormatOp;
-+
-+#define SVGA3D_FORMAT_POSITIVE                                                                     \
-+	(SVGA3DFORMAT_OP_TEXTURE | SVGA3DFORMAT_OP_VOLUMETEXTURE | SVGA3DFORMAT_OP_CUBETEXTURE |   \
-+	 SVGA3DFORMAT_OP_OFFSCREEN_RENDERTARGET | SVGA3DFORMAT_OP_SAME_FORMAT_RENDERTARGET |       \
-+	 SVGA3DFORMAT_OP_ZSTENCIL | SVGA3DFORMAT_OP_ZSTENCIL_WITH_ARBITRARY_COLOR_DEPTH |          \
-+	 SVGA3DFORMAT_OP_SAME_FORMAT_UP_TO_ALPHA_RENDERTARGET | SVGA3DFORMAT_OP_DISPLAYMODE |      \
-+	 SVGA3DFORMAT_OP_3DACCELERATION | SVGA3DFORMAT_OP_PIXELSIZE |                              \
-+	 SVGA3DFORMAT_OP_CONVERT_TO_ARGB | SVGA3DFORMAT_OP_OFFSCREENPLAIN |                        \
-+	 SVGA3DFORMAT_OP_SRGBREAD | SVGA3DFORMAT_OP_BUMPMAP | SVGA3DFORMAT_OP_DMAP |               \
-+	 SVGA3DFORMAT_OP_MEMBEROFGROUP_ARGB | SVGA3DFORMAT_OP_SRGBWRITE |                          \
-+	 SVGA3DFORMAT_OP_AUTOGENMIPMAP | SVGA3DFORMAT_OP_VERTEXTEXTURE)
-+
-+#define SVGA3D_FORMAT_NEGATIVE                                                                     \
-+	(SVGA3DFORMAT_OP_NOFILTER | SVGA3DFORMAT_OP_NOALPHABLEND |                                 \
-+	 SVGA3DFORMAT_OP_NOTEXCOORDWRAPNORMIP)
-+
-+typedef enum {
-+	SVGA3D_RS_INVALID = 0,
-+	SVGA3D_RS_MIN = 1,
-+	SVGA3D_RS_ZENABLE = 1,		       /* SVGA3dBool */
-+	SVGA3D_RS_ZWRITEENABLE = 2,	    /* SVGA3dBool */
-+	SVGA3D_RS_ALPHATESTENABLE = 3,	 /* SVGA3dBool */
-+	SVGA3D_RS_DITHERENABLE = 4,	    /* SVGA3dBool */
-+	SVGA3D_RS_BLENDENABLE = 5,	     /* SVGA3dBool */
-+	SVGA3D_RS_FOGENABLE = 6,	       /* SVGA3dBool */
-+	SVGA3D_RS_SPECULARENABLE = 7,	  /* SVGA3dBool */
-+	SVGA3D_RS_STENCILENABLE = 8,	   /* SVGA3dBool */
-+	SVGA3D_RS_LIGHTINGENABLE = 9,	  /* SVGA3dBool */
-+	SVGA3D_RS_NORMALIZENORMALS = 10,       /* SVGA3dBool */
-+	SVGA3D_RS_POINTSPRITEENABLE = 11,      /* SVGA3dBool */
-+	SVGA3D_RS_POINTSCALEENABLE = 12,       /* SVGA3dBool */
-+	SVGA3D_RS_STENCILREF = 13,	     /* uint32 */
-+	SVGA3D_RS_STENCILMASK = 14,	    /* uint32 */
-+	SVGA3D_RS_STENCILWRITEMASK = 15,       /* uint32 */
-+	SVGA3D_RS_FOGSTART = 16,	       /* float */
-+	SVGA3D_RS_FOGEND = 17,		       /* float */
-+	SVGA3D_RS_FOGDENSITY = 18,	     /* float */
-+	SVGA3D_RS_POINTSIZE = 19,	      /* float */
-+	SVGA3D_RS_POINTSIZEMIN = 20,	   /* float */
-+	SVGA3D_RS_POINTSIZEMAX = 21,	   /* float */
-+	SVGA3D_RS_POINTSCALE_A = 22,	   /* float */
-+	SVGA3D_RS_POINTSCALE_B = 23,	   /* float */
-+	SVGA3D_RS_POINTSCALE_C = 24,	   /* float */
-+	SVGA3D_RS_FOGCOLOR = 25,	       /* SVGA3dColor */
-+	SVGA3D_RS_AMBIENT = 26,		       /* SVGA3dColor */
-+	SVGA3D_RS_CLIPPLANEENABLE = 27,	/* SVGA3dClipPlanes */
-+	SVGA3D_RS_FOGMODE = 28,		       /* SVGA3dFogMode */
-+	SVGA3D_RS_FILLMODE = 29,	       /* SVGA3dFillMode */
-+	SVGA3D_RS_SHADEMODE = 30,	      /* SVGA3dShadeMode */
-+	SVGA3D_RS_LINEPATTERN = 31,	    /* SVGA3dLinePattern */
-+	SVGA3D_RS_SRCBLEND = 32,	       /* SVGA3dBlendOp */
-+	SVGA3D_RS_DSTBLEND = 33,	       /* SVGA3dBlendOp */
-+	SVGA3D_RS_BLENDEQUATION = 34,	  /* SVGA3dBlendEquation */
-+	SVGA3D_RS_CULLMODE = 35,	       /* SVGA3dFace */
-+	SVGA3D_RS_ZFUNC = 36,		       /* SVGA3dCmpFunc */
-+	SVGA3D_RS_ALPHAFUNC = 37,	      /* SVGA3dCmpFunc */
-+	SVGA3D_RS_STENCILFUNC = 38,	    /* SVGA3dCmpFunc */
-+	SVGA3D_RS_STENCILFAIL = 39,	    /* SVGA3dStencilOp */
-+	SVGA3D_RS_STENCILZFAIL = 40,	   /* SVGA3dStencilOp */
-+	SVGA3D_RS_STENCILPASS = 41,	    /* SVGA3dStencilOp */
-+	SVGA3D_RS_ALPHAREF = 42,	       /* float (0.0 .. 1.0) */
-+	SVGA3D_RS_FRONTWINDING = 43,	   /* SVGA3dFrontWinding */
-+	SVGA3D_RS_COORDINATETYPE = 44,	 /* SVGA3dCoordinateType */
-+	SVGA3D_RS_ZBIAS = 45,		       /* float */
-+	SVGA3D_RS_RANGEFOGENABLE = 46,	 /* SVGA3dBool */
-+	SVGA3D_RS_COLORWRITEENABLE = 47,       /* SVGA3dColorMask */
-+	SVGA3D_RS_VERTEXMATERIALENABLE = 48,   /* SVGA3dBool */
-+	SVGA3D_RS_DIFFUSEMATERIALSOURCE = 49,  /* SVGA3dVertexMaterial */
-+	SVGA3D_RS_SPECULARMATERIALSOURCE = 50, /* SVGA3dVertexMaterial */
-+	SVGA3D_RS_AMBIENTMATERIALSOURCE = 51,  /* SVGA3dVertexMaterial */
-+	SVGA3D_RS_EMISSIVEMATERIALSOURCE = 52, /* SVGA3dVertexMaterial */
-+	SVGA3D_RS_TEXTUREFACTOR = 53,	  /* SVGA3dColor */
-+	SVGA3D_RS_LOCALVIEWER = 54,	    /* SVGA3dBool */
-+	SVGA3D_RS_SCISSORTESTENABLE = 55,      /* SVGA3dBool */
-+	SVGA3D_RS_BLENDCOLOR = 56,	     /* SVGA3dColor */
-+	SVGA3D_RS_STENCILENABLE2SIDED = 57,    /* SVGA3dBool */
-+	SVGA3D_RS_CCWSTENCILFUNC = 58,	 /* SVGA3dCmpFunc */
-+	SVGA3D_RS_CCWSTENCILFAIL = 59,	 /* SVGA3dStencilOp */
-+	SVGA3D_RS_CCWSTENCILZFAIL = 60,	/* SVGA3dStencilOp */
-+	SVGA3D_RS_CCWSTENCILPASS = 61,	 /* SVGA3dStencilOp */
-+	SVGA3D_RS_VERTEXBLEND = 62,	    /* SVGA3dVertexBlendFlags */
-+	SVGA3D_RS_SLOPESCALEDEPTHBIAS = 63,    /* float */
-+	SVGA3D_RS_DEPTHBIAS = 64,	      /* float */
-+
-+	/*
-+	 * Output Gamma Level
-+	 *
-+	 * Output gamma effects the gamma curve of colors that are output from the
-+	 * rendering pipeline.  A value of 1.0 specifies a linear color space. If the
-+	 * value is <= 0.0, gamma correction is ignored and linear color space is
-+	 * used.
-+	 */
-+
-+	SVGA3D_RS_OUTPUTGAMMA = 65,		 /* float */
-+	SVGA3D_RS_ZVISIBLE = 66,		 /* SVGA3dBool */
-+	SVGA3D_RS_LASTPIXEL = 67,		 /* SVGA3dBool */
-+	SVGA3D_RS_CLIPPING = 68,		 /* SVGA3dBool */
-+	SVGA3D_RS_WRAP0 = 69,			 /* SVGA3dWrapFlags */
-+	SVGA3D_RS_WRAP1 = 70,			 /* SVGA3dWrapFlags */
-+	SVGA3D_RS_WRAP2 = 71,			 /* SVGA3dWrapFlags */
-+	SVGA3D_RS_WRAP3 = 72,			 /* SVGA3dWrapFlags */
-+	SVGA3D_RS_WRAP4 = 73,			 /* SVGA3dWrapFlags */
-+	SVGA3D_RS_WRAP5 = 74,			 /* SVGA3dWrapFlags */
-+	SVGA3D_RS_WRAP6 = 75,			 /* SVGA3dWrapFlags */
-+	SVGA3D_RS_WRAP7 = 76,			 /* SVGA3dWrapFlags */
-+	SVGA3D_RS_WRAP8 = 77,			 /* SVGA3dWrapFlags */
-+	SVGA3D_RS_WRAP9 = 78,			 /* SVGA3dWrapFlags */
-+	SVGA3D_RS_WRAP10 = 79,			 /* SVGA3dWrapFlags */
-+	SVGA3D_RS_WRAP11 = 80,			 /* SVGA3dWrapFlags */
-+	SVGA3D_RS_WRAP12 = 81,			 /* SVGA3dWrapFlags */
-+	SVGA3D_RS_WRAP13 = 82,			 /* SVGA3dWrapFlags */
-+	SVGA3D_RS_WRAP14 = 83,			 /* SVGA3dWrapFlags */
-+	SVGA3D_RS_WRAP15 = 84,			 /* SVGA3dWrapFlags */
-+	SVGA3D_RS_MULTISAMPLEANTIALIAS = 85,     /* SVGA3dBool */
-+	SVGA3D_RS_MULTISAMPLEMASK = 86,		 /* uint32 */
-+	SVGA3D_RS_INDEXEDVERTEXBLENDENABLE = 87, /* SVGA3dBool */
-+	SVGA3D_RS_TWEENFACTOR = 88,		 /* float */
-+	SVGA3D_RS_ANTIALIASEDLINEENABLE = 89,    /* SVGA3dBool */
-+	SVGA3D_RS_COLORWRITEENABLE1 = 90,	/* SVGA3dColorMask */
-+	SVGA3D_RS_COLORWRITEENABLE2 = 91,	/* SVGA3dColorMask */
-+	SVGA3D_RS_COLORWRITEENABLE3 = 92,	/* SVGA3dColorMask */
-+	SVGA3D_RS_SEPARATEALPHABLENDENABLE = 93, /* SVGA3dBool */
-+	SVGA3D_RS_SRCBLENDALPHA = 94,		 /* SVGA3dBlendOp */
-+	SVGA3D_RS_DSTBLENDALPHA = 95,		 /* SVGA3dBlendOp */
-+	SVGA3D_RS_BLENDEQUATIONALPHA = 96,       /* SVGA3dBlendEquation */
-+	SVGA3D_RS_TRANSPARENCYANTIALIAS = 97,    /* SVGA3dTransparencyAntialiasType */
-+	SVGA3D_RS_LINEWIDTH = 98,		 /* float */
-+	SVGA3D_RS_MAX
-+} SVGA3dRenderStateName;
-+
-+typedef enum {
-+	SVGA3D_TRANSPARENCYANTIALIAS_NORMAL = 0,
-+	SVGA3D_TRANSPARENCYANTIALIAS_ALPHATOCOVERAGE = 1,
-+	SVGA3D_TRANSPARENCYANTIALIAS_SUPERSAMPLE = 2,
-+	SVGA3D_TRANSPARENCYANTIALIAS_MAX
-+} SVGA3dTransparencyAntialiasType;
-+
-+typedef enum {
-+	SVGA3D_VERTEXMATERIAL_NONE = 0,     /* Use the value in the current material */
-+	SVGA3D_VERTEXMATERIAL_DIFFUSE = 1,  /* Use the value in the diffuse component */
-+	SVGA3D_VERTEXMATERIAL_SPECULAR = 2, /* Use the value in the specular component */
-+	SVGA3D_VERTEXMATERIAL_MAX = 3,
-+} SVGA3dVertexMaterial;
-+
-+typedef enum {
-+	SVGA3D_FILLMODE_INVALID = 0,
-+	SVGA3D_FILLMODE_MIN = 1,
-+	SVGA3D_FILLMODE_POINT = 1,
-+	SVGA3D_FILLMODE_LINE = 2,
-+	SVGA3D_FILLMODE_FILL = 3,
-+	SVGA3D_FILLMODE_MAX
-+} SVGA3dFillModeType;
-+#endif
-diff --git a/include/svga_types.h b/include/svga_types.h
-new file mode 100644
-index 0000000..01b0c59
---- /dev/null
-+++ b/include/svga_types.h
-@@ -0,0 +1,50 @@
-+/* SPDX-License-Identifier: GPL-2.0 OR MIT */
-+/**********************************************************
-+ * Copyright 2015 VMware, Inc.
-+ *
-+ * Permission is hereby granted, free of charge, to any person
-+ * obtaining a copy of this software and associated documentation
-+ * files (the "Software"), to deal in the Software without
-+ * restriction, including without limitation the rights to use, copy,
-+ * modify, merge, publish, distribute, sublicense, and/or sell copies
-+ * of the Software, and to permit persons to whom the Software is
-+ * furnished to do so, subject to the following conditions:
-+ *
-+ * The above copyright notice and this permission notice shall be
-+ * included in all copies or substantial portions of the Software.
-+ *
-+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
-+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
-+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-+ * SOFTWARE.
-+ *
-+ **********************************************************/
-+#ifndef _VM_BASIC_TYPES_H_
-+#define _VM_BASIC_TYPES_H_
-+#include <linux/kernel.h>
-+
-+typedef uint32_t uint32;
-+typedef int32_t int32;
-+typedef uint64_t uint64;
-+typedef uint16_t uint16;
-+typedef int16_t int16;
-+typedef char uint8;
-+typedef int8_t int8;
-+
-+typedef uint64 PA;
-+typedef uint32 PPN;
-+typedef uint64 PPN64;
-+
-+typedef _Bool Bool;
-+
-+#define MAX_UINT64 U64_MAX
-+#define MAX_UINT32 U32_MAX
-+#define MAX_UINT16 U16_MAX
-+
-+#define CONST64U(x) x##ULL
-+
-+#endif
 diff --git a/v3d.c b/v3d.c
 new file mode 100644
-index 0000000..fa0a945
+index 0000000..967d332
 --- /dev/null
 +++ b/v3d.c
-@@ -0,0 +1,93 @@
+@@ -0,0 +1,94 @@
 +/*
 + * Copyright 2019 The FydeOS Authors. All rights reserved.
 + * Use of this source code is governed by a BSD-style license that can be
@@ -851,10 +55,10 @@ index 0000000..fa0a945
 +#include <sys/mman.h>
 +#include <xf86drm.h>
 +
++#include "v3d_drm.h"
 +#include "drv_priv.h"
 +#include "helpers.h"
 +#include "util.h"
-+#include "v3d_drm.h"
 +
 +static const uint32_t render_target_formats[] = { DRM_FORMAT_RGB565, DRM_FORMAT_BGR565, 
 +	DRM_FORMAT_ARGB8888, DRM_FORMAT_XRGB8888, DRM_FORMAT_ABGR8888, DRM_FORMAT_XBGR8888 };
@@ -863,6 +67,7 @@ index 0000000..fa0a945
 +  drv_add_combinations(drv, render_target_formats, ARRAY_SIZE(render_target_formats),
 +           &LINEAR_METADATA, BO_USE_RENDER_MASK );
 +  drv_modify_combination(drv, DRM_FORMAT_ARGB8888, &LINEAR_METADATA, BO_USE_CURSOR | BO_USE_SCANOUT);
++  drv_log("v3d driver init.\n");
 +  return 0;  
 +}
 +
@@ -931,10 +136,10 @@ index 0000000..fa0a945
 +#endif // DEV_V3D
 diff --git a/v3d_drm.h b/v3d_drm.h
 new file mode 100644
-index 0000000..c8a508a
+index 0000000..b8c6f9d
 --- /dev/null
 +++ b/v3d_drm.h
-@@ -0,0 +1,247 @@
+@@ -0,0 +1,267 @@
 +/*
 + * Copyright © 2014-2018 Broadcom
 + *
@@ -985,12 +190,22 @@ index 0000000..c8a508a
 +#define DRM_IOCTL_V3D_SUBMIT_TFU          DRM_IOW(DRM_COMMAND_BASE + DRM_V3D_SUBMIT_TFU, struct drm_v3d_submit_tfu)
 +#define DRM_IOCTL_V3D_SUBMIT_CSD          DRM_IOW(DRM_COMMAND_BASE + DRM_V3D_SUBMIT_CSD, struct drm_v3d_submit_csd)
 +
++#define DRM_V3D_SUBMIT_CL_FLUSH_CACHE             0x01
++
 +/**
 + * struct drm_v3d_submit_cl - ioctl argument for submitting commands to the 3D
 + * engine.
 + *
 + * This asks the kernel to have the GPU execute an optional binner
 + * command list, and a render command list.
++ *
++ * The L1T, slice, L2C, L2T, and GCA caches will be flushed before
++ * each CL executes.  The VCD cache should be flushed (if necessary)
++ * by the submitted CLs.  The TLB writes are guaranteed to have been
++ * flushed by the time the render done IRQ happens, which is the
++ * trigger for out_sync.  Any dirtying of cachelines by the job (only
++ * possible using TMU writes) must be flushed by the caller using the
++ * CL's cache flush commands.
 + */
 +struct drm_v3d_submit_cl {
 +	/* Pointer to the binner command list.
@@ -999,10 +214,15 @@ index 0000000..c8a508a
 +	 * coordinate shader to determine where primitives land on the screen,
 +	 * then writes out the state updates and draw calls necessary per tile
 +	 * to the tile allocation BO.
++	 *
++	 * This BCL will block on any previous BCL submitted on the
++	 * same FD, but not on any RCL or BCLs submitted by other
++	 * clients -- that is left up to the submitter to control
++	 * using in_sync_bcl if necessary.
 +	 */
 +	__u32 bcl_start;
 +
-+	 /** End address of the BCL (first byte after the BCL) */
++	/** End address of the BCL (first byte after the BCL) */
 +	__u32 bcl_end;
 +
 +	/* Offset of the render command list.
@@ -1010,10 +230,15 @@ index 0000000..c8a508a
 +	 * This is the second set of commands executed, which will either
 +	 * execute the tiles that have been set up by the BCL, or a fixed set
 +	 * of tiles (in the case of RCL-only blits).
++	 *
++	 * This RCL will block on this submit's BCL, and any previous
++	 * RCL submitted on the same FD, but not on any RCL or BCLs
++	 * submitted by other clients -- that is left up to the
++	 * submitter to control using in_sync_rcl if necessary.
 +	 */
 +	__u32 rcl_start;
 +
-+	 /** End address of the RCL (first byte after the RCL) */
++	/** End address of the RCL (first byte after the RCL) */
 +	__u32 rcl_end;
 +
 +	/** An optional sync object to wait on before starting the BCL. */
@@ -1043,8 +268,7 @@ index 0000000..c8a508a
 +	/* Number of BO handles passed in (size is that times 4). */
 +	__u32 bo_handle_count;
 +
-+	/* Pad, must be zero-filled. */
-+	__u32 pad;
++	__u32 flags;
 +};
 +
 +/**
@@ -1112,6 +336,7 @@ index 0000000..c8a508a
 +	DRM_V3D_PARAM_V3D_CORE0_IDENT2,
 +	DRM_V3D_PARAM_SUPPORTS_TFU,
 +	DRM_V3D_PARAM_SUPPORTS_CSD,
++	DRM_V3D_PARAM_SUPPORTS_CACHE_FLUSH,
 +};
 +
 +struct drm_v3d_get_param {
@@ -1183,26 +408,24 @@ index 0000000..c8a508a
 +
 +#endif /* _V3D_DRM_H_ */
 diff --git a/vc4.c b/vc4.c
-index 7af16c2..184afac 100644
+index 06b3ed7..468432f 100644
 --- a/vc4.c
 +++ b/vc4.c
-@@ -17,46 +17,97 @@
+@@ -17,15 +17,33 @@
  #include "helpers.h"
  #include "util.h"
  
--static const uint32_t render_target_formats[] = { DRM_FORMAT_ARGB8888, DRM_FORMAT_RGB565,
--						  DRM_FORMAT_XRGB8888 };
 +#define VC4_TILING_NONE 0
 +#define VC4_TILING_T 1
 +
-+static const uint32_t render_target_formats[] = { DRM_FORMAT_RGB565, DRM_FORMAT_BGR565,
-+              DRM_FORMAT_ARGB8888, DRM_FORMAT_XRGB8888, DRM_FORMAT_ABGR8888, DRM_FORMAT_XBGR8888
-+              };
-+
+ static const uint32_t render_target_formats[] = { DRM_FORMAT_ARGB8888, DRM_FORMAT_RGB565,
++						  DRM_FORMAT_ABGR8888, DRM_FORMAT_XBGR8888, DRM_FORMAT_BGR565,
+ 						  DRM_FORMAT_XRGB8888 };
+ 
 +static const uint32_t texture_target_formats[] = {
 +             DRM_FORMAT_YVU420, DRM_FORMAT_NV12
 +             };
- 
++
  static int vc4_init(struct driver *drv)
  {
 -	drv_add_combinations(drv, render_target_formats, ARRAY_SIZE(render_target_formats),
@@ -1218,363 +441,80 @@ index 7af16c2..184afac 100644
 +          &metadata, BO_USE_RENDER_MASK );
 +  drv_add_combinations(drv, texture_target_formats, ARRAY_SIZE(texture_target_formats),
 +           &metadata, texture_use_flags);
-+ 
++
 +  drv_modify_combination(drv, DRM_FORMAT_XRGB8888, &metadata, BO_USE_CURSOR | BO_USE_SCANOUT);
 +  drv_modify_combination(drv, DRM_FORMAT_ARGB8888, &metadata, BO_USE_CURSOR | BO_USE_SCANOUT);
-+  /*
-+  texture_use_flags &= ~BO_USE_RENDERSCRIPT;
-+  texture_use_flags &= ~BO_USE_SW_WRITE_OFTEN;
-+  texture_use_flags &= ~BO_USE_SW_READ_OFTEN;
-+  metadata.priority = 2;
-+  metadata.tiling = VC4_TILING_T;
-+  metadata.modifier = DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED;
-+  drv_add_combinations(drv, tileable_target_formats , ARRAY_SIZE(tileable_target_formats),
-+         &metadata, texture_use_flags);
-+ 
-+  drv_modify_combination(drv, DRM_FORMAT_XRGB8888, &metadata, BO_USE_SCANOUT);
-+  drv_modify_combination(drv, DRM_FORMAT_ARGB8888, &metadata, BO_USE_SCANOUT);
-+  */
++  drv_log("vc4 driver inited.\n");
 +  return 0;
  }
  
--static int vc4_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t format,
--			 uint64_t use_flags)
-+static int vc4_bo_create_for_modifiers(struct bo *bo, uint32_t width, uint32_t height,
-+               uint32_t format, uint64_t modifier)
- {
--	int ret;
--	size_t plane;
--	uint32_t stride;
--	struct drm_vc4_create_bo bo_create;
+ static int vc4_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t height,
+@@ -35,17 +53,6 @@ static int vc4_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t he
+ 	size_t plane;
+ 	uint32_t stride;
+ 	struct drm_vc4_create_bo bo_create;
 -
--	/*
--	 * Since the ARM L1 cache line size is 64 bytes, align to that as a
--	 * performance optimization.
--	 */
--	stride = drv_stride_from_format(format, width, 0);
--	stride = ALIGN(stride, 64);
--	drv_bo_from_format(bo, stride, height, format);
--
--	memset(&bo_create, 0, sizeof(bo_create));
--	bo_create.size = bo->meta.total_size;
--
--	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VC4_CREATE_BO, &bo_create);
--	if (ret) {
--		drv_log("DRM_IOCTL_VC4_GEM_CREATE failed (size=%zu)\n", bo->meta.total_size);
--		return -errno;
+-	switch (modifier) {
+-	case DRM_FORMAT_MOD_LINEAR:
+-		break;
+-	case DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED:
+-		drv_log("DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED not supported yet\n");
+-		return -EINVAL;
+-	default:
+-		return -EINVAL;
 -	}
 -
--	for (plane = 0; plane < bo->meta.num_planes; plane++)
--		bo->handles[plane].u32 = bo_create.handle;
-+  int ret;
-+  size_t plane;
-+  uint32_t stride;
-+  struct drm_vc4_create_bo bo_create;
-+  struct drm_vc4_set_tiling set_tiling;
-+  memset(&bo_create, 0, sizeof(bo_create));
-+  memset(&set_tiling, 0, sizeof(set_tiling));
-+  stride = drv_stride_from_format(format, width, 0);
-+  stride = ALIGN(stride, 64);
-+  drv_bo_from_format(bo, stride, height, format);
-+  bo_create.size = bo->meta.total_size;
-+  bo->meta.format_modifiers[0] = modifier;
-+
-+  bo->meta.tiling = modifier == DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED ? VC4_TILING_T : VC4_TILING_NONE;
-+  ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VC4_CREATE_BO, &bo_create);
-+  if (ret) {
-+    drv_log("DRM_IOCTL_VC4_GEM_CREATE failed (size=%zu), ret:%d\n", bo->meta.total_size, ret);
-+    return -errno;
-+  }
-+
-+  for (plane = 0; plane < bo->meta.num_planes; plane++)
-+    bo->handles[plane].u32 = bo_create.handle;
-+
-+  if (bo->meta.tiling == VC4_TILING_T) {
-+    set_tiling.handle = bo->handles[0].u32;
-+    set_tiling.modifier = modifier;
-+    ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VC4_SET_TILING, &set_tiling);
-+    if (ret) {
-+      drv_log("DRM_IOCTL_VC4_SET_TILING failed ret=%d\n", ret);
-+      return -errno;
-+    }
-+  }
-+  return 0; 
-+}
+ 	/*
+ 	 * Since the ARM L1 cache line size is 64 bytes, align to that as a
+ 	 * performance optimization.
+@@ -56,42 +63,32 @@ static int vc4_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t he
  
--	return 0;
-+static int vc4_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint32_t height,
-+           uint32_t format, const uint64_t *modifiers, uint32_t count)
-+{
-+  /*
-+  static const uint64_t modifier_order[] = {
-+    DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED,
-+    DRM_FORMAT_MOD_LINEAR
-+  };
-+  uint64_t modifier;
-+  modifier = drv_pick_modifier(modifiers, count, modifier_order, ARRAY_SIZE(modifier_order));
-+  */
-+  return vc4_bo_create_for_modifiers(bo, width, height, format, DRM_FORMAT_MOD_LINEAR/*modifier*/);
+ 	memset(&bo_create, 0, sizeof(bo_create));
+ 	bo_create.size = bo->meta.total_size;
++	bo->meta.format_modifiers[0] = modifier;
+ 
++	bo->meta.tiling =  VC4_TILING_NONE;
+ 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VC4_CREATE_BO, &bo_create);
+ 	if (ret) {
+-		drv_log("DRM_IOCTL_VC4_GEM_CREATE failed (size=%zu)\n", bo->meta.total_size);
++		drv_log("DRM_IOCTL_VC4_GEM_CREATE failed (size=%zu), ret=%d\n", bo->meta.total_size, ret);
+ 		return -errno;
+ 	}
+ 
+-	for (plane = 0; plane < bo->meta.num_planes; plane++)
++	for (plane = 0; plane < bo->meta.num_planes; plane++) {
+ 		bo->handles[plane].u32 = bo_create.handle;
+-
++	  bo->meta.format_modifiers[plane] = modifier;
++	}
+ 	return 0;
+ }
+ 
+ static int vc4_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t format,
+ 			 uint64_t use_flags)
+ {
+-	struct combination *combo;
+-
+-	combo = drv_get_combination(bo->drv, format, use_flags);
+-	if (!combo)
+-		return -EINVAL;
+-
+-	return vc4_bo_create_for_modifier(bo, width, height, format, combo->metadata.modifier);
++	return vc4_bo_create_for_modifier(bo, width, height, format, DRM_FORMAT_MOD_LINEAR);
+ }
+ 
+ static int vc4_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint32_t height,
+ 					uint32_t format, const uint64_t *modifiers, uint32_t count)
+ {
+-	static const uint64_t modifier_order[] = {
+-		DRM_FORMAT_MOD_LINEAR,
+-	};
+-	uint64_t modifier;
+-
+-	modifier = drv_pick_modifier(modifiers, count, modifier_order, ARRAY_SIZE(modifier_order));
+-
+-	return vc4_bo_create_for_modifier(bo, width, height, format, modifier);
++	return vc4_bo_create_for_modifier(bo, width, height, format, DRM_FORMAT_MOD_LINEAR);
  }
  
  static void *vc4_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags)
-@@ -78,11 +129,43 @@ static void *vc4_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t m
- 		    bo_map.offset);
- }
- 
-+static int vc4_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t format,
-+			 uint64_t use_flags)
-+{
-+  /*
-+  struct combination *combo;
-+  combo = drv_get_combination(bo->drv, format, use_flags);
-+  if (!combo)
-+    return -EINVAL;*/
-+  return vc4_bo_create_for_modifiers(bo, width, height, format, DRM_FORMAT_MOD_LINEAR /*combo->metadata.modifier*/);
-+}
-+
-+static int vc4_bo_import(struct bo *bo, struct drv_import_fd_data *data)
-+{
-+  int ret;
-+  struct drm_vc4_get_tiling get_tiling;
-+  ret = drv_prime_bo_import(bo, data);
-+  if (ret)
-+    return ret;
-+  memset(&get_tiling, 0, sizeof(get_tiling));
-+  get_tiling.handle = bo->handles[0].u32;
-+  ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VC4_GET_TILING, &get_tiling);
-+  if (ret) {
-+    drv_gem_bo_destroy(bo);
-+    drv_log("DRM_IOCTL_VC4_GET_TILING failed.\n");
-+    return ret;
-+  }
-+  bo->meta.format_modifiers[0] = get_tiling.modifier;
-+  bo->meta.tiling = get_tiling.modifier == DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED ? VC4_TILING_T: VC4_TILING_NONE; 
-+  return 0;
-+}
-+
- const struct backend backend_vc4 = {
- 	.name = "vc4",
- 	.init = vc4_init,
- 	.bo_create = vc4_bo_create,
--	.bo_import = drv_prime_bo_import,
-+  .bo_create_with_modifiers = vc4_bo_create_with_modifiers,
-+	.bo_import = vc4_bo_import,
- 	.bo_destroy = drv_gem_bo_destroy,
- 	.bo_map = vc4_bo_map,
- 	.bo_unmap = drv_bo_munmap,
-diff --git a/vmwgfx.c b/vmwgfx.c
-new file mode 100644
-index 0000000..10c48d1
---- /dev/null
-+++ b/vmwgfx.c
-@@ -0,0 +1,210 @@
-+/*
-+ * Copyright 2018 The FydeOS Authors. All rights reserved.
-+ * Use of this source code is governed by a BSD-style license that can be
-+ * found in the LICENSE file.
-+ */
-+
-+#ifdef DRV_VMWGFX
-+
-+#include "drv_priv.h"
-+#include "helpers.h"
-+#include "include/svga3d_types.h"
-+#include "util.h"
-+#include <stdio.h>
-+#include <string.h>
-+#include <sys/mman.h>
-+#include <vmwgfx_drm.h>
-+#include <xf86drm.h>
-+
-+static const uint32_t render_target_formats[] = { DRM_FORMAT_ARGB8888, DRM_FORMAT_XRGB8888,
-+						  DRM_FORMAT_XRGB1555, DRM_FORMAT_RGB565,
-+						  DRM_FORMAT_ABGR8888 };
-+
-+static const uint32_t texture_source_formats[] = { DRM_FORMAT_R8, DRM_FORMAT_NV12,
-+                                                   DRM_FORMAT_YVU420, DRM_FORMAT_YVU420_ANDROID };
-+
-+static int vmwgfx_init(struct driver *drv)
-+{
-+  drv_add_combinations(drv, render_target_formats, ARRAY_SIZE(render_target_formats),
-+			     &LINEAR_METADATA, BO_USE_RENDER_MASK);
-+
-+  drv_add_combinations(drv, texture_source_formats, ARRAY_SIZE(texture_source_formats),
-+                       &LINEAR_METADATA, BO_USE_TEXTURE_MASK);
-+
-+  return drv_modify_linear_combinations(drv);
-+}
-+
-+static const uint32_t drm_format_to_svga_format(uint32_t format)
-+{
-+	switch (format) {
-+  case DRM_FORMAT_R8:
-+    return SVGA3D_P8;
-+	case DRM_FORMAT_ARGB8888:
-+		return SVGA3D_B8G8R8A8_UNORM;
-+	case DRM_FORMAT_XRGB8888:
-+	return SVGA3D_B8G8R8X8_UNORM;
-+	case DRM_FORMAT_XRGB1555:
-+		return SVGA3D_X1R5G5B5;
-+	case DRM_FORMAT_RGB565:
-+		return SVGA3D_R5G6B5;
-+	case DRM_FORMAT_YVU420_ANDROID:
-+	case DRM_FORMAT_YVU420:
-+		return SVGA3D_YUY2;
-+	case DRM_FORMAT_NV12:
-+		return SVGA3D_NV12;
-+	case DRM_FORMAT_ABGR8888:
-+		return SVGA3D_R8G8B8A8_UNORM;
-+	default:
-+		drv_log("UNKNOWN FORMAT %d\n", format);
-+		return format;
-+	}
-+}
-+
-+static uint32_t subsample_stride(uint32_t stride, uint32_t format, size_t plane)
-+{
-+  if (plane != 0) {
-+    switch (format) {
-+    case DRM_FORMAT_YVU420:
-+    case DRM_FORMAT_YVU420_ANDROID:
-+      stride = DIV_ROUND_UP(stride, 2);
-+      break;
-+    }
-+  }
-+
-+  return stride;
-+}
-+
-+static int vmwgfx_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t format,
-+			    uint64_t use_flags)
-+{
-+	int ret;
-+	size_t plane;
-+	uint32_t stride; 
-+	uint32_t aligned_width, aligned_height;
-+	union drm_vmw_gb_surface_create_arg create_arg;
-+	struct drm_vmw_gb_surface_create_rep *rep = &create_arg.rep;
-+	struct drm_vmw_gb_surface_create_req *req = &create_arg.req;
-+  uint32_t extra_flag = 0;
-+
-+	aligned_width = width;
-+	aligned_height = height;
-+	switch (format) {
-+	case DRM_FORMAT_YVU420_ANDROID:
-+		/* Align width to 32 pixels, so chroma strides are 16 bytes as
-+		 * Android requires. */
-+		aligned_width = ALIGN(width, 32);
-+		/* Adjust the height to include room for chroma planes.
-+		 *
-+		 * HAL_PIXEL_FORMAT_YV12 requires that the buffer's height not
-+		 * be aligned. */
-+		aligned_height = 3 * DIV_ROUND_UP(height, 2);
-+    extra_flag = SVGA3D_SURFACE_BIND_STREAM_OUTPUT | SVGA3D_SURFACE_TRANSFER_FROM_BUFFER;
-+		break;
-+	case DRM_FORMAT_YVU420:
-+	case DRM_FORMAT_NV12:
-+		/* Adjust the height to include room for chroma planes */
-+		aligned_height = 3 * DIV_ROUND_UP(height, 2);
-+    extra_flag = SVGA3D_SURFACE_BIND_STREAM_OUTPUT | SVGA3D_SURFACE_TRANSFER_FROM_BUFFER;
-+		break;
-+	default:
-+		break;
-+	}
-+
-+  bo->meta.total_size = 0;
-+	for (plane = 0; plane < bo->meta.num_planes; plane++) {
-+    memset(&create_arg, 0, sizeof(create_arg));
-+    req->svga3d_flags = SVGA3D_SURFACE_SCREENTARGET | extra_flag | 
-+        SVGA3D_SURFACE_HINT_RENDERTARGET | SVGA3D_SURFACE_HINT_DYNAMIC;
-+    req->format = drm_format_to_svga_format(format);
-+    req->mip_levels = 1;
-+    req->drm_surface_flags = drm_vmw_surface_flag_scanout | drm_vmw_surface_flag_shareable |
-+       drm_vmw_surface_flag_create_buffer;
-+    req->array_size = 0;
-+    req->buffer_handle = SVGA3D_INVALID_ID;
-+    req->base_size.width = aligned_width;
-+    req->base_size.height = aligned_height;
-+    req->base_size.depth = 1;
-+	  ret = drmCommandWriteRead(bo->drv->fd, DRM_VMW_GB_SURFACE_CREATE, &create_arg,
-+				  sizeof(create_arg));
-+
-+	  if (ret) {
-+		  drv_log("DRM_VMW_GB_SURFACE_CREATE failed (%d, %d)\n", bo->drv->fd, ret);
-+		  return ret;
-+	  }
-+    stride = drv_stride_from_format(format, aligned_width, plane);
-+    bo->handles[plane].u32 = rep->handle;
-+    bo->meta.strides[plane] = subsample_stride(stride, format, plane);
-+    bo->meta.offsets[plane] = 0;
-+    bo->meta.sizes[plane] = rep->backup_size;
-+    bo->meta.total_size += bo->meta.sizes[plane];
-+	}
-+
-+	return 0;
-+}
-+
-+static int vmwgfx_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint32_t height,
-+          uint32_t format, const uint64_t *modifiers, uint32_t count)
-+{
-+  int ret;
-+  size_t i;
-+  static const uint64_t modifier_order[] = {DRM_FORMAT_MOD_LINEAR,};
-+  uint64_t modifier = 
-+      drv_pick_modifier(modifiers, count, modifier_order, ARRAY_SIZE(modifier_order));
-+  ret = vmwgfx_bo_create(bo, width, height, format, 0);
-+  for (i = 0; i< bo->meta.num_planes; i++) {
-+    bo->meta.format_modifiers[i] =  modifier; 
-+  }
-+  return ret;
-+}
-+
-+static void *vmwgfx_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags)
-+{
-+   union drm_vmw_gb_surface_reference_arg s_arg;
-+   struct drm_vmw_surface_arg *req = &s_arg.req;
-+   struct drm_vmw_gb_surface_ref_rep *rep = &s_arg.rep;
-+   int ret;
-+   void *addr;
-+   req->sid = bo->handles[plane].u32;
-+   req->handle_type = DRM_VMW_HANDLE_LEGACY;
-+   ret = drmCommandWriteRead(bo->drv->fd, DRM_VMW_GB_SURFACE_REF,
-+                 &s_arg, sizeof(s_arg));
-+   if (ret) {
-+     drv_log("Error get gb surface reference, ret:%d\n", ret);
-+     return MAP_FAILED;
-+   }
-+   vma->length = bo->meta.total_size;
-+   addr =  mmap(0, vma->length, drv_get_prot(map_flags), MAP_SHARED, bo->drv->fd,
-+                rep->crep.buffer_map_handle);
-+   drv_log("map offset:0x%llx, length:%zu, to addr:%p\n", rep->crep.buffer_map_handle, vma->length, addr);
-+   return addr;
-+}
-+
-+static unsigned int vmwgfx_resolve_format(struct driver *drv, unsigned int format, unsigned long use_flags)
-+{
-+  switch (format) {
-+  case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED:
-+    /* Camera subsystem requires NV12. */
-+    if (use_flags & (BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE))
-+      return DRM_FORMAT_NV12;
-+    /*HACK: See b/28671744 */
-+    return DRM_FORMAT_ABGR8888;
-+  case DRM_FORMAT_FLEX_YCbCr_420_888:
-+    return DRM_FORMAT_YVU420;
-+  default:
-+    return format;
-+  }
-+}
-+
-+const struct backend backend_vmwgfx = {
-+	.name = "vmwgfx",
-+	.init = vmwgfx_init,
-+	.bo_create = vmwgfx_bo_create,
-+  .bo_create_with_modifiers = vmwgfx_bo_create_with_modifiers,
-+	.bo_import = drv_prime_bo_import,
-+	.bo_destroy = drv_dumb_bo_destroy,
-+	.bo_map = vmwgfx_bo_map,
-+	.bo_unmap = drv_bo_munmap,
-+	.resolve_format = vmwgfx_resolve_format,
-+};
-+
-+#endif

@@ -26,7 +26,7 @@ SRC_URI=""
 
 LICENSE="BSD-Google chrome_internal? ( Google-TOS )"
 SLOT="0"
-KEYWORDS="~*"
+KEYWORDS="*"
 IUSE="
 	+afdo_use
 	afdo_verify
@@ -72,6 +72,7 @@ IUSE="
 	verbose
 	vtable_verify
 	xkbcommon
+  +widevine
 	"
 REQUIRED_USE="
 	cfi? ( thinlto )
@@ -662,6 +663,18 @@ add_api_keys() {
 	)
 }
 
+patch_widevine() {
+  info "patching for widevine..."
+  local target_dir="${CHROME_ROOT}/src/third_party/widevine/cdm/chromeos/arm"
+  local bin_file="${target_dir}/libwidevinecdm.so"
+  if [ ! -f ${bin_file} ]; then
+    epatch ${FILESDIR}/widevine/widevine_gni.patch
+    mkdir -p $target_dir || true
+    cp ${FILESDIR}/widevine/widevine_cdm_version.h $target_dir || die "Could not copy file to $target_dir"
+    cp ${FILESDIR}/widevine/libwidevinecdm.so $target_dir || die "Could not copy file to $bin_file"
+  fi
+}
+
 src_prepare() {
 	if [[ "${CHROME_ORIGIN}" != "LOCAL_SOURCE" &&
 			"${CHROME_ORIGIN}" != "SERVER_SOURCE" ]]; then
@@ -700,6 +713,9 @@ src_prepare() {
 			add_api_keys "${GAPI_CONFIG_FILE}"
 		fi
 	fi
+  if [[ "${CHROME_ORIGIN}" == "SERVER_SOURCE" ]]; then
+    use widevine && patch_widevine
+  fi
 }
 
 setup_test_lists() {
