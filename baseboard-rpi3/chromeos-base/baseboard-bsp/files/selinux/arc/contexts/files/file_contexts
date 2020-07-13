@@ -1,0 +1,959 @@
+
+
+
+
+
+
+
+
+
+
+# Wraps policies that fails CTS.
+# arc_cts_fails_release(policies, affected_scontexts)
+
+
+
+
+
+# Copyright 2019 The Chromium OS Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+
+
+/bin/.* u:object_r:cros_unconfined_exec:s0
+/sbin/.* u:object_r:cros_unconfined_exec:s0
+/usr/bin/.* u:object_r:cros_unconfined_exec:s0
+/usr/sbin/.* u:object_r:cros_unconfined_exec:s0
+/usr/libexec/sudo/libsudo_util.* u:object_r:cros_unconfined_exec:s0
+/usr/local/bin/.* u:object_r:cros_unconfined_exec:s0
+/usr/local/lib/libpython.* u:object_r:cros_unconfined_exec:s0
+/usr/local/lib/python.*/lib-dynload/.* u:object_r:cros_unconfined_exec:s0
+
+/usr/share/userfeedback/scripts/.* u:object_r:cros_unconfined_exec:s0
+/opt/google/touch/scripts/.* u:object_r:cros_unconfined_exec:s0
+
+/bin/basename u:object_r:cros_coreutils_exec:s0
+/bin/cat u:object_r:cros_coreutils_exec:s0
+/bin/chgrp u:object_r:cros_coreutils_exec:s0
+/bin/chmod u:object_r:cros_coreutils_exec:s0
+/bin/chown u:object_r:cros_coreutils_exec:s0
+/bin/chroot u:object_r:cros_coreutils_exec:s0
+/bin/cp u:object_r:cros_coreutils_exec:s0
+/bin/cut u:object_r:cros_coreutils_exec:s0
+/bin/date u:object_r:cros_coreutils_exec:s0
+/bin/dd u:object_r:cros_coreutils_exec:s0
+/bin/df u:object_r:cros_coreutils_exec:s0
+/bin/dir u:object_r:cros_coreutils_exec:s0
+/bin/dirname u:object_r:cros_coreutils_exec:s0
+/bin/du u:object_r:cros_coreutils_exec:s0
+/bin/echo u:object_r:cros_coreutils_exec:s0
+/bin/env u:object_r:cros_coreutils_exec:s0
+/bin/expr u:object_r:cros_coreutils_exec:s0
+/bin/false u:object_r:cros_coreutils_exec:s0
+/bin/head u:object_r:cros_coreutils_exec:s0
+/bin/ln u:object_r:cros_coreutils_exec:s0
+/bin/ls u:object_r:cros_coreutils_exec:s0
+/bin/mkdir u:object_r:cros_coreutils_exec:s0
+/bin/mkfifo u:object_r:cros_coreutils_exec:s0
+/bin/mknod u:object_r:cros_coreutils_exec:s0
+/bin/mktemp u:object_r:cros_coreutils_exec:s0
+/bin/mv u:object_r:cros_coreutils_exec:s0
+/bin/pwd u:object_r:cros_coreutils_exec:s0
+/bin/readlink u:object_r:cros_coreutils_exec:s0
+/bin/rm u:object_r:cros_coreutils_exec:s0
+/bin/rmdir u:object_r:cros_coreutils_exec:s0
+/bin/seq u:object_r:cros_coreutils_exec:s0
+/bin/sleep u:object_r:cros_coreutils_exec:s0
+/bin/sort u:object_r:cros_coreutils_exec:s0
+/bin/stty u:object_r:cros_coreutils_exec:s0
+/bin/sync u:object_r:cros_coreutils_exec:s0
+/bin/tail u:object_r:cros_coreutils_exec:s0
+/bin/touch u:object_r:cros_coreutils_exec:s0
+/bin/tr u:object_r:cros_coreutils_exec:s0
+/bin/true u:object_r:cros_coreutils_exec:s0
+/bin/tty u:object_r:cros_coreutils_exec:s0
+/bin/uname u:object_r:cros_coreutils_exec:s0
+/bin/vdir u:object_r:cros_coreutils_exec:s0
+/bin/wc u:object_r:cros_coreutils_exec:s0
+/bin/yes u:object_r:cros_coreutils_exec:s0
+/usr/bin/\[ u:object_r:cros_coreutils_exec:s0
+/usr/bin/arch u:object_r:cros_coreutils_exec:s0
+/usr/bin/base32 u:object_r:cros_coreutils_exec:s0
+/usr/bin/base64 u:object_r:cros_coreutils_exec:s0
+/usr/bin/basename u:object_r:cros_coreutils_exec:s0
+/usr/bin/chcon u:object_r:cros_coreutils_exec:s0
+/usr/bin/chroot u:object_r:cros_coreutils_exec:s0
+/usr/bin/cksum u:object_r:cros_coreutils_exec:s0
+/usr/bin/comm u:object_r:cros_coreutils_exec:s0
+/usr/bin/coreutils u:object_r:cros_coreutils_exec:s0
+/usr/bin/csplit u:object_r:cros_coreutils_exec:s0
+/usr/bin/cut u:object_r:cros_coreutils_exec:s0
+/usr/bin/dir u:object_r:cros_coreutils_exec:s0
+/usr/bin/dircolors u:object_r:cros_coreutils_exec:s0
+/usr/bin/dirname u:object_r:cros_coreutils_exec:s0
+/usr/bin/du u:object_r:cros_coreutils_exec:s0
+/usr/bin/env u:object_r:cros_coreutils_exec:s0
+/usr/bin/expand u:object_r:cros_coreutils_exec:s0
+/usr/bin/expr u:object_r:cros_coreutils_exec:s0
+/usr/bin/factor u:object_r:cros_coreutils_exec:s0
+/usr/bin/fmt u:object_r:cros_coreutils_exec:s0
+/usr/bin/fold u:object_r:cros_coreutils_exec:s0
+/usr/bin/head u:object_r:cros_coreutils_exec:s0
+/usr/bin/hostid u:object_r:cros_coreutils_exec:s0
+/usr/bin/id u:object_r:cros_coreutils_exec:s0
+/usr/bin/install u:object_r:cros_coreutils_exec:s0
+/usr/bin/join u:object_r:cros_coreutils_exec:s0
+/usr/bin/link u:object_r:cros_coreutils_exec:s0
+/usr/bin/logname u:object_r:cros_coreutils_exec:s0
+/usr/bin/md5sum u:object_r:cros_coreutils_exec:s0
+/usr/bin/mkfifo u:object_r:cros_coreutils_exec:s0
+/usr/bin/mktemp u:object_r:cros_coreutils_exec:s0
+/usr/bin/nice u:object_r:cros_coreutils_exec:s0
+/usr/bin/nl u:object_r:cros_coreutils_exec:s0
+/usr/bin/nohup u:object_r:cros_coreutils_exec:s0
+/usr/bin/nproc u:object_r:cros_coreutils_exec:s0
+/usr/bin/numfmt u:object_r:cros_coreutils_exec:s0
+/usr/bin/od u:object_r:cros_coreutils_exec:s0
+/usr/bin/paste u:object_r:cros_coreutils_exec:s0
+/usr/bin/pathchk u:object_r:cros_coreutils_exec:s0
+/usr/bin/pinky u:object_r:cros_coreutils_exec:s0
+/usr/bin/pr u:object_r:cros_coreutils_exec:s0
+/usr/bin/printenv u:object_r:cros_coreutils_exec:s0
+/usr/bin/printf u:object_r:cros_coreutils_exec:s0
+/usr/bin/ptx u:object_r:cros_coreutils_exec:s0
+/usr/bin/readlink u:object_r:cros_coreutils_exec:s0
+/usr/bin/realpath u:object_r:cros_coreutils_exec:s0
+/usr/bin/runcon u:object_r:cros_coreutils_exec:s0
+/usr/bin/seq u:object_r:cros_coreutils_exec:s0
+/usr/bin/sha1sum u:object_r:cros_coreutils_exec:s0
+/usr/bin/sha224sum u:object_r:cros_coreutils_exec:s0
+/usr/bin/sha256sum u:object_r:cros_coreutils_exec:s0
+/usr/bin/sha384sum u:object_r:cros_coreutils_exec:s0
+/usr/bin/sha512sum u:object_r:cros_coreutils_exec:s0
+/usr/bin/shred u:object_r:cros_coreutils_exec:s0
+/usr/bin/shuf u:object_r:cros_coreutils_exec:s0
+/usr/bin/sleep u:object_r:cros_coreutils_exec:s0
+/usr/bin/sort u:object_r:cros_coreutils_exec:s0
+/usr/bin/split u:object_r:cros_coreutils_exec:s0
+/usr/bin/stat u:object_r:cros_coreutils_exec:s0
+/usr/bin/stdbuf u:object_r:cros_coreutils_exec:s0
+/usr/bin/sum u:object_r:cros_coreutils_exec:s0
+/usr/bin/tac u:object_r:cros_coreutils_exec:s0
+/usr/bin/tail u:object_r:cros_coreutils_exec:s0
+/usr/bin/tee u:object_r:cros_coreutils_exec:s0
+/usr/bin/test u:object_r:cros_coreutils_exec:s0
+/usr/bin/timeout u:object_r:cros_coreutils_exec:s0
+/usr/bin/touch u:object_r:cros_coreutils_exec:s0
+/usr/bin/tr u:object_r:cros_coreutils_exec:s0
+/usr/bin/truncate u:object_r:cros_coreutils_exec:s0
+/usr/bin/tsort u:object_r:cros_coreutils_exec:s0
+/usr/bin/tty u:object_r:cros_coreutils_exec:s0
+/usr/bin/uname u:object_r:cros_coreutils_exec:s0
+/usr/bin/unexpand u:object_r:cros_coreutils_exec:s0
+/usr/bin/uniq u:object_r:cros_coreutils_exec:s0
+/usr/bin/unlink u:object_r:cros_coreutils_exec:s0
+/usr/bin/users u:object_r:cros_coreutils_exec:s0
+/usr/bin/vdir u:object_r:cros_coreutils_exec:s0
+/usr/bin/wc u:object_r:cros_coreutils_exec:s0
+/usr/bin/who u:object_r:cros_coreutils_exec:s0
+/usr/bin/whoami u:object_r:cros_coreutils_exec:s0
+/usr/bin/yes u:object_r:cros_coreutils_exec:s0
+
+/etc/localtime u:object_r:cros_tz_data_file:s0
+/var/lib/timezone(/.*)? u:object_r:cros_tz_data_file:s0
+/usr/share/zoneinfo(/.*)? u:object_r:cros_tz_data_file:s0
+
+
+/sys/kernel/debug(/.*)?                    u:object_r:debugfs:s0
+/sys/kernel/debug/tracing(/.*)?            u:object_r:debugfs_tracing:s0
+/sys/kernel/debug/tracing/trace_marker     u:object_r:debugfs_trace_marker:s0
+/sys/kernel/debug/sync(/.*)?               u:object_r:debugfs_sync:s0
+/sys/kernel/debug/sync/sw_sync             u:object_r:debugfs_sw_sync:s0
+
+/sys/class/net(/.*)?                       u:object_r:sysfs_net:s0
+/sys/class/devcoredump(/.*)?               u:object_r:sysfs_class_devcoredump:s0
+
+/sys/devices/system/cpu(/.*)?                                   u:object_r:sysfs_devices_system_cpu:s0
+# Use u:object_r:sysfs:s0 for writable files to disallow regular apps to
+# access them.
+/sys/devices/system/cpu/cpufreq/ondemand/ignore_nice_load       u:object_r:sysfs:s0
+/sys/devices/system/cpu/cpufreq/ondemand/io_is_busy             u:object_r:sysfs:s0
+/sys/devices/system/cpu/cpufreq/ondemand/powersave_bias         u:object_r:sysfs:s0
+/sys/devices/system/cpu/cpufreq/ondemand/sampling_down_factor   u:object_r:sysfs:s0
+/sys/devices/system/cpu/cpufreq/ondemand/sampling_rate          u:object_r:sysfs:s0
+/sys/devices/system/cpu/cpufreq/ondemand/up_threshold           u:object_r:sysfs:s0
+/sys/devices/system/cpu/cpufreq/schedutil/down_rate_limit_us    u:object_r:sysfs:s0
+/sys/devices/system/cpu/cpufreq/schedutil/up_rate_limit_us      u:object_r:sysfs:s0
+/sys/devices/system/cpu/cpufreq/policy[0-9]+/cpb                u:object_r:sysfs:s0
+/sys/devices/system/cpu/cpufreq/policy[0-9]+/stats/reset        u:object_r:sysfs:s0
+/sys/devices/system/cpu/(cpu[0-9]+/)?(cache/)?(index[0-9]+/)?hotplug/fail               u:object_r:sysfs:s0
+/sys/devices/system/cpu/(cpu[0-9]+/)?(cache/)?(index[0-9]+/)?hotplug/target             u:object_r:sysfs:s0
+/sys/devices/system/cpu/(cpu[0-9]+/)?(cache/)?(index[0-9]+/)?power/async                u:object_r:sysfs:s0
+/sys/devices/system/cpu/(cpu[0-9]+/)?(cache/)?(index[0-9]+/)?power/autosuspend_delay_ms u:object_r:sysfs:s0
+/sys/devices/system/cpu/(cpu[0-9]+/)?(cache/)?(index[0-9]+/)?power/control              u:object_r:sysfs:s0
+/sys/devices/system/cpu/(cpu[0-9]+/)?(cache/)?(index[0-9]+/)?power/pm_qos_resume_latency_us     u:object_r:sysfs:s0
+/sys/devices/system/cpu/(cpu[0-9]+/)?(cache/)?(index[0-9]+/)?uevent                     u:object_r:sysfs:s0
+/sys/devices/system/cpu/(cpu[0-9]+/)?cpufreq/(interactive/)?above_hispeed_delay u:object_r:sysfs:s0
+/sys/devices/system/cpu/(cpu[0-9]+/)?cpufreq/(interactive/)?boost               u:object_r:sysfs:s0
+/sys/devices/system/cpu/(cpu[0-9]+/)?cpufreq/(interactive/)?boostpulse          u:object_r:sysfs:s0
+/sys/devices/system/cpu/(cpu[0-9]+/)?cpufreq/(interactive/)?boostpulse_duration u:object_r:sysfs:s0
+/sys/devices/system/cpu/(cpu[0-9]+/)?cpufreq/(interactive/)?go_hispeed_load     u:object_r:sysfs:s0
+/sys/devices/system/cpu/(cpu[0-9]+/)?cpufreq/(interactive/)?hispeed_freq        u:object_r:sysfs:s0
+/sys/devices/system/cpu/(cpu[0-9]+/)?cpufreq/(interactive/)?io_is_busy          u:object_r:sysfs:s0
+/sys/devices/system/cpu/(cpu[0-9]+/)?cpufreq/(interactive/)?min_sample_time     u:object_r:sysfs:s0
+/sys/devices/system/cpu/(cpu[0-9]+/)?cpufreq/(interactive/)?target_loads        u:object_r:sysfs:s0
+/sys/devices/system/cpu/(cpu[0-9]+/)?cpufreq/(interactive/)?timer_rate          u:object_r:sysfs:s0
+/sys/devices/system/cpu/(cpu[0-9]+/)?cpufreq/(interactive/)?timer_slack         u:object_r:sysfs:s0
+/sys/devices/system/cpu/(cpu[0-9]+/)?cpuidle/(state[0-9]+/)?disable             u:object_r:sysfs:s0
+/sys/devices/system/cpu/cpu[0-9]+/cpu_capacity                  u:object_r:sysfs:s0
+/sys/devices/system/cpu/cpu[0-9]+/cpufreq/scaling_governor      u:object_r:sysfs:s0
+/sys/devices/system/cpu/cpu[0-9]+/cpufreq/scaling_max_freq      u:object_r:sysfs:s0
+/sys/devices/system/cpu/cpu[0-9]+/cpufreq/scaling_min_freq      u:object_r:sysfs:s0
+/sys/devices/system/cpu/cpu[0-9]+/cpufreq/scaling_setspeed      u:object_r:sysfs:s0
+/sys/devices/system/cpu/cpu[0-9]+/cpuidle/state[0-9]+/disable   u:object_r:sysfs:s0
+# For Intel
+/sys/devices/system/cpu/cpufreq/policy[0-9]*/energy_performance_preference u:object_r:sysfs:s0
+/sys/devices/system/cpu/intel_pstate/hwp_dynamic_boost          u:object_r:sysfs:s0
+/sys/devices/system/cpu/intel_pstate/max_perf_pct               u:object_r:sysfs:s0
+/sys/devices/system/cpu/intel_pstate/min_perf_pct               u:object_r:sysfs:s0
+/sys/devices/system/cpu/intel_pstate/no_turbo                   u:object_r:sysfs:s0
+/sys/devices/system/cpu/intel_pstate/status                     u:object_r:sysfs:s0
+/sys/devices/system/cpu/microcode/reload                        u:object_r:sysfs:s0
+/sys/devices/system/cpu/smt/control                             u:object_r:sysfs:s0
+# For ARM
+/sys/devices/system/cpu/cpu[0-9]+/online                        u:object_r:sysfs:s0
+/sys/devices/system/cpu/cpufreq/policy[0-9]+/scaling_governor   u:object_r:sysfs:s0
+/sys/devices/system/cpu/cpufreq/policy[0-9]+/scaling_max_freq   u:object_r:sysfs:s0
+/sys/devices/system/cpu/cpufreq/policy[0-9]+/scaling_min_freq   u:object_r:sysfs:s0
+/sys/devices/system/cpu/cpufreq/policy[0-9]+/scaling_setspeed   u:object_r:sysfs:s0
+/sys/devices/system/cpu/cpufreq/policy[0-9]+/sched/down_throttle_nsec u:object_r:sysfs:s0
+/sys/devices/system/cpu/cpufreq/policy[0-9]+/sched/up_throttle_nsec   u:object_r:sysfs:s0
+
+
+
+# Chrome OS file contexts.
+/([^/]+)?                       u:object_r:rootfs:s0
+/usr/[^/]+                      u:object_r:cros_usr_dirs:s0
+/usr/share(/.*)?                u:object_r:cros_usr_dirs:s0
+/usr/local/[^/]+                u:object_r:cros_dev_image_files:s0
+/sbin/init                      u:object_r:chromeos_init_exec:s0
+
+# SBIN_START_HERE
+/sbin/agetty                    u:object_r:cros_agetty_exec:s0
+/sbin/audispd                   u:object_r:cros_audispd_exec:s0
+/sbin/auditd                    u:object_r:cros_auditd_exec:s0
+/sbin/chromeos_startup          u:object_r:chromeos_startup_script_exec:s0
+/sbin/crash_reporter            u:object_r:cros_crash_reporter_exec:s0
+/sbin/crash_sender              u:object_r:cros_crash_sender_exec:s0
+/sbin/debugd                    u:object_r:cros_debugd_exec:s0
+/sbin/dhcpcd                    u:object_r:cros_dhcpcd_exec:s0
+/sbin/frecon                    u:object_r:frecon_exec:s0
+/sbin/hwclock                   u:object_r:cros_hwclock_exec:s0
+/sbin/insmod                    u:object_r:cros_modprobe_exec:s0
+/sbin/minijail0                 u:object_r:cros_minijail_exec:s0
+/sbin/modprobe                  u:object_r:cros_modprobe_exec:s0
+/sbin/restorecon                u:object_r:cros_restorecon_exec:s0
+/sbin/rmmod                     u:object_r:cros_modprobe_exec:s0
+/sbin/session_manager           u:object_r:cros_session_manager_exec:s0
+/sbin/setfiles                  u:object_r:cros_restorecon_exec:s0
+/sbin/udevd                     u:object_r:cros_udevd_exec:s0
+/sbin/upstart-socket-bridge     u:object_r:upstart_socket_bridge_exec:s0
+# SBIN_END_HERE
+
+/bin/bash                       u:object_r:sh_exec:s0
+/bin/dash                       u:object_r:sh_exec:s0
+/bin/kmod                       u:object_r:cros_modprobe_exec:s0
+/bin/sh                         u:object_r:sh_exec:s0
+
+# USR_BIN_START_HERE
+/usr/bin/anomaly_detector       u:object_r:cros_anomaly_detector_exec:s0
+/usr/bin/arc-appfuse-provider   u:object_r:cros_arc_appfuse_provider_exec:s0
+/usr/bin/arc-networkd           u:object_r:cros_arc_networkd_exec:s0
+/usr/bin/arc-obb-mounter        u:object_r:cros_arc_obb_mounter_exec:s0
+/usr/bin/arc_camera_service     u:object_r:cros_arc_camera_service_exec:s0
+/usr/bin/biod                   u:object_r:cros_biod_exec:s0
+/usr/bin/btdispatch             u:object_r:cros_btdispatch_exec:s0
+/usr/bin/chrt                   u:object_r:cros_chrt_exec:s0
+/usr/bin/core_collector[0-9]*   u:object_r:cros_core_collector_exec:s0
+/usr/bin/cras                   u:object_r:cros_cras_exec:s0
+/usr/bin/cros-disks             u:object_r:cros_disks_exec:s0
+/usr/bin/cros_camera_algo       u:object_r:cros_camera_algo_exec:s0
+/usr/bin/cros_camera_service    u:object_r:cros_camera_service_exec:s0
+/usr/bin/dbus-daemon            u:object_r:cros_dbus_daemon_exec:s0
+/usr/bin/dbus-send              u:object_r:cros_dbus_send_exec:s0
+/usr/bin/dbus-uuidgen           u:object_r:cros_dbus_uuidgen_exec:s0
+/usr/bin/esif_ufd               u:object_r:cros_esif_ufd_exec:s0
+/usr/bin/find                   u:object_r:cros_system_file:s0
+/usr/bin/ionice                 u:object_r:cros_ionice_exec:s0
+/usr/bin/logger                 u:object_r:cros_logger_exec:s0
+/usr/bin/memd                   u:object_r:cros_memd_exec:s0
+/usr/bin/metrics_client         u:object_r:cros_metrics_client_exec:s0
+/usr/bin/metrics_daemon         u:object_r:cros_metrics_daemon_exec:s0
+/usr/bin/midis                  u:object_r:cros_midis_exec:s0
+/usr/bin/ml_service             u:object_r:cros_ml_service_exec:s0
+/usr/bin/modemfwd               u:object_r:cros_modemfwd_exec:s0
+/usr/bin/mount-passthrough      u:object_r:cros_mount_passthrough_exec:s0
+/usr/bin/mount-passthrough-jailed u:object_r:cros_mount_passthrough_jailed_exec:s0
+/usr/bin/newblued               u:object_r:cros_newblued_exec:s0
+/usr/bin/periodic_scheduler     u:object_r:cros_periodic_scheduler_exec:s0
+/usr/bin/permission_broker      u:object_r:cros_permission_broker_exec:s0
+/usr/bin/powerd                 u:object_r:cros_powerd_exec:s0
+/usr/bin/run_oci                u:object_r:cros_run_oci_exec:s0
+/usr/bin/shill                  u:object_r:cros_shill_exec:s0
+/usr/bin/systemd-cat            u:object_r:cros_systemd_cat_exec:s0
+/usr/bin/timberslide            u:object_r:cros_timberslide_exec:s0
+/usr/bin/tlsdated               u:object_r:cros_tlsdated_exec:s0
+/usr/bin/u2fd                   u:object_r:cros_u2fd_exec:s0
+/usr/bin/vmlog_forwarder        u:object_r:cros_vmlog_forwarder_exec:s0
+# USR_BIN_END_HERE
+
+# USR_SBIN_START_HERE
+/usr/sbin/ModemManager          u:object_r:cros_modem_manager_exec:s0
+/usr/sbin/accelerator-logs      u:object_r:cros_accelerator_logs_exec:s0
+/usr/sbin/apk-cache-cleaner-jailed u:object_r:cros_apk_cache_cleaner_jailed_exec:s0
+/usr/sbin/arc-oemcrypto         u:object_r:cros_arc_oemcrypto_exec:s0
+/usr/sbin/arc-setup             u:object_r:cros_arc_setup_exec:s0
+/usr/sbin/atrusd                u:object_r:cros_atrusd_exec:s0
+/usr/sbin/attestationd          u:object_r:cros_attestationd_exec:s0
+/usr/sbin/avahi-daemon          u:object_r:cros_avahi_daemon_exec:s0
+/usr/sbin/bootlockboxd          u:object_r:cros_bootlockboxd_exec:s0
+/usr/sbin/bootstat              u:object_r:cros_bootstat_exec:s0
+/usr/sbin/brcm_patchram_plus    u:object_r:cros_brcm_patchram_plus_exec:s0
+/usr/sbin/cecservice            u:object_r:cros_cecservice_exec:s0
+/usr/sbin/chapsd                u:object_r:cros_chapsd_exec:s0
+/usr/sbin/chromeos-cleanup-logs u:object_r:cros_chromeos_cleanup_logs_exec:s0
+/usr/sbin/chromeos-trim         u:object_r:cros_chromeos_trim_exec:s0
+/usr/sbin/conntrackd            u:object_r:cros_conntrackd_exec:s0
+/usr/sbin/cros-machine-id-regen u:object_r:cros_machine_id_regen_exec:s0
+/usr/sbin/cryptohomed           u:object_r:cros_cryptohomed_exec:s0
+/usr/sbin/daisydog              u:object_r:cros_daisydog_exec:s0
+/usr/sbin/dlcservice            u:object_r:cros_dlcservice_exec:s0
+/usr/sbin/huddly-monitor         u:object_r:cros_huddly_monitor_exec:s0
+/usr/sbin/jetstream-update-stats u:object_r:cros_jetstream_update_stats_exec:s0
+/usr/sbin/mimo-monitor          u:object_r:cros_mimo_monitor_exec:s0
+/usr/sbin/mtpd                  u:object_r:cros_mtpd_exec:s0
+/usr/sbin/oobe_config_restore   u:object_r:cros_oobe_config_restore_exec:s0
+/usr/sbin/rsyslogd              u:object_r:cros_rsyslogd_exec:s0
+/usr/sbin/sshd                  u:object_r:cros_sshd_exec:s0
+/usr/sbin/sslh(-fork|-select)?  u:object_r:cros_sslh_exec:s0
+/usr/sbin/tcsd                  u:object_r:cros_tcsd_exec:s0
+/usr/sbin/tpm_managerd          u:object_r:cros_tpm_managerd_exec:s0
+/usr/sbin/trunksd               u:object_r:cros_trunksd_exec:s0
+/usr/sbin/update_engine         u:object_r:cros_update_engine_exec:s0
+/usr/sbin/wpa_supplicant        u:object_r:cros_wpa_supplicant_exec:s0
+# USR_SBIN_END_HERE
+
+/usr/local/bin/recover_duts     u:object_r:cros_recover_duts_script:s0
+
+/usr/lib/systemd/systemd-journald u:object_r:cros_journald_exec:s0
+/usr/libexec/bluetooth/bluetoothd u:object_r:cros_bluetoothd_exec:s0
+
+/usr/share/policy(/.*)?         u:object_r:cros_seccomp_policy_file:s0
+/usr/share/userfeedback(/.*)?   u:object_r:cros_userfeedback_file:s0
+
+/usr/bin/start_bluetoothd.sh    u:object_r:cros_init_start_bluetoothd_shell_script:s0
+/usr/bin/start_bluetoothlog.sh  u:object_r:cros_init_start_bluetoothlog_shell_script:s0
+/usr/share/chromeos-ssh-config/sshd-pre u:object_r:cros_init_sshd_pre_shell_script:s0
+/usr/share/cros(/.*)?           u:object_r:cros_usr_dirs:s0
+/usr/share/cros/init(/.*)?      u:object_r:cros_init_shell_scripts:s0
+/usr/share/cros/init/activate_date.sh u:object_r:cros_init_activate_date_script:s0
+/usr/share/cros/init/crx-import.sh u:object_r:cros_init_crx_import_script:s0
+/usr/share/cros/init/lockbox-cache.sh u:object_r:cros_init_lockbox_cache_script:s0
+/usr/share/cros/init/powerd-pre-start.sh u:object_r:cros_init_powerd_pre_start_script:s0
+/usr/share/cros/init/ui-pre-start u:object_r:cros_init_ui_pre_start_shell_script:s0
+/usr/share/cros/init/ui-respawn u:object_r:cros_init_ui_respawn_shell_script:s0
+/usr/share/cros/init/shill.sh   u:object_r:cros_init_shill_shell_script:s0
+/usr/share/cros/init/shill-pre-start.sh u:object_r:cros_init_shill_shell_script:s0
+
+/var                            u:object_r:cros_var:s0
+/var/cache                      u:object_r:cros_var_cache:s0
+/var/cache/shill(/.*)?          u:object_r:cros_var_cache_shill:s0
+/var/cache/camera(/.*)?         u:object_r:cros_var_cache_camera:s0
+/var/empty                      u:object_r:cros_var_empty:s0
+/var/lib                        u:object_r:cros_var_lib:s0
+/var/lib/bluetooth(/.*)?        u:object_r:cros_var_lib_bluetooth:s0
+/var/lib/chaps(/.*)?            u:object_r:cros_var_lib_chaps:s0
+/var/lib/crash_reporter(/.*)?   u:object_r:cros_var_lib_crash_reporter:s0
+/var/lib/dbus(/.*)?             u:object_r:cros_var_lib_dbus:s0
+/var/lib/dhcpcd(/.*)?           u:object_r:cros_var_lib_shill:s0
+/var/lib/imageloader(/.*)?      u:object_r:cros_var_lib_imageloader:s0
+/var/lib/metrics(/.*)?          u:object_r:cros_metrics_file:s0
+/var/lib/metrics/uma-events     u:object_r:cros_metrics_uma_events_file:s0
+/var/lib/oemcrypto(/.*)?        u:object_r:cros_var_lib_oemcrypto:s0
+/var/lib/oobe_config_restore(/.*)? u:object_r:cros_var_lib_oobe_config_restore:s0
+/var/lib/power_manager(/.*)?    u:object_r:cros_var_lib_power_manager:s0
+/var/lib/preload-network-drivers.* u:object_r:cros_var_lib_preload_network_drivers:s0
+/var/lib/shill(/.*)?            u:object_r:cros_var_lib_shill:s0
+/var/lib/tpm(/.*)?              u:object_r:cros_var_lib_tpm:s0
+/var/lib/trim(/.*)?             u:object_r:cros_var_lib_trim:s0
+/var/lib/ui(/.*)?               u:object_r:cros_var_lib_ui:s0
+/var/lib/update_engine(/.*)?    u:object_r:cros_var_lib_update_engine:s0
+/var/lib/ureadahead(/.*)?       u:object_r:cros_var_lib_ureadahead:s0
+/var/lib/whitelist(/.*)?        u:object_r:cros_var_lib_whitelist:s0
+/var/log                        u:object_r:cros_var_log:s0
+/var/log/arc.log                u:object_r:cros_arc_log:s0
+/var/log/asan(/.*)?             u:object_r:cros_var_log_asan:s0
+/var/log/atrus.log              u:object_r:cros_var_log_atrus:s0
+/var/log/audit(/.*)?            u:object_r:cros_var_log_audit:s0
+/var/log/authpolicy.log         u:object_r:cros_authpolicy_log:s0
+/var/log/boot.log               u:object_r:cros_boot_log:s0
+/var/log/chrome(/.*)?           u:object_r:cros_var_log_chrome:s0
+/var/log/eventlog.txt           u:object_r:cros_var_log_eventlog:s0
+/var/log/faillog                u:object_r:cros_var_log_faillog:s0
+/var/log/hammerd.log            u:object_r:cros_hammerd_log:s0
+/var/log/journal(/.*)?          u:object_r:cros_var_log_journal:s0
+/var/log/messages               u:object_r:cros_syslog:s0
+/var/log/mount_options.log      u:object_r:chromeos_startup_mount_options_log_file:s0
+/var/log/net.log                u:object_r:cros_net_log:s0
+/var/log/powerd.out             u:object_r:cros_powerd_log:s0
+/var/log/recover_duts(/.*)?     u:object_r:cros_var_log_recover_duts:s0
+/var/log/secure                 u:object_r:cros_secure_log:s0
+/var/log/session_manager        u:object_r:cros_var_log_session_manager:s0
+/var/log/tlsdate.log            u:object_r:cros_tlsdate_log:s0
+/var/log/tpm-firmware-updater.log u:object_r:cros_var_log_tpm_firmware_updater:s0
+/var/log/ui(/.*)?               u:object_r:cros_var_log_ui:s0
+/var/log/vmlog(/.*)?            u:object_r:cros_var_log_vmlog:s0
+/var/spool                      u:object_r:cros_var_spool:s0
+/var/spool/cron-lite(/.*)?      u:object_r:cros_periodic_scheduler_cache_t:s0
+/var/spool/crash_reporter(/.*)? u:object_r:cros_crash_spool:s0
+/var/spool/power_manager(/.*)?  u:object_r:cros_var_spool_power_manager:s0
+
+# /opt
+/opt(/.*)          u:object_r:cros_system_file:s0
+/opt/google/chrome/chrome       u:object_r:chrome_browser_exec:s0
+/opt/google/containers/android/rootfs/root u:object_r:cros_arc_rootfs_mountpoint:s0
+/opt/google/containers/arc-sdcard/mountpoints/container-root u:object_r:cros_arc_sdcard_mountpoint:s0
+# These files are mounted into the mini-container before real /data, /cache are
+# available.
+/opt/google/containers/android/rootfs/android-data/cache                   u:object_r:cache_file:s0
+/opt/google/containers/android/rootfs/android-data/data                    u:object_r:system_data_file:s0
+/opt/google/containers/android/rootfs/android-data/data/dalvik-cache(/.*)? u:object_r:dalvikcache_data_file:s0
+
+# /etc
+/etc(/.*)?                      u:object_r:cros_conf_file:s0
+/etc/group                      u:object_r:cros_passwd_file:s0
+/etc/passwd                     u:object_r:cros_passwd_file:s0
+/etc/shadow                     u:object_r:cros_shadow_file:s0
+/etc/selinux(/.*)?              u:object_r:cros_selinux_config_file:s0
+
+# All the following files are created dynamically and need to be labeled at
+# runtime.
+/run                            u:object_r:cros_run:s0
+/run/lock                       u:object_r:cros_run_lock:s0
+/run/arc/debugfs                u:object_r:debugfs:s0
+/run/arc/sdcard(/.*)?           u:object_r:storage_file:s0
+/run/dbus                       u:object_r:cros_run_dbus:s0
+/run/dbus.pid                   u:object_r:cros_dbus_pid_file:s0
+/run/dbus/system_bus_socket     u:object_r:cros_system_bus_socket:s0
+
+
+
+/run/arc/cmdline.android        u:object_r:proc:s0
+
+
+
+/dev                            u:object_r:device:s0
+/dev/console                    u:object_r:console_device:s0
+/dev/input(/.*)?                u:object_r:input_device:s0
+/dev/kmsg                       u:object_r:kmsg_device:s0
+/dev/log                        u:object_r:logger_device:s0
+/dev/null                       u:object_r:null_device:s0
+/dev/ptmx                       u:object_r:ptmx_device:s0
+/dev/random                     u:object_r:random_device:s0
+/dev/shm(/.*)?                  u:object_r:cros_shm:s0
+/dev/snd(/.*)?                  u:object_r:audio_device:s0
+/dev/tpm[0-9]*                  u:object_r:tpm_device:s0
+/dev/urandom                    u:object_r:urandom_device:s0
+/dev/zero                       u:object_r:zero_device:s0
+
+# Label /dev/bus/usb/NNN/MMM
+# (USB device nodes passed by Chrome / permission broker)
+/dev/bus/usb(/.*)?              u:object_r:usb_device:s0
+
+
+(/usr)?/lib64(/.*)?                    u:object_r:cros_system_file:s0
+(/usr)?/lib(/.*)?                      u:object_r:cros_system_file:s0
+/lib/modules(/.*)?                     u:object_r:cros_kernel_modules_file:s0
+/lib/modules/.*\.ko                    u:object_r:cros_kernel_modules_ko_file:s0
+
+# /home
+/home                            u:object_r:cros_home:s0
+/home/root(/[0-9a-z]{40})?       u:object_r:cros_home_root:s0
+/home/user(/[0-9a-z]{40})?       u:object_r:cros_home_user:s0
+/home/chronos(/(?!(u-[0-9a-z]{40}|user)).*)?   u:object_r:cros_home_chronos:s0
+/home/chronos/crash              u:object_r:cros_home_chronos_crash:s0
+/home/chronos/user               u:object_r:cros_home_chronos:s0
+/home/chronos/u-[0-9a-z]{40}     u:object_r:cros_home_chronos:s0
+/home/.shadow                    u:object_r:cros_home_shadow:s0
+/home/.shadow/(?![0-9a-z]{40}).* u:object_r:cros_home_shadow:s0
+/home/.shadow/low_entropy_creds(/.*)? u:object_r:cros_home_shadow_low_entropy_creds:s0
+# exclude <uid>/mount/root/android-data/data
+/home/.shadow/[0-9a-z]{40}(/(?!mount/root/android-data/data).*)? u:object_r:cros_home_shadow_uid:s0
+/home/.shadow/[0-9a-z]{40}/mount/root(/(?!android-data/data).*)? u:object_r:cros_home_shadow_uid_root:s0
+/home/.shadow/[0-9a-z]{40}/mount/user(/.*)? u:object_r:cros_home_shadow_uid_user:s0
+/home/.shadow/[0-9a-z]{40}/mount/user/Downloads(/.*)? u:object_r:media_rw_data_file:s0
+/home/.shadow/[0-9a-z]{40}/mount/user/MyFiles(/.*)?   u:object_r:media_rw_data_file:s0
+/home/.shadow/[0-9a-z]{40}/mount/root/android-data u:object_r:cros_home_shadow_uid_root_android:s0
+/home/.shadow/[0-9a-z]{40}/mount/root/android-data/cache u:object_r:cache_file:s0
+/home/.shadow/[0-9a-z]{40}/mount/root/android-data/data u:object_r:system_data_file:s0
+/home/.shadow/[0-9a-z]{40}/mount/root/authpolicyd(/.*)?   u:object_r:cros_home_shadow_uid_root_authpolicyd:s0
+/home/.shadow/[0-9a-z]{40}/mount/root/chaps(/.*)?   u:object_r:cros_home_shadow_uid_root_chaps:s0
+/home/.shadow/[0-9a-z]{40}/mount/root/session_manager(/.*)?   u:object_r:cros_home_shadow_uid_root_session_manager:s0
+/home/.shadow/[0-9a-z]{40}/mount/root/shill(/.*)?   u:object_r:cros_home_shadow_uid_root_shill:s0
+/home/.shadow/[0-9a-z]{40}/mount/root/shill_logs(/.*)?   u:object_r:cros_home_shadow_uid_root_shill_logs:s0
+/home/.shadow/[0-9a-z]{40}/mount/root/usb_bouncer(/.*)?   u:object_r:cros_home_shadow_uid_root_usb_bouncer:s0
+#line 1 "out/target/product/cheets_arm/obj/ETC/file_contexts.bin_intermediates/file_contexts.local.tmp"
+#line 1 "system/sepolicy/file_contexts"
+###########################################
+# Root
+/opt/google/containers/android/rootfs/root/                   u:object_r:rootfs:s0
+
+# Data files
+/opt/google/containers/android/rootfs/root/adb_keys           u:object_r:adb_keys_file:s0
+/opt/google/containers/android/rootfs/root/build\.prop        u:object_r:rootfs:s0
+/opt/google/containers/android/rootfs/root/default\.prop      u:object_r:rootfs:s0
+/opt/google/containers/android/rootfs/root/fstab\..*          u:object_r:rootfs:s0
+/opt/google/containers/android/rootfs/root/init\..*           u:object_r:rootfs:s0
+/opt/google/containers/android/rootfs/root/res(/.*)?          u:object_r:rootfs:s0
+/opt/google/containers/android/rootfs/root/selinux_version    u:object_r:rootfs:s0
+/opt/google/containers/android/rootfs/root/ueventd\..*        u:object_r:rootfs:s0
+/opt/google/containers/android/rootfs/root/verity_key         u:object_r:rootfs:s0
+
+# Executables
+/opt/google/containers/android/rootfs/root/charger            u:object_r:rootfs:s0
+/opt/google/containers/android/rootfs/root/init               u:object_r:init_exec:s0
+/opt/google/containers/android/rootfs/root/sbin(/.*)?         u:object_r:rootfs:s0
+
+# Empty directories
+/opt/google/containers/android/rootfs/root/lost\+found        u:object_r:rootfs:s0
+/opt/google/containers/android/rootfs/root/acct               u:object_r:cgroup:s0
+/opt/google/containers/android/rootfs/root/config             u:object_r:rootfs:s0
+/opt/google/containers/android/rootfs/root/mnt                u:object_r:tmpfs:s0
+/opt/google/containers/android/rootfs/root/postinstall        u:object_r:postinstall_mnt_dir:s0
+/opt/google/containers/android/rootfs/root/proc               u:object_r:rootfs:s0
+/opt/google/containers/android/rootfs/root/root               u:object_r:rootfs:s0
+/opt/google/containers/android/rootfs/root/sys                u:object_r:sysfs:s0
+
+# Symlinks
+/opt/google/containers/android/rootfs/root/bugreports         u:object_r:rootfs:s0
+/opt/google/containers/android/rootfs/root/d                  u:object_r:rootfs:s0
+/opt/google/containers/android/rootfs/root/etc                u:object_r:rootfs:s0
+/opt/google/containers/android/rootfs/root/sdcard             u:object_r:rootfs:s0
+
+# SELinux policy files
+/opt/google/containers/android/rootfs/root/file_contexts\.bin u:object_r:rootfs:s0
+/opt/google/containers/android/rootfs/root/property_contexts  u:object_r:property_contexts:s0
+/opt/google/containers/android/rootfs/root/seapp_contexts     u:object_r:rootfs:s0
+/opt/google/containers/android/rootfs/root/sepolicy           u:object_r:rootfs:s0
+/opt/google/containers/android/rootfs/root/service_contexts   u:object_r:rootfs:s0
+
+##########################
+# Devices
+#
+/opt/google/containers/android/rootfs/root/dev(/.*)?		u:object_r:device:s0
+/opt/google/containers/android/rootfs/root/dev/akm8973.*		u:object_r:sensors_device:s0
+/opt/google/containers/android/rootfs/root/dev/accelerometer	u:object_r:sensors_device:s0
+/opt/google/containers/android/rootfs/root/dev/adf[0-9]*		u:object_r:graphics_device:s0
+/opt/google/containers/android/rootfs/root/dev/adf-interface[0-9]*\.[0-9]*	u:object_r:graphics_device:s0
+/opt/google/containers/android/rootfs/root/dev/adf-overlay-engine[0-9]*\.[0-9]*	u:object_r:graphics_device:s0
+/opt/google/containers/android/rootfs/root/dev/alarm		u:object_r:alarm_device:s0
+/opt/google/containers/android/rootfs/root/dev/android_adb.*	u:object_r:adb_device:s0
+/opt/google/containers/android/rootfs/root/dev/ashmem		u:object_r:ashmem_device:s0
+/opt/google/containers/android/rootfs/root/dev/audio.*		u:object_r:audio_device:s0
+/opt/google/containers/android/rootfs/root/dev/binder		u:object_r:binder_device:s0
+/opt/google/containers/android/rootfs/root/dev/block(/.*)?	u:object_r:block_device:s0
+/opt/google/containers/android/rootfs/root/dev/block/dm-[0-9]+	u:object_r:dm_device:s0
+/opt/google/containers/android/rootfs/root/dev/block/loop[0-9]*	u:object_r:loop_device:s0
+/opt/google/containers/android/rootfs/root/dev/block/vold/.+	u:object_r:vold_device:s0
+/opt/google/containers/android/rootfs/root/dev/block/ram[0-9]*	u:object_r:ram_device:s0
+/opt/google/containers/android/rootfs/root/dev/block/zram[0-9]*	u:object_r:ram_device:s0
+/opt/google/containers/android/rootfs/root/dev/bus/usb(.*)?       u:object_r:usb_device:s0
+/opt/google/containers/android/rootfs/root/dev/cam		u:object_r:video_device:s0
+/opt/google/containers/android/rootfs/root/dev/console		u:object_r:console_device:s0
+/opt/google/containers/android/rootfs/root/dev/cpuctl(/.*)?	u:object_r:cpuctl_device:s0
+/opt/google/containers/android/rootfs/root/dev/device-mapper	u:object_r:dm_device:s0
+/opt/google/containers/android/rootfs/root/dev/eac		u:object_r:audio_device:s0
+/opt/google/containers/android/rootfs/root/dev/fscklogs(/.*)?	u:object_r:fscklogs:s0
+/opt/google/containers/android/rootfs/root/dev/full		u:object_r:full_device:s0
+/opt/google/containers/android/rootfs/root/dev/fuse		u:object_r:fuse_device:s0
+/opt/google/containers/android/rootfs/root/dev/graphics(/.*)?	u:object_r:graphics_device:s0
+/opt/google/containers/android/rootfs/root/dev/hw_random		u:object_r:hw_random_device:s0
+/opt/google/containers/android/rootfs/root/dev/i2c-[0-9]+		u:object_r:i2c_device:s0
+/opt/google/containers/android/rootfs/root/dev/input(/.*)		u:object_r:input_device:s0
+/opt/google/containers/android/rootfs/root/dev/iio:device[0-9]+   u:object_r:iio_device:s0
+/opt/google/containers/android/rootfs/root/dev/ion		u:object_r:ion_device:s0
+/opt/google/containers/android/rootfs/root/dev/kmem		u:object_r:kmem_device:s0
+/opt/google/containers/android/rootfs/root/dev/log(/.*)?		u:object_r:log_device:s0
+/opt/google/containers/android/rootfs/root/dev/mem		u:object_r:kmem_device:s0
+/opt/google/containers/android/rootfs/root/dev/modem.*		u:object_r:radio_device:s0
+/opt/google/containers/android/rootfs/root/dev/mpu		u:object_r:gps_device:s0
+/opt/google/containers/android/rootfs/root/dev/mpuirq		u:object_r:gps_device:s0
+/opt/google/containers/android/rootfs/root/dev/mtd(/.*)?		u:object_r:mtd_device:s0
+/opt/google/containers/android/rootfs/root/dev/mtp_usb		u:object_r:mtp_device:s0
+/opt/google/containers/android/rootfs/root/dev/pmsg0		u:object_r:pmsg_device:s0
+/opt/google/containers/android/rootfs/root/dev/pn544		u:object_r:nfc_device:s0
+/opt/google/containers/android/rootfs/root/dev/ppp		u:object_r:ppp_device:s0
+/opt/google/containers/android/rootfs/root/dev/ptmx		u:object_r:ptmx_device:s0
+/opt/google/containers/android/rootfs/root/dev/pvrsrvkm		u:object_r:gpu_device:s0
+/opt/google/containers/android/rootfs/root/dev/kmsg		u:object_r:kmsg_device:s0
+/opt/google/containers/android/rootfs/root/dev/null		u:object_r:null_device:s0
+/opt/google/containers/android/rootfs/root/dev/nvhdcp1		u:object_r:video_device:s0
+/opt/google/containers/android/rootfs/root/dev/random		u:object_r:random_device:s0
+/opt/google/containers/android/rootfs/root/dev/rpmsg-omx[0-9]	u:object_r:rpmsg_device:s0
+/opt/google/containers/android/rootfs/root/dev/rproc_user	u:object_r:rpmsg_device:s0
+/opt/google/containers/android/rootfs/root/dev/rtc[0-9]      u:object_r:rtc_device:s0
+/opt/google/containers/android/rootfs/root/dev/snd(/.*)?		u:object_r:audio_device:s0
+/opt/google/containers/android/rootfs/root/dev/socket(/.*)?	u:object_r:socket_device:s0
+/opt/google/containers/android/rootfs/root/dev/socket/adbd	u:object_r:adbd_socket:s0
+/opt/google/containers/android/rootfs/root/dev/socket/sap_uim_socket[0-9]        u:object_r:sap_uim_socket:s0
+/opt/google/containers/android/rootfs/root/dev/socket/cryptd	u:object_r:vold_socket:s0
+/opt/google/containers/android/rootfs/root/dev/socket/dnsproxyd	u:object_r:dnsproxyd_socket:s0
+/opt/google/containers/android/rootfs/root/dev/socket/dumpstate	u:object_r:dumpstate_socket:s0
+/opt/google/containers/android/rootfs/root/dev/socket/fwmarkd	u:object_r:fwmarkd_socket:s0
+/opt/google/containers/android/rootfs/root/dev/socket/gps		u:object_r:gps_socket:s0
+/opt/google/containers/android/rootfs/root/dev/socket/installd	u:object_r:installd_socket:s0
+/opt/google/containers/android/rootfs/root/dev/socket/lmkd        u:object_r:lmkd_socket:s0
+/opt/google/containers/android/rootfs/root/dev/socket/logd	u:object_r:logd_socket:s0
+/opt/google/containers/android/rootfs/root/dev/socket/logdr	u:object_r:logdr_socket:s0
+/opt/google/containers/android/rootfs/root/dev/socket/logdw	u:object_r:logdw_socket:s0
+/opt/google/containers/android/rootfs/root/dev/socket/mdns	u:object_r:mdns_socket:s0
+/opt/google/containers/android/rootfs/root/dev/socket/mdnsd	u:object_r:mdnsd_socket:s0
+/opt/google/containers/android/rootfs/root/dev/socket/mtpd	u:object_r:mtpd_socket:s0
+/opt/google/containers/android/rootfs/root/dev/socket/netd	u:object_r:netd_socket:s0
+/opt/google/containers/android/rootfs/root/dev/socket/property_service	u:object_r:property_socket:s0
+/opt/google/containers/android/rootfs/root/dev/socket/racoon	u:object_r:racoon_socket:s0
+/opt/google/containers/android/rootfs/root/dev/socket/rild	u:object_r:rild_socket:s0
+/opt/google/containers/android/rootfs/root/dev/socket/rild-debug	u:object_r:rild_debug_socket:s0
+/opt/google/containers/android/rootfs/root/dev/socket/uncrypt	u:object_r:uncrypt_socket:s0
+/opt/google/containers/android/rootfs/root/dev/socket/vold	u:object_r:vold_socket:s0
+/opt/google/containers/android/rootfs/root/dev/socket/wpa_eth[0-9] u:object_r:wpa_socket:s0
+/opt/google/containers/android/rootfs/root/dev/socket/wpa_wlan[0-9] u:object_r:wpa_socket:s0
+/opt/google/containers/android/rootfs/root/dev/socket/zygote	u:object_r:zygote_socket:s0
+/opt/google/containers/android/rootfs/root/dev/socket/zygote_secondary	u:object_r:zygote_socket:s0
+/opt/google/containers/android/rootfs/root/dev/spdif_out.*	u:object_r:audio_device:s0
+/opt/google/containers/android/rootfs/root/dev/tegra.*		u:object_r:video_device:s0
+/opt/google/containers/android/rootfs/root/dev/tf_driver		u:object_r:tee_device:s0
+/opt/google/containers/android/rootfs/root/dev/tty		u:object_r:owntty_device:s0
+/opt/google/containers/android/rootfs/root/dev/tty[0-9]*		u:object_r:tty_device:s0
+/opt/google/containers/android/rootfs/root/dev/ttyS[0-9]*		u:object_r:serial_device:s0
+/opt/google/containers/android/rootfs/root/dev/tun		u:object_r:tun_device:s0
+/opt/google/containers/android/rootfs/root/dev/uhid		u:object_r:uhid_device:s0
+/opt/google/containers/android/rootfs/root/dev/uinput		u:object_r:uhid_device:s0
+/opt/google/containers/android/rootfs/root/dev/uio[0-9]*		u:object_r:uio_device:s0
+/opt/google/containers/android/rootfs/root/dev/urandom		u:object_r:urandom_device:s0
+/opt/google/containers/android/rootfs/root/dev/usb_accessory	u:object_r:usbaccessory_device:s0
+/opt/google/containers/android/rootfs/root/dev/vcs[0-9a-z]*	u:object_r:vcs_device:s0
+/opt/google/containers/android/rootfs/root/dev/video[0-9]*	u:object_r:video_device:s0
+/opt/google/containers/android/rootfs/root/dev/watchdog		u:object_r:watchdog_device:s0
+/opt/google/containers/android/rootfs/root/dev/xt_qtaguid	u:object_r:qtaguid_device:s0
+/opt/google/containers/android/rootfs/root/dev/zero		u:object_r:zero_device:s0
+/opt/google/containers/android/rootfs/root/dev/__kmsg__		u:object_r:klog_device:s0
+/opt/google/containers/android/rootfs/root/dev/__properties__ u:object_r:properties_device:s0
+#############################
+# System files
+#
+/opt/google/containers/android/rootfs/root/system(/.*)?		u:object_r:system_file:s0
+/opt/google/containers/android/rootfs/root/system/bin/atrace	u:object_r:atrace_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/e2fsck	--	u:object_r:fsck_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/fsck\.f2fs	--	u:object_r:fsck_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/fsck_msdos	--	u:object_r:fsck_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/toolbox	--	u:object_r:toolbox_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/toybox	--	u:object_r:toolbox_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/logcat	--	u:object_r:logcat_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/sh		--	u:object_r:shell_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/run-as	--	u:object_r:runas_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/bootanimation u:object_r:bootanim_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/bootstat		u:object_r:bootstat_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/app_process32	u:object_r:zygote_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/app_process64	u:object_r:zygote_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/servicemanager	u:object_r:servicemanager_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/surfaceflinger	u:object_r:surfaceflinger_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/drmserver	u:object_r:drmserver_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/dumpstate   u:object_r:dumpstate_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/vold	u:object_r:vold_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/netd	u:object_r:netd_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/rild	u:object_r:rild_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/audioserver	u:object_r:audioserver_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/mediadrmserver	u:object_r:mediadrmserver_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/mediaserver	u:object_r:mediaserver_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/cameraserver	u:object_r:cameraserver_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/mediaextractor	u:object_r:mediaextractor_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/mediacodec	u:object_r:mediacodec_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/mdnsd	u:object_r:mdnsd_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/installd	u:object_r:installd_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/otapreopt_chroot   u:object_r:otapreopt_chroot_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/otapreopt_slot   u:object_r:otapreopt_slot_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/keystore	u:object_r:keystore_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/fingerprintd u:object_r:fingerprintd_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/gatekeeperd u:object_r:gatekeeperd_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/debuggerd	u:object_r:debuggerd_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/debuggerd64	u:object_r:debuggerd_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/wpa_supplicant	u:object_r:wpa_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/recovery-persist     u:object_r:recovery_persist_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/recovery-refresh     u:object_r:recovery_refresh_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/sdcard      u:object_r:sdcardd_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/dhcpcd      u:object_r:dhcp_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/dhcpcd-6.8.2	u:object_r:dhcp_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/mtpd	u:object_r:mtp_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/pppd	u:object_r:ppp_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/tf_daemon	u:object_r:tee_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/racoon	u:object_r:racoon_exec:s0
+/opt/google/containers/android/rootfs/root/system/xbin/su		u:object_r:su_exec:s0
+/opt/google/containers/android/rootfs/root/system/xbin/perfprofd  u:object_r:perfprofd_exec:s0
+/opt/google/containers/android/rootfs/root/system/vendor/bin/gpsd u:object_r:gpsd_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/dnsmasq     u:object_r:dnsmasq_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/hostapd     u:object_r:hostapd_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/clatd	u:object_r:clatd_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/lmkd        u:object_r:lmkd_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/inputflinger u:object_r:inputflinger_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/logd        u:object_r:logd_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/uncrypt     u:object_r:uncrypt_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/update_verifier u:object_r:update_verifier_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/logwrapper  u:object_r:system_file:s0
+/opt/google/containers/android/rootfs/root/system/bin/vdc         u:object_r:vdc_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/cppreopts.sh   u:object_r:cppreopts_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/preopt2cachename u:object_r:preopt2cachename_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/install-recovery.sh u:object_r:install_recovery_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/dex2oat     u:object_r:dex2oat_exec:s0
+# patchoat executable has (essentially) the same requirements as dex2oat.
+/opt/google/containers/android/rootfs/root/system/bin/patchoat    u:object_r:dex2oat_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/profman     u:object_r:profman_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/sgdisk      u:object_r:sgdisk_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/blkid       u:object_r:blkid_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/tzdatacheck u:object_r:tzdatacheck_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/idmap u:object_r:idmap_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/update_engine        u:object_r:update_engine_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/bspatch              u:object_r:update_engine_exec:s0
+
+#############################
+# Vendor files
+#
+/opt/google/containers/android/rootfs/root/vendor(/.*)?		u:object_r:system_file:s0
+/opt/google/containers/android/rootfs/root/vendor/bin/gpsd	u:object_r:gpsd_exec:s0
+
+#############################
+# OEM and ODM files
+#
+/opt/google/containers/android/rootfs/root/odm(/.*)?              u:object_r:system_file:s0
+/opt/google/containers/android/rootfs/root/oem(/.*)?              u:object_r:oemfs:s0
+
+
+#############################
+# Data files
+#
+# NOTE: When modifying existing label rules, changes may also need to
+# propagate to the "Expanded data files" section.
+#
+/opt/google/containers/android/rootfs/root/data(/.*)?		u:object_r:system_data_file:s0
+/opt/google/containers/android/rootfs/root/data/.layout_version		u:object_r:install_data_file:s0
+/opt/google/containers/android/rootfs/root/data/unencrypted(/.*)?         u:object_r:unencrypted_data_file:s0
+/opt/google/containers/android/rootfs/root/data/backup(/.*)?		u:object_r:backup_data_file:s0
+/opt/google/containers/android/rootfs/root/data/secure/backup(/.*)?	u:object_r:backup_data_file:s0
+/opt/google/containers/android/rootfs/root/data/security(/.*)?	u:object_r:security_file:s0
+/opt/google/containers/android/rootfs/root/data/system/ndebugsocket	u:object_r:system_ndebug_socket:s0
+/opt/google/containers/android/rootfs/root/data/drm(/.*)?		u:object_r:drm_data_file:s0
+/opt/google/containers/android/rootfs/root/data/gps(/.*)?		u:object_r:gps_data_file:s0
+/opt/google/containers/android/rootfs/root/data/resource-cache(/.*)? u:object_r:resourcecache_data_file:s0
+/opt/google/containers/android/rootfs/root/data/dalvik-cache(/.*)? u:object_r:dalvikcache_data_file:s0
+/opt/google/containers/android/rootfs/root/data/ota(/.*)? u:object_r:ota_data_file:s0
+/opt/google/containers/android/rootfs/root/data/ota_package(/.*)? u:object_r:ota_package_file:s0
+/opt/google/containers/android/rootfs/root/data/adb(/.*)?		u:object_r:adb_data_file:s0
+/opt/google/containers/android/rootfs/root/data/anr(/.*)?		u:object_r:anr_data_file:s0
+/opt/google/containers/android/rootfs/root/data/app(/.*)?                       u:object_r:apk_data_file:s0
+/opt/google/containers/android/rootfs/root/data/app/[^/]+/oat(/.*)?                u:object_r:dalvikcache_data_file:s0
+/opt/google/containers/android/rootfs/root/data/app/vmdl[^/]+\.tmp(/.*)?           u:object_r:apk_tmp_file:s0
+/opt/google/containers/android/rootfs/root/data/app/vmdl[^/]+\.tmp/oat(/.*)?           u:object_r:dalvikcache_data_file:s0
+/opt/google/containers/android/rootfs/root/data/app-private(/.*)?               u:object_r:apk_private_data_file:s0
+/opt/google/containers/android/rootfs/root/data/app-private/vmdl.*\.tmp(/.*)?   u:object_r:apk_private_tmp_file:s0
+/opt/google/containers/android/rootfs/root/data/tombstones(/.*)?	u:object_r:tombstone_data_file:s0
+/opt/google/containers/android/rootfs/root/data/local/tmp(/.*)?	u:object_r:shell_data_file:s0
+/opt/google/containers/android/rootfs/root/data/media(/.*)?	u:object_r:media_rw_data_file:s0
+/opt/google/containers/android/rootfs/root/data/mediadrm(/.*)?	u:object_r:media_data_file:s0
+/opt/google/containers/android/rootfs/root/data/nativetest(/.*)?	u:object_r:nativetest_data_file:s0
+/opt/google/containers/android/rootfs/root/data/property(/.*)?	u:object_r:property_data_file:s0
+/opt/google/containers/android/rootfs/root/data/preloads(/.*)?	u:object_r:preloads_data_file:s0
+
+# Misc data
+/opt/google/containers/android/rootfs/root/data/misc/adb(/.*)?            u:object_r:adb_keys_file:s0
+/opt/google/containers/android/rootfs/root/data/misc/audio(/.*)?          u:object_r:audio_data_file:s0
+/opt/google/containers/android/rootfs/root/data/misc/audioserver(/.*)?    u:object_r:audioserver_data_file:s0
+/opt/google/containers/android/rootfs/root/data/misc/bootstat(/.*)?       u:object_r:bootstat_data_file:s0
+/opt/google/containers/android/rootfs/root/data/misc/boottrace(/.*)?      u:object_r:boottrace_data_file:s0
+/opt/google/containers/android/rootfs/root/data/misc/bluetooth(/.*)?      u:object_r:bluetooth_data_file:s0
+/opt/google/containers/android/rootfs/root/data/misc/bluedroid(/.*)?      u:object_r:bluetooth_data_file:s0
+/opt/google/containers/android/rootfs/root/data/misc/bluedroid/\.a2dp_ctrl u:object_r:bluetooth_socket:s0
+/opt/google/containers/android/rootfs/root/data/misc/bluedroid/\.a2dp_data u:object_r:bluetooth_socket:s0
+/opt/google/containers/android/rootfs/root/data/misc/camera(/.*)?         u:object_r:camera_data_file:s0
+/opt/google/containers/android/rootfs/root/data/misc/dhcp(/.*)?           u:object_r:dhcp_data_file:s0
+/opt/google/containers/android/rootfs/root/data/misc/dhcp-6.8.2(/.*)?     u:object_r:dhcp_data_file:s0
+/opt/google/containers/android/rootfs/root/data/misc/gatekeeper(/.*)?     u:object_r:gatekeeper_data_file:s0
+/opt/google/containers/android/rootfs/root/data/misc/keychain(/.*)?       u:object_r:keychain_data_file:s0
+/opt/google/containers/android/rootfs/root/data/misc/keystore(/.*)?       u:object_r:keystore_data_file:s0
+/opt/google/containers/android/rootfs/root/data/misc/logd(/.*)?           u:object_r:misc_logd_file:s0
+/opt/google/containers/android/rootfs/root/data/misc/media(/.*)?          u:object_r:media_data_file:s0
+/opt/google/containers/android/rootfs/root/data/misc/net(/.*)?            u:object_r:net_data_file:s0
+/opt/google/containers/android/rootfs/root/data/misc/recovery(/.*)?       u:object_r:recovery_data_file:s0
+/opt/google/containers/android/rootfs/root/data/misc/shared_relro(/.*)?   u:object_r:shared_relro_file:s0
+/opt/google/containers/android/rootfs/root/data/misc/sms(/.*)?            u:object_r:radio_data_file:s0
+/opt/google/containers/android/rootfs/root/data/misc/systemkeys(/.*)?     u:object_r:systemkeys_data_file:s0
+/opt/google/containers/android/rootfs/root/data/misc/user(/.*)?           u:object_r:misc_user_data_file:s0
+/opt/google/containers/android/rootfs/root/data/misc/vpn(/.*)?            u:object_r:vpn_data_file:s0
+/opt/google/containers/android/rootfs/root/data/misc/wifi(/.*)?           u:object_r:wifi_data_file:s0
+/opt/google/containers/android/rootfs/root/data/misc/wifi/sockets(/.*)?   u:object_r:wpa_socket:s0
+/opt/google/containers/android/rootfs/root/data/misc/wifi/sockets/wpa_ctrl.*   u:object_r:system_wpa_socket:s0
+/opt/google/containers/android/rootfs/root/data/misc/wifi/hostapd(/.*)?   u:object_r:wpa_socket:s0
+/opt/google/containers/android/rootfs/root/data/misc/zoneinfo(/.*)?       u:object_r:zoneinfo_data_file:s0
+/opt/google/containers/android/rootfs/root/data/misc/vold(/.*)?           u:object_r:vold_data_file:s0
+/opt/google/containers/android/rootfs/root/data/misc/perfprofd(/.*)?      u:object_r:perfprofd_data_file:s0
+/opt/google/containers/android/rootfs/root/data/misc/update_engine(/.*)?  u:object_r:update_engine_data_file:s0
+/opt/google/containers/android/rootfs/root/data/system/heapdump(/.*)?     u:object_r:heapdump_data_file:s0
+/opt/google/containers/android/rootfs/root/data/misc/trace(/.*)?          u:object_r:method_trace_data_file:s0
+# TODO(calin) label profile reference differently so that only
+# profman run as a special user can write to them
+/opt/google/containers/android/rootfs/root/data/misc/profiles/cur(/.*)?       u:object_r:user_profile_data_file:s0
+/opt/google/containers/android/rootfs/root/data/misc/profiles/cur/[0-9]+/foreign-dex(/.*)? u:object_r:user_profile_foreign_dex_data_file:s0
+/opt/google/containers/android/rootfs/root/data/misc/profiles/ref(/.*)?       u:object_r:user_profile_data_file:s0
+/opt/google/containers/android/rootfs/root/data/misc/profman(/.*)?        u:object_r:profman_dump_data_file:s0
+
+# Fingerprint data
+/opt/google/containers/android/rootfs/root/data/system/users/[0-9]+/fpdata(/.*)? u:object_r:fingerprintd_data_file:s0
+
+# Bootchart data
+/opt/google/containers/android/rootfs/root/data/bootchart(/.*)?		u:object_r:bootchart_data_file:s0
+
+#############################
+# Expanded data files
+#
+/opt/google/containers/android/rootfs/root/mnt/expand(/.*)?                                   u:object_r:mnt_expand_file:s0
+/opt/google/containers/android/rootfs/root/mnt/expand/[^/]+(/.*)?                             u:object_r:system_data_file:s0
+/opt/google/containers/android/rootfs/root/mnt/expand/[^/]+/app(/.*)?                         u:object_r:apk_data_file:s0
+/opt/google/containers/android/rootfs/root/mnt/expand/[^/]+/app/[^/]+/oat(/.*)?               u:object_r:dalvikcache_data_file:s0
+/opt/google/containers/android/rootfs/root/mnt/expand/[^/]+/app/vmdl[^/]+\.tmp(/.*)?          u:object_r:apk_tmp_file:s0
+/opt/google/containers/android/rootfs/root/mnt/expand/[^/]+/app/vmdl[^/]+\.tmp/oat(/.*)?      u:object_r:dalvikcache_data_file:s0
+/opt/google/containers/android/rootfs/root/mnt/expand/[^/]+/local/tmp(/.*)?                   u:object_r:shell_data_file:s0
+/opt/google/containers/android/rootfs/root/mnt/expand/[^/]+/media(/.*)?                       u:object_r:media_rw_data_file:s0
+/opt/google/containers/android/rootfs/root/mnt/expand/[^/]+/misc/vold(/.*)?                   u:object_r:vold_data_file:s0
+
+# coredump directory for userdebug/eng devices
+/opt/google/containers/android/rootfs/root/cores(/.*)?                    u:object_r:coredump_file:s0
+
+# Wallpaper files
+/opt/google/containers/android/rootfs/root/data/system/users/[0-9]+/wallpaper_lock_orig	u:object_r:wallpaper_file:s0
+/opt/google/containers/android/rootfs/root/data/system/users/[0-9]+/wallpaper_lock	u:object_r:wallpaper_file:s0
+/opt/google/containers/android/rootfs/root/data/system/users/[0-9]+/wallpaper_orig	u:object_r:wallpaper_file:s0
+/opt/google/containers/android/rootfs/root/data/system/users/[0-9]+/wallpaper		u:object_r:wallpaper_file:s0
+
+# Ringtone files
+/opt/google/containers/android/rootfs/root/data/system_de/[0-9]+/ringtones(/.*)?          u:object_r:ringtone_file:s0
+
+# ShortcutManager icons, e.g.
+#   /data/system_ce/0/shortcut_service/bitmaps/com.example.app/1457472879282.png
+/opt/google/containers/android/rootfs/root/data/system_ce/[0-9]+/shortcut_service/bitmaps(/.*)? u:object_r:shortcut_manager_icons:s0
+
+# User icon files
+/opt/google/containers/android/rootfs/root/data/system/users/[0-9]+/photo.png             u:object_r:icon_file:s0
+
+#############################
+# efs files
+#
+/opt/google/containers/android/rootfs/root/efs(/.*)?		u:object_r:efs_file:s0
+
+#############################
+# Cache files
+#
+/opt/google/containers/android/rootfs/root/cache(/.*)?		u:object_r:cache_file:s0
+/opt/google/containers/android/rootfs/root/cache/recovery(/.*)?	u:object_r:cache_recovery_file:s0
+# General backup/restore interchange with apps
+/opt/google/containers/android/rootfs/root/cache/backup_stage(/.*)?	u:object_r:cache_backup_file:s0
+# LocalTransport (backup) uses this subtree
+/opt/google/containers/android/rootfs/root/cache/backup(/.*)?		u:object_r:cache_private_backup_file:s0
+
+/opt/google/containers/android/rootfs/root/data/cache(/.*)?		u:object_r:cache_file:s0
+/opt/google/containers/android/rootfs/root/data/cache/recovery(/.*)?	u:object_r:cache_recovery_file:s0
+# General backup/restore interchange with apps
+/opt/google/containers/android/rootfs/root/data/cache/backup_stage(/.*)?	u:object_r:cache_backup_file:s0
+# LocalTransport (backup) uses this subtree
+/opt/google/containers/android/rootfs/root/data/cache/backup(/.*)?	u:object_r:cache_private_backup_file:s0
+
+#############################
+# sysfs files
+#
+/opt/google/containers/android/rootfs/root/sys/devices/platform/nfc-power/nfc_power -- u:object_r:sysfs_nfc_power_writable:s0
+/opt/google/containers/android/rootfs/root/sys/devices/system/cpu(/.*)?    u:object_r:sysfs_devices_system_cpu:s0
+/opt/google/containers/android/rootfs/root/sys/devices/virtual/block/zram\d+(/.*)?     u:object_r:sysfs_zram:s0
+/opt/google/containers/android/rootfs/root/sys/devices/virtual/block/zram\d+/uevent    u:object_r:sysfs_zram_uevent:s0
+/opt/google/containers/android/rootfs/root/sys/devices/virtual/misc/hw_random(/.*)?    u:object_r:sysfs_hwrandom:s0
+/opt/google/containers/android/rootfs/root/sys/power/wake_lock -- u:object_r:sysfs_wake_lock:s0
+/opt/google/containers/android/rootfs/root/sys/power/wake_unlock -- u:object_r:sysfs_wake_lock:s0
+/opt/google/containers/android/rootfs/root/sys/kernel/uevent_helper --	u:object_r:usermodehelper:s0
+/opt/google/containers/android/rootfs/root/sys/module/lowmemorykiller(/.*)? -- u:object_r:sysfs_lowmemorykiller:s0
+
+#############################
+# debugfs files
+#
+/opt/google/containers/android/rootfs/root/sys/kernel/debug/tracing(/.*)?          u:object_r:debugfs_tracing:s0
+/opt/google/containers/android/rootfs/root/sys/kernel/debug/tracing/trace_marker   u:object_r:debugfs_trace_marker:s0
+
+#############################
+# asec containers
+/opt/google/containers/android/rootfs/root/mnt/asec(/.*)?             u:object_r:asec_apk_file:s0
+/opt/google/containers/android/rootfs/root/mnt/asec/[^/]+/[^/]+\.zip  u:object_r:asec_public_file:s0
+/opt/google/containers/android/rootfs/root/mnt/asec/[^/]+/lib(/.*)?   u:object_r:asec_public_file:s0
+/opt/google/containers/android/rootfs/root/data/app-asec(/.*)?        u:object_r:asec_image_file:s0
+
+#############################
+# external storage
+/opt/google/containers/android/rootfs/root/mnt/media_rw(/.*)?         u:object_r:mnt_media_rw_file:s0
+/opt/google/containers/android/rootfs/root/mnt/user(/.*)?             u:object_r:mnt_user_file:s0
+/opt/google/containers/android/rootfs/root/mnt/runtime(/.*)?          u:object_r:storage_file:s0
+/opt/google/containers/android/rootfs/root/storage(/.*)?              u:object_r:storage_file:s0
+
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# !! Additional ARC specific configurations must be written below this line !!
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# (A CTS test is textually verifying that all modifications are additions.)
+
+# Empty directories
+/opt/google/containers/android/rootfs/root/var                   u:object_r:rootfs:s0
+/opt/google/containers/android/rootfs/root/dummy                 u:object_r:rootfs:s0
+
+# SELinux policy files
+/opt/google/containers/android/rootfs/root/file_contexts         u:object_r:rootfs:s0
+#line 1 "out/target/product/cheets_arm/obj/ETC/sectxfile_nl_intermediates/sectxfile_nl"
+
+#line 1 "out/target/product/cheets_arm/obj/ETC/file_contexts.bin_intermediates/file_contexts.device.sorted.tmp"
+/opt/google/containers/android/rootfs/root/dev/dri(/.*)?		u:object_r:gpu_device:s0
+/opt/google/containers/android/rootfs/root/var/run(/.*)?		u:object_r:rootfs:s0
+/opt/google/containers/android/rootfs/root/dev/pts(/.*)?		u:object_r:devpts:s0
+/opt/google/containers/android/rootfs/root/var/run/arc(/.*)?		u:object_r:rootfs:s0
+/opt/google/containers/android/rootfs/root/var/run/cras(/.*)?		u:object_r:cras_socket:s0
+/opt/google/containers/android/rootfs/root/var/run/camera(/.*)?		u:object_r:camera_socket:s0
+/opt/google/containers/android/rootfs/root/var/run/arc/sdcard(/.*)?		u:object_r:storage_file:s0
+/opt/google/containers/android/rootfs/root/var/run/inputbridge(/.*)?		u:object_r:inputbridge:s0
+/opt/google/containers/android/rootfs/root/var/run/arc/apkcache(/.*)?		u:object_r:apkcache_file:s0
+/opt/google/containers/android/rootfs/root/var/run/arc/bugreport(/.*)?		u:object_r:debug_bugreport:s0
+/opt/google/containers/android/rootfs/root/data/system/ndebugsocket(/.*)?		u:object_r:system_ndebug_socket:s0
+/opt/google/containers/android/rootfs/root/var/run/arc/debugfs/sync(/.*)?		u:object_r:debugfs_sync:s0
+/opt/google/containers/android/rootfs/root/var/run/arc/dalvik-cache(/.*)?		u:object_r:dalvikcache_data_file:s0
+/opt/google/containers/android/rootfs/root/system/etc/packages_cache.xml		u:object_r:system_file:s0
+/opt/google/containers/android/rootfs/root/var/run/chrome/arc_bridge.sock		u:object_r:arc_bridge_socket:s0
+/opt/google/containers/android/rootfs/root/system/etc/gms_core_cache(/.*)?		u:object_r:app_data_file:s0
+/opt/google/containers/android/rootfs/root/system/etc/gservices_cache(/.*)?		u:object_r:app_data_file:s0
+/opt/google/containers/android/rootfs/root/dev/mali0		u:object_r:gpu_device:s0
+/opt/google/containers/android/rootfs/root/dev/sw_sync		u:object_r:sw_sync_dev:s0
+/opt/google/containers/android/rootfs/root/dev/pts/ptmx		u:object_r:ptmx_device:s0
+/opt/google/containers/android/rootfs/root/dev/pvr_sync		u:object_r:gpu_device:s0
+/opt/google/containers/android/rootfs/root/var/run/chrome		u:object_r:arc_dir:s0
+/opt/google/containers/android/rootfs/root/sys/kernel/debug		u:object_r:debugfs:s0
+/opt/google/containers/android/rootfs/root/dev/socket/trace		u:object_r:arc_trace_service_socket:s0
+/opt/google/containers/android/rootfs/root/dev/goldfish_pipe		u:object_r:qemu_device:s0
+/opt/google/containers/android/rootfs/root/system/bin/boot_latch		u:object_r:boot_latch_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/arcwlservice		u:object_r:arc_wake_lock_exec:s0
+/opt/google/containers/android/rootfs/root/var/run/chrome/wayland-0		u:object_r:wayland_socket:s0
+/opt/google/containers/android/rootfs/root/system/bin/arc-bugreportd		u:object_r:arc_bugreportd_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/arctraceservice		u:object_r:arc_trace_service_exec:s0
+/opt/google/containers/android/rootfs/root/system/bin/arcbootcontinue		u:object_r:arc_boot_continue_exec:s0
+/opt/google/containers/android/rootfs/root/var/run/chrome/inputbridge		u:object_r:inputbridge:s0
+/opt/google/containers/android/rootfs/root/system/bin/arcbridgeservice		u:object_r:arc_bridge_exec:s0
+/opt/google/containers/android/rootfs/root/var/run/arc/debugfs/sync/sw_sync		u:object_r:debugfs_sw_sync:s0

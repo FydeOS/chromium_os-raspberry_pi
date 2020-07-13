@@ -20,3 +20,8 @@ RDEPEND="
 DEPEND="${RDEPEND}"
 
 S=$WORKDIR
+
+src_install() {
+  insinto /etc
+  doins -r ${FILESDIR}/selinux
+}

@@ -1,3 +1,4 @@
 chromiumos:default/linux/arm/10.0/chromeos
+chromiumos:features/selinux
 baseboard-rpi3:base
 fyde-for-rpi:base

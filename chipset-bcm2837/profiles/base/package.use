@@ -1,1 +1,1 @@
-sys-kernel/upstream-kernel-mainline apply_patches clang
+sys-kernel/upstream-kernel-mainline apply_patches clang lld

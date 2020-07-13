@@ -732,6 +732,7 @@ setup_test_lists() {
 		video_decode_accelerator_tests
 		video_encode_accelerator_unittest
 		wayland_client_perftests
+    components_unittests
 	)
 
 	TEST_FILES+=( ppapi/examples/video_decode )

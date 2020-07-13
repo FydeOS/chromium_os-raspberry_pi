@@ -1,0 +1,454 @@
+#line 1 "out/target/product/cheets_arm/obj/ETC/file_contexts.bin_intermediates/file_contexts.local.tmp"
+#line 1 "system/sepolicy/file_contexts"
+###########################################
+# Root
+/                   u:object_r:rootfs:s0
+
+# Data files
+/adb_keys           u:object_r:adb_keys_file:s0
+/build\.prop        u:object_r:rootfs:s0
+/default\.prop      u:object_r:rootfs:s0
+/fstab\..*          u:object_r:rootfs:s0
+/init\..*           u:object_r:rootfs:s0
+/res(/.*)?          u:object_r:rootfs:s0
+/selinux_version    u:object_r:rootfs:s0
+/ueventd\..*        u:object_r:rootfs:s0
+/verity_key         u:object_r:rootfs:s0
+
+# Executables
+/charger            u:object_r:rootfs:s0
+/init               u:object_r:init_exec:s0
+/sbin(/.*)?         u:object_r:rootfs:s0
+
+# Empty directories
+/lost\+found        u:object_r:rootfs:s0
+/acct               u:object_r:cgroup:s0
+/config             u:object_r:rootfs:s0
+/mnt                u:object_r:tmpfs:s0
+/postinstall        u:object_r:postinstall_mnt_dir:s0
+/proc               u:object_r:rootfs:s0
+/root               u:object_r:rootfs:s0
+/sys                u:object_r:sysfs:s0
+
+# Symlinks
+/bugreports         u:object_r:rootfs:s0
+/d                  u:object_r:rootfs:s0
+/etc                u:object_r:rootfs:s0
+/sdcard             u:object_r:rootfs:s0
+
+# SELinux policy files
+/file_contexts\.bin u:object_r:rootfs:s0
+/property_contexts  u:object_r:property_contexts:s0
+/seapp_contexts     u:object_r:rootfs:s0
+/sepolicy           u:object_r:rootfs:s0
+/service_contexts   u:object_r:rootfs:s0
+
+##########################
+# Devices
+#
+/dev(/.*)?		u:object_r:device:s0
+/dev/akm8973.*		u:object_r:sensors_device:s0
+/dev/accelerometer	u:object_r:sensors_device:s0
+/dev/adf[0-9]*		u:object_r:graphics_device:s0
+/dev/adf-interface[0-9]*\.[0-9]*	u:object_r:graphics_device:s0
+/dev/adf-overlay-engine[0-9]*\.[0-9]*	u:object_r:graphics_device:s0
+/dev/alarm		u:object_r:alarm_device:s0
+/dev/android_adb.*	u:object_r:adb_device:s0
+/dev/ashmem		u:object_r:ashmem_device:s0
+/dev/audio.*		u:object_r:audio_device:s0
+/dev/binder		u:object_r:binder_device:s0
+/dev/block(/.*)?	u:object_r:block_device:s0
+/dev/block/dm-[0-9]+	u:object_r:dm_device:s0
+/dev/block/loop[0-9]*	u:object_r:loop_device:s0
+/dev/block/vold/.+	u:object_r:vold_device:s0
+/dev/block/ram[0-9]*	u:object_r:ram_device:s0
+/dev/block/zram[0-9]*	u:object_r:ram_device:s0
+/dev/bus/usb(.*)?       u:object_r:usb_device:s0
+/dev/cam		u:object_r:video_device:s0
+/dev/console		u:object_r:console_device:s0
+/dev/cpuctl(/.*)?	u:object_r:cpuctl_device:s0
+/dev/device-mapper	u:object_r:dm_device:s0
+/dev/eac		u:object_r:audio_device:s0
+/dev/fscklogs(/.*)?	u:object_r:fscklogs:s0
+/dev/full		u:object_r:full_device:s0
+/dev/fuse		u:object_r:fuse_device:s0
+/dev/graphics(/.*)?	u:object_r:graphics_device:s0
+/dev/hw_random		u:object_r:hw_random_device:s0
+/dev/i2c-[0-9]+		u:object_r:i2c_device:s0
+/dev/input(/.*)		u:object_r:input_device:s0
+/dev/iio:device[0-9]+   u:object_r:iio_device:s0
+/dev/ion		u:object_r:ion_device:s0
+/dev/kmem		u:object_r:kmem_device:s0
+/dev/log(/.*)?		u:object_r:log_device:s0
+/dev/mem		u:object_r:kmem_device:s0
+/dev/modem.*		u:object_r:radio_device:s0
+/dev/mpu		u:object_r:gps_device:s0
+/dev/mpuirq		u:object_r:gps_device:s0
+/dev/mtd(/.*)?		u:object_r:mtd_device:s0
+/dev/mtp_usb		u:object_r:mtp_device:s0
+/dev/pmsg0		u:object_r:pmsg_device:s0
+/dev/pn544		u:object_r:nfc_device:s0
+/dev/ppp		u:object_r:ppp_device:s0
+/dev/ptmx		u:object_r:ptmx_device:s0
+/dev/pvrsrvkm		u:object_r:gpu_device:s0
+/dev/kmsg		u:object_r:kmsg_device:s0
+/dev/null		u:object_r:null_device:s0
+/dev/nvhdcp1		u:object_r:video_device:s0
+/dev/random		u:object_r:random_device:s0
+/dev/rpmsg-omx[0-9]	u:object_r:rpmsg_device:s0
+/dev/rproc_user	u:object_r:rpmsg_device:s0
+/dev/rtc[0-9]      u:object_r:rtc_device:s0
+/dev/snd(/.*)?		u:object_r:audio_device:s0
+/dev/socket(/.*)?	u:object_r:socket_device:s0
+/dev/socket/adbd	u:object_r:adbd_socket:s0
+/dev/socket/sap_uim_socket[0-9]        u:object_r:sap_uim_socket:s0
+/dev/socket/cryptd	u:object_r:vold_socket:s0
+/dev/socket/dnsproxyd	u:object_r:dnsproxyd_socket:s0
+/dev/socket/dumpstate	u:object_r:dumpstate_socket:s0
+/dev/socket/fwmarkd	u:object_r:fwmarkd_socket:s0
+/dev/socket/gps		u:object_r:gps_socket:s0
+/dev/socket/installd	u:object_r:installd_socket:s0
+/dev/socket/lmkd        u:object_r:lmkd_socket:s0
+/dev/socket/logd	u:object_r:logd_socket:s0
+/dev/socket/logdr	u:object_r:logdr_socket:s0
+/dev/socket/logdw	u:object_r:logdw_socket:s0
+/dev/socket/mdns	u:object_r:mdns_socket:s0
+/dev/socket/mdnsd	u:object_r:mdnsd_socket:s0
+/dev/socket/mtpd	u:object_r:mtpd_socket:s0
+/dev/socket/netd	u:object_r:netd_socket:s0
+/dev/socket/property_service	u:object_r:property_socket:s0
+/dev/socket/racoon	u:object_r:racoon_socket:s0
+/dev/socket/rild	u:object_r:rild_socket:s0
+/dev/socket/rild-debug	u:object_r:rild_debug_socket:s0
+/dev/socket/uncrypt	u:object_r:uncrypt_socket:s0
+/dev/socket/vold	u:object_r:vold_socket:s0
+/dev/socket/wpa_eth[0-9] u:object_r:wpa_socket:s0
+/dev/socket/wpa_wlan[0-9] u:object_r:wpa_socket:s0
+/dev/socket/zygote	u:object_r:zygote_socket:s0
+/dev/socket/zygote_secondary	u:object_r:zygote_socket:s0
+/dev/spdif_out.*	u:object_r:audio_device:s0
+/dev/tegra.*		u:object_r:video_device:s0
+/dev/tf_driver		u:object_r:tee_device:s0
+/dev/tty		u:object_r:owntty_device:s0
+/dev/tty[0-9]*		u:object_r:tty_device:s0
+/dev/ttyS[0-9]*		u:object_r:serial_device:s0
+/dev/tun		u:object_r:tun_device:s0
+/dev/uhid		u:object_r:uhid_device:s0
+/dev/uinput		u:object_r:uhid_device:s0
+/dev/uio[0-9]*		u:object_r:uio_device:s0
+/dev/urandom		u:object_r:urandom_device:s0
+/dev/usb_accessory	u:object_r:usbaccessory_device:s0
+/dev/vcs[0-9a-z]*	u:object_r:vcs_device:s0
+/dev/video[0-9]*	u:object_r:video_device:s0
+/dev/watchdog		u:object_r:watchdog_device:s0
+/dev/xt_qtaguid	u:object_r:qtaguid_device:s0
+/dev/zero		u:object_r:zero_device:s0
+/dev/__kmsg__		u:object_r:klog_device:s0
+/dev/__properties__ u:object_r:properties_device:s0
+#############################
+# System files
+#
+/system(/.*)?		u:object_r:system_file:s0
+/system/bin/atrace	u:object_r:atrace_exec:s0
+/system/bin/e2fsck	--	u:object_r:fsck_exec:s0
+/system/bin/fsck\.f2fs	--	u:object_r:fsck_exec:s0
+/system/bin/fsck_msdos	--	u:object_r:fsck_exec:s0
+/system/bin/toolbox	--	u:object_r:toolbox_exec:s0
+/system/bin/toybox	--	u:object_r:toolbox_exec:s0
+/system/bin/logcat	--	u:object_r:logcat_exec:s0
+/system/bin/sh		--	u:object_r:shell_exec:s0
+/system/bin/run-as	--	u:object_r:runas_exec:s0
+/system/bin/bootanimation u:object_r:bootanim_exec:s0
+/system/bin/bootstat		u:object_r:bootstat_exec:s0
+/system/bin/app_process32	u:object_r:zygote_exec:s0
+/system/bin/app_process64	u:object_r:zygote_exec:s0
+/system/bin/servicemanager	u:object_r:servicemanager_exec:s0
+/system/bin/surfaceflinger	u:object_r:surfaceflinger_exec:s0
+/system/bin/drmserver	u:object_r:drmserver_exec:s0
+/system/bin/dumpstate   u:object_r:dumpstate_exec:s0
+/system/bin/vold	u:object_r:vold_exec:s0
+/system/bin/netd	u:object_r:netd_exec:s0
+/system/bin/rild	u:object_r:rild_exec:s0
+/system/bin/audioserver	u:object_r:audioserver_exec:s0
+/system/bin/mediadrmserver	u:object_r:mediadrmserver_exec:s0
+/system/bin/mediaserver	u:object_r:mediaserver_exec:s0
+/system/bin/cameraserver	u:object_r:cameraserver_exec:s0
+/system/bin/mediaextractor	u:object_r:mediaextractor_exec:s0
+/system/bin/mediacodec	u:object_r:mediacodec_exec:s0
+/system/bin/mdnsd	u:object_r:mdnsd_exec:s0
+/system/bin/installd	u:object_r:installd_exec:s0
+/system/bin/otapreopt_chroot   u:object_r:otapreopt_chroot_exec:s0
+/system/bin/otapreopt_slot   u:object_r:otapreopt_slot_exec:s0
+/system/bin/keystore	u:object_r:keystore_exec:s0
+/system/bin/fingerprintd u:object_r:fingerprintd_exec:s0
+/system/bin/gatekeeperd u:object_r:gatekeeperd_exec:s0
+/system/bin/debuggerd	u:object_r:debuggerd_exec:s0
+/system/bin/debuggerd64	u:object_r:debuggerd_exec:s0
+/system/bin/wpa_supplicant	u:object_r:wpa_exec:s0
+/system/bin/recovery-persist     u:object_r:recovery_persist_exec:s0
+/system/bin/recovery-refresh     u:object_r:recovery_refresh_exec:s0
+/system/bin/sdcard      u:object_r:sdcardd_exec:s0
+/system/bin/dhcpcd      u:object_r:dhcp_exec:s0
+/system/bin/dhcpcd-6.8.2	u:object_r:dhcp_exec:s0
+/system/bin/mtpd	u:object_r:mtp_exec:s0
+/system/bin/pppd	u:object_r:ppp_exec:s0
+/system/bin/tf_daemon	u:object_r:tee_exec:s0
+/system/bin/racoon	u:object_r:racoon_exec:s0
+/system/xbin/su		u:object_r:su_exec:s0
+/system/xbin/perfprofd  u:object_r:perfprofd_exec:s0
+/system/vendor/bin/gpsd u:object_r:gpsd_exec:s0
+/system/bin/dnsmasq     u:object_r:dnsmasq_exec:s0
+/system/bin/hostapd     u:object_r:hostapd_exec:s0
+/system/bin/clatd	u:object_r:clatd_exec:s0
+/system/bin/lmkd        u:object_r:lmkd_exec:s0
+/system/bin/inputflinger u:object_r:inputflinger_exec:s0
+/system/bin/logd        u:object_r:logd_exec:s0
+/system/bin/uncrypt     u:object_r:uncrypt_exec:s0
+/system/bin/update_verifier u:object_r:update_verifier_exec:s0
+/system/bin/logwrapper  u:object_r:system_file:s0
+/system/bin/vdc         u:object_r:vdc_exec:s0
+/system/bin/cppreopts.sh   u:object_r:cppreopts_exec:s0
+/system/bin/preopt2cachename u:object_r:preopt2cachename_exec:s0
+/system/bin/install-recovery.sh u:object_r:install_recovery_exec:s0
+/system/bin/dex2oat     u:object_r:dex2oat_exec:s0
+# patchoat executable has (essentially) the same requirements as dex2oat.
+/system/bin/patchoat    u:object_r:dex2oat_exec:s0
+/system/bin/profman     u:object_r:profman_exec:s0
+/system/bin/sgdisk      u:object_r:sgdisk_exec:s0
+/system/bin/blkid       u:object_r:blkid_exec:s0
+/system/bin/tzdatacheck u:object_r:tzdatacheck_exec:s0
+/system/bin/idmap u:object_r:idmap_exec:s0
+/system/bin/update_engine        u:object_r:update_engine_exec:s0
+/system/bin/bspatch              u:object_r:update_engine_exec:s0
+
+#############################
+# Vendor files
+#
+/vendor(/.*)?		u:object_r:system_file:s0
+/vendor/bin/gpsd	u:object_r:gpsd_exec:s0
+
+#############################
+# OEM and ODM files
+#
+/odm(/.*)?              u:object_r:system_file:s0
+/oem(/.*)?              u:object_r:oemfs:s0
+
+
+#############################
+# Data files
+#
+# NOTE: When modifying existing label rules, changes may also need to
+# propagate to the "Expanded data files" section.
+#
+/data(/.*)?		u:object_r:system_data_file:s0
+/data/.layout_version		u:object_r:install_data_file:s0
+/data/unencrypted(/.*)?         u:object_r:unencrypted_data_file:s0
+/data/backup(/.*)?		u:object_r:backup_data_file:s0
+/data/secure/backup(/.*)?	u:object_r:backup_data_file:s0
+/data/security(/.*)?	u:object_r:security_file:s0
+/data/system/ndebugsocket	u:object_r:system_ndebug_socket:s0
+/data/drm(/.*)?		u:object_r:drm_data_file:s0
+/data/gps(/.*)?		u:object_r:gps_data_file:s0
+/data/resource-cache(/.*)? u:object_r:resourcecache_data_file:s0
+/data/dalvik-cache(/.*)? u:object_r:dalvikcache_data_file:s0
+/data/ota(/.*)? u:object_r:ota_data_file:s0
+/data/ota_package(/.*)? u:object_r:ota_package_file:s0
+/data/adb(/.*)?		u:object_r:adb_data_file:s0
+/data/anr(/.*)?		u:object_r:anr_data_file:s0
+/data/app(/.*)?                       u:object_r:apk_data_file:s0
+/data/app/[^/]+/oat(/.*)?                u:object_r:dalvikcache_data_file:s0
+/data/app/vmdl[^/]+\.tmp(/.*)?           u:object_r:apk_tmp_file:s0
+/data/app/vmdl[^/]+\.tmp/oat(/.*)?           u:object_r:dalvikcache_data_file:s0
+/data/app-private(/.*)?               u:object_r:apk_private_data_file:s0
+/data/app-private/vmdl.*\.tmp(/.*)?   u:object_r:apk_private_tmp_file:s0
+/data/tombstones(/.*)?	u:object_r:tombstone_data_file:s0
+/data/local/tmp(/.*)?	u:object_r:shell_data_file:s0
+/data/media(/.*)?	u:object_r:media_rw_data_file:s0
+/data/mediadrm(/.*)?	u:object_r:media_data_file:s0
+/data/nativetest(/.*)?	u:object_r:nativetest_data_file:s0
+/data/property(/.*)?	u:object_r:property_data_file:s0
+/data/preloads(/.*)?	u:object_r:preloads_data_file:s0
+
+# Misc data
+/data/misc/adb(/.*)?            u:object_r:adb_keys_file:s0
+/data/misc/audio(/.*)?          u:object_r:audio_data_file:s0
+/data/misc/audioserver(/.*)?    u:object_r:audioserver_data_file:s0
+/data/misc/bootstat(/.*)?       u:object_r:bootstat_data_file:s0
+/data/misc/boottrace(/.*)?      u:object_r:boottrace_data_file:s0
+/data/misc/bluetooth(/.*)?      u:object_r:bluetooth_data_file:s0
+/data/misc/bluedroid(/.*)?      u:object_r:bluetooth_data_file:s0
+/data/misc/bluedroid/\.a2dp_ctrl u:object_r:bluetooth_socket:s0
+/data/misc/bluedroid/\.a2dp_data u:object_r:bluetooth_socket:s0
+/data/misc/camera(/.*)?         u:object_r:camera_data_file:s0
+/data/misc/dhcp(/.*)?           u:object_r:dhcp_data_file:s0
+/data/misc/dhcp-6.8.2(/.*)?     u:object_r:dhcp_data_file:s0
+/data/misc/gatekeeper(/.*)?     u:object_r:gatekeeper_data_file:s0
+/data/misc/keychain(/.*)?       u:object_r:keychain_data_file:s0
+/data/misc/keystore(/.*)?       u:object_r:keystore_data_file:s0
+/data/misc/logd(/.*)?           u:object_r:misc_logd_file:s0
+/data/misc/media(/.*)?          u:object_r:media_data_file:s0
+/data/misc/net(/.*)?            u:object_r:net_data_file:s0
+/data/misc/recovery(/.*)?       u:object_r:recovery_data_file:s0
+/data/misc/shared_relro(/.*)?   u:object_r:shared_relro_file:s0
+/data/misc/sms(/.*)?            u:object_r:radio_data_file:s0
+/data/misc/systemkeys(/.*)?     u:object_r:systemkeys_data_file:s0
+/data/misc/user(/.*)?           u:object_r:misc_user_data_file:s0
+/data/misc/vpn(/.*)?            u:object_r:vpn_data_file:s0
+/data/misc/wifi(/.*)?           u:object_r:wifi_data_file:s0
+/data/misc/wifi/sockets(/.*)?   u:object_r:wpa_socket:s0
+/data/misc/wifi/sockets/wpa_ctrl.*   u:object_r:system_wpa_socket:s0
+/data/misc/wifi/hostapd(/.*)?   u:object_r:wpa_socket:s0
+/data/misc/zoneinfo(/.*)?       u:object_r:zoneinfo_data_file:s0
+/data/misc/vold(/.*)?           u:object_r:vold_data_file:s0
+/data/misc/perfprofd(/.*)?      u:object_r:perfprofd_data_file:s0
+/data/misc/update_engine(/.*)?  u:object_r:update_engine_data_file:s0
+/data/system/heapdump(/.*)?     u:object_r:heapdump_data_file:s0
+/data/misc/trace(/.*)?          u:object_r:method_trace_data_file:s0
+# TODO(calin) label profile reference differently so that only
+# profman run as a special user can write to them
+/data/misc/profiles/cur(/.*)?       u:object_r:user_profile_data_file:s0
+/data/misc/profiles/cur/[0-9]+/foreign-dex(/.*)? u:object_r:user_profile_foreign_dex_data_file:s0
+/data/misc/profiles/ref(/.*)?       u:object_r:user_profile_data_file:s0
+/data/misc/profman(/.*)?        u:object_r:profman_dump_data_file:s0
+
+# Fingerprint data
+/data/system/users/[0-9]+/fpdata(/.*)? u:object_r:fingerprintd_data_file:s0
+
+# Bootchart data
+/data/bootchart(/.*)?		u:object_r:bootchart_data_file:s0
+
+#############################
+# Expanded data files
+#
+/mnt/expand(/.*)?                                   u:object_r:mnt_expand_file:s0
+/mnt/expand/[^/]+(/.*)?                             u:object_r:system_data_file:s0
+/mnt/expand/[^/]+/app(/.*)?                         u:object_r:apk_data_file:s0
+/mnt/expand/[^/]+/app/[^/]+/oat(/.*)?               u:object_r:dalvikcache_data_file:s0
+/mnt/expand/[^/]+/app/vmdl[^/]+\.tmp(/.*)?          u:object_r:apk_tmp_file:s0
+/mnt/expand/[^/]+/app/vmdl[^/]+\.tmp/oat(/.*)?      u:object_r:dalvikcache_data_file:s0
+/mnt/expand/[^/]+/local/tmp(/.*)?                   u:object_r:shell_data_file:s0
+/mnt/expand/[^/]+/media(/.*)?                       u:object_r:media_rw_data_file:s0
+/mnt/expand/[^/]+/misc/vold(/.*)?                   u:object_r:vold_data_file:s0
+
+# coredump directory for userdebug/eng devices
+/cores(/.*)?                    u:object_r:coredump_file:s0
+
+# Wallpaper files
+/data/system/users/[0-9]+/wallpaper_lock_orig	u:object_r:wallpaper_file:s0
+/data/system/users/[0-9]+/wallpaper_lock	u:object_r:wallpaper_file:s0
+/data/system/users/[0-9]+/wallpaper_orig	u:object_r:wallpaper_file:s0
+/data/system/users/[0-9]+/wallpaper		u:object_r:wallpaper_file:s0
+
+# Ringtone files
+/data/system_de/[0-9]+/ringtones(/.*)?          u:object_r:ringtone_file:s0
+
+# ShortcutManager icons, e.g.
+#   /data/system_ce/0/shortcut_service/bitmaps/com.example.app/1457472879282.png
+/data/system_ce/[0-9]+/shortcut_service/bitmaps(/.*)? u:object_r:shortcut_manager_icons:s0
+
+# User icon files
+/data/system/users/[0-9]+/photo.png             u:object_r:icon_file:s0
+
+#############################
+# efs files
+#
+/efs(/.*)?		u:object_r:efs_file:s0
+
+#############################
+# Cache files
+#
+/cache(/.*)?		u:object_r:cache_file:s0
+/cache/recovery(/.*)?	u:object_r:cache_recovery_file:s0
+# General backup/restore interchange with apps
+/cache/backup_stage(/.*)?	u:object_r:cache_backup_file:s0
+# LocalTransport (backup) uses this subtree
+/cache/backup(/.*)?		u:object_r:cache_private_backup_file:s0
+
+/data/cache(/.*)?		u:object_r:cache_file:s0
+/data/cache/recovery(/.*)?	u:object_r:cache_recovery_file:s0
+# General backup/restore interchange with apps
+/data/cache/backup_stage(/.*)?	u:object_r:cache_backup_file:s0
+# LocalTransport (backup) uses this subtree
+/data/cache/backup(/.*)?	u:object_r:cache_private_backup_file:s0
+
+#############################
+# sysfs files
+#
+/sys/devices/platform/nfc-power/nfc_power -- u:object_r:sysfs_nfc_power_writable:s0
+/sys/devices/system/cpu(/.*)?    u:object_r:sysfs_devices_system_cpu:s0
+/sys/devices/virtual/block/zram\d+(/.*)?     u:object_r:sysfs_zram:s0
+/sys/devices/virtual/block/zram\d+/uevent    u:object_r:sysfs_zram_uevent:s0
+/sys/devices/virtual/misc/hw_random(/.*)?    u:object_r:sysfs_hwrandom:s0
+/sys/power/wake_lock -- u:object_r:sysfs_wake_lock:s0
+/sys/power/wake_unlock -- u:object_r:sysfs_wake_lock:s0
+/sys/kernel/uevent_helper --	u:object_r:usermodehelper:s0
+/sys/module/lowmemorykiller(/.*)? -- u:object_r:sysfs_lowmemorykiller:s0
+
+#############################
+# debugfs files
+#
+/sys/kernel/debug/tracing(/.*)?          u:object_r:debugfs_tracing:s0
+/sys/kernel/debug/tracing/trace_marker   u:object_r:debugfs_trace_marker:s0
+
+#############################
+# asec containers
+/mnt/asec(/.*)?             u:object_r:asec_apk_file:s0
+/mnt/asec/[^/]+/[^/]+\.zip  u:object_r:asec_public_file:s0
+/mnt/asec/[^/]+/lib(/.*)?   u:object_r:asec_public_file:s0
+/data/app-asec(/.*)?        u:object_r:asec_image_file:s0
+
+#############################
+# external storage
+/mnt/media_rw(/.*)?         u:object_r:mnt_media_rw_file:s0
+/mnt/user(/.*)?             u:object_r:mnt_user_file:s0
+/mnt/runtime(/.*)?          u:object_r:storage_file:s0
+/storage(/.*)?              u:object_r:storage_file:s0
+
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# !! Additional ARC specific configurations must be written below this line !!
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# (A CTS test is textually verifying that all modifications are additions.)
+
+# Empty directories
+/var                   u:object_r:rootfs:s0
+/dummy                 u:object_r:rootfs:s0
+
+# SELinux policy files
+/file_contexts         u:object_r:rootfs:s0
+#line 1 "out/target/product/cheets_arm/obj/ETC/sectxfile_nl_intermediates/sectxfile_nl"
+
+#line 1 "out/target/product/cheets_arm/obj/ETC/file_contexts.bin_intermediates/file_contexts.device.sorted.tmp"
+/dev/dri(/.*)?		u:object_r:gpu_device:s0
+/var/run(/.*)?		u:object_r:rootfs:s0
+/dev/pts(/.*)?		u:object_r:devpts:s0
+/var/run/arc(/.*)?		u:object_r:rootfs:s0
+/var/run/cras(/.*)?		u:object_r:cras_socket:s0
+/var/run/camera(/.*)?		u:object_r:camera_socket:s0
+/var/run/arc/sdcard(/.*)?		u:object_r:storage_file:s0
+/var/run/inputbridge(/.*)?		u:object_r:inputbridge:s0
+/var/run/arc/apkcache(/.*)?		u:object_r:apkcache_file:s0
+/var/run/arc/bugreport(/.*)?		u:object_r:debug_bugreport:s0
+/data/system/ndebugsocket(/.*)?		u:object_r:system_ndebug_socket:s0
+/var/run/arc/debugfs/sync(/.*)?		u:object_r:debugfs_sync:s0
+/var/run/arc/dalvik-cache(/.*)?		u:object_r:dalvikcache_data_file:s0
+/system/etc/packages_cache.xml		u:object_r:system_file:s0
+/var/run/chrome/arc_bridge.sock		u:object_r:arc_bridge_socket:s0
+/system/etc/gms_core_cache(/.*)?		u:object_r:app_data_file:s0
+/system/etc/gservices_cache(/.*)?		u:object_r:app_data_file:s0
+/dev/mali0		u:object_r:gpu_device:s0
+/dev/sw_sync		u:object_r:sw_sync_dev:s0
+/dev/pts/ptmx		u:object_r:ptmx_device:s0
+/dev/pvr_sync		u:object_r:gpu_device:s0
+/var/run/chrome		u:object_r:arc_dir:s0
+/sys/kernel/debug		u:object_r:debugfs:s0
+/dev/socket/trace		u:object_r:arc_trace_service_socket:s0
+/dev/goldfish_pipe		u:object_r:qemu_device:s0
+/system/bin/boot_latch		u:object_r:boot_latch_exec:s0
+/system/bin/arcwlservice		u:object_r:arc_wake_lock_exec:s0
+/var/run/chrome/wayland-0		u:object_r:wayland_socket:s0
+/system/bin/arc-bugreportd		u:object_r:arc_bugreportd_exec:s0
+/system/bin/arctraceservice		u:object_r:arc_trace_service_exec:s0
+/system/bin/arcbootcontinue		u:object_r:arc_boot_continue_exec:s0
+/var/run/chrome/inputbridge		u:object_r:inputbridge:s0
+/system/bin/arcbridgeservice		u:object_r:arc_bridge_exec:s0
+/var/run/arc/debugfs/sync/sw_sync		u:object_r:debugfs_sw_sync:s0

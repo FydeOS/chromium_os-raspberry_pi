@@ -1,0 +1,86 @@
+diff --git a/include/linux/mm.h b/include/linux/mm.h
+index 3c1b9fc0079d..8ff96ee9852f 100644
+--- a/include/linux/mm.h
++++ b/include/linux/mm.h
+@@ -197,6 +197,7 @@ static inline void __mm_zero_struct_page(struct page *page)
+ #define DEFAULT_MAX_MAP_COUNT	(USHRT_MAX - MAPCOUNT_ELF_CORE_MARGIN)
+ 
+ extern int sysctl_max_map_count;
++extern int sysctl_mmap_noexec_taint;
+ 
+ extern unsigned long sysctl_user_reserve_kbytes;
+ extern unsigned long sysctl_admin_reserve_kbytes;
+diff --git a/kernel/sysctl.c b/kernel/sysctl.c
+index e09f8fdf9588..7eef9abfed1b 100644
+--- a/kernel/sysctl.c
++++ b/kernel/sysctl.c
+@@ -1637,6 +1637,15 @@ static struct ctl_table vm_table[] = {
+ 		.mode		= 0644,
+ 		.proc_handler	= mmap_min_addr_handler,
+ 	},
++  {
++    .procname = "mmap_noexec_taint",
++    .data   = &sysctl_mmap_noexec_taint,
++    .maxlen   = sizeof(sysctl_mmap_noexec_taint),
++    .mode   = 0644,
++    .proc_handler = proc_dointvec_minmax,
++    .extra1   = SYSCTL_ZERO,
++    .extra2   = SYSCTL_ONE,
++  },
+ #endif
+ #ifdef CONFIG_NUMA
+ 	{
+diff --git a/mm/Kconfig b/mm/Kconfig
+index c9c01cdb1915..080ed115540d 100644
+--- a/mm/Kconfig
++++ b/mm/Kconfig
+@@ -319,6 +319,23 @@ config DEFAULT_MMAP_MIN_ADDR
+ 	  This value can be changed after boot using the
+ 	  /proc/sys/vm/mmap_min_addr tunable.
+ 
++config MMAP_NOEXEC_TAINT
++  int "Turns on tainting of mmap()d files from noexec mountpoints"
++  default 1 if MMU
++  default 0 if !MMU
++  help
++    By default, the ability to change the protections of a virtual
++    memory area to allow execution depend on if the vma has the
++    VM_MAYEXEC flag.  When mapping regions from files, VM_MAYEXEC
++    will be unset if the containing mountpoint is mounted MNT_NOEXEC.
++    By setting the value to 0, any mmap()d region may be later
++    mprotect()d with PROT_EXEC.
++
++    If unsure, keep the value set to 1.
++
++    This value can be changed after boot using the
++    /proc/sys/vm/mmap_noexec_taint tunable.
++
+ config ARCH_SUPPORTS_MEMORY_FAILURE
+ 	bool
+ 
+diff --git a/mm/mmap.c b/mm/mmap.c
+index 514cc19c5916..f6d5bfd74fcc 100644
+--- a/mm/mmap.c
++++ b/mm/mmap.c
+@@ -1518,7 +1518,8 @@ unsigned long do_mmap(struct file *file, unsigned long addr,
+ 			if (path_noexec(&file->f_path)) {
+ 				if (vm_flags & VM_EXEC)
+ 					return -EPERM;
+-				vm_flags &= ~VM_MAYEXEC;
++        if (sysctl_mmap_noexec_taint)
++				  vm_flags &= ~VM_MAYEXEC;
+ 			}
+ 
+ 			if (!file->f_op->mmap)
+diff --git a/mm/util.c b/mm/util.c
+index ab358c64bbd3..19c33cc3f147 100644
+--- a/mm/util.c
++++ b/mm/util.c
+@@ -722,6 +722,7 @@ int sysctl_overcommit_memory __read_mostly = OVERCOMMIT_GUESS;
+ int sysctl_overcommit_ratio __read_mostly = 50;
+ unsigned long sysctl_overcommit_kbytes __read_mostly;
+ int sysctl_max_map_count __read_mostly = DEFAULT_MAX_MAP_COUNT;
++int sysctl_mmap_noexec_taint __read_mostly = CONFIG_MMAP_NOEXEC_TAINT;
+ unsigned long sysctl_user_reserve_kbytes __read_mostly = 1UL << 17; /* 128MB */
+ unsigned long sysctl_admin_reserve_kbytes __read_mostly = 1UL << 13; /* 8MB */
+ 
