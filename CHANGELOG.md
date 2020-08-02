@@ -1,5 +1,10 @@
 # Changelog
 
+### 2020-07-12
+##### Tweaked and enabled PNaCl
+* so that things like Zoom/Polarr can now work on Chromium OS for Raspberry Pi.
+
+
 ### 2020-02-10
 ##### Relocate CHANGELOG to a single separate file.
 
