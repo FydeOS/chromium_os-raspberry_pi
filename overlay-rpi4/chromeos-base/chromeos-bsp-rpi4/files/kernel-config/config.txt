@@ -1,6 +1,6 @@
 #hdmi_drive=2
 #config_hdmi_boost=7
-#disable_overscan=1
+disable_overscan=1
 gpu_mem=256
 #cma_lwm=16
 #cma_hwm=256

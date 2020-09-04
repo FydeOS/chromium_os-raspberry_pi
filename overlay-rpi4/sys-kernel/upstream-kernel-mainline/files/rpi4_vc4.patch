@@ -1,0 +1,13 @@
+diff --git a/drivers/gpu/drm/vc4/vc4_drv.c b/drivers/gpu/drm/vc4/vc4_drv.c
+index cbab26d18342..19c9288b94c6 100644
+--- a/drivers/gpu/drm/vc4/vc4_drv.c
++++ b/drivers/gpu/drm/vc4/vc4_drv.c
+@@ -179,7 +179,7 @@ static const struct drm_ioctl_desc vc4_drm_ioctls[] = {
+ 
+ static struct drm_driver vc4_drm_driver = {
+ 	.driver_features = (DRIVER_MODESET |
+-			    DRIVER_ATOMIC |
++	//		    DRIVER_ATOMIC |
+ 			    DRIVER_GEM |
+ 			    DRIVER_RENDER |
+ 			    DRIVER_SYNCOBJ),

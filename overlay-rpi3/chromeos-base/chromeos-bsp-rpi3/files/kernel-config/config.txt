@@ -13,6 +13,6 @@ dtoverlay=vc4-kms-v3d,cma-256
 #mask_gpu_interrupt0=0x400   # KMS/DRM
 #avoid_warnings=2            # KMS/DRM
 #arm_control=0x200           # open armV8 mode
-#force_turbo=1               # we need more power
+force_turbo=1               # we need more power
 enable_uart=1               # for debug
 kernel=kernel7.img
