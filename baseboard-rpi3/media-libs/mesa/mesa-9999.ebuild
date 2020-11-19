@@ -13,7 +13,7 @@ if [[ ${PV} = 9999* ]]; then
 	EXPERIMENTAL="true"
 fi
 
-inherit base multilib flag-o-matic meson toolchain-funcs ${GIT_ECLASS} cros-workon
+inherit base flag-o-matic meson toolchain-funcs ${GIT_ECLASS} cros-workon
 
 FOLDER="${PV/_rc*/}"
 [[ ${PV/_rc*/} == ${PV} ]] || FOLDER+="/RC"
@@ -63,6 +63,7 @@ COMMON_DEPEND="
 		x11-libs/libXdamage:=
 		x11-libs/libXext:=
 		x11-libs/libXrandr:=
+		x11-libs/libxshmfence:=
 		x11-libs/libXxf86vm:=
 	)
 	${LIBDRM_DEPSTRING}
@@ -181,8 +182,6 @@ src_configure() {
 		glx="disabled"
 	fi
 
-	append-flags "-UENABLE_SHADER_CACHE"
-
 	if use kvm_guest; then
 		emesonargs+=( -Ddri-search-path=/opt/google/cros-containers/lib )
 	fi
@@ -191,6 +190,7 @@ src_configure() {
 		-Dglx="${glx}"
 		-Dllvm="${LLVM_ENABLE}"
 		-Dplatforms="${egl_platforms}"
+		-Dshader-cache=false
 		$(meson_use egl)
 		$(meson_use gbm)
 		$(meson_use X gl)

@@ -1,2 +1,4 @@
 media-sound/adhd::chromiumos
 media-libs/minigbm::chromiumos
+virtual/chromeos-config-bsp::chromiumos
+media-libs/mesa::chromiumos

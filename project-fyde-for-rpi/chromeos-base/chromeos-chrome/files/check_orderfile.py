@@ -38,7 +38,7 @@ def _parse_text_section_bounds(chrome_binary):
       With offset being the fourth field, and size being the sixth field.
     """
     readelf = subprocess.check_output(
-        ['readelf', '--sections', '--wide', chrome_binary]).splitlines()
+        ['llvm-readelf', '--sections', '--wide', chrome_binary]).splitlines()
     text = [x.strip() for x in readelf if b'.text' in x]
     if len(text) != 1:
         raise ValueError('Expected exactly one .text section; got: %s' % text)

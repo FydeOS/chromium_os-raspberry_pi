@@ -29,7 +29,7 @@ def _parse_text_hot_bounds(chrome_binary):
     # [18] .text.hot  PROGBITS   00b2d000 b2d000 5cb9b8 00  AX  0   0 32
     # With offset being the fourth field, and size being the sixth field.
     readelf = subprocess.check_output(
-        ['readelf', '--sections', '--wide', chrome_binary]).splitlines()
+        ['llvm-readelf', '--sections', '--wide', chrome_binary]).splitlines()
 
     text_hot = [line.strip() for line in readelf if '.text.hot' in line]
     if len(text_hot) != 1:
@@ -49,7 +49,7 @@ def _parse_builtins_locations(chrome_binary):
     #
     # We can rely on FUNC, LOCAL, and DEFAULT being consistent for all
     # `Builtins_`.
-    cmd = subprocess.Popen(['readelf', '--symbols', '--wide', chrome_binary],
+    cmd = subprocess.Popen(['llvm-readelf', '--symbols', '--wide', chrome_binary],
                            stdout=subprocess.PIPE)
 
     keys = ['FUNC', 'LOCAL', 'DEFAULT']

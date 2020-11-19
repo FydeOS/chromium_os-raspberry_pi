@@ -11,14 +11,12 @@
 # If building from LOCAL_SOURCE or LOCAL_BINARY specifying BUILDTYPE
 # will allow you to specify "Debug" or another build type; "Release" is
 # the default.
-# gclient is expected to be in ~/depot_tools if EGCLIENT is not set
-# to gclient path.
 
-EAPI="5"
+EAPI=7
 
 # TODO(crbug.com/984182): We force Python 2 because depot_tools doesn't support Python 3.
 PYTHON_COMPAT=( python2_7 )
-inherit autotest-deponly binutils-funcs cros-credentials cros-constants cros-sanitizers eutils flag-o-matic git-2 multilib toolchain-funcs user python-any-r1
+inherit autotest-deponly binutils-funcs chromium-source cros-credentials cros-constants cros-sanitizers eutils flag-o-matic git-2 multilib toolchain-funcs user python-any-r1
 
 DESCRIPTION="Open-source version of Google Chrome web browser"
 HOMEPAGE="http://www.chromium.org/"
@@ -37,6 +35,7 @@ IUSE="
 	+build_tests
 	+chrome_debug
 	+cfi
+	cfm
 	chrome_debug_tests
 	chrome_internal
 	chrome_media
@@ -54,6 +53,7 @@ IUSE="
 	msan
 	+nacl
 	neon
+	on_device_assistant
 	oobe_config
 	opengl
 	opengles
@@ -80,7 +80,7 @@ REQUIRED_USE="
 	"
 
 OZONE_PLATFORM_PREFIX=ozone_platform_
-OZONE_PLATFORMS=(gbm cast test egltest caca)
+OZONE_PLATFORMS=(gbm cast headless egltest caca)
 IUSE_OZONE_PLATFORMS="${OZONE_PLATFORMS[@]/#/${OZONE_PLATFORM_PREFIX}}"
 IUSE+=" ${IUSE_OZONE_PLATFORMS}"
 OZONE_PLATFORM_DEFAULT_PREFIX=ozone_platform_default_
@@ -106,7 +106,6 @@ CHROME_DIR=/opt/google/chrome
 D_CHROME_DIR="${D}/${CHROME_DIR}"
 
 # For compilation/local chrome
-DEPOT_TOOLS=/mnt/host/depot_tools
 BUILDTYPE="${BUILDTYPE:-Release}"
 BOARD="${BOARD:-${SYSROOT##/build/}}"
 BUILD_OUT="${BUILD_OUT:-out_${BOARD}}"
@@ -140,15 +139,14 @@ RDEPEND="${RDEPEND}
 	chromeos-base/gestures
 	chromeos-base/libevdev
 	fonts? ( chromeos-base/chromeos-fonts )
+	chrome_internal? ( chromeos-base/quickoffice )
 	dev-libs/nspr
 	>=dev-libs/nss-3.12.2
-	dev-libs/libxml2
 	>=media-libs/alsa-lib-1.0.19
 	media-libs/fontconfig
 	media-libs/libsync
 	x11-libs/libdrm
 	ozone_platform_gbm? ( media-libs/minigbm )
-	media-libs/libpng
 	v4lplugin? ( media-libs/libv4lplugins )
 	>=media-sound/adhd-0.0.1-r310
 	net-print/cups
@@ -159,7 +157,6 @@ RDEPEND="${RDEPEND}
 	virtual/udev
 	sys-libs/libcap
 	chrome_remoting? ( sys-libs/pam )
-	sys-libs/zlib
 	vaapi? ( x11-libs/libva )
 	xkbcommon? (
 		x11-libs/libxkbcommon
@@ -168,6 +165,7 @@ RDEPEND="${RDEPEND}
 	accessibility? (
 		app-accessibility/brltty
 		app-accessibility/espeak-ng
+		app-accessibility/googletts
 	)
 	libcxx? (
 		sys-libs/libcxxabi
@@ -188,11 +186,10 @@ PATCHES=()
 
 AUTOTEST_COMMON="src/chrome/test/chromeos/autotest/files"
 AUTOTEST_DEPS="${AUTOTEST_COMMON}/client/deps"
-AUTOTEST_DEPS_LIST="chrome_test page_cycler_dep perf_data_dep telemetry_dep"
+AUTOTEST_DEPS_LIST="chrome_test telemetry_dep"
 
 IUSE="${IUSE} +autotest"
 
-export CHROMIUM_HOME=/usr/$(get_libdir)/chromium-browser
 
 QA_TEXTRELS="*"
 QA_EXECSTACK="*"
@@ -242,32 +239,23 @@ set_build_args() {
 		"use_v4l2_codec=$(usetf v4l2_codec)"
 		"use_v4lplugin=$(usetf v4lplugin)"
 		"use_vaapi=$(usetf vaapi)"
-		"use_ozone=true"
 		"use_xkbcommon=$(usetf xkbcommon)"
-		# Use the Chrome OS toolchain and not the one bundled with Chromium.
-		"linux_use_bundled_binutils=false"
 		"enable_remoting=$(usetf chrome_remoting)"
 		"enable_nacl=$(use_nacl; echotf)"
-		"icu_use_data_file=true"
 		# use_system_minigbm is set below.
-		# HarfBuzz and FreeType need to be built together in a specific way
-		# to get FreeType autohinting to work properly. Chromium bundles
-		# FreeType and HarfBuzz to meet that need.
-		# See crbug.com/694137 .
-		"use_system_harfbuzz=false"
-		"use_system_freetype=false"
-		"use_bundled_fontconfig=false"
+
+		"is_cfm=$(usetf cfm)"
 
 		# Clang features.
 		"is_asan=$(usetf asan)"
 		"is_msan=$(usetf msan)"
 		"is_ubsan=$(usetf ubsan)"
 		"is_clang=true"
-		"cros_host_is_clang=true"
-		"cros_v8_snapshot_is_clang=true"
 		"use_thin_lto=$(usetf thinlto)"
 		"use_goma_thin_lto=${use_goma_thin_lto}"
 		"is_cfi=$(usetf cfi)"
+
+		"enable_cros_on_device_assistant=$(usetf on_device_assistant)"
 
 		# Assistant integration tests are only run on the Chromium bots,
 		# but they increase the size of libassistant.so by 1.3MB so we
@@ -283,6 +271,7 @@ set_build_args() {
 		"pkg_config=$(tc-getPKG_CONFIG)"
 		"target_os=chromeos"
 		"host_pkg_config=$(tc-getBUILD_PKG_CONFIG)"
+		"clang_diagnostic_dir=/tmp/clang_crash_diagnostics"
 	)
 	use internal_gles_conform && BUILD_ARGS+=( "internal_gles2_conform_tests=true" )
 
@@ -465,25 +454,26 @@ unpack_chrome() {
 	# is needed for unattended operation.
 	cmd+=( --reset "--gclient=${EGCLIENT}" "${CHROME_DISTDIR}" )
 	elog "${cmd[*]}"
-	"${cmd[@]}" || die
+	# TODO(crbug.com/1103048): Disable the sandbox when syncing the code.
+	# It seems to break gclient execution at random for unknown reasons.
+	# Children stop being tracked, or no git repos actually get cloned.
+	SANDBOX_ON=0 "${cmd[@]}" || die
 }
 
 decide_chrome_origin() {
-	local chrome_workon="=chromeos-base/chromeos-chrome-9999"
-	local cros_workon_file="${SYSROOT}/etc/portage/package.keywords/cros-workon"
-	if [[ -e "${cros_workon_file}" ]] && grep -q "${chrome_workon}" "${cros_workon_file}"; then
-		# LOCAL_SOURCE is the default for cros_workon
-		# Warn the user if CHROME_ORIGIN is already set
+	if [[ "${PV}" == "9999" ]]; then
+		# LOCAL_SOURCE is the default for cros_workon.
+		# Warn the user if CHROME_ORIGIN is already set.
 		if [[ -n "${CHROME_ORIGIN}" && "${CHROME_ORIGIN}" != LOCAL_SOURCE ]]; then
 			ewarn "CHROME_ORIGIN is already set to ${CHROME_ORIGIN}."
 			ewarn "This will prevent you from building from your local checkout."
 			ewarn "Please run 'unset CHROME_ORIGIN' to reset Chrome"
 			ewarn "to the default source location."
 		fi
-		: ${CHROME_ORIGIN:=LOCAL_SOURCE}
+		: "${CHROME_ORIGIN:=LOCAL_SOURCE}"
 	else
-		# By default, pull from server
-		: ${CHROME_ORIGIN:=SERVER_SOURCE}
+		# By default, pull from server.
+		: "${CHROME_ORIGIN:=SERVER_SOURCE}"
 	fi
 }
 
@@ -509,14 +499,6 @@ src_unpack() {
 
 	tc-export CC CXX
 	local WHOAMI=$(whoami)
-	export EGCLIENT="${EGCLIENT:-${DEPOT_TOOLS}/gclient}"
-	export ENINJA="${ENINJA:-${DEPOT_TOOLS}/ninja}"
-
-	# Prevents gclient from updating self.
-	export DEPOT_TOOLS_UPDATE=0
-
-	# Prevent gclient metrics collection.
-	export DEPOT_TOOLS_METRICS=0
 
 	CHROME_SRC="chrome-src"
 	if use chrome_internal; then
@@ -595,9 +577,6 @@ src_unpack() {
 	# a symlink here to add compatibility with autotest eclass which uses this.
 	ln -sf "${CHROME_ROOT}" "${WORKDIR}/${P}"
 
-	export EGN="${EGN:-${CHROME_ROOT}/src/buildtools/linux64/gn}"
-	einfo "Using GN from ${EGN}"
-
 	if use internal_gles_conform; then
 		local CHROME_GLES2_CONFORM=${CHROME_ROOT}/src/third_party/gles2_conform
 		local CROS_GLES2_CONFORM=/home/${WHOAMI}/trunk/src/third_party/gles2_conform
@@ -663,6 +642,9 @@ add_api_keys() {
 }
 
 src_prepare() {
+	# Must call eapply_user in EAPI 7, but this function is a no-op here.
+	eapply_user
+
 	if [[ "${CHROME_ORIGIN}" != "LOCAL_SOURCE" &&
 			"${CHROME_ORIGIN}" != "SERVER_SOURCE" ]]; then
 		return
@@ -751,7 +733,7 @@ setup_compile_flags() {
 
 	# The chrome makefiles specify -O and -g flags already, so remove the
 	# portage flags.
-	filter-flags -g -O*
+	filter-flags -g "-O*"
 
 	# Remove unsupported arm64 linker flag on arm32 builds.
 	# https://crbug.com/889079
@@ -845,8 +827,8 @@ src_configure() {
 	export CC_host=$(tc-getBUILD_CC)
 	export CXX_host=$(tc-getBUILD_CXX)
 	export NM_host=$(tc-getBUILD_NM)
-	export READELF="${CHOST}-readelf"
-	export READELF_host="${CBUILD}-readelf"
+	export READELF="llvm-readelf"
+	export READELF_host="llvm-readelf"
 
 	# Use C++ compiler as the linker driver.
 	export LD="${CXX}"
@@ -887,7 +869,6 @@ src_configure() {
 	# TODO(rcui): crosbug.com/20435. Investigate removal of runhooks
 	# useflag when chrome build switches to Ninja inside the chroot.
 	if use runhooks; then
-		[[ -f "${EGCLIENT}" ]] || die "EGCLIENT at '${EGCLIENT}' does not exist"
 		local cmd=( "${EGCLIENT}" runhooks --force )
 		echo "${cmd[@]}"
 		CFLAGS="${CFLAGS} ${EBUILD_CFLAGS[*]}" \
@@ -938,8 +919,13 @@ src_configure() {
 	done
 	export GN_ARGS="${BUILD_ARGS[*]}"
 	einfo "GN_ARGS = ${GN_ARGS}"
-	${EGN} gen "${CHROME_ROOT}/src/${BUILD_OUT_SYM}/${BUILDTYPE}" \
-		--args="${GN_ARGS}" --root="${CHROME_ROOT}/src" || die
+	local gn=(
+		"${CHROME_ROOT}/src/buildtools/linux64/gn" gen
+		"${CHROME_ROOT}/src/${BUILD_OUT_SYM}/${BUILDTYPE}"
+		--args="${GN_ARGS}" --root="${CHROME_ROOT}/src"
+	)
+	echo "${gn[@]}"
+	"${gn[@]}" || die
 
 	setup_test_lists
 
@@ -959,10 +945,10 @@ chrome_make() {
 
 	# If goma is enabled, increase the number of parallel run to
 	# 10 * {number of processors}. Though, if it is too large the
-	# performance gets slow down, so limit by 80 heuristically.
+	# performance gets slow down, so limit by 200 heuristically.
 	if use_goma; then
 		local num_parallel=$(($(nproc) * 10))
-		local j_limit=80
+		local j_limit=200
 		set -- -j $((num_parallel < j_limit ? num_parallel : j_limit)) "$@"
 	fi
 	local command=(
@@ -1024,8 +1010,6 @@ src_compile() {
 
 	if use build_tests; then
 		install_chrome_test_resources "${WORKDIR}/test_src"
-		install_page_cycler_dep_resources "${WORKDIR}/page_cycler_src"
-		install_perf_data_dep_resources "${WORKDIR}/perf_data_src"
 		install_telemetry_dep_resources "${WORKDIR}/telemetry_src"
 
 		# NOTE: Since chrome is built inside distfiles, we have to get
@@ -1035,12 +1019,6 @@ src_compile() {
 
 		rm -rf "${deps}/chrome_test/test_src"
 		mv "${WORKDIR}/test_src" "${deps}/chrome_test/"
-
-		rm -rf "${deps}/page_cycler_dep/test_src"
-		mv "${WORKDIR}/page_cycler_src" "${deps}/page_cycler_dep/test_src"
-
-		rm -rf "${deps}/perf_data_dep/test_src"
-		mv "${WORKDIR}/perf_data_src" "${deps}/perf_data_dep/test_src"
 
 		rm -rf "${deps}/telemetry_dep/test_src"
 		mv "${WORKDIR}/telemetry_src" "${deps}/telemetry_dep/test_src"
@@ -1166,27 +1144,6 @@ install_chrome_test_resources() {
 		"${dest}"
 }
 
-install_page_cycler_dep_resources() {
-	local test_dir="${1}"
-
-	if [[ -r "${CHROME_ROOT}/src/data/page_cycler" ]]; then
-		echo "Copying Page Cycler Data into ${test_dir}"
-		mkdir -p "${test_dir}"
-		install_test_resources "${test_dir}" \
-			data/page_cycler
-	fi
-}
-
-install_perf_data_dep_resources() {
-	local test_dir="${1}"
-
-	if [[ -r "${CHROME_ROOT}/src/tools/perf/data" ]]; then
-		echo "Copying Perf Data into ${test_dir}"
-		mkdir -p "${test_dir}"
-		install_test_resources "${test_dir}" tools/perf/data
-	fi
-}
-
 install_telemetry_dep_resources() {
 	local test_dir="${1}"
 
@@ -1289,17 +1246,9 @@ src_install() {
 			-4k-align -root-mode 0755 -no-progress \
 			|| die "Failed to create Quickoffice squashfs"
 
+		# The squashfs will be mounted at boot time by an upstart script
+		# installed by chromeos-base/quickoffice.
 		doins "${WORKDIR}/quickoffice.squash"
-		# Create the directory where the Quickoffice squashfs will be
-		# mounted.
-		keepdir "${qo_install_root}"/_platform_specific
-		# Install the upstart scripts that will automatically
-		# mount/unmount the Quickoffice squashfs when Chrome
-		# starts/stops.
-		insinto /etc/init
-		doins "${QUICKOFFICE}"/upstart/quickoffice-start.conf
-		doins "${QUICKOFFICE}"/upstart/quickoffice-stop.conf
-
 	fi
 
 	# Chrome test resources
@@ -1397,7 +1346,7 @@ src_install() {
 			fi
 			source="${i}"
 			${DWP} -e "${FROM}/${source}" -o "${D}/usr/lib/debug/${CHROME_DIR}/${i}.dwp" || die
-		done < <(scanelf -BRyF '%F' ".")
+		done < <(scanelf -ByF '%F' ".")
 	fi
 
 	if use build_tests; then

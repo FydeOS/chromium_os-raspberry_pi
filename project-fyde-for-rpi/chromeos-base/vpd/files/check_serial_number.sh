@@ -5,7 +5,10 @@ NET_NODE=/sys/class/net
 LAN_MAC_NODE=$NET_NODE/eth0/address
 WLAN_MAC_NODE=$NET_NODE/wlan0/address
 
-[ ! -f ${LICENCE} ] && exit 0
+die() {
+  logger -t "${JOB}" "Error:" $@
+  exit 1 
+}
 
 get_system_mac() {
   local mac
@@ -28,7 +31,7 @@ get_system_mac() {
       break
     fi
 
-    [ -n "$UPSTART_JOB" ] && logger -t "$UPSTART_JOB" "Cannot get mac, maybe NIC driver is not ready yet, waiting to retry"
+    logger -t "$JOB" "Cannot get mac, maybe NIC driver is not ready yet, waiting to retry"
     sleep 1s
   done
 }
@@ -56,6 +59,12 @@ update_serial_number() {
   dump_vpd_log --force
 }
 
+check_vpd() {
+  if [ ! -s "${LICENCE}" ]; then
+    cat /usr/share/cros/init/vpd.gz | gunzip > ${LICENCE}
+  fi  
+}
+
 check_serial_number() {
   local serial=$(vpd -i RO_VPD -g serial_number 2>/dev/null)
   local mac_serial=$(get_system_mac | sed "s/://g")
@@ -71,5 +80,7 @@ check_serial_number() {
   fi
 }
 
-remount_oem_writable
+remount_oem_writable || die "Remount OEM partition failed"
+check_vpd || die "Cann't init vpd system"
 check_serial_number
+remount_oem_readonly

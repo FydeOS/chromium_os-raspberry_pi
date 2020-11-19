@@ -7,7 +7,7 @@ CROS_WORKON_PROJECT="chromiumos/platform/minigbm"
 CROS_WORKON_LOCALNAME="../platform/minigbm"
 CROS_WORKON_OUTOFTREE_BUILD=1
 
-inherit cros-sanitizers cros-workon cros-common.mk toolchain-funcs multilib
+inherit cros-sanitizers cros-workon cros-common.mk multilib
 
 DESCRIPTION="Mini GBM implementation"
 HOMEPAGE="https://chromium.googlesource.com/chromiumos/platform/minigbm"
@@ -31,7 +31,7 @@ RDEPEND="
 DEPEND="${RDEPEND}
 	virtual/pkgconfig
 	video_cards_amdgpu? (
-		media-libs/mesa-amd
+		virtual/opengles
 		x11-drivers/opengles-headers
 	)"
 
@@ -75,6 +75,10 @@ src_compile() {
 src_install() {
 	insinto "${EPREFIX}/etc/udev/rules.d"
 	doins "${FILESDIR}/50-vgem.rules"
+
+	# Install cros_gralloc header files for arc-mali-* packages
+	insinto "${EPREFIX}/usr/include/cros_gralloc"
+	doins "${S}/cros_gralloc/cros_gralloc_handle.h"
 
 	default
 }

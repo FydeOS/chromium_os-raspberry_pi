@@ -1,22 +1,22 @@
 # Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
 # Distributed under the terms of the GNU General Public License v2
 
-EAPI="4"
+EAPI=7
 CROS_WORKON_PROJECT="chromiumos/platform/vpd"
+CROS_WORKON_LOCALNAME="platform/vpd"
 
 inherit cros-workon systemd
 
 DESCRIPTION="ChromeOS vital product data utilities"
-HOMEPAGE="http://www.chromium.org/"
+HOMEPAGE="https://chromium.googlesource.com/chromiumos/platform/vpd/"
 SRC_URI=""
 
 LICENSE="BSD-Google"
-SLOT="0"
 KEYWORDS="~*"
 IUSE="static systemd"
 
 # util-linux is for libuuid.
-DEPEND="sys-apps/util-linux"
+DEPEND="sys-apps/util-linux:="
 # shflags for dump_vpd_log.
 # chromeos-activate-date for ActivateDate upstart and script.
 RDEPEND="
@@ -24,10 +24,6 @@ RDEPEND="
 	dev-util/shflags
 	virtual/chromeos-activate-date
 	"
-
-src_configure() {
-	cros-workon_src_configure
-}
 
 src_compile() {
 	tc-export CC
@@ -40,7 +36,7 @@ src_install() {
 	# (no ACPI stuff on ARM for instance)
 	dosbin vpd vpd_s
 	dosbin util/check_rw_vpd util/dump_vpd_log util/update_rw_vpd
-	dosbin util/vpd_get_value
+	dosbin util/vpd_get_value util/vpd_icc
 
 	# install the init script
 	if use systemd; then

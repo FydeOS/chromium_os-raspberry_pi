@@ -1,1 +1,1 @@
-sys-kernel/upstream-kernel-mainline apply_patches clang lld
+sys-kernel/raspberry-kernel apply_patches clang lld

@@ -10,14 +10,14 @@ CROS_WORKON_USE_VCSID=1
 inherit toolchain-funcs autotools cros-fuzzer cros-sanitizers cros-workon systemd user libchrome-version
 
 DESCRIPTION="Google A/V Daemon"
-HOMEPAGE="http://www.chromium.org"
+HOMEPAGE="https://chromium.googlesource.com/chromiumos/third_party/adhd/"
 SRC_URI=""
 LICENSE="BSD-Google"
 KEYWORDS="~*"
 IUSE="asan +cras-apm fuzzer generated_cros_config selinux systemd unibuild"
 
 COMMON_DEPEND="
-	chromeos-base/metrics:=
+	>=chromeos-base/metrics-0.0.1-r3152:=
 	dev-libs/iniparser:=
 	cras-apm? ( media-libs/webrtc-apm:= )
 	>=media-libs/alsa-lib-1.1.6-r3:=
@@ -46,30 +46,6 @@ DEPEND="
 	media-sound/cras_rust:=
 "
 
-check_format_error() {
-	local file
-	local files_need_format=()
-	einfo "Running format checks for ADHD .c, .cc and .h files"
-	while read -r -d $'\0' file; do
-		if ! cmp <(clang-format -style=file "${file}") "${file}"
-		then
-			files_need_format+=( "${file}" )
-		fi
-	done< <(find . \( -name "*.c" -o -name "*.cc" -o -name "*.h" \) \
-		-print0)
-
-	if [[ "${#files_need_format[@]}" != "0" ]]; then
-		eerror "The following files have formatting errors:"
-		eerror "${files_need_format[*]}"
-		eerror "You can run \"clang-format -i -style=file" \
-			"${files_need_format[*]}\"" \
-			"under chromiumos/src/third_party/adhd to fix them."
-		return 1
-	fi
-	einfo "    All files are well formatted."
-	return 0
-}
-
 src_prepare() {
 	cd cras
 	eautoreconf
@@ -96,7 +72,8 @@ src_configure() {
 			$(use_enable cras-apm webrtc-apm) \
 			--enable-metrics \
 			--with-system-cras-rust \
-			$(use_enable amd64 fuzzer)
+			$(use_enable amd64 fuzzer) \
+			BASE_VER="$(libchrome_ver)"
 	fi
 }
 
@@ -105,7 +82,6 @@ src_compile() {
 }
 
 src_test() {
-	check_format_error || die "Format check failed"
 	if ! use x86 && ! use amd64 ; then
 		elog "Skipping unit tests on non-x86 platform"
 	else
@@ -148,8 +124,6 @@ src_install() {
 		fuzzer_install "${S}/OWNERS.fuzz" cras/src/cras_hfp_slc_fuzzer \
 			--dict "${S}/cras/src/fuzz/cras_hfp_slc.dict"
 	fi
-  insinto /etc/init
-  doins ${FILESDIR}/cras_monitor.conf
 }
 
 pkg_preinst() {
