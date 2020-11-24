@@ -1,17 +1,20 @@
 #hdmi_drive=2
 #config_hdmi_boost=7
 disable_overscan=1
-gpu_mem=256
-#cma_lwm=16
-#cma_hwm=256
 dtparam=audio=on
-dtoverlay=vc4-kms-v3d-pi4,cma-256
-mask_gpu_interrupt0=0x400   # KMS/DRM
-#avoid_warnings=2            # KMS/DRM
-arm_control=0x200           # open armV8 mode
-force_turbo=1               # we need more power
-enable_uart=1               # for debug
+
+# better graphic performance,but need fydeos-force-cursor-compositing in /etc/chrome_dev.conf
+#dtoverlay=vc4-kms-v3d
+
+# fit for rpi3/rpi4
+dtoverlay=vc4-fkms-v3d
+
+# for more power
+#force_turbo=1
+
+# for debug
+#enable_uart=1
 #start_debug=1
+
 arm_64bit=1
-#total_mem=4096
-enable_gic=1
+max_framebuffers=2

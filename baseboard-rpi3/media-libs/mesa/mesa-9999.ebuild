@@ -37,7 +37,7 @@ KEYWORDS="~*"
 
 INTEL_CARDS="intel"
 RADEON_CARDS="amdgpu radeon"
-VIDEO_CARDS="${INTEL_CARDS} ${RADEON_CARDS} freedreno llvmpipe mach64 mga nouveau r128 radeonsi savage sis softpipe tdfx via virgl vmware"
+VIDEO_CARDS="${INTEL_CARDS} ${RADEON_CARDS} freedreno llvmpipe mach64 mga nouveau r128 radeonsi savage sis softpipe tdfx via virgl vmware vc4 v3d"
 for card in ${VIDEO_CARDS}; do
 	IUSE_VIDEO_CARDS+=" video_cards_${card}"
 done
@@ -145,6 +145,8 @@ src_configure() {
 		gallium_enable video_cards_freedreno freedreno
 
 		gallium_enable video_cards_virgl virgl
+    gallium_enable video_cards_vc4 vc4
+    gallium_enable video_cards_v3d v3d
 	fi
 
 	if use vulkan; then
@@ -216,7 +218,7 @@ src_install() {
 	insinto "/usr/$(get_libdir)/dri/"
 	insopts -m0755
 	# install the gallium drivers we use
-	local gallium_drivers_files=( nouveau_dri.so r300_dri.so r600_dri.so msm_dri.so swrast_dri.so )
+	local gallium_drivers_files=( nouveau_dri.so r300_dri.so r600_dri.so msm_dri.so swrast_dri.so vc4_dri.so v3d_dri.so )
 	for x in ${gallium_drivers_files[@]}; do
 		if [ -f "${S}/$(get_libdir)/gallium/${x}" ]; then
 			doins "${S}/$(get_libdir)/gallium/${x}"
