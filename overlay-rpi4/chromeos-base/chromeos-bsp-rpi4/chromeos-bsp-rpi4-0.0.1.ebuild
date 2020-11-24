@@ -14,6 +14,7 @@ IUSE=""
 RDEPEND="
     chromeos-base/device-appid
     chromeos-base/snd_bcm2835-spec
+    chromeos-base/surface-power-management-policy
 "
 
 DEPEND="${RDEPEND}"
