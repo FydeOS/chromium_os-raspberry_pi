@@ -1,0 +1,2 @@
+chromeos-base/auto-expand-partition::fydeos
+virtual/chromeos-bsp::fydeos

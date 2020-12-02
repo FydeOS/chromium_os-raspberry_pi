@@ -1,0 +1,5 @@
+Something went wrong and the installation wasn't successful.
+
+You need check out the hard driver of device. Or reboot and try again.
+
+Press the SPACE key to shutdown.

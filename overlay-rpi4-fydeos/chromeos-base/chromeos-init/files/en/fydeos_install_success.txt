@@ -1,0 +1,7 @@
+Everything looked fine.
+
+Press Any Key to ShutDown the device.
+
+System will shutdown in 3 seconds.
+
+Unplug the USB disk after power off. Cross the finger and Return it on .

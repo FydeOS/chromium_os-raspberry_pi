@@ -1,0 +1,11 @@
+{
+    "PowerManagementIdleSettings": {
+        "AC": {
+            "IdleAction": "DoNothing"
+        },
+        "Battery": {
+            "IdleAction": "DoNothing"
+        }
+    },
+    "LidCloseAction": 3
+}

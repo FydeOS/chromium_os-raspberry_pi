@@ -13,7 +13,6 @@ IUSE=""
 
 RDEPEND="
     chromeos-base/device-appid
-    chromeos-base/snd_bcm2835-spec
     chromeos-base/surface-power-management-policy
 "
 
@@ -26,7 +25,6 @@ src_install() {
   insinto /etc/init
   doins "${FILESDIR}/bt/bluetooth_uart.conf"
   doins "${FILESDIR}/bt/console-ttyAMA0.override"
-#  doins "${FILESDIR}/audio/force_audio_output_to_headphones.conf"
   insinto /firmware/rpi
   doins "${FILESDIR}/kernel-config"/*
 }

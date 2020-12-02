@@ -1,0 +1,13 @@
+diff --git a/init/upstart/cgroups.conf b/init/upstart/cgroups.conf
+index 8f6b68f16..67a7e3f15 100644
+--- a/init/upstart/cgroups.conf
++++ b/init/upstart/cgroups.conf
+@@ -52,7 +52,7 @@ script
+   # (all cpus, all mems).
+   cpuset_root_dir="/sys/fs/cgroup/cpuset"
+   if [ -d "${cpuset_root_dir}" ]; then
+-    cpuset_root_cpus=$(cat "${cpuset_root_dir}/cpus")
++    cpuset_root_cpus=$(lscpu |grep "On-line CPU(s) list" |sed 's/On-line CPU(s) list: //g')
+     cpuset_root_mems=$(cat "${cpuset_root_dir}/mems")
+     for cset in chrome chrome/urgent chrome/non-urgent; do
+       cset_dir="${cpuset_root_dir}/${cset}"

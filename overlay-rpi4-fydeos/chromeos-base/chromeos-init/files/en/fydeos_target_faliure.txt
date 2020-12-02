@@ -1,0 +1,7 @@
+*Critical ERROR*
+
+Can not find target disk, check the list below:
+1. Assigned wrong target disk at /usr/share/oem/.fydeos_factory_install
+2. Target disk failure.
+
+System halt, press any key to shutdown.
