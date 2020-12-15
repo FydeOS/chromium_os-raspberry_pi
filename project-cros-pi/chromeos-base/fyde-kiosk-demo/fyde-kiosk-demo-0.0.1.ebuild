@@ -8,7 +8,7 @@ inherit git-r3
 DESCRIPTION="Install demo app for Chromium OS for Raspberry Pi kiosk mode"
 HOMEPAGE="https://fydeos.io"
 
-LICENSE="BSD-Google"
+LICENSE="BSD"
 SLOT="0"
 KEYWORDS="*"
 IUSE=""

@@ -4,9 +4,9 @@
 EAPI="5"
 
 DESCRIPTION="bcm2835 chip related configuration files"
-HOMEPAGE="http://fydeos.com"
+HOMEPAGE="https://fydeos.io"
 
-LICENSE="BSD-Google"
+LICENSE="BSD"
 SLOT="0"
 KEYWORDS="*"
 IUSE=""

@@ -8,7 +8,7 @@ inherit git-r3
 DESCRIPTION="Raspberry Pi boot binary files"
 HOMEPAGE="https://fydeos.io"
 
-LICENSE="BSD-Google"
+LICENSE="BSD"
 SLOT="0"
 KEYWORDS="*"
 IUSE=""

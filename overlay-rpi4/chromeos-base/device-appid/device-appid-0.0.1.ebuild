@@ -5,9 +5,9 @@ EAPI="5"
 
 inherit appid
 DESCRIPTION="Creates an app id for this build and update the lsb-release file"
-HOMEPAGE="https://fydeos.com"
+HOMEPAGE="https://fydeos.io"
 
-LICENSE="BSD-Google"
+LICENSE="BSD"
 SLOT="0"
 KEYWORDS="*"
 IUSE=""

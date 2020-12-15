@@ -4,9 +4,9 @@
 EAPI="4"
 
 DESCRIPTION="vistual bsp"
-HOMEPAGE="https://fydeos.com"
+HOMEPAGE="https://fydeos.io"
 
-LICENSE="BSD-Google"
+LICENSE="BSD"
 SLOT="0"
 KEYWORDS="*"
 IUSE=""

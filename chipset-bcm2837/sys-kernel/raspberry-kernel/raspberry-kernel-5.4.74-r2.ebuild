@@ -2,18 +2,18 @@
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=7
-CROS_WORKON_REPO="git@github.com:FydeOS-for-You-overlays"
+CROS_WORKON_REPO="https://github.com/FydeOS"
 CROS_WORKON_COMMIT="997ea41c5fc65d9f0b6bd3f133cb6a7efaf47f24"
-CROS_WORKON_PROJECT="kernel-rpi"
+CROS_WORKON_PROJECT="kernel-raspberry_pi"
 CROS_WORKON_LOCALNAME="kernel/v5.4-rpi"
-CROS_WORKON_EGIT_BRANCH="fydeos-5.4"
+CROS_WORKON_EGIT_BRANCH="cros-5.4"
 CROS_WORKON_INCREMENTAL_BUILD="1"
 
 # This must be inherited *after* EGIT/CROS_WORKON variables defined
 inherit cros-workon cros-kernel2
 
 HOMEPAGE="https://www.chromium.org/chromium-os/chromiumos-design-docs/chromium-os-kernel"
-DESCRIPTION="Fyd OS Linux Kernel 5.4"
+DESCRIPTION="Chromium OS Linux kernel 5.4"
 KEYWORDS="*"
 
 # Change the following (commented out) number to the next prime number

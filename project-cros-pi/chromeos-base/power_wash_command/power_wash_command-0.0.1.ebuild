@@ -6,7 +6,7 @@ EAPI="4"
 DESCRIPTION="Add powerwash command shortcut 'clobber' to usr/local/sbin"
 HOMEPAGE="https://fydeos.io"
 
-LICENSE="BSD-Google"
+LICENSE="BSD"
 SLOT="0"
 KEYWORDS="*"
 IUSE=""

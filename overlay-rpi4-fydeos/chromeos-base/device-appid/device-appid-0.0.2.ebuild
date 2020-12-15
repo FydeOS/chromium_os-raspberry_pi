@@ -5,9 +5,9 @@ EAPI="5"
 
 inherit appid
 DESCRIPTION="empty project"
-HOMEPAGE="http://fydeos.com"
+HOMEPAGE="https://fydeos.io"
 
-LICENSE="BSD-Google"
+LICENSE="BSD"
 SLOT="0"
 KEYWORDS="*"
 IUSE=""

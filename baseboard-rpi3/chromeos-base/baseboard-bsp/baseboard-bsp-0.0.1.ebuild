@@ -4,9 +4,9 @@
 EAPI="5"
 
 DESCRIPTION="Baseboard BSP definition"
-HOMEPAGE="https://fydeos.com"
+HOMEPAGE="https://fydeos.io"
 
-LICENSE="BSD-Google"
+LICENSE="BSD"
 SLOT="0"
 KEYWORDS="*"
 IUSE=""

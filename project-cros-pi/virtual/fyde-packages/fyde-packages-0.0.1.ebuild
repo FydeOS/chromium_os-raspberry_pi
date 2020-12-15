@@ -4,9 +4,9 @@
 EAPI="5"
 
 DESCRIPTION="empty project"
-HOMEPAGE="http://fydeos.com"
+HOMEPAGE="https://fydeos.io"
 
-LICENSE="BSD-Google"
+LICENSE="BSD"
 SLOT="0"
 KEYWORDS="*"
 IUSE="kiosk_demo widevine fyde_extension"
