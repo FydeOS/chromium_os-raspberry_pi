@@ -1,12 +1,12 @@
-# Copyright (c) 2018 The Fyde OS Authors. All rights reserved.
-# Distributed under the terms of the BSD
+# Copyright (c) 2020 The Fyde Innovations. All rights reserved.
+# Distributed under the license specified in the root directory of this project.
 
 EAPI="5"
 EGIT_REPO_URI="https://github.com/FydeOS/rpi-boot-bin.git"
 
 inherit git-r3
-DESCRIPTION="rpi boot bin files"
-HOMEPAGE="http://fydeos.com"
+DESCRIPTION="Raspberry Pi boot binary files"
+HOMEPAGE="https://fydeos.io"
 
 LICENSE="BSD-Google"
 SLOT="0"

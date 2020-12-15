@@ -1,10 +1,10 @@
-# Copyright (c) 2018 The Fyde OS Authors. All rights reserved.
-# Distributed under the terms of the BSD
+# Copyright (c) 2020 The Fyde Innovations. All rights reserved.
+# Distributed under the license specified in the root directory of this project.
 
 EAPI="4"
 
 DESCRIPTION="vistual bsp"
-HOMEPAGE="http://fydeos.com"
+HOMEPAGE="https://fydeos.com"
 
 LICENSE="BSD-Google"
 SLOT="0"

@@ -1,21 +1,23 @@
 # Copyright (c) 2020 The Fyde Innovations. All rights reserved.
 # Distributed under the license specified in the root directory of this project.
 
-EAPI="5"
+EAPI="4"
 
-DESCRIPTION="Baseboard BSP definition"
-HOMEPAGE="https://fydeos.com"
+DESCRIPTION="Add powerwash command shortcut 'clobber' to usr/local/sbin"
+HOMEPAGE="https://fydeos.io"
 
 LICENSE="BSD-Google"
 SLOT="0"
 KEYWORDS="*"
 IUSE=""
 
-RDEPEND="
-  chromeos-base/rpi-boot-bin
-  chromeos-base/rpi-firmware
-  sys-apps/haveged
-"
+RDEPEND=""
 
 DEPEND="${RDEPEND}"
 
+S=${WORKDIR}
+
+src_install() {
+  exeinto /usr/sbin
+  doexe ${FILESDIR}/clobber 
+}

@@ -3,19 +3,20 @@
 
 EAPI="5"
 
-DESCRIPTION="Baseboard BSP definition"
-HOMEPAGE="https://fydeos.com"
+DESCRIPTION="Google drive related files"
+HOMEPAGE="https://drive.google.com/"
 
 LICENSE="BSD-Google"
 SLOT="0"
 KEYWORDS="*"
 IUSE=""
 
-RDEPEND="
-  chromeos-base/rpi-boot-bin
-  chromeos-base/rpi-firmware
-  sys-apps/haveged
-"
+RDEPEND=""
 
 DEPEND="${RDEPEND}"
+S=${WORKDIR}
 
+src_install() {
+  exeinto /opt/google/drive-file-stream
+  doexe ${FILESDIR}/drivefs
+}

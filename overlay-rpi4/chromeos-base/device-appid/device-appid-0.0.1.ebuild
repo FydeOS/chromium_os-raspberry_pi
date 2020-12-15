@@ -1,11 +1,11 @@
-# Copyright (c) 2019 The Fyde OS Authors. All rights reserved.
-# Distributed under the terms of the BSD
+# Copyright (c) 2020 The Fyde Innovations. All rights reserved.
+# Distributed under the license specified in the root directory of this project.
 
 EAPI="5"
 
 inherit appid
-DESCRIPTION="empty project"
-HOMEPAGE="http://fydeos.com"
+DESCRIPTION="Creates an app id for this build and update the lsb-release file"
+HOMEPAGE="https://fydeos.com"
 
 LICENSE="BSD-Google"
 SLOT="0"
