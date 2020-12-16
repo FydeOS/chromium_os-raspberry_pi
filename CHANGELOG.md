@@ -1,5 +1,34 @@
 # Changelog
 
+### 2020-12-16
+##### Refactoring and add wifi support for Pi400
+
+ - **Purpose**
+    
+    Refreshed the overlays updated README to reflect a recent full run-through of the build process.
+
+ - **Changes highlight**
+
+   - Name changes
+     - The umbrella project `project-fyde-for-rpi` is renamed to `project-cros-pi`: There is no "fyde" in there
+     - Updated `chromeos-chrome-86.0.4240.260_rc-r1.ebuild` to reflect recent rebase of the chromium project
+
+   - Location changes
+     - The Linux kernel used in for building Chromium OS is now moved from <https://github.com/FydeOS-for-You-overlays/kernel-rpi> to this group, named <https://github.com/FydeOS/kernel-raspberry_pi>
+     - To reflect the kernel location change, also updated `raspberry-kernel-5.4.74-r2.ebuild` file.
+
+   - Removals
+     - Removed an unnecessary power management policy borrowed from other board
+
+   - License updates
+     - Updated ebuild files front matter, copyright text, homepage and some descriptions
+     - Updated contact email address and removed personal information
+     - Updated License to BSD in consistency with the project
+
+   - README updates
+     - Directory name fixes and added some additional information
+     - Refreshed the build process description
+
 ### 2020-07-12
 ##### Tweaked and enabled PNaCl
 * so that things like Zoom/Polarr can now work on Chromium OS for Raspberry Pi.
