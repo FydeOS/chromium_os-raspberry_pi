@@ -24,6 +24,9 @@ src_install() {
   insinto /etc/init
   doins "${FILESDIR}/bt/bluetooth_uart.conf"
   doins "${FILESDIR}/bt/console-ttyAMA0.override"
+  doins "${FILESDIR}"/audio/rpi4-hdmi.conf
   insinto /firmware/rpi
   doins "${FILESDIR}/kernel-config"/*
+  exeinto /usr/share/cros/init
+  doexe "${FILESDIR}"/audio/set-hdmi.sh
 }
