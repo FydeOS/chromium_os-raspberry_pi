@@ -3,7 +3,7 @@
 
 EAPI="5"
 
-DESCRIPTION="bcm2835 chip related configuration files"
+DESCRIPTION="Setup shell daemon helper to allow certain privileged extension to execute shell commands"
 HOMEPAGE="https://fydeos.io"
 
 LICENSE="BSD"
@@ -18,8 +18,10 @@ DEPEND="${RDEPEND}"
 S=$WORKDIR
 
 src_install() {
-  #insinto /etc/modprobe.d
-  #doins ${FILESDIR}/snd_bcm2835.conf  
+  insinto /etc/dbus-1/system.d
+  doins ${FILESDIR}/io.fydeos.ShellDaemon.conf
   insinto /etc/init
-  doins "${FILESDIR}/force_audio_output_to_headphones.conf"
+  doins ${FILESDIR}/fydeos-shell-daemon.conf
+  exeinto /usr/share/fydeos_shell
+  doexe ${FILESDIR}/fydeos_shell/*
 }

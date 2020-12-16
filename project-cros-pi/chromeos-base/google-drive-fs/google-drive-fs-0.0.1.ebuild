@@ -3,10 +3,10 @@
 
 EAPI="5"
 
-DESCRIPTION="Raspberry Pi firmware"
-HOMEPAGE="https://fydeos.io"
+DESCRIPTION="Google drive related files"
+HOMEPAGE="https://drive.google.com/"
 
-LICENSE="BSD"
+LICENSE="BSD-Google"
 SLOT="0"
 KEYWORDS="*"
 IUSE=""
@@ -14,10 +14,9 @@ IUSE=""
 RDEPEND=""
 
 DEPEND="${RDEPEND}"
-
 S=${WORKDIR}
 
 src_install() {
-  insinto /lib
-  doins -r "${FILESDIR}/firmware"
+  exeinto /opt/google/drive-file-stream
+  doexe ${FILESDIR}/drivefs
 }

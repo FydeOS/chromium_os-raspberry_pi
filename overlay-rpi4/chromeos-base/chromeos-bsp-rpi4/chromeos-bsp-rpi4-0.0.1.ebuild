@@ -1,19 +1,18 @@
-# Copyright (c) 2019 The Fyde OS Authors. All rights reserved.
-# Distributed under the terms of the BSD
+# Copyright (c) 2020 The Fyde Innovations. All rights reserved.
+# Distributed under the license specified in the root directory of this project.
 
 EAPI="5"
 inherit udev
-DESCRIPTION="drivers, config files for rpi3"
-HOMEPAGE="http://fydeos.com"
+DESCRIPTION="drivers, config files for Raspberry Pi 4"
+HOMEPAGE="https://fydeos.io"
 
-LICENSE="BSD-Google"
+LICENSE="BSD"
 SLOT="0"
 KEYWORDS="*"
 IUSE=""
 
 RDEPEND="
     chromeos-base/device-appid
-    chromeos-base/surface-power-management-policy
 "
 
 DEPEND="${RDEPEND}"

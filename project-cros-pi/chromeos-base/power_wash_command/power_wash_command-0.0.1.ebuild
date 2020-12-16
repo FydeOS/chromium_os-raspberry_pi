@@ -1,9 +1,9 @@
 # Copyright (c) 2020 The Fyde Innovations. All rights reserved.
 # Distributed under the license specified in the root directory of this project.
 
-EAPI="5"
+EAPI="4"
 
-DESCRIPTION="bcm2835 chip related configuration files"
+DESCRIPTION="Add powerwash command shortcut 'clobber' to usr/local/sbin"
 HOMEPAGE="https://fydeos.io"
 
 LICENSE="BSD"
@@ -15,11 +15,9 @@ RDEPEND=""
 
 DEPEND="${RDEPEND}"
 
-S=$WORKDIR
+S=${WORKDIR}
 
 src_install() {
-  #insinto /etc/modprobe.d
-  #doins ${FILESDIR}/snd_bcm2835.conf  
-  insinto /etc/init
-  doins "${FILESDIR}/force_audio_output_to_headphones.conf"
+  exeinto /usr/sbin
+  doexe ${FILESDIR}/clobber 
 }
