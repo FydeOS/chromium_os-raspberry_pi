@@ -1,0 +1,1 @@
+chromeos-bsp-rpi4-fydeos-0.0.1.ebuild

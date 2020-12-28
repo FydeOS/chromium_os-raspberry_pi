@@ -860,10 +860,10 @@ index 0000000..01b0c59
 +#endif
 diff --git a/v3d.c b/v3d.c
 new file mode 100644
-index 0000000..de59065
+index 0000000..842a0a4
 --- /dev/null
 +++ b/v3d.c
-@@ -0,0 +1,100 @@
+@@ -0,0 +1,105 @@
 +/*
 + * Copyright 2019 The FydeOS Authors. All rights reserved.
 + * Use of this source code is governed by a BSD-style license that can be
@@ -883,7 +883,7 @@ index 0000000..de59065
 +#include "drv_priv.h"
 +#include "helpers.h"
 +#include "util.h"
-+
++#define ARC_CALLOC (1<<7)
 +static const uint32_t render_target_formats[] = { DRM_FORMAT_RGB565, DRM_FORMAT_BGR565, 
 +	DRM_FORMAT_ARGB8888, DRM_FORMAT_XRGB8888, DRM_FORMAT_ABGR8888, DRM_FORMAT_XBGR8888 };
 +
@@ -910,19 +910,24 @@ index 0000000..de59065
 +  memset(&bo_create, 0, sizeof(bo_create));
 +
 +  stride = drv_stride_from_format(format, width, 0);
-+  //stride = ALIGN(stride, 64);
++  stride = ALIGN(stride, 4096);
 +  drv_bo_from_format(bo, stride, height, format);
++  //bo->meta.total_size = ALIGN(bo->meta.total_size, 4096);
 +  bo_create.size = bo->meta.total_size;
 +  bo->meta.format_modifiers[0] = modifier;
-+
++  #ifdef __ANDROID__
++  bo_create.flags = ARC_CALLOC;
++  #endif
 +  ret = drmIoctl(bo->drv->fd, DRM_IOCTL_V3D_CREATE_BO, &bo_create);
 +  if (ret) {
-+    drv_log("DRM_IOCTL_V3D_CREATE_BO failed (size=%zu)\n", bo->meta.total_size);
++    drv_log("DRM_IOCTL_V3D_CREATE_BO failed (size=%zu), ret=%d\n", bo->meta.total_size, ret);
 +    return -errno;
 +  }
 +
-+  for (plane = 0; plane < bo->meta.num_planes; plane++)
++  for (plane = 0; plane < bo->meta.num_planes; plane++) 
 +    bo->handles[plane].u32 = bo_create.handle;
++ // drv_log("create bo handler:0x%x, size:%d, format:0x%x, width:%u, height:%u\n", 
++  //	bo_create.handle, bo->meta.total_size, format, width, height); 
 +  return 0;
 +}
 +
@@ -1238,7 +1243,7 @@ index 0000000..b8c6f9d
 +
 +#endif /* _V3D_DRM_H_ */
 diff --git a/vc4.c b/vc4.c
-index 71763e4..0554bcb 100644
+index 71763e4..8f92565 100644
 --- a/vc4.c
 +++ b/vc4.c
 @@ -17,15 +17,33 @@
@@ -1297,6 +1302,14 @@ index 71763e4..0554bcb 100644
  	/*
  	 * Since the ARM L1 cache line size is 64 bytes, align to that as a
  	 * performance optimization.
+@@ -65,6 +72,7 @@ static int vc4_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t he
+ 
+ 	for (plane = 0; plane < bo->meta.num_planes; plane++)
+ 		bo->handles[plane].u32 = bo_create.handle;
++//  drv_log("create bo for vc4: handle:0x%x, size:%d\n", bo_create.handle, bo->meta.total_size);
+ 
+ 	return 0;
+ }
 diff --git a/vmwgfx.c b/vmwgfx.c
 new file mode 100644
 index 0000000..be0d474

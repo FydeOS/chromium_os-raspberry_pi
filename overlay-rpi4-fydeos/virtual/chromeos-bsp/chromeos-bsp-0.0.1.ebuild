@@ -24,6 +24,6 @@ RDEPEND="
   chromeos-base/baseboard-bsp
   virtual/fyde-packages
   virtual/fydemina
-  chromeos-base/chromeos-bsp-rpi4"
+  chromeos-base/chromeos-bsp-rpi4-fydeos"
 
 DEPEND="${RDEPEND}"

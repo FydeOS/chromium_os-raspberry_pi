@@ -1,0 +1,107 @@
+From dc5182e3d0884b7ff19d3d3a3e9469f105a0a9d8 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Tapani=20P=C3=A4lli?= <tapani.palli@intel.com>
+Date: Tue, 18 Oct 2016 14:23:47 +0300
+Subject: [PATCH 2/2] FROMLIST: glcpp: Hack to handle expressions in #line
+ directives.
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+GLSL ES 320 technically allows #line to have arbitrary expression trees
+rather than integer literal constants, unlike the C and C++ preprocessor.
+This is likely a completely unused feature that does not make sense.
+
+However, Android irritatingly mandates this useless behavior, so this
+patch implements a hack to try and support it.
+
+We handle a single expression:
+
+    #line <line number expression>
+
+but we avoid handling the double expression:
+
+    #line <line number expression> <source string expression>
+
+because this is an ambiguous grammar.  Instead, we handle the case that
+wraps both in parenthesis, which is actually well defined:
+
+    #line (<line number expression>) (<source string expression>)
+
+With this change following tests pass:
+
+   dEQP-GLES3.functional.shaders.preprocessor.builtin.line_expression_vertex
+   dEQP-GLES3.functional.shaders.preprocessor.builtin.line_expression_fragment
+   dEQP-GLES3.functional.shaders.preprocessor.builtin.line_and_file_expression_vertex
+   dEQP-GLES3.functional.shaders.preprocessor.builtin.line_and_file_expression_fragment
+
+Signed-off-by: Tapani Pälli <tapani.palli@intel.com>
+Signed-off-by: Kenneth Graunke <kenneth@whitecape.org>
+
+BUG=b:33352633
+BUG=b:33247335
+TEST=affected tests passing on CTS 7.1_r1 sentry
+
+Reviewed-on: https://chromium-review.googlesource.com/427305
+Tested-by: Haixia Shi <hshi@chromium.org>
+Reviewed-by: Ilja H. Friedel <ihf@chromium.org>
+Commit-Queue: Haixia Shi <hshi@chromium.org>
+Trybot-Ready: Haixia Shi <hshi@chromium.org>
+(cherry picked from commit 5ec83db3fcd5d64446ecc0860fa4b7dbb08b969a)
+
+BUG=b:77235812
+TEST=emerge-grunt arc-mesa; emerge-eve arc-mesa
+
+Change-Id: Ie12a03e7642ac4f5d79e0b6b20e16d7653c3395c
+Reviewed-on: https://chromium-review.googlesource.com/1105705
+Commit-Queue: Chad Versace <chadversary@chromium.org>
+Tested-by: Chad Versace <chadversary@chromium.org>
+Reviewed-by: Stéphane Marchesin <marcheu@chromium.org>
+(cherry picked from commit 97636c85f9e924f32a7ac4aac60ad4b27f4a09c7)
+Signed-off-by: Gurchetan Singh <gurchetansingh@chromium.org>
+---
+ src/compiler/glsl/glcpp/glcpp-parse.y | 21 ++++++++++++++++++---
+ 1 file changed, 18 insertions(+), 3 deletions(-)
+
+diff --git a/src/compiler/glsl/glcpp/glcpp-parse.y b/src/compiler/glsl/glcpp/glcpp-parse.y
+index 1c095cb66f9f..0dae4f7f28dc 100644
+--- a/src/compiler/glsl/glcpp/glcpp-parse.y
++++ b/src/compiler/glsl/glcpp/glcpp-parse.y
+@@ -224,10 +224,12 @@ expanded_line:
+ 			glcpp_error(& @1, parser, "undefined macro %s in expression (illegal in GLES)", $2.undefined_macro);
+ 		_glcpp_parser_skip_stack_change_if (parser, & @1, "elif", $2.value);
+ 	}
+-|	LINE_EXPANDED integer_constant NEWLINE {
++|	LINE_EXPANDED expression NEWLINE {
++		if (parser->is_gles && $2.undefined_macro)
++			glcpp_error(& @1, parser, "undefined macro %s in expression (illegal in GLES)", $2.undefined_macro);
+ 		parser->has_new_line_number = 1;
+-		parser->new_line_number = $2;
+-		_mesa_string_buffer_printf(parser->output, "#line %" PRIiMAX "\n", $2);
++		parser->new_line_number = $2.value;
++		_mesa_string_buffer_printf(parser->output, "#line %" PRIiMAX "\n", $2.value);
+ 	}
+ |	LINE_EXPANDED integer_constant integer_constant NEWLINE {
+ 		parser->has_new_line_number = 1;
+@@ -238,6 +240,19 @@ expanded_line:
+ 					   "#line %" PRIiMAX " %" PRIiMAX "\n",
+ 					    $2, $3);
+ 	}
++|	LINE_EXPANDED '(' expression ')' '(' expression ')' NEWLINE {
++		if (parser->is_gles && $3.undefined_macro)
++			glcpp_error(& @1, parser, "undefined macro %s in expression (illegal in GLES)", $3.undefined_macro);
++		if (parser->is_gles && $6.undefined_macro)
++			glcpp_error(& @1, parser, "undefined macro %s in expression (illegal in GLES)", $6.undefined_macro);
++		parser->has_new_line_number = 1;
++		parser->new_line_number = $3.value;
++		parser->has_new_source_number = 1;
++		parser->new_source_number = $6.value;
++		_mesa_string_buffer_printf(parser->output,
++					   "#line %" PRIiMAX " %" PRIiMAX "\n",
++					   $3.value, $6.value);
++	}
+ ;
+ 
+ define:
+-- 
+2.20.1
+

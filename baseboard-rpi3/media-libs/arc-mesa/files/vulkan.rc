@@ -1,0 +1,8 @@
+# Copyright 2017 The Chromium OS Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+on early-init
+    setprop ro.hardware.vulkan cheets
+    setprop ro.hardware.vulkan.level 1
+    setprop ro.hardware.vulkan.version 4194307

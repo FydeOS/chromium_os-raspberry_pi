@@ -136,7 +136,7 @@ RDEPEND="${RDEPEND}
 	app-crypt/mit-krb5
 	app-misc/edid-decode
 	authpolicy? ( chromeos-base/authpolicy )
-	~chromeos-base/chrome-icu-${PV}
+	chromeos-base/chrome-icu
 	chromeos-base/gestures
 	chromeos-base/libevdev
 	fonts? ( chromeos-base/chromeos-fonts )
