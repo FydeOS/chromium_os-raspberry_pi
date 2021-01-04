@@ -18,3 +18,4 @@ dtoverlay=vc4-fkms-v3d
 
 arm_64bit=1
 max_framebuffers=2
+kernel=kernel8_a.img

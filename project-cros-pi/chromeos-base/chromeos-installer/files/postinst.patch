@@ -1,0 +1,23 @@
+diff --git a/installer/chromeos-postinst b/installer/chromeos-postinst
+index bd8e095c4..7a7d25f4e 100755
+--- a/installer/chromeos-postinst
++++ b/installer/chromeos-postinst
+@@ -20,7 +20,18 @@ cleanup() {
+   done
+ }
+ 
++get_cur_dev() {
++  mount |grep ${INSTALL_ROOT} |awk '{print $1}'
++}
++
++get_disk_dev() {
++  local disk_dev=$(get_cur_dev)
++  disk_dev=${disk_dev%[0-9]*}
++  echo ${disk_dev%p}
++}
++
+ main() {
++  /usr/sbin/switch_root.sh 3 $(get_disk_dev)
+   cd "${INSTALL_ROOT}" || exit 1
+ 
+   trap cleanup EXIT

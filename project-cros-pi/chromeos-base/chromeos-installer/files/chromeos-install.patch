@@ -1,0 +1,22 @@
+diff --git a/installer/chromeos-install b/installer/chromeos-install
+index 72839d966..92a8a6f48 100755
+--- a/installer/chromeos-install
++++ b/installer/chromeos-install
+@@ -645,6 +645,8 @@ install_stateful() {
+     #
+     touch ${TMPMNT}/.developer_mode
+   fi
++  # avoid modify the gpt table
++  touch ${TMPMNT}/.autoexpanded
+ 
+   if [ -n "${IS_RECOVERY_INSTALL-}" ] ; then
+     # This is a recovery install; write some recovery metrics to the stateful
+@@ -893,6 +895,8 @@ do_post_install() {
+     if [ "${FLAGS_mtd_layout}" -eq "${FLAGS_FALSE}" ]; then
+       loop_offset_cleanup
+     fi
++  else
++    /usr/sbin/switch_root.sh ${PARTITION_NUM_ROOT_A} ${DST}
+   fi
+ }
+ 

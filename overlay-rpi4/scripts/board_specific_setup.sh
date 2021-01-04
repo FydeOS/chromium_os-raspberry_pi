@@ -21,6 +21,19 @@ disk2 : start=   1, size=    1, Id= ee
 EOF
 }
 
+get_target_uuid() {
+  local partnum=$1
+  local diskimage=$2
+  cgpt show -i $partnum -u $diskimage
+}
+
+modify_root() {
+  local diskimage=$1
+  local target_cmdline=$2
+  local uuid=$(get_target_uuid 3 $diskimage)
+  sudo sed -i "s|/dev/mmcblk0p3|PARTUUID=${uuid}|" $target_cmdline
+}
+
 install_raspberrypi_bootloader() {
   local efi_offset_sectors=$(partoffset "$1" 12)
   local efi_size_sectors=$(partsize "$1" 12)
@@ -32,12 +45,13 @@ install_raspberrypi_bootloader() {
   local target_img="${efi_dir}/kernel7l.img"
   if [ -z "$kernel_img" ]; then
     kernel_img=$(ls "${ROOT}/boot/Image"*)
-    target_img="${efi_dir}/kernel8.img"
+    target_img="${efi_dir}/kernel8_a.img"
   fi
   sudo mount -o "${mount_opts}"  "$1" "${efi_dir}"
 
   info "Installing firmware, kernel and overlays"
   sudo cp -r "${ROOT}/firmware/rpi/"* "${efi_dir}/"
+  modify_root $1 ${efi_dir}/cmdline.txt
   if [ -d ${ROOT}/usr/src/linux/arch/arm/boot/dts ]; then
     sudo cp ${ROOT}/usr/src/linux/arch/arm/boot/dts/*.dtb "${efi_dir}/"
     sudo cp -r ${ROOT}/usr/src/linux/arch/arm/boot/dts/overlays "${efi_dir}/"

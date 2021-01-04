@@ -24,6 +24,7 @@ RDEPEND="
   chromeos-base/baseboard-bsp
   virtual/fyde-packages
   virtual/fydemina
+  app-i18n/google-ime-tools
   chromeos-base/chromeos-bsp-rpi4-fydeos"
 
 DEPEND="${RDEPEND}"
