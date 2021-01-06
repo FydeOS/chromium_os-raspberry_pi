@@ -14,6 +14,44 @@
       {
         "num": 12,
         "size": "64 MiB"
+      },
+      {
+        # Slot B rootfs, unused on USB, but pad to 2M.
+        # installation will expand this to size from base.
+        "num": 5,
+        "size": "2 MiB"
+      },
+      {
+        "num": 3,
+        "fs_size":"2700 MiB",
+        "size": "2724 MiB"
+      }
+    ],
+    "usb":[
+      {
+        # Slot B rootfs, unused on USB, but pad to 2M.
+        # installation will expand this to size from base.
+        "num": 5,
+        "size": "2 MiB"
+      },
+      {
+        "num": 3,
+        "fs_size":"2700 MiB",
+        "size": "2724 MiB"
+      }
+    ],
+    "factory_install": [
+      {
+        "num": 3,
+        "fs_size":"2484 MiB",
+        "size":"2724 MiB"
+      }
+    ],
+    "recovery":[
+      {
+        "num": 3,
+        "fs_size":"2484 MiB",
+        "size": "2724 MiB"
       }
     ]
   }
