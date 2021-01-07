@@ -49,7 +49,7 @@ expand_partition() {
   local partnum=$(parse_partition_num $part)
   local first_sec=$(cgpt show -i ${partnum} -b ${disk})
   local last_sec=$(cgpt show ${disk}| grep "Sec GPT table" | awk '{print $1}')
-  local target_size=$((${last_sec}-${first_sec}-33))
+  local target_size=$((${last_sec}-${first_sec}-64))
   target_size=$((${target_size}/4*4))
   echo "Check disk:$disk partition table..."
   sgdisk -e $disk
@@ -61,6 +61,7 @@ expand_partition() {
   partx -u $part
   echo "Down"
   echo "Resize filesystem on partition..."
+  sync
   resize2fs $part
   echo "Down"
 }
