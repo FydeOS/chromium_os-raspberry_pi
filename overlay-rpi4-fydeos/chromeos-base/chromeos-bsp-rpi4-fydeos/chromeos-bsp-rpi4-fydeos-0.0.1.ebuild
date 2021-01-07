@@ -29,4 +29,6 @@ src_install() {
   doins "${FILESDIR}/kernel-config"/*
   exeinto /usr/share/cros/init
   doexe "${FILESDIR}"/audio/set-hdmi.sh
+  insinto /etc/chromium/policies/managed
+  doins ${FILESDIR}/power_policy/power.json
 }
