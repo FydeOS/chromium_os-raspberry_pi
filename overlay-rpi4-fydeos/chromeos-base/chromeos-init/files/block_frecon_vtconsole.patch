@@ -1,0 +1,13 @@
+diff --git a/init/upstart/boot-splash.conf b/init/upstart/boot-splash.conf
+index 3fdcc3312..208e98cbe 100644
+--- a/init/upstart/boot-splash.conf
++++ b/init/upstart/boot-splash.conf
+@@ -48,7 +48,7 @@ script
+     ARGS="${ASSETLESS_ARGS}"
+   fi
+ 
+-  if is_developer_end_user; then
++  if ! is_developer_end_user; then
+     ARGS="${ARGS} --dev-mode --enable-osc --enable-vts --pre-create-vts"
+   fi
+ 

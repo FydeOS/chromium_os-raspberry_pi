@@ -1,7 +1,39 @@
 #/bin/bash
 cras_client=/usr/bin/cras_test_client
-hdmi_fix_id=e9849cd9
-dev=$(${cras_client} --dump_s |grep $hdmi_fix_id | awk '{print $2}')
-${cras_client} --plug "${dev}":1
-${cras_client} --select_output ${dev}
-logger -t "rpi4-hdmi" "set ${dev} plugged and to be the output dev."
+plug_devs=(e9849cd9)
+unplug_devs=(99dc7b5c 595f1baf)
+
+set_state(){
+  local dev=$1
+  local state=$2
+  ${cras_client} --plug "${dev}":${state}
+}
+
+plug_dev(){
+  local dev=$1
+  set_state $dev 1
+  logger -t "rpi4-hdmi" "set ${dev} plugged"
+}
+
+unplug_dev(){
+  local dev=$1
+  set_state $dev 0
+  logger -t "rpi4-hdmi" "set ${dev} unplugged"
+}
+
+unplug_devs(){
+  for id in "${unplug_devs[@]}";do
+    local dev=$(${cras_client} | grep $id | awk '{print $2}')
+    unplug_dev $dev
+  done
+}
+
+plug_devs(){
+  for id in "${plug_devs[@]}";do
+    local dev=$(${cras_client} | grep $id | awk '{print $2}')
+    plug_dev $dev
+  done
+}
+
+plug_devs
+unplug_devs

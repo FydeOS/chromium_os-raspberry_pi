@@ -232,4 +232,5 @@ src_prepare() {
     epatch ${FILESDIR}/fix_cgroup_memory.patch
   fi
   epatch ${FILESDIR}/change_splash_background_color_black.patch
+  epatch ${FILESDIR}/block_frecon_vtconsole.patch
 }
