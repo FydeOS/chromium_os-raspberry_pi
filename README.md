@@ -25,6 +25,7 @@ If you aren't bothered with all the technicalities and just want the pre-built i
 - [Setup local chromium source](#setup-local-chromium-source)
 - [Build Chromium OS for Raspberry Pi](#build-chromium-os-for-raspberry-pi)
 - [Boot Raspberry Pi from the image](#boot-raspberry-pi-from-the-image)
+- [Video demonstration of the build process](#video-demonstration-of-the-build-process)
 - [More information](#more-information)
 - [About us](#about-us)
   <!-- /TOC -->
@@ -571,6 +572,10 @@ This asks to write the latest disk image to USB removable media. A list of USB r
 
 After the disk image is successfully written to the SD card, plug it into the Raspberry Pi and boot it as usual. After a few seconds you will see a Chromium logo, later on it will boot into GUI mode and the first time setup screen (OOBE) will pop up for you to configure the system and login.
 
+
+# Video demonstration of the build process
+
+<https://youtu.be/og4wzzIfGA0>
 
 
 # More information
