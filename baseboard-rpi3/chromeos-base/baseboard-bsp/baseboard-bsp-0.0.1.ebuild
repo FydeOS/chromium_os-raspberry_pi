@@ -19,3 +19,9 @@ RDEPEND="
 
 DEPEND="${RDEPEND}"
 
+S=$WORKDIR
+
+src_install() {
+  insinto /etc/init
+  doins ${FILESDIR}/powerd/never-suspend.conf
+}
