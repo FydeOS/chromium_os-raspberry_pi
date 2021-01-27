@@ -12,6 +12,7 @@ KEYWORDS="*"
 IUSE=""
 
 RDEPEND="
+    chromeos-base/arc-user-env
     chromeos-base/device-appid
 "
 
@@ -31,4 +32,6 @@ src_install() {
   doexe "${FILESDIR}"/audio/set-hdmi.sh
   insinto /etc/chromium/policies/managed
   doins ${FILESDIR}/power_policy/power.json
+  insinto /etc
+  doins ${FILESDIR}/etc/hardware_features.xml
 }
