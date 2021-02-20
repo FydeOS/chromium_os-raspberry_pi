@@ -65,9 +65,10 @@
    - You've read the entire developer guide and even watched the [build demonstration video](https://youtu.be/og4wzzIfGA0), and then you are attempting to build Chromium OS but have encountered problems
    - You believe your copy of the Chromium OS for Raspberry Pi isn't functioning correctly as it should be
 
-  Your issues will likely to get instantly closed if:
+  Your issues will likely to get closed if:
    - You are asking about FydeOS for You - Raspberry Pi 400: for this please use [FydeOS Community](http://community.fydeos.com/) or join [Official FydeOS Telegram Group](http://t.me/hi_fydeos)
    - You are asking generic features/bugs about Chromium OS / Chrome OS itself: for this please use use [chromium-os-dev Google Group](https://groups.google.com/a/chromium.org/g/chromium-os-dev) or report bugs to [CRBUGS](https://bugs.chromium.org/)
+   - You are asking issues about a 3rd-party app, a non-standard peripheral device or a special setup that does not benefit the general community
 </details>
 
 
