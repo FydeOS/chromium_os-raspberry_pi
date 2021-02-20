@@ -5,9 +5,70 @@
 
 <br>
 
-# TL;DR:
+# TL;DR: (in FAQ format)
 
-If you aren't bothered with all the technicalities and just want the pre-built images, it's [here](https://github.com/FydeOS/chromium_os-raspberry_pi/releases), under the **release** tab, no hard feelings :p
+<details>
+  <summary>What's this, is this FydeOS?</summary>
+  <br>
+  
+  We get it, it's confusing. There are `Chromium OS for Raspberry Pi` and `FydeOS for You - Raspberry Pi 400`, these are different releases.
+  
+  This project is about `Chromium OS for Raspberry Pi`, **not** `FydeOS for You - Raspberry Pi 400`. However, some of the elements that we have used to produce FydeOS for You - Raspberry Pi 400 are also open sourced in this project.
+  
+  The next question gives detailed differences between these confusing terms.
+</details>
+
+
+<details>
+  <summary>What's the difference between Chromium OS, Chrome OS and FydeOS?</summary>
+  <br>
+  
+  - Chromium OS is the open source project, used primarily by developers, with code that is available for anyone to checkout, modify, and build.
+  - Google Chrome OS is the Google product that OEMs ship on Chromebooks for general consumer use.
+  - FydeOS is similar to Google Chrome OS, but produced and maintained by Fyde Innovations. 
+  
+  Some specific differences:
+
+  - These OS projects fundamentally share the same code base, but Google Chrome OS has some additional firmware features, including verified boot and easy recovery, which require corresponding hardware changes and thus also don't work out of the box in Chromium OS builds.
+  - Google Chrome OS / "FydeOS for You" runs on specially optimised hardware in order to get enhanced performance and security.
+  - Chromium OS does not auto-update by default (so that changes you may have made to the code are not blown away), whereas Google Chrome OS / FydeOS seamlessly auto-updates so that users have the latest and greatest features and fixes.
+  - Google Chrome OS / FydeOS includes some proprietary/commercial/licensed packages which are not included in the Chromium OS project.
+  - In consequence of the above, Google Chrome OS / FydeOS supports Android subsystem, Chromium OS does not.
+  - Google Chrome OS has a green/yellow/red logo, Chromium OS has a blue/bluer/bluest logo, FydeOS has a weird grey/black/red logo and it may change in the future.
+
+</details>
+
+
+<details>
+  <summary>Can I build Chromium OS? Can I build FydeOS?</summary>
+  <br>
+  
+   - Yes you can build Chromium OS, in fact this project is all about building your own Chromium OS for Raspberry Pi as well as offering pre-built images using the provided build artefacts.
+   - No you can't build FydeOS - same reason that you can't build Google Chrome OS.
+</details>
+
+
+<details>
+  <summary>I don't want to be bothered with the technicalities, where are the download links?</summary>
+  <br>
+  
+   - To download pre-built Chromium OS for Raspberry Pi, head over to [releases](https://github.com/FydeOS/chromium_os-raspberry_pi/releases) tab, you will find all historical releases as well as important release notes. Please do read the release note!
+   - To download FydeOS for You - Raspberry Pi 400, please use the [Download](https://fydeos.com/download) page of the FydeOS official site.
+</details>
+
+
+<details>
+  <summary>Where to get help?</summary>
+  <br>
+  
+  You are welcome to open an issue in this project if:
+   - You've read the entire developer guide and even watched the [build demonstration video](https://youtu.be/og4wzzIfGA0), and then you are attempting to build Chromium OS but have encountered problems
+   - You believe your copy of the Chromium OS for Raspberry Pi isn't functioning correctly as it should be
+
+  Your issues will likely to get instantly closed if:
+   - You are asking about FydeOS for You - Raspberry Pi 400: for this please use [FydeOS Community](http://community.fydeos.com/) or join [Official FydeOS Telegram Group](http://t.me/hi_fydeos)
+   - You are asking generic features/bugs about Chromium OS / Chrome OS itself: for this please use use [chromium-os-dev Google Group](https://groups.google.com/a/chromium.org/g/chromium-os-dev) or report bugs to [CRBUGS](https://bugs.chromium.org/)
+</details>
 
 
 
