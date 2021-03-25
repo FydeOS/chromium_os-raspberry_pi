@@ -2,3 +2,5 @@ media-sound/adhd::chromiumos
 media-libs/minigbm::chromiumos
 virtual/chromeos-config-bsp::chromiumos
 media-libs/mesa::chromiumos
+media-libs/arc-mesa::arc-plus
+media-libs/arc-cros-gralloc::chromiumos

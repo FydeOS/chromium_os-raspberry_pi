@@ -4,6 +4,8 @@
 
 EAPI=6
 
+CROS_WORKON_COMMIT="88061634c9f65f4c9496c59e446acf71b862da17"
+CROS_WORKON_TREE="81076becad9df804deff46f52f64efa2f7f47288"
 CROS_WORKON_PROJECT="chromiumos/third_party/mesa"
 CROS_WORKON_LOCALNAME="mesa-freedreno"
 
@@ -34,9 +36,9 @@ DEPEND="
 	>=x11-libs/arc-libdrm-2.4.82[${MULTILIB_USEDEP}]
 	dev-libs/arc-libelf[${MULTILIB_USEDEP}]
 "
-ARC_PLATFORM_SDK_VERSION=28
 
 RDEPEND="${DEPEND}"
+ARC_PLATFORM_SDK_VERSION=28
 
 src_configure() {
 	arc-build-select-clang
@@ -46,8 +48,8 @@ src_configure() {
 
 multilib_src_configure() {
 	tc-getPROG PKG_CONFIG pkg-config
-  
-  CPPFLAGS+=" -DANDROID_API_LEVEL=${ARC_PLATFORM_SDK_VERSION}"
+  CFLAGS+=" -DANDROID_API_LEVEL=${ARC_PLATFORM_SDK_VERSION}"
+  CPFLAGS+=" -DANDROID_API_LEVEL=${ARC_PLATFORM_SDK_VERSION}"
 
 	emesonargs+=(
 		--prefix="${ARC_PREFIX}/vendor"
@@ -63,7 +65,7 @@ multilib_src_configure() {
 		-Dgles2=enabled
 		-Dshared-glapi=enabled
 		-Ddri-drivers=
-		-Dgallium-drivers=freedreno
+		-Dgallium-drivers="vc4,v3d"
 		-Dgallium-vdpau=disabled
 		-Dgallium-xa=disabled
 		-Dplatforms=android
@@ -93,7 +95,7 @@ multilib_src_install() {
 	newexe "${BUILD_DIR}/src/mapi/es2api/libGLESv2_mesa.so" libGLESv2_mesa.so
 
 	exeinto "${ARC_PREFIX}/vendor/$(get_libdir)/dri"
-  newexe "${BUILD_DIR}/src/gallium/targets/dri/libgallium_dri.so" vc4_dri.so
+	newexe "${BUILD_DIR}/src/gallium/targets/dri/libgallium_dri.so" vc4_dri.so
   newexe "${BUILD_DIR}/src/gallium/targets/dri/libgallium_dri.so" v3d_dri.so
 }
 
@@ -106,7 +108,7 @@ multilib_src_install_all() {
 
 	# Install init files to advertise supported API versions.
 	insinto "${ARC_PREFIX}/vendor/etc/init"
-	doins "${FILESDIR}/gles31.rc"
+	doins "${FILESDIR}/gles31/init.gpu.rc"
 
 	# Install the dri header for arc-cros-gralloc
 	insinto "${ARC_PREFIX}/vendor/include/GL"

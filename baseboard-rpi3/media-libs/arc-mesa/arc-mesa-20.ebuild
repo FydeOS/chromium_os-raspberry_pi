@@ -8,7 +8,7 @@ CROS_WORKON_COMMIT="e925e97746afa471b86e4f9608498f15fe9b2956"
 CROS_WORKON_TREE="cde5431fb6fb5b6843049a5df677de47050df448"
 CROS_WORKON_PROJECT="chromiumos/third_party/mesa"
 CROS_WORKON_LOCALNAME="arc-mesa-virgl"
-CROS_WORKON_BLACKLIST="1"
+CROS_WORKON_MANUAL_UPREV="1"
 
 EGIT_REPO_URI="git://anongit.freedesktop.org/mesa/mesa"
 
@@ -53,7 +53,7 @@ REQUIRED_USE="
 	android_aep? ( !android_gles2 !android_gles30 )
 	android_vulkan_compute_0? ( vulkan )
 	cheets? (
-		vulkan? ( ^^ ( video_cards_amdgpu video_cards_intel ) )
+		vulkan? ( ^^ ( video_cards_amdgpu video_cards_intel video_cards_v3d ) )
 		video_cards_amdgpu? ( llvm )
 		video_cards_llvmpipe? ( !cheets_user !cheets_user_64 )
 	)"
@@ -207,6 +207,7 @@ multilib_src_configure() {
 	if use vulkan; then
 		vulkan_enable video_cards_amdgpu amd
 		vulkan_enable video_cards_intel intel
+    vulkan_enable video_cards_v3d broadcom
 	fi
 
 	export LLVM_CONFIG=${SYSROOT}/usr/bin/llvm-config-host

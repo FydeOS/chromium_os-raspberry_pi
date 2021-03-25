@@ -38,7 +38,7 @@ DEPEND="${RDEPEND}
 	)"
 
 src_prepare() {
-  epatch ${FILESDIR}/01_add_more_formats.patch
+  epatch ${FILESDIR}/vc4_v3d.patch
 	default
 	sanitizers-setup-env
 	cros-common.mk_src_prepare

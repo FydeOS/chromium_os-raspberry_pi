@@ -6,3 +6,4 @@ chromeos-base/cros-disks::patches
 chromeos-base/vm_host_tools::patches
 chromeos-base/chromeos-init::patches
 chromeos-base/chromeos-init::chromiumos
+media-libs/arc-mesa::arc-plus

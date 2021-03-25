@@ -17,12 +17,15 @@ SLOT="0"
 KEYWORDS="~*"
 VIDEO_CARDS="
 	amdgpu exynos intel marvell mediatek msm
-	radeon radeonsi rockchip tegra vc4 virgl v3d
+	radeon radeonsi rockchip tegra vc4 virgl
 "
-IUSE="-asan kernel-3_8 kernel-3_14 kernel-3_18"
+IUSE="-asan kernel-3_8 kernel-3_14 kernel-3_18 linear_align_256"
 for card in ${VIDEO_CARDS}; do
 	IUSE+=" video_cards_${card}"
 done
+
+MINI_GBM_PLATFORMS_USE=( mt8183 mt8192 )
+IUSE+=" ${MINI_GBM_PLATFORMS_USE[*]/#/minigbm_platform_}"
 
 RDEPEND="
 	x11-libs/libdrm
@@ -53,9 +56,8 @@ src_configure() {
 		fi
 	fi
 	use video_cards_marvell && append-cppflags -DDRV_MARVELL && export DRV_MARVELL=1
-	if [[ ${MTK_MINIGBM_PLATFORM} == "MT8183" ]] ; then
-		append-cppflags -DMTK_MT8183 && export MTK_MT8183=1
-	fi
+	use minigbm_platform_mt8183 && append-cppflags -DMTK_MT8183
+	use minigbm_platform_mt8192 && append-cppflags -DMTK_MT8192
 	use video_cards_mediatek && append-cppflags -DDRV_MEDIATEK && export DRV_MEDIATEK=1
 	use video_cards_msm && append-cppflags -DDRV_MSM && export DRV_MSM=1
 	use video_cards_radeon && append-cppflags -DDRV_RADEON && export DRV_RADEON=1
@@ -64,7 +66,7 @@ src_configure() {
 	use video_cards_tegra && append-cppflags -DDRV_TEGRA && export DRV_TEGRA=1
 	use video_cards_vc4 && append-cppflags -DDRV_VC4 && export DRV_VC4=1
 	use video_cards_virgl && append-cppflags -DDRV_VIRGL && export DRV_VIRGL=1
-  use video_cards_v3d && append-cppflags -DDRV_V3D && export DRV_V3D=1
+	use linear_align_256 && append-cppflags -DLINEAR_ALIGN_256
 	cros-common.mk_src_configure
 }
 
@@ -75,10 +77,6 @@ src_compile() {
 src_install() {
 	insinto "${EPREFIX}/etc/udev/rules.d"
 	doins "${FILESDIR}/50-vgem.rules"
-
-	# Install cros_gralloc header files for arc-mali-* packages
-	insinto "${EPREFIX}/usr/include/cros_gralloc"
-	doins "${S}/cros_gralloc/cros_gralloc_handle.h"
 
 	default
 }

@@ -8,4 +8,4 @@
 # the package, and it prints a string on stdout with the numerical version
 # number for said repo.
 
-exec sed -e 's/devel/pre/g' -e 's/-/_/g' $1/VERSION
+exec sed -e 's/devel/pre/g' -e 's/-/_/g' "$1/VERSION"

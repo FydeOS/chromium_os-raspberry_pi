@@ -5,11 +5,11 @@ index 05d7fd061..1377d9ed6 100644
 @@ -48,6 +48,10 @@ script
            -o "${subsys},${mount_opts}" || log "${subsys}"
      fi
- 
+
 +    if [ "${subsys}" = "memory" ]; then
 +      echo 1 > /sys/fs/cgroup/memory/memory.use_hierarchy
 +    fi
 +
-     mkdir -p /sys/fs/cgroup/${subsys}/session_manager_containers
-     if id -u android-root 2>/dev/null; then
-       chown android-root:android-root \
+     if [ "${subsys}" != "net_cls" ]; then
+       mkdir -p /sys/fs/cgroup/${subsys}/session_manager_containers
+       if id -u android-root 2>/dev/null; then

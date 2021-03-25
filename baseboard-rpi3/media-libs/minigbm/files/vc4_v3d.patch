@@ -1,0 +1,702 @@
+diff --git a/Android.mk b/Android.mk
+index 18c1bba..77b0d4c 100644
+--- a/Android.mk
++++ b/Android.mk
+@@ -23,6 +23,7 @@ MINIGBM_SRC := \
+ 	rockchip.c \
+ 	tegra.c \
+ 	vc4.c \
++	v3d.c \
+ 	virtio_gpu.c
+ 
+ MINIGBM_CPPFLAGS := -std=c++14
+diff --git a/drv.c b/drv.c
+index 5c8f9a0..9cbd9f7 100644
+--- a/drv.c
++++ b/drv.c
+@@ -49,6 +49,9 @@ extern const struct backend backend_tegra;
+ #ifdef DRV_VC4
+ extern const struct backend backend_vc4;
+ #endif
++#ifdef DRV_V3D
++extern const struct backend backend_v3d;
++#endif
+ 
+ // Dumb / generic drivers
+ extern const struct backend backend_evdi;
+@@ -93,6 +96,9 @@ static const struct backend *drv_get_backend(int fd)
+ #endif
+ #ifdef DRV_VC4
+ 		&backend_vc4,
++#endif
++#ifdef DRV_V3D
++    &backend_v3d,
+ #endif
+ 		&backend_evdi,	   &backend_marvell,	&backend_meson,	    &backend_nouveau,
+ 		&backend_komeda,   &backend_radeon,	&backend_synaptics, &backend_virtio_gpu,
+@@ -102,13 +108,18 @@ static const struct backend *drv_get_backend(int fd)
+ 	for (i = 0; i < ARRAY_SIZE(backend_list); i++) {
+ 		const struct backend *b = backend_list[i];
+ 		// Exactly one of the main create functions must be defined.
++	#ifdef DEBUG
++		drv_log("compare:drm-%s to drv-%s\n", drm_version->name, b->name);
++	#endif
+ 		assert((b->bo_create != NULL) ^ (b->bo_create_from_metadata != NULL));
+ 		// Either both or neither must be implemented.
+ 		assert((b->bo_compute_metadata != NULL) == (b->bo_create_from_metadata != NULL));
+ 		// Both can't be defined, but it's okay for neither to be (i.e. only bo_create).
+ 		assert((b->bo_create_with_modifiers == NULL) ||
+ 		       (b->bo_create_from_metadata == NULL));
+-
++	#ifdef DEBUG
++                drv_log("%s passed driver check.\n", b->name);
++	#endif
+ 		if (!strcmp(drm_version->name, b->name)) {
+ 			drmFreeVersion(drm_version);
+ 			return b;
+diff --git a/helpers.c b/helpers.c
+index 326dddf..873a244 100644
+--- a/helpers.c
++++ b/helpers.c
+@@ -647,3 +647,113 @@ uint32_t drv_get_standard_fourcc(uint32_t fourcc_internal)
+ {
+ 	return (fourcc_internal == DRM_FORMAT_YVU420_ANDROID) ? DRM_FORMAT_YVU420 : fourcc_internal;
+ }
++
++char * getDrmFormatString(uint32_t drmFormat) {
++    switch (drmFormat) {
++        case DRM_FORMAT_ABGR1555:
++            return "DRM_FORMAT_ABGR1555";
++        case DRM_FORMAT_ABGR2101010:
++            return "DRM_FORMAT_ABGR2101010";
++        case DRM_FORMAT_ABGR4444:
++            return "DRM_FORMAT_ABGR4444";
++        case DRM_FORMAT_ABGR8888:
++            return "DRM_FORMAT_ABGR8888";
++        case DRM_FORMAT_ARGB1555:
++            return "DRM_FORMAT_ARGB1555";
++        case DRM_FORMAT_ARGB2101010:
++            return "DRM_FORMAT_ARGB2101010";
++        case DRM_FORMAT_ARGB4444:
++            return "DRM_FORMAT_ARGB4444";
++        case DRM_FORMAT_ARGB8888:
++            return "DRM_FORMAT_ARGB8888";
++        case DRM_FORMAT_AYUV:
++            return "DRM_FORMAT_AYUV";
++        case DRM_FORMAT_BGR233:
++            return "DRM_FORMAT_BGR233";
++        case DRM_FORMAT_BGR565:
++            return "DRM_FORMAT_BGR565";
++        case DRM_FORMAT_BGR888:
++            return "DRM_FORMAT_BGR888";
++        case DRM_FORMAT_BGRA1010102:
++            return "DRM_FORMAT_BGRA1010102";
++        case DRM_FORMAT_BGRA4444:
++            return "DRM_FORMAT_BGRA4444";
++        case DRM_FORMAT_BGRA5551:
++            return "DRM_FORMAT_BGRA5551";
++        case DRM_FORMAT_BGRA8888:
++            return "DRM_FORMAT_BGRA8888";
++        case DRM_FORMAT_BGRX1010102:
++            return "DRM_FORMAT_BGRX1010102";
++        case DRM_FORMAT_BGRX4444:
++            return "DRM_FORMAT_BGRX4444";
++        case DRM_FORMAT_BGRX5551:
++            return "DRM_FORMAT_BGRX5551";
++        case DRM_FORMAT_BGRX8888:
++            return "DRM_FORMAT_BGRX8888";
++        case DRM_FORMAT_C8:
++            return "DRM_FORMAT_C8";
++        case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED:
++            return "DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED";
++        case DRM_FORMAT_GR88:
++            return "DRM_FORMAT_GR88";
++        case DRM_FORMAT_NV12:
++            return "DRM_FORMAT_NV12";
++        case DRM_FORMAT_NV21:
++            return "DRM_FORMAT_NV21";
++        case DRM_FORMAT_R8:
++            return "DRM_FORMAT_R8";
++        case DRM_FORMAT_RG88:
++            return "DRM_FORMAT_RG88";
++        case DRM_FORMAT_RGB332:
++            return "DRM_FORMAT_RGB332";
++        case DRM_FORMAT_RGB565:
++            return "DRM_FORMAT_RGB565";
++        case DRM_FORMAT_RGB888:
++            return "DRM_FORMAT_RGB888";
++        case DRM_FORMAT_RGBA1010102:
++            return "DRM_FORMAT_RGBA1010102";
++        case DRM_FORMAT_RGBA4444:
++            return "DRM_FORMAT_RGBA4444";
++        case DRM_FORMAT_RGBA5551:
++            return "DRM_FORMAT_RGBA5551";
++        case DRM_FORMAT_RGBA8888:
++            return "DRM_FORMAT_RGBA8888";
++        case DRM_FORMAT_RGBX1010102:
++            return "DRM_FORMAT_RGBX1010102";
++        case DRM_FORMAT_RGBX4444:
++            return "DRM_FORMAT_RGBX4444";
++        case DRM_FORMAT_RGBX5551:
++            return "DRM_FORMAT_RGBX5551";
++        case DRM_FORMAT_RGBX8888:
++            return "DRM_FORMAT_RGBX8888";
++        case DRM_FORMAT_UYVY:
++            return "DRM_FORMAT_UYVY";
++        case DRM_FORMAT_VYUY:
++            return "DRM_FORMAT_VYUY";
++        case DRM_FORMAT_XBGR1555:
++            return "DRM_FORMAT_XBGR1555";
++        case DRM_FORMAT_XBGR2101010:
++            return "DRM_FORMAT_XBGR2101010";
++        case DRM_FORMAT_XBGR4444:
++            return "DRM_FORMAT_XBGR4444";
++        case DRM_FORMAT_XBGR8888:
++            return "DRM_FORMAT_XBGR8888";
++        case DRM_FORMAT_XRGB1555:
++            return "DRM_FORMAT_XRGB1555";
++        case DRM_FORMAT_XRGB2101010:
++            return "DRM_FORMAT_XRGB2101010";
++        case DRM_FORMAT_XRGB4444:
++            return "DRM_FORMAT_XRGB4444";
++        case DRM_FORMAT_XRGB8888:
++            return "DRM_FORMAT_XRGB8888";
++        case DRM_FORMAT_YUYV:
++            return "DRM_FORMAT_YUYV";
++        case DRM_FORMAT_YVU420:
++            return "DRM_FORMAT_YVU420";
++        case DRM_FORMAT_YVU420_ANDROID:
++            return "DRM_FORMAT_YVU420";
++        case DRM_FORMAT_YVYU:
++            return "DRM_FORMAT_YVYU";
++    }
++    return "Unknown format";
++}
+diff --git a/helpers.h b/helpers.h
+index bbefed8..7cddda8 100644
+--- a/helpers.h
++++ b/helpers.h
+@@ -47,6 +47,7 @@ uint64_t drv_pick_modifier(const uint64_t *modifiers, uint32_t count,
+ 			   const uint64_t *modifier_order, uint32_t order_count);
+ bool drv_has_modifier(const uint64_t *list, uint32_t count, uint64_t modifier);
+ uint32_t drv_get_standard_fourcc(uint32_t fourcc_internal);
++char *getDrmFormatString(uint32_t drmFormat);
+ 
+ #ifdef __cplusplus
+ }
+diff --git a/v3d.c b/v3d.c
+new file mode 100644
+index 0000000..42f95f8
+--- /dev/null
++++ b/v3d.c
+@@ -0,0 +1,114 @@
++/*
++ * Copyright 2019 The FydeOS Authors. All rights reserved.
++ * Use of this source code is governed by a BSD-style license that can be
++ * found in the LICENSE file.
++ * Author: Yang Tsao <yang@fydeos.io>
++ */
++
++#ifdef DRV_V3D
++
++#include <errno.h>
++#include <stdio.h>
++#include <string.h>
++#include <sys/mman.h>
++#include <xf86drm.h>
++
++#include "drv_priv.h"
++#include "helpers.h"
++#include "util.h"
++#include "v3d_drm.h"
++#define ARC_CALLOC (1<<7)
++static const uint32_t render_target_formats[] = { DRM_FORMAT_RGB565, DRM_FORMAT_BGR565,
++ DRM_FORMAT_ARGB8888, DRM_FORMAT_XRGB8888, DRM_FORMAT_ABGR8888, DRM_FORMAT_XBGR8888 };
++
++static const uint32_t texture_target_formats[] = {
++             DRM_FORMAT_YVU420, DRM_FORMAT_NV12
++      };
++
++static int v3d_init(struct driver *drv) {
++  drv_add_combinations(drv, render_target_formats, ARRAY_SIZE(render_target_formats),
++           &LINEAR_METADATA, BO_USE_RENDER_MASK );
++  drv_add_combinations(drv, texture_target_formats, ARRAY_SIZE(texture_target_formats),
++           &LINEAR_METADATA, BO_USE_TEXTURE_MASK);
++  drv_modify_combination(drv, DRM_FORMAT_YVU420, &LINEAR_METADATA,  
++           BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
++           BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
++  drv_modify_combination(drv, DRM_FORMAT_NV12, &LINEAR_METADATA,
++           BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
++           BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
++  drv_modify_combination(drv, DRM_FORMAT_R8, &LINEAR_METADATA, BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT);
++  drv_modify_combination(drv, DRM_FORMAT_ARGB8888, &LINEAR_METADATA, BO_USE_CURSOR | BO_USE_SCANOUT);
++  drv_log("v3d driver init.\n");
++  return 0;
++}
++
++static int v3d_bo_create_for_modifiers(struct bo *bo, uint32_t width, uint32_t height,
++               uint32_t format, uint64_t modifier) {
++  int ret;
++  size_t plane;
++  uint32_t stride;
++  struct drm_v3d_create_bo bo_create;
++  memset(&bo_create, 0, sizeof(bo_create));
++
++  stride = drv_stride_from_format(format, width, 0);
++  stride = ALIGN(stride, 4096);
++  drv_bo_from_format(bo, stride, height, format);
++//  bo->meta.total_size = ALIGN(bo->meta.total_size, 4096);
++  bo_create.size = bo->meta.total_size;
++  bo->meta.format_modifiers[0] = modifier;
++  #ifdef __ANDROID__
++  bo_create.flags = ARC_CALLOC;
++  #endif
++  ret = drmIoctl(bo->drv->fd, DRM_IOCTL_V3D_CREATE_BO, &bo_create);
++  if (ret) {
++    drv_log("DRM_IOCTL_V3D_CREATE_BO failed (size=%zu), ret=%d, format:%s\n", bo->meta.total_size, ret, getDrmFormatString(format));
++    return -errno;
++  }
++
++  for (plane = 0; plane < bo->meta.num_planes; plane++)
++    bo->handles[plane].u32 = bo_create.handle;
++#ifdef DEBUG
++ drv_log("create bo handler:0x%x, size:%d, format:%s, width:%u, height:%u\n",
++   bo_create.handle, bo->meta.total_size, getDrmFormatString(format), width, height);
++#endif
++  return 0;
++}
++
++static int v3d_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint32_t height,
++           uint32_t format, const uint64_t *modifiers, uint32_t count) {
++  return v3d_bo_create_for_modifiers(bo, width, height, format, DRM_FORMAT_MOD_LINEAR/*modifier*/);
++}
++
++static int v3d_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t format,
++       uint64_t use_flags) {
++  return v3d_bo_create_for_modifiers(bo, width, height, format, DRM_FORMAT_MOD_LINEAR/*modifier*/);
++}
++
++static void *v3d_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags) {
++  int ret;
++  struct drm_v3d_mmap_bo bo_map;
++  memset(&bo_map, 0, sizeof(bo_map));
++  bo_map.handle = bo->handles[0].u32;
++
++  ret = drmIoctl(bo->drv->fd, DRM_IOCTL_V3D_MMAP_BO, &bo_map);
++  if (ret) {
++    drv_log("DRM_V3D_MMAP_BO failed\n");
++    return MAP_FAILED;
++  }
++  vma->length = bo->meta.total_size;
++  return mmap(NULL, bo->meta.total_size, drv_get_prot(map_flags), MAP_SHARED, bo->drv->fd,
++        bo_map.offset);
++}
++
++const struct backend backend_v3d = {
++  .name = "v3d",
++  .init = v3d_init,
++  .bo_create = v3d_bo_create,
++  .bo_create_with_modifiers = v3d_bo_create_with_modifiers,
++  .bo_import = drv_prime_bo_import,
++  .bo_destroy = drv_gem_bo_destroy,
++  .bo_map = v3d_bo_map,
++  .bo_unmap = drv_bo_munmap,
++};
++
++#endif // DEV_V3D
+diff --git a/v3d_drm.h b/v3d_drm.h
+new file mode 100644
+index 0000000..b8c6f9d
+--- /dev/null
++++ b/v3d_drm.h
+@@ -0,0 +1,267 @@
++/*
++ * Copyright © 2014-2018 Broadcom
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining a
++ * copy of this software and associated documentation files (the "Software"),
++ * to deal in the Software without restriction, including without limitation
++ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
++ * and/or sell copies of the Software, and to permit persons to whom the
++ * Software is furnished to do so, subject to the following conditions:
++ *
++ * The above copyright notice and this permission notice (including the next
++ * paragraph) shall be included in all copies or substantial portions of the
++ * Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
++ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
++ * IN THE SOFTWARE.
++ */
++
++#ifndef _V3D_DRM_H_
++#define _V3D_DRM_H_
++
++#include "drm.h"
++
++#if defined(__cplusplus)
++extern "C" {
++#endif
++
++#define DRM_V3D_SUBMIT_CL                         0x00
++#define DRM_V3D_WAIT_BO                           0x01
++#define DRM_V3D_CREATE_BO                         0x02
++#define DRM_V3D_MMAP_BO                           0x03
++#define DRM_V3D_GET_PARAM                         0x04
++#define DRM_V3D_GET_BO_OFFSET                     0x05
++#define DRM_V3D_SUBMIT_TFU                        0x06
++#define DRM_V3D_SUBMIT_CSD                        0x07
++
++#define DRM_IOCTL_V3D_SUBMIT_CL           DRM_IOWR(DRM_COMMAND_BASE + DRM_V3D_SUBMIT_CL, struct drm_v3d_submit_cl)
++#define DRM_IOCTL_V3D_WAIT_BO             DRM_IOWR(DRM_COMMAND_BASE + DRM_V3D_WAIT_BO, struct drm_v3d_wait_bo)
++#define DRM_IOCTL_V3D_CREATE_BO           DRM_IOWR(DRM_COMMAND_BASE + DRM_V3D_CREATE_BO, struct drm_v3d_create_bo)
++#define DRM_IOCTL_V3D_MMAP_BO             DRM_IOWR(DRM_COMMAND_BASE + DRM_V3D_MMAP_BO, struct drm_v3d_mmap_bo)
++#define DRM_IOCTL_V3D_GET_PARAM           DRM_IOWR(DRM_COMMAND_BASE + DRM_V3D_GET_PARAM, struct drm_v3d_get_param)
++#define DRM_IOCTL_V3D_GET_BO_OFFSET       DRM_IOWR(DRM_COMMAND_BASE + DRM_V3D_GET_BO_OFFSET, struct drm_v3d_get_bo_offset)
++#define DRM_IOCTL_V3D_SUBMIT_TFU          DRM_IOW(DRM_COMMAND_BASE + DRM_V3D_SUBMIT_TFU, struct drm_v3d_submit_tfu)
++#define DRM_IOCTL_V3D_SUBMIT_CSD          DRM_IOW(DRM_COMMAND_BASE + DRM_V3D_SUBMIT_CSD, struct drm_v3d_submit_csd)
++
++#define DRM_V3D_SUBMIT_CL_FLUSH_CACHE             0x01
++
++/**
++ * struct drm_v3d_submit_cl - ioctl argument for submitting commands to the 3D
++ * engine.
++ *
++ * This asks the kernel to have the GPU execute an optional binner
++ * command list, and a render command list.
++ *
++ * The L1T, slice, L2C, L2T, and GCA caches will be flushed before
++ * each CL executes.  The VCD cache should be flushed (if necessary)
++ * by the submitted CLs.  The TLB writes are guaranteed to have been
++ * flushed by the time the render done IRQ happens, which is the
++ * trigger for out_sync.  Any dirtying of cachelines by the job (only
++ * possible using TMU writes) must be flushed by the caller using the
++ * CL's cache flush commands.
++ */
++struct drm_v3d_submit_cl {
++	/* Pointer to the binner command list.
++	 *
++	 * This is the first set of commands executed, which runs the
++	 * coordinate shader to determine where primitives land on the screen,
++	 * then writes out the state updates and draw calls necessary per tile
++	 * to the tile allocation BO.
++	 *
++	 * This BCL will block on any previous BCL submitted on the
++	 * same FD, but not on any RCL or BCLs submitted by other
++	 * clients -- that is left up to the submitter to control
++	 * using in_sync_bcl if necessary.
++	 */
++	__u32 bcl_start;
++
++	/** End address of the BCL (first byte after the BCL) */
++	__u32 bcl_end;
++
++	/* Offset of the render command list.
++	 *
++	 * This is the second set of commands executed, which will either
++	 * execute the tiles that have been set up by the BCL, or a fixed set
++	 * of tiles (in the case of RCL-only blits).
++	 *
++	 * This RCL will block on this submit's BCL, and any previous
++	 * RCL submitted on the same FD, but not on any RCL or BCLs
++	 * submitted by other clients -- that is left up to the
++	 * submitter to control using in_sync_rcl if necessary.
++	 */
++	__u32 rcl_start;
++
++	/** End address of the RCL (first byte after the RCL) */
++	__u32 rcl_end;
++
++	/** An optional sync object to wait on before starting the BCL. */
++	__u32 in_sync_bcl;
++	/** An optional sync object to wait on before starting the RCL. */
++	__u32 in_sync_rcl;
++	/** An optional sync object to place the completion fence in. */
++	__u32 out_sync;
++
++	/* Offset of the tile alloc memory
++	 *
++	 * This is optional on V3D 3.3 (where the CL can set the value) but
++	 * required on V3D 4.1.
++	 */
++	__u32 qma;
++
++	/** Size of the tile alloc memory. */
++	__u32 qms;
++
++	/** Offset of the tile state data array. */
++	__u32 qts;
++
++	/* Pointer to a u32 array of the BOs that are referenced by the job.
++	 */
++	__u64 bo_handles;
++
++	/* Number of BO handles passed in (size is that times 4). */
++	__u32 bo_handle_count;
++
++	__u32 flags;
++};
++
++/**
++ * struct drm_v3d_wait_bo - ioctl argument for waiting for
++ * completion of the last DRM_V3D_SUBMIT_CL on a BO.
++ *
++ * This is useful for cases where multiple processes might be
++ * rendering to a BO and you want to wait for all rendering to be
++ * completed.
++ */
++struct drm_v3d_wait_bo {
++	__u32 handle;
++	__u32 pad;
++	__u64 timeout_ns;
++};
++
++/**
++ * struct drm_v3d_create_bo - ioctl argument for creating V3D BOs.
++ *
++ * There are currently no values for the flags argument, but it may be
++ * used in a future extension.
++ */
++struct drm_v3d_create_bo {
++	__u32 size;
++	__u32 flags;
++	/** Returned GEM handle for the BO. */
++	__u32 handle;
++	/**
++	 * Returned offset for the BO in the V3D address space.  This offset
++	 * is private to the DRM fd and is valid for the lifetime of the GEM
++	 * handle.
++	 *
++	 * This offset value will always be nonzero, since various HW
++	 * units treat 0 specially.
++	 */
++	__u32 offset;
++};
++
++/**
++ * struct drm_v3d_mmap_bo - ioctl argument for mapping V3D BOs.
++ *
++ * This doesn't actually perform an mmap.  Instead, it returns the
++ * offset you need to use in an mmap on the DRM device node.  This
++ * means that tools like valgrind end up knowing about the mapped
++ * memory.
++ *
++ * There are currently no values for the flags argument, but it may be
++ * used in a future extension.
++ */
++struct drm_v3d_mmap_bo {
++	/** Handle for the object being mapped. */
++	__u32 handle;
++	__u32 flags;
++	/** offset into the drm node to use for subsequent mmap call. */
++	__u64 offset;
++};
++
++enum drm_v3d_param {
++	DRM_V3D_PARAM_V3D_UIFCFG,
++	DRM_V3D_PARAM_V3D_HUB_IDENT1,
++	DRM_V3D_PARAM_V3D_HUB_IDENT2,
++	DRM_V3D_PARAM_V3D_HUB_IDENT3,
++	DRM_V3D_PARAM_V3D_CORE0_IDENT0,
++	DRM_V3D_PARAM_V3D_CORE0_IDENT1,
++	DRM_V3D_PARAM_V3D_CORE0_IDENT2,
++	DRM_V3D_PARAM_SUPPORTS_TFU,
++	DRM_V3D_PARAM_SUPPORTS_CSD,
++	DRM_V3D_PARAM_SUPPORTS_CACHE_FLUSH,
++};
++
++struct drm_v3d_get_param {
++	__u32 param;
++	__u32 pad;
++	__u64 value;
++};
++
++/**
++ * Returns the offset for the BO in the V3D address space for this DRM fd.
++ * This is the same value returned by drm_v3d_create_bo, if that was called
++ * from this DRM fd.
++ */
++struct drm_v3d_get_bo_offset {
++	__u32 handle;
++	__u32 offset;
++};
++
++struct drm_v3d_submit_tfu {
++	__u32 icfg;
++	__u32 iia;
++	__u32 iis;
++	__u32 ica;
++	__u32 iua;
++	__u32 ioa;
++	__u32 ios;
++	__u32 coef[4];
++	/* First handle is the output BO, following are other inputs.
++	 * 0 for unused.
++	 */
++	__u32 bo_handles[4];
++	/* sync object to block on before running the TFU job.  Each TFU
++	 * job will execute in the order submitted to its FD.  Synchronization
++	 * against rendering jobs requires using sync objects.
++	 */
++	__u32 in_sync;
++	/* Sync object to signal when the TFU job is done. */
++	__u32 out_sync;
++};
++
++/* Submits a compute shader for dispatch.  This job will block on any
++ * previous compute shaders submitted on this fd, and any other
++ * synchronization must be performed with in_sync/out_sync.
++ */
++struct drm_v3d_submit_csd {
++	__u32 cfg[7];
++	__u32 coef[4];
++
++	/* Pointer to a u32 array of the BOs that are referenced by the job.
++	 */
++	__u64 bo_handles;
++
++	/* Number of BO handles passed in (size is that times 4). */
++	__u32 bo_handle_count;
++
++	/* sync object to block on before running the CSD job.  Each
++	 * CSD job will execute in the order submitted to its FD.
++	 * Synchronization against rendering/TFU jobs or CSD from
++	 * other fds requires using sync objects.
++	 */
++	__u32 in_sync;
++	/* Sync object to signal when the CSD job is done. */
++	__u32 out_sync;
++};
++
++#if defined(__cplusplus)
++}
++#endif
++
++#endif /* _V3D_DRM_H_ */
+diff --git a/vc4.c b/vc4.c
+index 5ea4bc3..6283ac7 100644
+--- a/vc4.c
++++ b/vc4.c
+@@ -17,27 +17,35 @@
+ #include "helpers.h"
+ #include "util.h"
+ 
++#define VC4_TILING_NONE 0
++#define VC4_TILING_T 1
++
+ static const uint32_t render_target_formats[] = { DRM_FORMAT_ARGB8888, DRM_FORMAT_RGB565,
++              DRM_FORMAT_ABGR8888, DRM_FORMAT_XBGR8888, DRM_FORMAT_BGR565,
+ 						  DRM_FORMAT_XRGB8888 };
+ 
+-static const uint32_t texture_only_formats[] = { DRM_FORMAT_NV12, DRM_FORMAT_YVU420 };
++static const uint32_t texture_target_formats[] = { DRM_FORMAT_NV12, DRM_FORMAT_YVU420, DRM_FORMAT_R8 };
+ 
+ static int vc4_init(struct driver *drv)
+ {
+-	drv_add_combinations(drv, render_target_formats, ARRAY_SIZE(render_target_formats),
+-			     &LINEAR_METADATA, BO_USE_RENDER_MASK);
+-
+-	drv_add_combinations(drv, texture_only_formats, ARRAY_SIZE(texture_only_formats),
+-			     &LINEAR_METADATA, BO_USE_TEXTURE_MASK);
+-	/*
+-	 * Chrome uses DMA-buf mmap to write to YV12 buffers, which are then accessed by the
+-	 * Video Encoder Accelerator (VEA). It could also support NV12 potentially in the future.
+-	 */
+-	drv_modify_combination(drv, DRM_FORMAT_YVU420, &LINEAR_METADATA, BO_USE_HW_VIDEO_ENCODER);
+-	drv_modify_combination(drv, DRM_FORMAT_NV12, &LINEAR_METADATA,
+-			       BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT | BO_USE_HW_VIDEO_ENCODER);
+-
+-	return drv_modify_linear_combinations(drv);
++  struct format_metadata metadata;
++  uint64_t texture_use_flags = BO_USE_TEXTURE_MASK;
++  metadata.tiling = VC4_TILING_NONE;
++  metadata.priority = 1;
++  metadata.modifier = DRM_FORMAT_MOD_LINEAR;
++  drv_add_combinations(drv, render_target_formats, ARRAY_SIZE(render_target_formats),
++          &metadata, BO_USE_RENDER_MASK );
++  drv_add_combinations(drv, texture_target_formats, ARRAY_SIZE(texture_target_formats),
++           &metadata, texture_use_flags);
++  drv_modify_combination(drv, DRM_FORMAT_YVU420, &LINEAR_METADATA,  BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
++                                              BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
++  drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata,
++                                 BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
++                                            BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
++  drv_modify_combination(drv, DRM_FORMAT_R8, &LINEAR_METADATA, BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT);
++
++  drv_log("vc4 driver inited.\n");
++  return drv_modify_linear_combinations(drv); 
+ }
+ 
+ static int vc4_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t height,
+@@ -48,36 +56,25 @@ static int vc4_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t he
+ 	uint32_t stride;
+ 	struct drm_vc4_create_bo bo_create = { 0 };
+ 
+-	switch (modifier) {
+-	case DRM_FORMAT_MOD_LINEAR:
+-		break;
+-	case DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED:
+-		drv_log("DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED not supported yet\n");
+-		return -EINVAL;
+-	default:
+-		return -EINVAL;
+-	}
++  stride = drv_stride_from_format(format, width, 0);
++  stride = ALIGN(stride, 64);
++  drv_bo_from_format(bo, stride, height, format);
+ 
+-	/*
+-	 * Since the ARM L1 cache line size is 64 bytes, align to that as a
+-	 * performance optimization.
+-	 */
+-	stride = drv_stride_from_format(format, width, 0);
+-	stride = ALIGN(stride, 64);
+-	drv_bo_from_format(bo, stride, height, format);
++  memset(&bo_create, 0, sizeof(bo_create));
++  bo_create.size = bo->meta.total_size;
+ 
+-	bo_create.size = bo->meta.total_size;
++  ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VC4_CREATE_BO, &bo_create);
++  if (ret) {
++    drv_log("DRM_IOCTL_VC4_CREATE_BO failed (size=%zu)\n", bo->meta.total_size);
++    return -errno;
++  }
+ 
+-	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VC4_CREATE_BO, &bo_create);
+-	if (ret) {
+-		drv_log("DRM_IOCTL_VC4_CREATE_BO failed (size=%zu)\n", bo->meta.total_size);
+-		return -errno;
+-	}
+-
+-	for (plane = 0; plane < bo->meta.num_planes; plane++)
+-		bo->handles[plane].u32 = bo_create.handle;
+-
+-	return 0;
++  for (plane = 0; plane < bo->meta.num_planes; plane++)
++    bo->handles[plane].u32 = bo_create.handle;
++#ifdef DEBUG
++  drv_log("create bo for vc4: handle:0x%x, size:%d, format:%s\n", bo_create.handle, bo->meta.total_size, getDrmFormatString(format));
++#endif
++  return 0;
+ }
+ 
+ static int vc4_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t format,
+@@ -125,12 +122,12 @@ static void *vc4_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t m
+ const struct backend backend_vc4 = {
+ 	.name = "vc4",
+ 	.init = vc4_init,
+-	.bo_create = vc4_bo_create,
++	.bo_create = vc4_bo_create, 
+ 	.bo_create_with_modifiers = vc4_bo_create_with_modifiers,
+ 	.bo_import = drv_prime_bo_import,
+ 	.bo_destroy = drv_gem_bo_destroy,
+ 	.bo_map = vc4_bo_map,
+-	.bo_unmap = drv_bo_munmap,
++	.bo_unmap = drv_bo_munmap, 
+ };
+ 
+ #endif
