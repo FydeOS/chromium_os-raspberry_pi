@@ -67,6 +67,6 @@ src_test() {
 
 src_prepare() {
   default
-  epatch ${FILESDIR}/*.patch
+  eapply ${FILESDIR}/*.patch
   cp ${FILESDIR}/${VPD_TEMPLATE} ${S}
 }
