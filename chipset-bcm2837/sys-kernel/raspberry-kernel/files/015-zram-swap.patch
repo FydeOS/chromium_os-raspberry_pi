@@ -1,0 +1,2507 @@
+Index: rpi-kernel/arch/arm64/mm/fault.c
+===================================================================
+--- rpi-kernel.orig/arch/arm64/mm/fault.c
++++ rpi-kernel/arch/arm64/mm/fault.c
+@@ -455,7 +455,7 @@ static int __kprobes do_page_fault(unsig
+ 	struct mm_struct *mm = current->mm;
+ 	vm_fault_t fault, major = 0;
+ 	unsigned long vm_flags = VM_READ | VM_WRITE | VM_EXEC;
+-	unsigned int mm_flags = FAULT_FLAG_ALLOW_RETRY | FAULT_FLAG_KILLABLE;
++	unsigned int mm_flags = FAULT_FLAG_DEFAULT;
+ 
+ 	if (kprobe_page_fault(regs, esr))
+ 		return 0;
+@@ -495,6 +495,15 @@ static int __kprobes do_page_fault(unsig
+ 
+ 	perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS, 1, regs, addr);
+ 
++  /*
++   * let's try a speculative page fault without grabbing the
++   * mmap_sem.
++   */
++  fault = handle_speculative_fault(mm, addr, mm_flags);
++  if (fault != VM_FAULT_RETRY) {
++    perf_sw_event(PERF_COUNT_SW_SPF, 1, regs, addr);
++    goto done;
++  }
+ 	/*
+ 	 * As per x86, we may deadlock here. However, since the kernel only
+ 	 * validly references user space from well defined areas of the code,
+@@ -547,6 +556,7 @@ retry:
+ 	}
+ 	up_read(&mm->mmap_sem);
+ 
++  done:
+ 	/*
+ 	 * Handle the "normal" (no error) case first.
+ 	 */
+Index: rpi-kernel/include/linux/mm.h
+===================================================================
+--- rpi-kernel.orig/include/linux/mm.h
++++ rpi-kernel/include/linux/mm.h
+@@ -393,6 +393,16 @@ extern pgprot_t protection_map[16];
+ #define FAULT_FLAG_USER		0x40	/* The fault originated in userspace */
+ #define FAULT_FLAG_REMOTE	0x80	/* faulting for non current tsk/mm */
+ #define FAULT_FLAG_INSTRUCTION  0x100	/* The fault was during an instruction fetch */
++#define FAULT_FLAG_INTERRUPTIBLE    0x200
++#define FAULT_FLAG_SPECULATIVE      0x400
++
++/*
++ * The default fault flags that should be used by most of the
++ * arch-specific page fault handlers.
++ */
++#define FAULT_FLAG_DEFAULT  (FAULT_FLAG_ALLOW_RETRY | \
++           FAULT_FLAG_KILLABLE | \
++           FAULT_FLAG_INTERRUPTIBLE)
+ 
+ #define FAULT_FLAG_TRACE \
+ 	{ FAULT_FLAG_WRITE,		"WRITE" }, \
+@@ -403,7 +413,9 @@ extern pgprot_t protection_map[16];
+ 	{ FAULT_FLAG_TRIED,		"TRIED" }, \
+ 	{ FAULT_FLAG_USER,		"USER" }, \
+ 	{ FAULT_FLAG_REMOTE,		"REMOTE" }, \
+-	{ FAULT_FLAG_INSTRUCTION,	"INSTRUCTION" }
++	{ FAULT_FLAG_INSTRUCTION,	"INSTRUCTION" } \
++  { FAULT_FLAG_INTERRUPTIBLE, "INTERRUPTIBLE" }, \
++  { FAULT_FLAG_SPECULATIVE, "SPECULATIVE" }
+ 
+ /*
+  * vm_fault is filled by the the pagefault handler and passed to the vma's
+@@ -421,6 +433,10 @@ struct vm_fault {
+ 	gfp_t gfp_mask;			/* gfp mask to be used for allocations */
+ 	pgoff_t pgoff;			/* Logical page offset based on vma */
+ 	unsigned long address;		/* Faulting virtual address */
++#ifdef CONFIG_SPECULATIVE_PAGE_FAULT
++  unsigned int sequence;
++  pmd_t orig_pmd;     /* value of PMD at the time of fault */
++#endif
+ 	pmd_t *pmd;			/* Pointer to pmd entry matching
+ 					 * the 'address' */
+ 	pud_t *pud;			/* Pointer to pud entry matching
+@@ -451,6 +467,8 @@ struct vm_fault {
+ 					 * page table to avoid allocation from
+ 					 * atomic context.
+ 					 */
++  unsigned long vma_flags;
++  pgprot_t vma_page_prot;
+ };
+ 
+ /* page entry size for vm->huge_fault() */
+@@ -535,6 +553,9 @@ static inline void vma_init(struct vm_ar
+ 	vma->vm_mm = mm;
+ 	vma->vm_ops = &dummy_vm_ops;
+ 	INIT_LIST_HEAD(&vma->anon_vma_chain);
++#ifdef CONFIG_SPECULATIVE_PAGE_FAULT
++  atomic_set(&vma->vm_ref_count, 1);
++#endif
+ }
+ 
+ static inline void vma_set_anonymous(struct vm_area_struct *vma)
+@@ -1449,6 +1470,15 @@ struct zap_details {
+ 	pgoff_t last_index;			/* Highest page->index to unmap */
+ };
+ 
++static inline void INIT_VMA(struct vm_area_struct *vma)
++{
++  INIT_LIST_HEAD(&vma->anon_vma_chain);
++#ifdef CONFIG_SPECULATIVE_PAGE_FAULT
++  seqcount_init(&vma->vm_sequence);
++  atomic_set(&vma->vm_ref_count, 1);
++#endif
++}
++
+ struct page *vm_normal_page(struct vm_area_struct *vma, unsigned long addr,
+ 			     pte_t pte);
+ struct page *vm_normal_page_pmd(struct vm_area_struct *vma, unsigned long addr,
+@@ -1488,6 +1518,32 @@ int invalidate_inode_page(struct page *p
+ #ifdef CONFIG_MMU
+ extern vm_fault_t handle_mm_fault(struct vm_area_struct *vma,
+ 			unsigned long address, unsigned int flags);
++#ifdef CONFIG_SPECULATIVE_PAGE_FAULT
++extern int sysctl_speculative_page_fault;
++extern vm_fault_t __handle_speculative_fault(struct mm_struct *mm,
++               unsigned long address,
++               unsigned int flags);
++static inline vm_fault_t handle_speculative_fault(struct mm_struct *mm,
++              unsigned long address,
++              unsigned int flags)
++{
++  if (unlikely(!sysctl_speculative_page_fault))
++    return VM_FAULT_RETRY;
++  /*
++   * Try speculative page fault for multithreaded user space task only.
++   */
++  if (!(flags & FAULT_FLAG_USER) || atomic_read(&mm->mm_users) == 1)
++    return VM_FAULT_RETRY;
++  return __handle_speculative_fault(mm, address, flags);
++}
++#else
++static inline vm_fault_t handle_speculative_fault(struct mm_struct *mm,
++              unsigned long address,
++              unsigned int flags)
++{
++  return VM_FAULT_RETRY;
++}
++#endif /* CONFIG_SPECULATIVE_PAGE_FAULT */
+ extern int fixup_user_fault(struct task_struct *tsk, struct mm_struct *mm,
+ 			    unsigned long address, unsigned int fault_flags,
+ 			    bool *unlocked);
+@@ -1523,6 +1579,47 @@ static inline void unmap_shared_mapping_
+ 	unmap_mapping_range(mapping, holebegin, holelen, 0);
+ }
+ 
++#ifdef CONFIG_SPECULATIVE_PAGE_FAULT
++static inline void vm_write_begin(struct vm_area_struct *vma)
++{
++  raw_write_seqcount_begin(&vma->vm_sequence);
++}
++static inline void vm_write_begin_nested(struct vm_area_struct *vma,
++           int subclass)
++{
++  raw_write_seqcount_begin(&vma->vm_sequence);
++}
++static inline void vm_write_end(struct vm_area_struct *vma)
++{
++  raw_write_seqcount_end(&vma->vm_sequence);
++}
++static inline void vm_raw_write_begin(struct vm_area_struct *vma)
++{
++  raw_write_seqcount_begin(&vma->vm_sequence);
++}
++static inline void vm_raw_write_end(struct vm_area_struct *vma)
++{
++  raw_write_seqcount_end(&vma->vm_sequence);
++}
++#else
++static inline void vm_write_begin(struct vm_area_struct *vma)
++{
++}
++static inline void vm_write_begin_nested(struct vm_area_struct *vma,
++           int subclass)
++{
++}
++static inline void vm_write_end(struct vm_area_struct *vma)
++{
++}
++static inline void vm_raw_write_begin(struct vm_area_struct *vma)
++{
++}
++static inline void vm_raw_write_end(struct vm_area_struct *vma)
++{
++}
++#endif /* CONFIG_SPECULATIVE_PAGE_FAULT */
++
+ extern int access_process_vm(struct task_struct *tsk, unsigned long addr,
+ 		void *buf, int len, unsigned int gup_flags);
+ extern int access_remote_vm(struct mm_struct *mm, unsigned long addr,
+@@ -2277,16 +2374,26 @@ void anon_vma_interval_tree_verify(struc
+ extern int __vm_enough_memory(struct mm_struct *mm, long pages, int cap_sys_admin);
+ extern int __vma_adjust(struct vm_area_struct *vma, unsigned long start,
+ 	unsigned long end, pgoff_t pgoff, struct vm_area_struct *insert,
+-	struct vm_area_struct *expand);
++	struct vm_area_struct *expand, bool keep_locked);
+ static inline int vma_adjust(struct vm_area_struct *vma, unsigned long start,
+ 	unsigned long end, pgoff_t pgoff, struct vm_area_struct *insert)
+ {
+-	return __vma_adjust(vma, start, end, pgoff, insert, NULL);
++	return __vma_adjust(vma, start, end, pgoff, insert, NULL, false);
+ }
+-extern struct vm_area_struct *vma_merge(struct mm_struct *,
++extern struct vm_area_struct *__vma_merge(struct mm_struct *mm,
+ 	struct vm_area_struct *prev, unsigned long addr, unsigned long end,
+-	unsigned long vm_flags, struct anon_vma *, struct file *, pgoff_t,
+-	struct mempolicy *, struct vm_userfaultfd_ctx);
++	unsigned long vm_flags, struct anon_vma *anon, struct file *, pgoff_t pgoff,
++	struct mempolicy *mpol, struct vm_userfaultfd_ctx uff, const char __user *anon_name, bool keep_locked);
++
++static inline struct vm_area_struct *vma_merge(struct mm_struct *mm,
++  struct vm_area_struct *prev, unsigned long addr, unsigned long end,
++  unsigned long vm_flags, struct anon_vma *anon, struct file *file,
++  pgoff_t off, struct mempolicy *pol,
++  struct vm_userfaultfd_ctx uff, const char __user *anon_name)
++{
++  return __vma_merge(mm, prev, addr, end, vm_flags, anon, file, off,
++         pol, uff, anon_name, false);
++}
+ extern struct anon_vma *find_mergeable_anon_vma(struct vm_area_struct *);
+ extern int __split_vma(struct mm_struct *, struct vm_area_struct *,
+ 	unsigned long addr, int new_below);
+Index: rpi-kernel/include/linux/mm_types.h
+===================================================================
+--- rpi-kernel.orig/include/linux/mm_types.h
++++ rpi-kernel/include/linux/mm_types.h
+@@ -299,6 +299,10 @@ struct vm_area_struct {
+ 	/* linked list of VM areas per task, sorted by address */
+ 	struct vm_area_struct *vm_next, *vm_prev;
+ 
++#ifdef CONFIG_SPECULATIVE_PAGE_FAULT
++  atomic_t vm_ref_count;
++  struct rcu_head vm_rcu;
++#endif
+ 	struct rb_node vm_rb;
+ 
+ 	/*
+@@ -319,11 +323,13 @@ struct vm_area_struct {
+ 	 * For areas with an address space and backing store,
+ 	 * linkage into the address_space->i_mmap interval tree.
+ 	 */
+-	struct {
+-		struct rb_node rb;
+-		unsigned long rb_subtree_last;
+-	} shared;
+-
++  union {
++  	struct {
++  		struct rb_node rb;
++  		unsigned long rb_subtree_last;
++  	} shared;
++    const char __user *anon_name;
++  };
+ 	/*
+ 	 * A file's MAP_PRIVATE vma can be in both i_mmap tree and anon_vma
+ 	 * list, after a COW of one of the file pages.	A MAP_SHARED vma
+@@ -353,6 +359,9 @@ struct vm_area_struct {
+ 	struct mempolicy *vm_policy;	/* NUMA policy for the VMA */
+ #endif
+ 	struct vm_userfaultfd_ctx vm_userfaultfd_ctx;
++#ifdef CONFIG_SPECULATIVE_PAGE_FAULT
++  seqcount_t vm_sequence;
++#endif
+ } __randomize_layout;
+ 
+ struct core_thread {
+@@ -371,6 +380,9 @@ struct mm_struct {
+ 	struct {
+ 		struct vm_area_struct *mmap;		/* list of VMAs */
+ 		struct rb_root mm_rb;
++#ifdef CONFIG_SPECULATIVE_PAGE_FAULT
++    seqlock_t mm_seq;
++#endif
+ 		u64 vmacache_seqnum;                   /* per-thread vmacache */
+ #ifdef CONFIG_MMU
+ 		unsigned long (*get_unmapped_area) (struct file *filp,
+@@ -671,6 +683,8 @@ typedef __bitwise unsigned int vm_fault_
+  * @VM_FAULT_NEEDDSYNC:		->fault did not modify page tables and needs
+  *				fsync() to complete (for synchronous page faults
+  *				in DAX)
++ * @VM_FAULT_PTNOTSAME    Page table entries have changed during a
++ *        speculative page fault handling.
+  * @VM_FAULT_HINDEX_MASK:	mask HINDEX value
+  *
+  */
+@@ -688,6 +702,7 @@ enum vm_fault_reason {
+ 	VM_FAULT_FALLBACK       = (__force vm_fault_t)0x000800,
+ 	VM_FAULT_DONE_COW       = (__force vm_fault_t)0x001000,
+ 	VM_FAULT_NEEDDSYNC      = (__force vm_fault_t)0x002000,
++  VM_FAULT_PTNOTSAME  = (__force vm_fault_t)0x004000,
+ 	VM_FAULT_HINDEX_MASK    = (__force vm_fault_t)0x0f0000,
+ };
+ 
+@@ -712,7 +727,8 @@ enum vm_fault_reason {
+ 	{ VM_FAULT_RETRY,               "RETRY" },	\
+ 	{ VM_FAULT_FALLBACK,            "FALLBACK" },	\
+ 	{ VM_FAULT_DONE_COW,            "DONE_COW" },	\
+-	{ VM_FAULT_NEEDDSYNC,           "NEEDDSYNC" }
++	{ VM_FAULT_NEEDDSYNC,           "NEEDDSYNC" }, \
++  { VM_FAULT_PTNOTSAME,   "PTNOTSAME" }
+ 
+ struct vm_special_mapping {
+ 	const char *name;	/* The name, e.g. "[vdso]". */
+@@ -754,4 +770,13 @@ typedef struct {
+ 	unsigned long val;
+ } swp_entry_t;
+ 
++/* Return the name for an anonymous mapping or NULL for a file-backed mapping */
++static inline const char __user *vma_get_anon_name(struct vm_area_struct *vma)
++{
++  if (vma->vm_file)
++    return NULL;
++
++  return vma->anon_name;
++}
++
+ #endif /* _LINUX_MM_TYPES_H */
+Index: rpi-kernel/include/linux/vm_event_item.h
+===================================================================
+--- rpi-kernel.orig/include/linux/vm_event_item.h
++++ rpi-kernel/include/linux/vm_event_item.h
+@@ -110,6 +110,9 @@ enum vm_event_item { PGPGIN, PGPGOUT, PS
+ 		SWAP_RA,
+ 		SWAP_RA_HIT,
+ #endif
++#ifdef CONFIG_SPECULATIVE_PAGE_FAULT
++    SPECULATIVE_PGFAULT,
++#endif 
+ 		NR_VM_EVENT_ITEMS
+ };
+ 
+Index: rpi-kernel/mm/internal.h
+===================================================================
+--- rpi-kernel.orig/mm/internal.h
++++ rpi-kernel/mm/internal.h
+@@ -36,6 +36,50 @@ void page_writeback_init(void);
+ 
+ vm_fault_t do_swap_page(struct vm_fault *vmf);
+ 
++extern void __free_vma(struct vm_area_struct *vma);
++
++#ifdef CONFIG_SPECULATIVE_PAGE_FAULT
++static inline void get_vma(struct vm_area_struct *vma)
++{
++  atomic_inc(&vma->vm_ref_count);
++}
++
++static inline void put_vma(struct vm_area_struct *vma)
++{
++  if (atomic_dec_and_test(&vma->vm_ref_count))
++    __free_vma(vma);
++}
++
++extern struct vm_area_struct *find_vma_rcu(struct mm_struct *mm,
++             unsigned long addr);
++
++
++static inline bool vma_has_changed(struct vm_fault *vmf)
++{
++  int ret = RB_EMPTY_NODE(&vmf->vma->vm_rb);
++  unsigned int seq = READ_ONCE(vmf->vma->vm_sequence.sequence);
++
++  /*
++   * Matches both the wmb in write_seqlock_{begin,end}() and
++   * the wmb in vma_rb_erase().
++   */
++  smp_rmb();
++
++  return ret || seq != vmf->sequence;
++}
++
++#else /* CONFIG_SPECULATIVE_PAGE_FAULT */
++
++static inline void get_vma(struct vm_area_struct *vma)
++{
++}
++
++static inline void put_vma(struct vm_area_struct *vma)
++{
++  __free_vma(vma);
++}
++#endif /* CONFIG_SPECULATIVE_PAGE_FAULT */
++
+ void free_pgtables(struct mmu_gather *tlb, struct vm_area_struct *start_vma,
+ 		unsigned long floor, unsigned long ceiling);
+ 
+Index: rpi-kernel/mm/memory.c
+===================================================================
+--- rpi-kernel.orig/mm/memory.c
++++ rpi-kernel/mm/memory.c
+@@ -81,6 +81,11 @@
+ #include <asm/pgtable.h>
+ 
+ #include "internal.h"
++#define CREATE_TRACE_POINTS
++#include <trace/events/pagefault.h>
++#ifdef CONFIG_SPECULATIVE_PAGE_FAULT
++int sysctl_speculative_page_fault;
++#endif
+ 
+ #if defined(LAST_CPUPID_NOT_IN_PAGE_FLAGS) && !defined(CONFIG_COMPILE_TEST)
+ #warning Unfortunate NUMA and NUMA Balancing config, growing page-frame for last_cpupid.
+@@ -1240,6 +1245,7 @@ void unmap_page_range(struct mmu_gather
+ 	unsigned long next;
+ 
+ 	BUG_ON(addr >= end);
++  vm_write_begin(vma);
+ 	tlb_start_vma(tlb, vma);
+ 	pgd = pgd_offset(vma->vm_mm, addr);
+ 	do {
+@@ -1249,6 +1255,7 @@ void unmap_page_range(struct mmu_gather
+ 		next = zap_p4d_range(tlb, vma, pgd, addr, next, details);
+ 	} while (pgd++, addr = next, addr != end);
+ 	tlb_end_vma(tlb, vma);
++  vm_write_end(vma);
+ }
+ 
+ 
+@@ -2133,6 +2140,140 @@ int apply_to_page_range(struct mm_struct
+ }
+ EXPORT_SYMBOL_GPL(apply_to_page_range);
+ 
++#ifdef CONFIG_SPECULATIVE_PAGE_FAULT
++static bool pte_spinlock(struct vm_fault *vmf)
++{
++  bool ret = false;
++#ifdef CONFIG_TRANSPARENT_HUGEPAGE
++  pmd_t pmdval;
++#endif
++
++  /* Check if vma is still valid */
++  if (!(vmf->flags & FAULT_FLAG_SPECULATIVE)) {
++    vmf->ptl = pte_lockptr(vmf->vma->vm_mm, vmf->pmd);
++    spin_lock(vmf->ptl);
++    return true;
++  }
++
++  local_irq_disable();
++  if (vma_has_changed(vmf)) {
++    trace_spf_vma_changed(_RET_IP_, vmf->vma, vmf->address);
++    goto out;
++  }
++
++#ifdef CONFIG_TRANSPARENT_HUGEPAGE
++  /*
++   * We check if the pmd value is still the same to ensure that there
++   * is not a huge collapse operation in progress in our back.
++   */
++  pmdval = READ_ONCE(*vmf->pmd);
++  if (!pmd_same(pmdval, vmf->orig_pmd)) {
++    trace_spf_pmd_changed(_RET_IP_, vmf->vma, vmf->address);
++    goto out;
++  }
++#endif
++
++  vmf->ptl = pte_lockptr(vmf->vma->vm_mm, vmf->pmd);
++  if (unlikely(!spin_trylock(vmf->ptl))) {
++    local_irq_enable();
++    goto out;
++  }
++
++  if (vma_has_changed(vmf)) {
++    spin_unlock(vmf->ptl);
++    trace_spf_vma_changed(_RET_IP_, vmf->vma, vmf->address);
++    goto out;
++  }
++
++  ret = true;
++out:
++  local_irq_enable();
++  return ret;
++}
++
++static bool pte_map_lock(struct vm_fault *vmf)
++{
++  bool ret = false;
++  pte_t *pte;
++  spinlock_t *ptl;
++#ifdef CONFIG_TRANSPARENT_HUGEPAGE
++  pmd_t pmdval;
++#endif
++
++  if (!(vmf->flags & FAULT_FLAG_SPECULATIVE)) {
++    vmf->pte = pte_offset_map_lock(vmf->vma->vm_mm, vmf->pmd,
++                 vmf->address, &vmf->ptl);
++    return true;
++  }
++
++  /*
++   * The first vma_has_changed() guarantees the page-tables are still
++   * valid, having IRQs disabled ensures they stay around, hence the
++   * second vma_has_changed() to make sure they are still valid once
++   * we've got the lock. After that a concurrent zap_pte_range() will
++   * block on the PTL and thus we're safe.
++   */
++  local_irq_disable();
++  if (vma_has_changed(vmf)) {
++    trace_spf_vma_changed(_RET_IP_, vmf->vma, vmf->address);
++    goto out;
++  }
++
++#ifdef CONFIG_TRANSPARENT_HUGEPAGE
++  /*
++   * We check if the pmd value is still the same to ensure that there
++   * is not a huge collapse operation in progress in our back.
++   */
++  pmdval = READ_ONCE(*vmf->pmd);
++  if (!pmd_same(pmdval, vmf->orig_pmd)) {
++    trace_spf_pmd_changed(_RET_IP_, vmf->vma, vmf->address);
++    goto out;
++  }
++#endif
++
++  /*
++   * Same as pte_offset_map_lock() except that we call
++   * spin_trylock() in place of spin_lock() to avoid race with
++   * unmap path which may have the lock and wait for this CPU
++   * to invalidate TLB but this CPU has irq disabled.
++   * Since we are in a speculative patch, accept it could fail
++   */
++  ptl = pte_lockptr(vmf->vma->vm_mm, vmf->pmd);
++  pte = pte_offset_map(vmf->pmd, vmf->address);
++  if (unlikely(!spin_trylock(ptl))) {
++    pte_unmap(pte);
++    local_irq_enable();
++    goto out;
++  }
++
++  if (vma_has_changed(vmf)) {
++    pte_unmap_unlock(pte, ptl);
++    trace_spf_vma_changed(_RET_IP_, vmf->vma, vmf->address);
++    goto out;
++  }
++
++  vmf->pte = pte;
++  vmf->ptl = ptl;
++  ret = true;
++out:
++  local_irq_enable();
++  return ret;
++}
++#else
++static inline bool pte_spinlock(struct vm_fault *vmf)
++{
++  vmf->ptl = pte_lockptr(vmf->vma->vm_mm, vmf->pmd);
++  spin_lock(vmf->ptl);
++  return true;
++}
++
++static inline bool pte_map_lock(struct vm_fault *vmf)
++{
++  vmf->pte = pte_offset_map_lock(vmf->vma->vm_mm, vmf->pmd,
++               vmf->address, &vmf->ptl);
++  return true;
++}
++#endif /* CONFIG_SPECULATIVE_PAGE_FAULT */
+ /*
+  * handle_pte_fault chooses page fault handler according to an entry which was
+  * read non-atomically.  Before making any commitment, on those architectures
+@@ -2141,20 +2282,21 @@ EXPORT_SYMBOL_GPL(apply_to_page_range);
+  * proceeding (but do_wp_page is only called after already making such a check;
+  * and do_anonymous_page can safely check later on).
+  */
+-static inline int pte_unmap_same(struct mm_struct *mm, pmd_t *pmd,
+-				pte_t *page_table, pte_t orig_pte)
++static inline vm_fault_t pte_unmap_same(struct vm_fault *vmf)
+ {
+-	int same = 1;
++	int ret = 0;
+ #if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
+-	if (sizeof(pte_t) > sizeof(unsigned long)) {
+-		spinlock_t *ptl = pte_lockptr(mm, pmd);
+-		spin_lock(ptl);
+-		same = pte_same(*page_table, orig_pte);
+-		spin_unlock(ptl);
+-	}
++  if (sizeof(pte_t) > sizeof(unsigned long)) {
++    if (pte_spinlock(vmf)) {
++      if (!pte_same(*vmf->pte, vmf->orig_pte))
++        ret = VM_FAULT_PTNOTSAME;
++      spin_unlock(vmf->ptl);
++    } else
++      ret = VM_FAULT_RETRY;
++  }
+ #endif
+-	pte_unmap(page_table);
+-	return same;
++  pte_unmap(vmf->pte);
++  return ret;
+ }
+ 
+ static inline bool cow_user_page(struct page *dst, struct page *src,
+@@ -2409,6 +2551,7 @@ static vm_fault_t wp_page_copy(struct vm
+ 	int page_copied = 0;
+ 	struct mem_cgroup *memcg;
+ 	struct mmu_notifier_range range;
++  int ret = VM_FAULT_OOM;
+ 
+ 	if (unlikely(anon_vma_prepare(vma)))
+ 		goto oom;
+@@ -2451,7 +2594,10 @@ static vm_fault_t wp_page_copy(struct vm
+ 	/*
+ 	 * Re-check the pte - we dropped the lock
+ 	 */
+-	vmf->pte = pte_offset_map_lock(mm, vmf->pmd, vmf->address, &vmf->ptl);
++  if (!pte_map_lock(vmf)) {
++    ret = VM_FAULT_RETRY;
++    goto out_uncharge;
++  }
+ 	if (likely(pte_same(*vmf->pte, vmf->orig_pte))) {
+ 		if (old_page) {
+ 			if (!PageAnon(old_page)) {
+@@ -2538,12 +2684,14 @@ static vm_fault_t wp_page_copy(struct vm
+ 		put_page(old_page);
+ 	}
+ 	return page_copied ? VM_FAULT_WRITE : 0;
++out_uncharge:
++  mem_cgroup_cancel_charge(new_page, memcg, false);
+ oom_free_new:
+ 	put_page(new_page);
+ oom:
+ 	if (old_page)
+ 		put_page(old_page);
+-	return VM_FAULT_OOM;
++	return ret;
+ }
+ 
+ /**
+@@ -2565,8 +2713,8 @@ oom:
+ vm_fault_t finish_mkwrite_fault(struct vm_fault *vmf)
+ {
+ 	WARN_ON_ONCE(!(vmf->vma->vm_flags & VM_SHARED));
+-	vmf->pte = pte_offset_map_lock(vmf->vma->vm_mm, vmf->pmd, vmf->address,
+-				       &vmf->ptl);
++  if (!pte_map_lock(vmf))
++    return VM_FAULT_RETRY;
+ 	/*
+ 	 * We might have raced with another page fault while we released the
+ 	 * pte_offset_map_lock.
+@@ -2688,8 +2836,11 @@ static vm_fault_t do_wp_page(struct vm_f
+ 			get_page(vmf->page);
+ 			pte_unmap_unlock(vmf->pte, vmf->ptl);
+ 			lock_page(vmf->page);
+-			vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd,
+-					vmf->address, &vmf->ptl);
++      if (!pte_map_lock(vmf)) {
++        unlock_page(vmf->page);
++        put_page(vmf->page);
++        return VM_FAULT_RETRY;
++      }
+ 			if (!pte_same(*vmf->pte, vmf->orig_pte)) {
+ 				unlock_page(vmf->page);
+ 				pte_unmap_unlock(vmf->pte, vmf->ptl);
+@@ -2852,8 +3003,17 @@ vm_fault_t do_swap_page(struct vm_fault
+ 	int exclusive = 0;
+ 	vm_fault_t ret = 0;
+ 
+-	if (!pte_unmap_same(vma->vm_mm, vmf->pmd, vmf->pte, vmf->orig_pte))
+-		goto out;
++  ret = pte_unmap_same(vmf);
++  if (ret) {
++    /*
++     * If pte != orig_pte, this means another thread did the
++     * swap operation in our back.
++     * So nothing else to do.
++     */
++    if (ret == VM_FAULT_PTNOTSAME)
++      ret = 0;
++    goto out;
++  }
+ 
+ 	entry = pte_to_swp_entry(vmf->orig_pte);
+ 	if (unlikely(non_swap_entry(entry))) {
+@@ -2892,7 +3052,18 @@ vm_fault_t do_swap_page(struct vm_fault
+ 				lru_cache_add_anon(page);
+ 				swap_readpage(page, true);
+ 			}
+-		} else {
++		} else if (vmf->flags & FAULT_FLAG_SPECULATIVE) {
++      /*
++       * Don't try readahead during a speculative page fault
++       * as the VMA's boundaries may change in our back.
++       * If the page is not in the swap cache and synchronous
++       * read is disabled, fall back to the regular page
++       * fault mechanism.
++       */
++      delayacct_clear_flag(DELAYACCT_PF_SWAPIN);
++      ret = VM_FAULT_RETRY;
++      goto out;
++    } else {
+ 			page = swapin_readahead(entry, GFP_HIGHUSER_MOVABLE,
+ 						vmf);
+ 			swapcache = page;
+@@ -2903,8 +3074,11 @@ vm_fault_t do_swap_page(struct vm_fault
+ 			 * Back out if somebody else faulted in this pte
+ 			 * while we released the pte lock.
+ 			 */
+-			vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd,
+-					vmf->address, &vmf->ptl);
++      if (!pte_map_lock(vmf)) {
++        delayacct_clear_flag(DELAYACCT_PF_SWAPIN);
++        ret = VM_FAULT_RETRY;
++        goto out;
++      }
+ 			if (likely(pte_same(*vmf->pte, vmf->orig_pte)))
+ 				ret = VM_FAULT_OOM;
+ 			delayacct_clear_flag(DELAYACCT_PF_SWAPIN);
+@@ -2959,8 +3133,10 @@ vm_fault_t do_swap_page(struct vm_fault
+ 	/*
+ 	 * Back out if somebody else already faulted in this pte.
+ 	 */
+-	vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd, vmf->address,
+-			&vmf->ptl);
++  if (!pte_map_lock(vmf)) {
++    ret = VM_FAULT_RETRY;
++    goto out_cancel_cgroup;
++  }
+ 	if (unlikely(!pte_same(*vmf->pte, vmf->orig_pte)))
+ 		goto out_nomap;
+ 
+@@ -3038,8 +3214,9 @@ unlock:
+ out:
+ 	return ret;
+ out_nomap:
+-	mem_cgroup_cancel_charge(page, memcg, false);
+ 	pte_unmap_unlock(vmf->pte, vmf->ptl);
++out_cancel_cgroup:
++	mem_cgroup_cancel_charge(page, memcg, false);
+ out_page:
+ 	unlock_page(page);
+ out_release:
+@@ -3090,13 +3267,15 @@ static vm_fault_t do_anonymous_page(stru
+ 			!mm_forbids_zeropage(vma->vm_mm)) {
+ 		entry = pte_mkspecial(pfn_pte(my_zero_pfn(vmf->address),
+ 						vma->vm_page_prot));
+-		vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd,
+-				vmf->address, &vmf->ptl);
++    if (!pte_map_lock(vmf))
++      return VM_FAULT_RETRY;
+ 		if (!pte_none(*vmf->pte))
+ 			goto unlock;
+ 		ret = check_stable_address_space(vma->vm_mm);
+ 		if (ret)
+ 			goto unlock;
++    if (vmf->flags & FAULT_FLAG_SPECULATIVE)
++      goto setpte;
+ 		/* Deliver the page fault to userland, check inside PT lock */
+ 		if (userfaultfd_missing(vma)) {
+ 			pte_unmap_unlock(vmf->pte, vmf->ptl);
+@@ -3127,8 +3306,10 @@ static vm_fault_t do_anonymous_page(stru
+ 	if (vma->vm_flags & VM_WRITE)
+ 		entry = pte_mkwrite(pte_mkdirty(entry));
+ 
+-	vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd, vmf->address,
+-			&vmf->ptl);
++  if (!pte_map_lock(vmf)) {
++    ret = VM_FAULT_RETRY;
++    goto release;
++  }
+ 	if (!pte_none(*vmf->pte))
+ 		goto release;
+ 
+@@ -3274,8 +3455,8 @@ map_pte:
+ 	 * pte_none() under vmf->ptl protection when we return to
+ 	 * alloc_set_pte().
+ 	 */
+-	vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd, vmf->address,
+-			&vmf->ptl);
++  if (!pte_map_lock(vmf))
++    return VM_FAULT_RETRY;
+ 	return 0;
+ }
+ 
+@@ -3770,8 +3951,8 @@ static vm_fault_t do_numa_page(struct vm
+ 	 * validation through pte_unmap_same(). It's of NUMA type but
+ 	 * the pfn may be screwed if the read is non atomic.
+ 	 */
+-	vmf->ptl = pte_lockptr(vma->vm_mm, vmf->pmd);
+-	spin_lock(vmf->ptl);
++  if (!pte_spinlock(vmf))
++    return VM_FAULT_RETRY;
+ 	if (unlikely(!pte_same(*vmf->pte, vmf->orig_pte))) {
+ 		pte_unmap_unlock(vmf->pte, vmf->ptl);
+ 		goto out;
+@@ -3964,8 +4145,8 @@ static vm_fault_t handle_pte_fault(struc
+ 	if (pte_protnone(vmf->orig_pte) && vma_is_accessible(vmf->vma))
+ 		return do_numa_page(vmf);
+ 
+-	vmf->ptl = pte_lockptr(vmf->vma->vm_mm, vmf->pmd);
+-	spin_lock(vmf->ptl);
++  if (!pte_spinlock(vmf))
++    return VM_FAULT_RETRY;
+ 	entry = vmf->orig_pte;
+ 	if (unlikely(!pte_same(*vmf->pte, entry)))
+ 		goto unlock;
+@@ -4049,6 +4230,9 @@ static vm_fault_t __handle_mm_fault(stru
+ 	vmf.pmd = pmd_alloc(mm, vmf.pud, address);
+ 	if (!vmf.pmd)
+ 		return VM_FAULT_OOM;
++#ifdef CONFIG_SPECULATIVE_PAGE_FAULT
++  vmf.sequence = raw_read_seqcount(&vma->vm_sequence);
++#endif
+ 	if (pmd_none(*vmf.pmd) && __transparent_hugepage_enabled(vma)) {
+ 		ret = create_huge_pmd(&vmf);
+ 		if (!(ret & VM_FAULT_FALLBACK))
+@@ -4082,6 +4266,227 @@ static vm_fault_t __handle_mm_fault(stru
+ 	return handle_pte_fault(&vmf);
+ }
+ 
++#ifdef CONFIG_SPECULATIVE_PAGE_FAULT
++/*
++ * Tries to handle the page fault in a speculative way, without grabbing the
++ * mmap_sem.
++ */
++vm_fault_t __handle_speculative_fault(struct mm_struct *mm,
++              unsigned long address,
++              unsigned int flags)
++{
++  struct vm_fault vmf = {
++    .address = address,
++  };
++  pgd_t *pgd, pgdval;
++  p4d_t *p4d, p4dval;
++  pud_t pudval;
++  int seq;
++  vm_fault_t ret = VM_FAULT_RETRY;
++  struct vm_area_struct *vma;
++#ifdef CONFIG_NUMA
++  struct mempolicy *pol;
++#endif
++
++  /* Clear flags that may lead to release the mmap_sem to retry */
++  flags &= ~(FAULT_FLAG_ALLOW_RETRY|FAULT_FLAG_KILLABLE);
++  flags |= FAULT_FLAG_SPECULATIVE;
++
++  vma = find_vma_rcu(mm, address);
++  if (!vma)
++    return ret;
++
++  /* rmb <-> seqlock,vma_rb_erase() */
++  seq = raw_read_seqcount(&vma->vm_sequence);
++  if (seq & 1) {
++    trace_spf_vma_changed(_RET_IP_, vma, address);
++    goto out_put;
++  }
++
++  /*
++   * Can't call vm_ops service has we don't know what they would do
++   * with the VMA.
++   * This include huge page from hugetlbfs.
++   */
++  if (vma->vm_ops && vma->vm_ops->fault) {
++    trace_spf_vma_notsup(_RET_IP_, vma, address);
++    goto out_put;
++  }
++
++  /*
++   * __anon_vma_prepare() requires the mmap_sem to be held
++   * because vm_next and vm_prev must be safe. This can't be guaranteed
++   * in the speculative path.
++   */
++  if (unlikely(!vma->anon_vma)) {
++    trace_spf_vma_notsup(_RET_IP_, vma, address);
++    goto out_put;
++  }
++
++  vmf.vma_flags = READ_ONCE(vma->vm_flags);
++  vmf.vma_page_prot = READ_ONCE(vma->vm_page_prot);
++
++  /* Can't call userland page fault handler in the speculative path */
++  if (unlikely(vmf.vma_flags & VM_UFFD_MISSING)) {
++    trace_spf_vma_notsup(_RET_IP_, vma, address);
++    goto out_put;
++  }
++
++  if (vmf.vma_flags & VM_GROWSDOWN || vmf.vma_flags & VM_GROWSUP) {
++    /*
++     * This could be detected by the check address against VMA's
++     * boundaries but we want to trace it as not supported instead
++     * of changed.
++     */
++    trace_spf_vma_notsup(_RET_IP_, vma, address);
++    goto out_put;
++  }
++
++  if (address < READ_ONCE(vma->vm_start)
++      || READ_ONCE(vma->vm_end) <= address) {
++    trace_spf_vma_changed(_RET_IP_, vma, address);
++    goto out_put;
++  }
++
++  if (!arch_vma_access_permitted(vma, flags & FAULT_FLAG_WRITE,
++               flags & FAULT_FLAG_INSTRUCTION,
++               flags & FAULT_FLAG_REMOTE)) {
++    trace_spf_vma_access(_RET_IP_, vma, address);
++    ret = VM_FAULT_SIGSEGV;
++    goto out_put;
++  }
++
++  /* This is one is required to check that the VMA has write access set */
++  if (flags & FAULT_FLAG_WRITE) {
++    if (unlikely(!(vmf.vma_flags & VM_WRITE))) {
++      trace_spf_vma_access(_RET_IP_, vma, address);
++      ret = VM_FAULT_SIGSEGV;
++      goto out_put;
++    }
++  } else if (unlikely(!(vmf.vma_flags & (VM_READ|VM_EXEC|VM_WRITE)))) {
++    trace_spf_vma_access(_RET_IP_, vma, address);
++    ret = VM_FAULT_SIGSEGV;
++    goto out_put;
++  }
++
++#ifdef CONFIG_NUMA
++  /*
++   * MPOL_INTERLEAVE implies additional checks in
++   * mpol_misplaced() which are not compatible with the
++   *speculative page fault processing.
++   */
++  pol = __get_vma_policy(vma, address);
++  if (!pol)
++    pol = get_task_policy(current);
++  if (pol && pol->mode == MPOL_INTERLEAVE) {
++    trace_spf_vma_notsup(_RET_IP_, vma, address);
++    goto out_put;
++  }
++#endif
++
++  /*
++   * Do a speculative lookup of the PTE entry.
++   */
++  local_irq_disable();
++  pgd = pgd_offset(mm, address);
++  pgdval = READ_ONCE(*pgd);
++  if (pgd_none(pgdval) || unlikely(pgd_bad(pgdval)))
++    goto out_walk;
++
++  p4d = p4d_offset(pgd, address);
++  p4dval = READ_ONCE(*p4d);
++  if (p4d_none(p4dval) || unlikely(p4d_bad(p4dval)))
++    goto out_walk;
++
++  vmf.pud = pud_offset(p4d, address);
++  pudval = READ_ONCE(*vmf.pud);
++  if (pud_none(pudval) || unlikely(pud_bad(pudval)))
++    goto out_walk;
++
++  /* Huge pages at PUD level are not supported. */
++  if (unlikely(pud_trans_huge(pudval)))
++    goto out_walk;
++
++  vmf.pmd = pmd_offset(vmf.pud, address);
++  vmf.orig_pmd = READ_ONCE(*vmf.pmd);
++  /*
++   * pmd_none could mean that a hugepage collapse is in progress
++   * in our back as collapse_huge_page() mark it before
++   * invalidating the pte (which is done once the IPI is catched
++   * by all CPU and we have interrupt disabled).
++   * For this reason we cannot handle THP in a speculative way since we
++   * can't safely identify an in progress collapse operation done in our
++   * back on that PMD.
++   * Regarding the order of the following checks, see comment in
++   * pmd_devmap_trans_unstable()
++   */
++  if (unlikely(pmd_devmap(vmf.orig_pmd) ||
++         pmd_none(vmf.orig_pmd) || pmd_trans_huge(vmf.orig_pmd) ||
++         is_swap_pmd(vmf.orig_pmd)))
++    goto out_walk;
++
++  /*
++   * The above does not allocate/instantiate page-tables because doing so
++   * would lead to the possibility of instantiating page-tables after
++   * free_pgtables() -- and consequently leaking them.
++   *
++   * The result is that we take at least one !speculative fault per PMD
++   * in order to instantiate it.
++   */
++
++  vmf.pte = pte_offset_map(vmf.pmd, address);
++  vmf.orig_pte = READ_ONCE(*vmf.pte);
++  barrier(); /* See comment in handle_pte_fault() */
++  if (pte_none(vmf.orig_pte)) {
++    pte_unmap(vmf.pte);
++    vmf.pte = NULL;
++  }
++
++  vmf.vma = vma;
++  vmf.pgoff = linear_page_index(vma, address);
++  vmf.gfp_mask = __get_fault_gfp_mask(vma);
++  vmf.sequence = seq;
++  vmf.flags = flags;
++
++  local_irq_enable();
++
++  /*
++   * We need to re-validate the VMA after checking the bounds, otherwise
++   * we might have a false positive on the bounds.
++   */
++  if (read_seqcount_retry(&vma->vm_sequence, seq)) {
++    trace_spf_vma_changed(_RET_IP_, vma, address);
++    goto out_put;
++  }
++
++  mem_cgroup_enter_user_fault();
++  ret = handle_pte_fault(&vmf);
++  mem_cgroup_exit_user_fault();
++
++  put_vma(vma);
++
++  if (ret != VM_FAULT_RETRY)
++    count_vm_event(SPECULATIVE_PGFAULT);
++
++  /*
++   * The task may have entered a memcg OOM situation but
++   * if the allocation error was handled gracefully (no
++   * VM_FAULT_OOM), there is no need to kill anything.
++   * Just clean up the OOM state peacefully.
++   */
++  if (task_in_memcg_oom(current) && !(ret & VM_FAULT_OOM))
++    mem_cgroup_oom_synchronize(false);
++  return ret;
++
++out_walk:
++  trace_spf_vma_notsup(_RET_IP_, vma, address);
++  local_irq_enable();
++out_put:
++  put_vma(vma);
++  return ret;
++}
++#endif /* CONFIG_SPECULATIVE_PAGE_FAULT */
++
+ /*
+  * By the time we get here, we already hold the mm semaphore
+  *
+Index: rpi-kernel/mm/mmap.c
+===================================================================
+--- rpi-kernel.orig/mm/mmap.c
++++ rpi-kernel/mm/mmap.c
+@@ -165,21 +165,82 @@ void unlink_file_vma(struct vm_area_stru
+ 	}
+ }
+ 
++#ifdef CONFIG_SPECULATIVE_PAGE_FAULT
++static inline void mm_write_seqlock(struct mm_struct *mm)
++{
++    write_seqlock(&mm->mm_seq);
++}
++static inline void mm_write_sequnlock(struct mm_struct *mm)
++{
++    write_sequnlock(&mm->mm_seq);
++}
++
++static void __vm_rcu_put(struct rcu_head *head)
++{
++    struct vm_area_struct *vma = container_of(head, struct vm_area_struct,
++                  vm_rcu);
++      put_vma(vma);
++}
++static void vm_rcu_put(struct vm_area_struct *vma)
++{
++    VM_BUG_ON_VMA(!RB_EMPTY_NODE(&vma->vm_rb), vma);
++      call_rcu(&vma->vm_rcu, __vm_rcu_put);
++}
++#else
++static inline void mm_write_seqlock(struct mm_struct *mm)
++{
++}
++static inline void mm_write_sequnlock(struct mm_struct *mm)
++{
++}
++#endif /* CONFIG_SPECULATIVE_PAGE_FAULT */
++
++void __free_vma(struct vm_area_struct *vma)
++{
++  if (IS_ENABLED(CONFIG_SPECULATIVE_PAGE_FAULT))
++    VM_BUG_ON_VMA(!RB_EMPTY_NODE(&vma->vm_rb), vma);
++  mpol_put(vma_policy(vma));
++  vm_area_free(vma);
++}
++
+ /*
+  * Close a vm structure and free it, returning the next.
+  */
+-static struct vm_area_struct *remove_vma(struct vm_area_struct *vma)
++static struct vm_area_struct *__remove_vma(struct vm_area_struct *vma)
+ {
+-	struct vm_area_struct *next = vma->vm_next;
++  struct vm_area_struct *next = vma->vm_next;
+ 
+-	might_sleep();
+-	if (vma->vm_ops && vma->vm_ops->close)
+-		vma->vm_ops->close(vma);
+-	if (vma->vm_file)
+-		fput(vma->vm_file);
+-	mpol_put(vma_policy(vma));
+-	vm_area_free(vma);
+-	return next;
++  might_sleep();
++  if (IS_ENABLED(CONFIG_SPECULATIVE_PAGE_FAULT) &&
++      !RB_EMPTY_NODE(&vma->vm_rb)) {
++    /*
++     * If the VMA is still linked in the RB tree, we must release
++     * that reference by calling put_vma().
++     * This should only happen when called from exit_mmap().
++     * We forcely clear the node to satisfy the chec in
++     * __free_vma(). This is safe since the RB tree is not walked
++     * anymore.
++     */
++    RB_CLEAR_NODE(&vma->vm_rb);
++    put_vma(vma);
++  }
++  if (vma->vm_ops && vma->vm_ops->close)
++    vma->vm_ops->close(vma);
++  if (vma->vm_file)
++    fput(vma->vm_file);
++  vma->vm_file = NULL;
++  put_vma(vma);
++  return next;
++}
++
++/*
++ * Close a vm structure and free it, returning the next.
++ */
++static struct vm_area_struct *remove_vma(struct vm_area_struct *vma)
++{
++  if (IS_ENABLED(CONFIG_SPECULATIVE_PAGE_FAULT))
++    VM_BUG_ON_VMA(!RB_EMPTY_NODE(&vma->vm_rb), vma);
++  return __remove_vma(vma);
+ }
+ 
+ static int do_brk_flags(unsigned long addr, unsigned long request, unsigned long flags,
+@@ -451,22 +512,33 @@ static inline void vma_rb_insert(struct
+ {
+ 	/* All rb_subtree_gap values must be consistent prior to insertion */
+ 	validate_mm_rb(root, NULL);
+-
++  get_vma(vma);
+ 	rb_insert_augmented(&vma->vm_rb, root, &vma_gap_callbacks);
+ }
+ 
+-static void __vma_rb_erase(struct vm_area_struct *vma, struct rb_root *root)
++static void __vma_rb_erase(struct vm_area_struct *vma, struct mm_struct *mm)
+ {
++  struct rb_root *root = &mm->mm_rb;
+ 	/*
+ 	 * Note rb_erase_augmented is a fairly large inline function,
+ 	 * so make sure we instantiate it only once with our desired
+ 	 * augmented rbtree callbacks.
+ 	 */
++  mm_write_seqlock(mm);
+ 	rb_erase_augmented(&vma->vm_rb, root, &vma_gap_callbacks);
++  mm_write_sequnlock(mm); /* wmb */
++#ifdef CONFIG_SPECULATIVE_PAGE_FAULT
++  /*
++   * Ensure the removal is complete before clearing the node.
++   * Matched by vma_has_changed()/handle_speculative_fault().
++   */
++  RB_CLEAR_NODE(&vma->vm_rb);
++  vm_rcu_put(vma);
++#endif
+ }
+ 
+ static __always_inline void vma_rb_erase_ignore(struct vm_area_struct *vma,
+-						struct rb_root *root,
++						struct mm_struct *mm,
+ 						struct vm_area_struct *ignore)
+ {
+ 	/*
+@@ -474,21 +546,21 @@ static __always_inline void vma_rb_erase
+ 	 * with the possible exception of the "next" vma being erased if
+ 	 * next->vm_start was reduced.
+ 	 */
+-	validate_mm_rb(root, ignore);
++	validate_mm_rb(&mm->mm_rb, ignore);
+ 
+-	__vma_rb_erase(vma, root);
++	__vma_rb_erase(vma, mm);
+ }
+ 
+ static __always_inline void vma_rb_erase(struct vm_area_struct *vma,
+-					 struct rb_root *root)
++					 struct mm_struct *mm)
+ {
+ 	/*
+ 	 * All rb_subtree_gap values must be consistent prior to erase,
+ 	 * with the possible exception of the vma being erased.
+ 	 */
+-	validate_mm_rb(root, vma);
++	validate_mm_rb(&mm->mm_rb, vma);
+ 
+-	__vma_rb_erase(vma, root);
++	__vma_rb_erase(vma, mm);
+ }
+ 
+ /*
+@@ -603,10 +675,12 @@ void __vma_link_rb(struct mm_struct *mm,
+ 	 * immediately update the gap to the correct value. Finally we
+ 	 * rebalance the rbtree after all augmented values have been set.
+ 	 */
++  mm_write_seqlock(mm);
+ 	rb_link_node(&vma->vm_rb, rb_parent, rb_link);
+ 	vma->rb_subtree_gap = 0;
+ 	vma_gap_update(vma);
+ 	vma_rb_insert(vma, &mm->mm_rb);
++  mm_write_sequnlock(mm);
+ }
+ 
+ static void __vma_link_file(struct vm_area_struct *vma)
+@@ -682,7 +756,7 @@ static __always_inline void __vma_unlink
+ {
+ 	struct vm_area_struct *next;
+ 
+-	vma_rb_erase_ignore(vma, &mm->mm_rb, ignore);
++	vma_rb_erase_ignore(vma, mm, ignore);
+ 	next = vma->vm_next;
+ 	if (has_prev)
+ 		prev->vm_next = next;
+@@ -716,7 +790,7 @@ static inline void __vma_unlink_prev(str
+  */
+ int __vma_adjust(struct vm_area_struct *vma, unsigned long start,
+ 	unsigned long end, pgoff_t pgoff, struct vm_area_struct *insert,
+-	struct vm_area_struct *expand)
++	struct vm_area_struct *expand, bool keep_locked)
+ {
+ 	struct mm_struct *mm = vma->vm_mm;
+ 	struct vm_area_struct *next = vma->vm_next, *orig_vma = vma;
+@@ -728,6 +802,10 @@ int __vma_adjust(struct vm_area_struct *
+ 	long adjust_next = 0;
+ 	int remove_next = 0;
+ 
++  vm_raw_write_begin(vma);
++  if (next)
++    vm_raw_write_begin(next); 
++
+ 	if (next && !insert) {
+ 		struct vm_area_struct *exporter = NULL, *importer = NULL;
+ 
+@@ -808,8 +886,12 @@ int __vma_adjust(struct vm_area_struct *
+ 
+ 			importer->anon_vma = exporter->anon_vma;
+ 			error = anon_vma_clone(importer, exporter);
+-			if (error)
++			if (error) {
++        if (next && next != vma)
++          vm_raw_write_end(next);
++        vm_raw_write_end(vma);
+ 				return error;
++      }
+ 		}
+ 	}
+ again:
+@@ -855,17 +937,18 @@ again:
+ 	}
+ 
+ 	if (start != vma->vm_start) {
+-		vma->vm_start = start;
++		WRITE_ONCE(vma->vm_start, start);
+ 		start_changed = true;
+ 	}
+ 	if (end != vma->vm_end) {
+-		vma->vm_end = end;
++		WRITE_ONCE(vma->vm_end, end);
+ 		end_changed = true;
+ 	}
+-	vma->vm_pgoff = pgoff;
++	WRITE_ONCE(vma->vm_pgoff, pgoff);
+ 	if (adjust_next) {
+-		next->vm_start += adjust_next << PAGE_SHIFT;
+-		next->vm_pgoff += adjust_next;
++    WRITE_ONCE(next->vm_start,
++		next->vm_start + (adjust_next << PAGE_SHIFT));
++		WRITE_ONCE(next->vm_pgoff, next->vm_pgoff + adjust_next);
+ 	}
+ 
+ 	if (root) {
+@@ -937,8 +1020,11 @@ again:
+ 		if (next->anon_vma)
+ 			anon_vma_merge(vma, next);
+ 		mm->map_count--;
++    put_vma(next);
++    /*
+ 		mpol_put(vma_policy(next));
+ 		vm_area_free(next);
++    */
+ 		/*
+ 		 * In mprotect's case 6 (see comments on vma_merge),
+ 		 * we must remove another next too. It would clutter
+@@ -952,6 +1038,8 @@ again:
+ 			 * "vma->vm_next" gap must be updated.
+ 			 */
+ 			next = vma->vm_next;
++      if (next)
++        vm_raw_write_begin(next);
+ 		} else {
+ 			/*
+ 			 * For the scope of the comment "next" and
+@@ -998,6 +1086,10 @@ again:
+ 	if (insert && file)
+ 		uprobe_mmap(insert);
+ 
++  if (next && next != vma)
++    vm_raw_write_end(next);
++  if (!keep_locked)
++    vm_raw_write_end(vma);
+ 	validate_mm(mm);
+ 
+ 	return 0;
+@@ -1009,7 +1101,8 @@ again:
+  */
+ static inline int is_mergeable_vma(struct vm_area_struct *vma,
+ 				struct file *file, unsigned long vm_flags,
+-				struct vm_userfaultfd_ctx vm_userfaultfd_ctx)
++				struct vm_userfaultfd_ctx vm_userfaultfd_ctx,
++        const char __user *anon_name)
+ {
+ 	/*
+ 	 * VM_SOFTDIRTY should not prevent from VMA merging, if we
+@@ -1027,6 +1120,8 @@ static inline int is_mergeable_vma(struc
+ 		return 0;
+ 	if (!is_mergeable_vm_userfaultfd_ctx(vma, vm_userfaultfd_ctx))
+ 		return 0;
++  if (vma_get_anon_name(vma) != anon_name)
++    return 0;
+ 	return 1;
+ }
+ 
+@@ -1059,9 +1154,10 @@ static int
+ can_vma_merge_before(struct vm_area_struct *vma, unsigned long vm_flags,
+ 		     struct anon_vma *anon_vma, struct file *file,
+ 		     pgoff_t vm_pgoff,
+-		     struct vm_userfaultfd_ctx vm_userfaultfd_ctx)
++		     struct vm_userfaultfd_ctx vm_userfaultfd_ctx,
++         const char __user *anon_name)
+ {
+-	if (is_mergeable_vma(vma, file, vm_flags, vm_userfaultfd_ctx) &&
++	if (is_mergeable_vma(vma, file, vm_flags, vm_userfaultfd_ctx, anon_name) &&
+ 	    is_mergeable_anon_vma(anon_vma, vma->anon_vma, vma)) {
+ 		if (vma->vm_pgoff == vm_pgoff)
+ 			return 1;
+@@ -1080,9 +1176,10 @@ static int
+ can_vma_merge_after(struct vm_area_struct *vma, unsigned long vm_flags,
+ 		    struct anon_vma *anon_vma, struct file *file,
+ 		    pgoff_t vm_pgoff,
+-		    struct vm_userfaultfd_ctx vm_userfaultfd_ctx)
++		    struct vm_userfaultfd_ctx vm_userfaultfd_ctx,
++        const char __user *anon_name)
+ {
+-	if (is_mergeable_vma(vma, file, vm_flags, vm_userfaultfd_ctx) &&
++	if (is_mergeable_vma(vma, file, vm_flags, vm_userfaultfd_ctx, anon_name) &&
+ 	    is_mergeable_anon_vma(anon_vma, vma->anon_vma, vma)) {
+ 		pgoff_t vm_pglen;
+ 		vm_pglen = vma_pages(vma);
+@@ -1132,12 +1229,13 @@ can_vma_merge_after(struct vm_area_struc
+  * parameter) may establish ptes with the wrong permissions of NNNN
+  * instead of the right permissions of XXXX.
+  */
+-struct vm_area_struct *vma_merge(struct mm_struct *mm,
++struct vm_area_struct *__vma_merge(struct mm_struct *mm,
+ 			struct vm_area_struct *prev, unsigned long addr,
+ 			unsigned long end, unsigned long vm_flags,
+ 			struct anon_vma *anon_vma, struct file *file,
+ 			pgoff_t pgoff, struct mempolicy *policy,
+-			struct vm_userfaultfd_ctx vm_userfaultfd_ctx)
++			struct vm_userfaultfd_ctx vm_userfaultfd_ctx,
++      const char __user *anon_name, bool keep_locked)
+ {
+ 	pgoff_t pglen = (end - addr) >> PAGE_SHIFT;
+ 	struct vm_area_struct *area, *next;
+@@ -1170,7 +1268,7 @@ struct vm_area_struct *vma_merge(struct
+ 			mpol_equal(vma_policy(prev), policy) &&
+ 			can_vma_merge_after(prev, vm_flags,
+ 					    anon_vma, file, pgoff,
+-					    vm_userfaultfd_ctx)) {
++					    vm_userfaultfd_ctx, anon_name)) {
+ 		/*
+ 		 * OK, it can.  Can we now merge in the successor as well?
+ 		 */
+@@ -1179,16 +1277,16 @@ struct vm_area_struct *vma_merge(struct
+ 				can_vma_merge_before(next, vm_flags,
+ 						     anon_vma, file,
+ 						     pgoff+pglen,
+-						     vm_userfaultfd_ctx) &&
++						     vm_userfaultfd_ctx, anon_name) &&
+ 				is_mergeable_anon_vma(prev->anon_vma,
+ 						      next->anon_vma, NULL)) {
+ 							/* cases 1, 6 */
+ 			err = __vma_adjust(prev, prev->vm_start,
+ 					 next->vm_end, prev->vm_pgoff, NULL,
+-					 prev);
++					 prev, keep_locked);
+ 		} else					/* cases 2, 5, 7 */
+ 			err = __vma_adjust(prev, prev->vm_start,
+-					 end, prev->vm_pgoff, NULL, prev);
++					 end, prev->vm_pgoff, NULL, prev, keep_locked);
+ 		if (err)
+ 			return NULL;
+ 		khugepaged_enter_vma_merge(prev, vm_flags);
+@@ -1202,13 +1300,13 @@ struct vm_area_struct *vma_merge(struct
+ 			mpol_equal(policy, vma_policy(next)) &&
+ 			can_vma_merge_before(next, vm_flags,
+ 					     anon_vma, file, pgoff+pglen,
+-					     vm_userfaultfd_ctx)) {
++					     vm_userfaultfd_ctx, anon_name)) {
+ 		if (prev && addr < prev->vm_end)	/* case 4 */
+ 			err = __vma_adjust(prev, prev->vm_start,
+-					 addr, prev->vm_pgoff, NULL, next);
++					 addr, prev->vm_pgoff, NULL, next, keep_locked);
+ 		else {					/* cases 3, 8 */
+ 			err = __vma_adjust(area, addr, next->vm_end,
+-					 next->vm_pgoff - pglen, NULL, next);
++					 next->vm_pgoff - pglen, NULL, next, keep_locked);
+ 			/*
+ 			 * In case 3 area is already equal to next and
+ 			 * this is a noop, but in case 8 "area" has
+@@ -1755,7 +1853,7 @@ unsigned long mmap_region(struct file *f
+ 	 * Can we just expand an old mapping?
+ 	 */
+ 	vma = vma_merge(mm, prev, addr, addr + len, vm_flags,
+-			NULL, file, pgoff, NULL, NULL_VM_UFFD_CTX);
++			NULL, file, pgoff, NULL, NULL_VM_UFFD_CTX, NULL);
+ 	if (vma)
+ 		goto out;
+ 
+@@ -1775,6 +1873,7 @@ unsigned long mmap_region(struct file *f
+ 	vma->vm_flags = vm_flags;
+ 	vma->vm_page_prot = vm_get_page_prot(vm_flags);
+ 	vma->vm_pgoff = pgoff;
++  INIT_VMA(vma);
+ 
+ 	if (file) {
+ 		if (vm_flags & VM_DENYWRITE) {
+@@ -1829,12 +1928,14 @@ unsigned long mmap_region(struct file *f
+ out:
+ 	perf_event_mmap(vma);
+ 
++  vm_write_begin(vma);
+ 	vm_stat_account(mm, vm_flags, len >> PAGE_SHIFT);
+ 	if (vm_flags & VM_LOCKED) {
+ 		if ((vm_flags & VM_SPECIAL) || vma_is_dax(vma) ||
+ 					is_vm_hugetlb_page(vma) ||
+ 					vma == get_gate_vma(current->mm))
+-			vma->vm_flags &= VM_LOCKED_CLEAR_MASK;
++      WRITE_ONCE(vma->vm_flags,
++			  vma->vm_flags & VM_LOCKED_CLEAR_MASK);
+ 		else
+ 			mm->locked_vm += (len >> PAGE_SHIFT);
+ 	}
+@@ -1849,9 +1950,10 @@ out:
+ 	 * then new mapped in-place (which must be aimed as
+ 	 * a completely new data area).
+ 	 */
+-	vma->vm_flags |= VM_SOFTDIRTY;
++	WRITE_ONCE(vma->vm_flags, vma->vm_flags | VM_SOFTDIRTY);
+ 
+ 	vma_set_page_prot(vma);
++  vm_write_end(vma);
+ 
+ 	return addr;
+ 
+@@ -2268,6 +2370,34 @@ struct vm_area_struct *find_vma(struct m
+ 
+ EXPORT_SYMBOL(find_vma);
+ 
++#ifdef CONFIG_SPECULATIVE_PAGE_FAULT
++/*
++ * Like find_vma() but under the protection of RCU and the mm sequence counter.
++ * The vma returned has to be relaesed by the caller through the call to
++ * put_vma()
++ */
++struct vm_area_struct *find_vma_rcu(struct mm_struct *mm, unsigned long addr)
++{
++  struct vm_area_struct *vma = NULL;
++  unsigned int seq;
++
++  do {
++    if (vma)
++      put_vma(vma);
++
++    seq = read_seqbegin(&mm->mm_seq);
++
++    rcu_read_lock();
++    vma = find_vma(mm, addr);
++    if (vma)
++      get_vma(vma);
++    rcu_read_unlock();
++  } while (read_seqretry(&mm->mm_seq, seq));
++
++  return vma;
++}
++#endif
++
+ /*
+  * Same as find_vma, but also return a pointer to the previous VMA in *pprev.
+  */
+@@ -2408,7 +2538,9 @@ int expand_upwards(struct vm_area_struct
+ 					mm->locked_vm += grow;
+ 				vm_stat_account(mm, vma->vm_flags, grow);
+ 				anon_vma_interval_tree_pre_update_vma(vma);
+-				vma->vm_end = address;
++        vm_write_begin(vma);
++				WRITE_ONCE(vma->vm_end, address);
++        vm_write_end(vma);
+ 				anon_vma_interval_tree_post_update_vma(vma);
+ 				if (vma->vm_next)
+ 					vma_gap_update(vma->vm_next);
+@@ -2488,8 +2620,10 @@ int expand_downwards(struct vm_area_stru
+ 					mm->locked_vm += grow;
+ 				vm_stat_account(mm, vma->vm_flags, grow);
+ 				anon_vma_interval_tree_pre_update_vma(vma);
+-				vma->vm_start = address;
+-				vma->vm_pgoff -= grow;
++        vm_write_begin(vma);
++				WRITE_ONCE(vma->vm_start, address);
++				WRITE_ONCE(vma->vm_pgoff, vma->vm_pgoff - grow);
++        vm_write_end(vma);
+ 				anon_vma_interval_tree_post_update_vma(vma);
+ 				vma_gap_update(vma);
+ 				spin_unlock(&mm->page_table_lock);
+@@ -2635,7 +2769,7 @@ detach_vmas_to_be_unmapped(struct mm_str
+ 	insertion_point = (prev ? &prev->vm_next : &mm->mmap);
+ 	vma->vm_prev = NULL;
+ 	do {
+-		vma_rb_erase(vma, &mm->mm_rb);
++		vma_rb_erase(vma, mm);
+ 		mm->map_count--;
+ 		tail_vma = vma;
+ 		vma = vma->vm_next;
+@@ -3046,7 +3180,7 @@ static int do_brk_flags(unsigned long ad
+ 
+ 	/* Can we just expand an old private anonymous mapping? */
+ 	vma = vma_merge(mm, prev, addr, addr + len, flags,
+-			NULL, NULL, pgoff, NULL, NULL_VM_UFFD_CTX);
++			NULL, NULL, pgoff, NULL, NULL_VM_UFFD_CTX, NULL);
+ 	if (vma)
+ 		goto out;
+ 
+@@ -3060,6 +3194,7 @@ static int do_brk_flags(unsigned long ad
+ 	}
+ 
+ 	vma_set_anonymous(vma);
++  INIT_VMA(vma);
+ 	vma->vm_start = addr;
+ 	vma->vm_end = addr + len;
+ 	vma->vm_pgoff = pgoff;
+@@ -3243,9 +3378,9 @@ struct vm_area_struct *copy_vma(struct v
+ 
+ 	if (find_vma_links(mm, addr, addr + len, &prev, &rb_link, &rb_parent))
+ 		return NULL;	/* should never get here */
+-	new_vma = vma_merge(mm, prev, addr, addr + len, vma->vm_flags,
++	new_vma = __vma_merge(mm, prev, addr, addr + len, vma->vm_flags,
+ 			    vma->anon_vma, vma->vm_file, pgoff, vma_policy(vma),
+-			    vma->vm_userfaultfd_ctx);
++			    vma->vm_userfaultfd_ctx, vma_get_anon_name(vma), true);
+ 	if (new_vma) {
+ 		/*
+ 		 * Source vma may have been merged into new_vma
+@@ -3283,6 +3418,7 @@ struct vm_area_struct *copy_vma(struct v
+ 			get_file(new_vma->vm_file);
+ 		if (new_vma->vm_ops && new_vma->vm_ops->open)
+ 			new_vma->vm_ops->open(new_vma);
++    vm_raw_write_begin(new_vma);
+ 		vma_link(mm, new_vma, prev, rb_link, rb_parent);
+ 		*need_rmap_locks = false;
+ 	}
+@@ -3419,6 +3555,7 @@ static struct vm_area_struct *__install_
+ 	if (unlikely(vma == NULL))
+ 		return ERR_PTR(-ENOMEM);
+ 
++  INIT_VMA(vma);
+ 	vma->vm_start = addr;
+ 	vma->vm_end = addr + len;
+ 
+Index: rpi-kernel/mm/nommu.c
+===================================================================
+--- rpi-kernel.orig/mm/nommu.c
++++ rpi-kernel/mm/nommu.c
+@@ -1141,6 +1141,7 @@ unsigned long do_mmap(struct file *file,
+ 	region->vm_flags = vm_flags;
+ 	region->vm_pgoff = pgoff;
+ 
++  INIT_VMA(vma);
+ 	vma->vm_flags = vm_flags;
+ 	vma->vm_pgoff = pgoff;
+ 
+Index: rpi-kernel/mm/vmstat.c
+===================================================================
+--- rpi-kernel.orig/mm/vmstat.c
++++ rpi-kernel/mm/vmstat.c
+@@ -1291,6 +1291,9 @@ const char * const vmstat_text[] = {
+ 	"swap_ra",
+ 	"swap_ra_hit",
+ #endif
++#ifdef CONFIG_SPECULATIVE_PAGE_FAULT
++  "speculative_pgfault",
++#endif
+ #endif /* CONFIG_VM_EVENTS_COUNTERS */
+ };
+ #endif /* CONFIG_PROC_FS || CONFIG_SYSFS || CONFIG_NUMA */
+Index: rpi-kernel/kernel/sysctl.c
+===================================================================
+--- rpi-kernel.orig/kernel/sysctl.c
++++ rpi-kernel/kernel/sysctl.c
+@@ -1303,6 +1303,15 @@ static struct ctl_table vm_table[] = {
+ 		.extra1		= SYSCTL_ZERO,
+ 		.extra2		= &two,
+ 	},
++#ifdef CONFIG_SPECULATIVE_PAGE_FAULT
++  {
++    .procname = "speculative_page_fault",
++    .data   = &sysctl_speculative_page_fault,
++    .maxlen   = sizeof(sysctl_speculative_page_fault),
++    .mode   = 0644,
++    .proc_handler = proc_dointvec,
++  },
++#endif
+ 	{
+ 		.procname	= "panic_on_oom",
+ 		.data		= &sysctl_panic_on_oom,
+Index: rpi-kernel/mm/init-mm.c
+===================================================================
+--- rpi-kernel.orig/mm/init-mm.c
++++ rpi-kernel/mm/init-mm.c
+@@ -28,6 +28,9 @@
+  */
+ struct mm_struct init_mm = {
+ 	.mm_rb		= RB_ROOT,
++#ifdef CONFIG_SPECULATIVE_PAGE_FAULT
++  .mm_seq   = __SEQLOCK_UNLOCKED(init_mm.mm_seq),
++#endif
+ 	.pgd		= swapper_pg_dir,
+ 	.mm_users	= ATOMIC_INIT(2),
+ 	.mm_count	= ATOMIC_INIT(1),
+Index: rpi-kernel/kernel/fork.c
+===================================================================
+--- rpi-kernel.orig/kernel/fork.c
++++ rpi-kernel/kernel/fork.c
+@@ -357,7 +357,7 @@ struct vm_area_struct *vm_area_dup(struc
+ 
+ 	if (new) {
+ 		*new = *orig;
+-		INIT_LIST_HEAD(&new->anon_vma_chain);
++    INIT_VMA(new);
+ 	}
+ 	return new;
+ }
+@@ -478,7 +478,7 @@ EXPORT_SYMBOL(free_task);
+ static __latent_entropy int dup_mmap(struct mm_struct *mm,
+ 					struct mm_struct *oldmm)
+ {
+-	struct vm_area_struct *mpnt, *tmp, *prev, **pprev;
++	struct vm_area_struct *mpnt, *tmp, *prev, **pprev, *last = NULL;
+ 	struct rb_node **rb_link, *rb_parent;
+ 	int retval;
+ 	unsigned long charge;
+@@ -597,8 +597,13 @@ static __latent_entropy int dup_mmap(str
+ 		rb_parent = &tmp->vm_rb;
+ 
+ 		mm->map_count++;
+-		if (!(tmp->vm_flags & VM_WIPEONFORK))
++		if (!(tmp->vm_flags & VM_WIPEONFORK)) {
++      if (IS_ENABLED(CONFIG_SPECULATIVE_PAGE_FAULT)) {
++        last = mpnt;
++        vm_raw_write_begin(mpnt);
++      }
+ 			retval = copy_page_range(mm, oldmm, mpnt);
++    }
+ 
+ 		if (tmp->vm_ops && tmp->vm_ops->open)
+ 			tmp->vm_ops->open(tmp);
+@@ -611,6 +616,20 @@ static __latent_entropy int dup_mmap(str
+ out:
+ 	up_write(&mm->mmap_sem);
+ 	flush_tlb_mm(oldmm);
++  if (IS_ENABLED(CONFIG_SPECULATIVE_PAGE_FAULT)) {
++    /*
++     * Since the TLB has been flush, we can safely unmark the
++     * copied VMAs and allows the speculative page fault handler to
++     * process them again.
++     * Walk back the VMA list from the last marked VMA.
++     */
++    for (; last; last = last->vm_prev) {
++      if (last->vm_flags & VM_DONTCOPY)
++        continue;
++      if (!(last->vm_flags & VM_WIPEONFORK))
++        vm_raw_write_end(last);
++    }
++  }
+ 	up_write(&oldmm->mmap_sem);
+ 	dup_userfaultfd_complete(&uf);
+ fail_uprobe_end:
+@@ -1006,6 +1025,9 @@ static struct mm_struct *mm_init(struct
+ 	mm->mmap = NULL;
+ 	mm->mm_rb = RB_ROOT;
+ 	mm->vmacache_seqnum = 0;
++#ifdef CONFIG_SPECULATIVE_PAGE_FAULT
++  seqlock_init(&mm->mm_seq);
++#endif
+ 	atomic_set(&mm->mm_users, 1);
+ 	atomic_set(&mm->mm_count, 1);
+ 	init_rwsem(&mm->mmap_sem);
+Index: rpi-kernel/include/uapi/linux/perf_event.h
+===================================================================
+--- rpi-kernel.orig/include/uapi/linux/perf_event.h
++++ rpi-kernel/include/uapi/linux/perf_event.h
+@@ -112,6 +112,7 @@ enum perf_sw_ids {
+ 	PERF_COUNT_SW_EMULATION_FAULTS		= 8,
+ 	PERF_COUNT_SW_DUMMY			= 9,
+ 	PERF_COUNT_SW_BPF_OUTPUT		= 10,
++  PERF_COUNT_SW_SPF     = 11,
+ 
+ 	PERF_COUNT_SW_MAX,			/* non-ABI */
+ };
+Index: rpi-kernel/tools/include/uapi/linux/perf_event.h
+===================================================================
+--- rpi-kernel.orig/tools/include/uapi/linux/perf_event.h
++++ rpi-kernel/tools/include/uapi/linux/perf_event.h
+@@ -112,6 +112,7 @@ enum perf_sw_ids {
+ 	PERF_COUNT_SW_EMULATION_FAULTS		= 8,
+ 	PERF_COUNT_SW_DUMMY			= 9,
+ 	PERF_COUNT_SW_BPF_OUTPUT		= 10,
++  PERF_COUNT_SW_SPF     = 11,
+ 
+ 	PERF_COUNT_SW_MAX,			/* non-ABI */
+ };
+Index: rpi-kernel/tools/perf/util/evsel.c
+===================================================================
+--- rpi-kernel.orig/tools/perf/util/evsel.c
++++ rpi-kernel/tools/perf/util/evsel.c
+@@ -446,6 +446,7 @@ const char *perf_evsel__sw_names[PERF_CO
+ 	"alignment-faults",
+ 	"emulation-faults",
+ 	"dummy",
++  "speculative-faults",
+ };
+ 
+ static const char *__perf_evsel__sw_name(u64 config)
+Index: rpi-kernel/tools/perf/util/parse-events.c
+===================================================================
+--- rpi-kernel.orig/tools/perf/util/parse-events.c
++++ rpi-kernel/tools/perf/util/parse-events.c
+@@ -143,6 +143,10 @@ struct event_symbol event_symbols_sw[PER
+ 		.symbol = "bpf-output",
+ 		.alias  = "",
+ 	},
++  [PERF_COUNT_SW_SPF] = {
++    .symbol = "speculative-faults",
++    .alias  = "spf",
++  },
+ };
+ 
+ #define __PERF_EVENT_FIELD(config, name) \
+Index: rpi-kernel/tools/perf/util/parse-events.l
+===================================================================
+--- rpi-kernel.orig/tools/perf/util/parse-events.l
++++ rpi-kernel/tools/perf/util/parse-events.l
+@@ -335,7 +335,7 @@ emulation-faults				{ return sym(yyscann
+ dummy						{ return sym(yyscanner, PERF_TYPE_SOFTWARE, PERF_COUNT_SW_DUMMY); }
+ duration_time					{ return tool(yyscanner, PERF_TOOL_DURATION_TIME); }
+ bpf-output					{ return sym(yyscanner, PERF_TYPE_SOFTWARE, PERF_COUNT_SW_BPF_OUTPUT); }
+-
++speculative-faults|spf        { return sym(yyscanner, PERF_TYPE_SOFTWARE, PERF_COUNT_SW_SPF); }
+ 	/*
+ 	 * We have to handle the kernel PMU event cycles-ct/cycles-t/mem-loads/mem-stores separately.
+ 	 * Because the prefix cycles is mixed up with cpu-cycles.
+Index: rpi-kernel/arch/arm64/Kconfig
+===================================================================
+--- rpi-kernel.orig/arch/arm64/Kconfig
++++ rpi-kernel/arch/arm64/Kconfig
+@@ -187,6 +187,7 @@ config ARM64
+ 	select SWIOTLB
+ 	select SYSCTL_EXCEPTION_TRACE
+ 	select THREAD_INFO_IN_TASK
++  select ARCH_SUPPORTS_SPECULATIVE_PAGE_FAULT
+ 	help
+ 	  ARM 64-bit (AArch64) Linux support.
+ 
+Index: rpi-kernel/mm/Kconfig
+===================================================================
+--- rpi-kernel.orig/mm/Kconfig
++++ rpi-kernel/mm/Kconfig
+@@ -764,4 +764,26 @@ config LOW_MEM_NOTIFY
+     the presence of large swap space, the system is likely to become
+     unusable before the OOM killer is triggered.
+ 
++config ARCH_SUPPORTS_SPECULATIVE_PAGE_FAULT
++       def_bool n
++
++config SPECULATIVE_PAGE_FAULT
++  bool "Speculative page faults"
++  default y
++  depends on ARCH_SUPPORTS_SPECULATIVE_PAGE_FAULT
++  depends on ARCH_HAS_PTE_SPECIAL && MMU && SMP
++  help
++    Try to handle user space page faults without holding the mmap_sem.
++
++    This should allow better concurrency for massively threaded processes
++    since the page fault handler will not wait for other thread's memory
++    layout change to be done, assuming that this change is done in
++    another part of the process's memory space. This type of page fault
++    is named speculative page fault.
++
++    If the speculative page fault fails because a concurrent modification
++    is detected or because underlying PMD or PTE tables are not yet
++    allocated, the speculative page fault fails and a classic page fault
++    is then tried.
++
+ endmenu
+Index: rpi-kernel/include/trace/events/pagefault.h
+===================================================================
+--- /dev/null
++++ rpi-kernel/include/trace/events/pagefault.h
+@@ -0,0 +1,80 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM pagefault
++
++#if !defined(_TRACE_PAGEFAULT_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_PAGEFAULT_H
++
++#include <linux/tracepoint.h>
++#include <linux/mm.h>
++
++DECLARE_EVENT_CLASS(spf,
++
++	TP_PROTO(unsigned long caller,
++		 struct vm_area_struct *vma, unsigned long address),
++
++	TP_ARGS(caller, vma, address),
++
++	TP_STRUCT__entry(
++		__field(unsigned long, caller)
++		__field(unsigned long, vm_start)
++		__field(unsigned long, vm_end)
++		__field(unsigned long, address)
++	),
++
++	TP_fast_assign(
++		__entry->caller		= caller;
++		__entry->vm_start	= vma->vm_start;
++		__entry->vm_end		= vma->vm_end;
++		__entry->address	= address;
++	),
++
++	TP_printk("ip:%lx vma:%lx-%lx address:%lx",
++		  __entry->caller, __entry->vm_start, __entry->vm_end,
++		  __entry->address)
++);
++
++DEFINE_EVENT(spf, spf_vma_changed,
++
++	TP_PROTO(unsigned long caller,
++		 struct vm_area_struct *vma, unsigned long address),
++
++	TP_ARGS(caller, vma, address)
++);
++
++DEFINE_EVENT(spf, spf_vma_noanon,
++
++	TP_PROTO(unsigned long caller,
++		 struct vm_area_struct *vma, unsigned long address),
++
++	TP_ARGS(caller, vma, address)
++);
++
++DEFINE_EVENT(spf, spf_vma_notsup,
++
++	TP_PROTO(unsigned long caller,
++		 struct vm_area_struct *vma, unsigned long address),
++
++	TP_ARGS(caller, vma, address)
++);
++
++DEFINE_EVENT(spf, spf_vma_access,
++
++	TP_PROTO(unsigned long caller,
++		 struct vm_area_struct *vma, unsigned long address),
++
++	TP_ARGS(caller, vma, address)
++);
++
++DEFINE_EVENT(spf, spf_pmd_changed,
++
++	TP_PROTO(unsigned long caller,
++		 struct vm_area_struct *vma, unsigned long address),
++
++	TP_ARGS(caller, vma, address)
++);
++
++#endif /* _TRACE_PAGEFAULT_H */
++
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+Index: rpi-kernel/fs/exec.c
+===================================================================
+--- rpi-kernel.orig/fs/exec.c
++++ rpi-kernel/fs/exec.c
+@@ -272,6 +272,7 @@ static int __bprm_mm_init(struct linux_b
+ 	vma->vm_start = vma->vm_end - PAGE_SIZE;
+ 	vma->vm_flags = VM_SOFTDIRTY | VM_STACK_FLAGS | VM_STACK_INCOMPLETE_SETUP;
+ 	vma->vm_page_prot = vm_get_page_prot(vma->vm_flags);
++  INIT_VMA(vma);
+ 
+ 	err = insert_vm_struct(mm, vma);
+ 	if (err)
+Index: rpi-kernel/fs/proc/task_mmu.c
+===================================================================
+--- rpi-kernel.orig/fs/proc/task_mmu.c
++++ rpi-kernel/fs/proc/task_mmu.c
+@@ -123,6 +123,56 @@ static void release_task_mempolicy(struc
+ }
+ #endif
+ 
++static void seq_print_vma_name(struct seq_file *m, struct vm_area_struct *vma)
++{
++  const char __user *name = vma_get_anon_name(vma);
++  struct mm_struct *mm = vma->vm_mm;
++
++  unsigned long page_start_vaddr;
++  unsigned long page_offset;
++  unsigned long num_pages;
++  unsigned long max_len = NAME_MAX;
++  int i;
++
++  page_start_vaddr = (unsigned long)name & PAGE_MASK;
++  page_offset = (unsigned long)name - page_start_vaddr;
++  num_pages = DIV_ROUND_UP(page_offset + max_len, PAGE_SIZE);
++
++  seq_puts(m, "[anon:");
++
++  for (i = 0; i < num_pages; i++) {
++    int len;
++    int write_len;
++    const char *kaddr;
++    long pages_pinned;
++    struct page *page;
++
++    pages_pinned = get_user_pages_remote(current, mm,
++        page_start_vaddr, 1, 0, &page, NULL, NULL);
++    if (pages_pinned < 1) {
++      seq_puts(m, "<fault>]");
++      return;
++    }
++
++    kaddr = (const char *)kmap(page);
++    len = min(max_len, PAGE_SIZE - page_offset);
++    write_len = strnlen(kaddr + page_offset, len);
++    seq_write(m, kaddr + page_offset, write_len);
++    kunmap(page);
++    put_page(page);
++
++    /* if strnlen hit a null terminator then we're done */
++    if (write_len != len)
++      break;
++
++    max_len -= len;
++    page_offset = 0;
++    page_start_vaddr += PAGE_SIZE;
++  }
++
++  seq_putc(m, ']');
++}
++
+ static void vma_stop(struct proc_maps_private *priv)
+ {
+ 	struct mm_struct *mm = priv->mm;
+@@ -348,8 +398,14 @@ show_map_vma(struct seq_file *m, struct
+ 			goto done;
+ 		}
+ 
+-		if (is_stack(vma))
++		if (is_stack(vma)) {
+ 			name = "[stack]";
++      goto done;
++    }
++    if (vma_get_anon_name(vma)) {
++      seq_pad(m, ' ');
++      seq_print_vma_name(m, vma);
++    }
+ 	}
+ 
+ done:
+@@ -832,7 +888,11 @@ static int show_smap(struct seq_file *m,
+ 	smap_gather_stats(vma, &mss);
+ 
+ 	show_map_vma(m, vma);
+-
++  if (vma_get_anon_name(vma)) {
++    seq_puts(m, "Name:           ");
++    seq_print_vma_name(m, vma);
++    seq_putc(m, '\n');
++  }
+ 	SEQ_PUT_DEC("Size:           ", vma->vm_end - vma->vm_start);
+ 	SEQ_PUT_DEC(" kB\nKernelPageSize: ", vma_kernel_pagesize(vma));
+ 	SEQ_PUT_DEC(" kB\nMMUPageSize:    ", vma_mmu_pagesize(vma));
+@@ -1213,8 +1273,11 @@ static ssize_t clear_refs_write(struct f
+ 					goto out_mm;
+ 				}
+ 				for (vma = mm->mmap; vma; vma = vma->vm_next) {
+-					vma->vm_flags &= ~VM_SOFTDIRTY;
++          vm_write_begin(vma);
++					WRITE_ONCE(vma->vm_flags,
++            vma->vm_flags & ~VM_SOFTDIRTY);
+ 					vma_set_page_prot(vma);
++          vm_write_end(vma);
+ 				}
+ 				downgrade_write(&mm->mmap_sem);
+ 				break;
+Index: rpi-kernel/fs/userfaultfd.c
+===================================================================
+--- rpi-kernel.orig/fs/userfaultfd.c
++++ rpi-kernel/fs/userfaultfd.c
+@@ -675,8 +675,11 @@ int dup_userfaultfd(struct vm_area_struc
+ 
+ 	octx = vma->vm_userfaultfd_ctx.ctx;
+ 	if (!octx || !(octx->features & UFFD_FEATURE_EVENT_FORK)) {
++    vm_write_begin(vma);
+ 		vma->vm_userfaultfd_ctx = NULL_VM_UFFD_CTX;
+-		vma->vm_flags &= ~(VM_UFFD_WP | VM_UFFD_MISSING);
++    WRITE_ONCE(vma->vm_flags,
++		  vma->vm_flags & ~(VM_UFFD_WP | VM_UFFD_MISSING));
++    vm_write_end(vma);
+ 		return 0;
+ 	}
+ 
+@@ -912,14 +915,17 @@ static int userfaultfd_release(struct in
+ 					 new_flags, vma->anon_vma,
+ 					 vma->vm_file, vma->vm_pgoff,
+ 					 vma_policy(vma),
+-					 NULL_VM_UFFD_CTX);
++					 NULL_VM_UFFD_CTX,
++           vma_get_anon_name(vma));
+ 			if (prev)
+ 				vma = prev;
+ 			else
+ 				prev = vma;
+ 		}
+-		vma->vm_flags = new_flags;
++    vm_write_begin(vma);
++		WRITE_ONCE(vma->vm_flags, new_flags);
+ 		vma->vm_userfaultfd_ctx = NULL_VM_UFFD_CTX;
++    vm_write_end(vma);
+ 	}
+ 	up_write(&mm->mmap_sem);
+ 	mmput(mm);
+@@ -1464,7 +1470,8 @@ static int userfaultfd_register(struct u
+ 		prev = vma_merge(mm, prev, start, vma_end, new_flags,
+ 				 vma->anon_vma, vma->vm_file, vma->vm_pgoff,
+ 				 vma_policy(vma),
+-				 ((struct vm_userfaultfd_ctx){ ctx }));
++				 ((struct vm_userfaultfd_ctx){ ctx }),
++         vma_get_anon_name(vma));
+ 		if (prev) {
+ 			vma = prev;
+ 			goto next;
+@@ -1485,8 +1492,10 @@ static int userfaultfd_register(struct u
+ 		 * the next vma was merged into the current one and
+ 		 * the current one has not been updated yet.
+ 		 */
+-		vma->vm_flags = new_flags;
++    vm_write_begin(vma);
++		WRITE_ONCE(vma->vm_flags, new_flags);
+ 		vma->vm_userfaultfd_ctx.ctx = ctx;
++    vm_write_end(vma);
+ 
+ 	skip:
+ 		prev = vma;
+@@ -1626,7 +1635,8 @@ static int userfaultfd_unregister(struct
+ 		prev = vma_merge(mm, prev, start, vma_end, new_flags,
+ 				 vma->anon_vma, vma->vm_file, vma->vm_pgoff,
+ 				 vma_policy(vma),
+-				 NULL_VM_UFFD_CTX);
++				 NULL_VM_UFFD_CTX,
++         vma_get_anon_name(vma));
+ 		if (prev) {
+ 			vma = prev;
+ 			goto next;
+@@ -1647,8 +1657,10 @@ static int userfaultfd_unregister(struct
+ 		 * the next vma was merged into the current one and
+ 		 * the current one has not been updated yet.
+ 		 */
+-		vma->vm_flags = new_flags;
++    vm_write_begin(vma);
++		WRITE_ONCE(vma->vm_flags, new_flags);
+ 		vma->vm_userfaultfd_ctx = NULL_VM_UFFD_CTX;
++    vm_write_end(vma);
+ 
+ 	skip:
+ 		prev = vma;
+Index: rpi-kernel/mm/khugepaged.c
+===================================================================
+--- rpi-kernel.orig/mm/khugepaged.c
++++ rpi-kernel/mm/khugepaged.c
+@@ -1041,6 +1041,7 @@ static void collapse_huge_page(struct mm
+ 	if (mm_find_pmd(mm, address) != pmd)
+ 		goto out;
+ 
++  vm_write_begin(vma);
+ 	anon_vma_lock_write(vma->anon_vma);
+ 
+ 	mmu_notifier_range_init(&range, MMU_NOTIFY_CLEAR, 0, NULL, mm,
+@@ -1077,6 +1078,7 @@ static void collapse_huge_page(struct mm
+ 		pmd_populate(mm, pmd, pmd_pgtable(_pmd));
+ 		spin_unlock(pmd_ptl);
+ 		anon_vma_unlock_write(vma->anon_vma);
++    vm_write_end(vma);
+ 		result = SCAN_FAIL;
+ 		goto out;
+ 	}
+@@ -1112,6 +1114,7 @@ static void collapse_huge_page(struct mm
+ 	set_pmd_at(mm, address, pmd, _pmd);
+ 	update_mmu_cache_pmd(vma, address, pmd);
+ 	spin_unlock(pmd_ptl);
++  vm_write_end(vma);
+ 
+ 	*hpage = NULL;
+ 
+Index: rpi-kernel/mm/madvise.c
+===================================================================
+--- rpi-kernel.orig/mm/madvise.c
++++ rpi-kernel/mm/madvise.c
+@@ -134,7 +134,7 @@ static long madvise_behavior(struct vm_a
+ 	pgoff = vma->vm_pgoff + ((start - vma->vm_start) >> PAGE_SHIFT);
+ 	*prev = vma_merge(mm, *prev, start, end, new_flags, vma->anon_vma,
+ 			  vma->vm_file, pgoff, vma_policy(vma),
+-			  vma->vm_userfaultfd_ctx);
++			  vma->vm_userfaultfd_ctx, vma_get_anon_name(vma));
+ 	if (*prev) {
+ 		vma = *prev;
+ 		goto success;
+@@ -166,7 +166,9 @@ success:
+ 	/*
+ 	 * vm_flags is protected by the mmap_sem held in write mode.
+ 	 */
+-	vma->vm_flags = new_flags;
++  vm_write_begin(vma);
++	WRITE_ONCE(vma->vm_flags, new_flags);
++  vm_write_end(vma);
+ 
+ out_convert_errno:
+ 	/*
+@@ -720,6 +722,7 @@ static int madvise_free_single_vma(struc
+ 	tlb_gather_mmu(&tlb, mm, range.start, range.end);
+ 	update_hiwater_rss(mm);
+ 
++  vm_write_begin(vma);
+ 	mmu_notifier_invalidate_range_start(&range);
+ 	tlb_start_vma(&tlb, vma);
+ 	walk_page_range(vma->vm_mm, range.start, range.end,
+@@ -727,7 +730,7 @@ static int madvise_free_single_vma(struc
+ 	tlb_end_vma(&tlb, vma);
+ 	mmu_notifier_invalidate_range_end(&range);
+ 	tlb_finish_mmu(&tlb, range.start, range.end);
+-
++  vm_write_end(vma);
+ 	return 0;
+ }
+ 
+Index: rpi-kernel/mm/mempolicy.c
+===================================================================
+--- rpi-kernel.orig/mm/mempolicy.c
++++ rpi-kernel/mm/mempolicy.c
+@@ -380,8 +380,11 @@ void mpol_rebind_mm(struct mm_struct *mm
+ 	struct vm_area_struct *vma;
+ 
+ 	down_write(&mm->mmap_sem);
+-	for (vma = mm->mmap; vma; vma = vma->vm_next)
++	for (vma = mm->mmap; vma; vma = vma->vm_next) {
++    vm_write_begin(vma);
+ 		mpol_rebind_policy(vma->vm_policy, new);
++    vm_write_end(vma);
++  }
+ 	up_write(&mm->mmap_sem);
+ }
+ 
+@@ -596,9 +599,11 @@ unsigned long change_prot_numa(struct vm
+ {
+ 	int nr_updated;
+ 
++  vm_write_begin(vma);
+ 	nr_updated = change_protection(vma, addr, end, PAGE_NONE, 0, 1);
+ 	if (nr_updated)
+ 		count_vm_numa_events(NUMA_PTE_UPDATES, nr_updated);
++  vm_write_end(vma);
+ 
+ 	return nr_updated;
+ }
+@@ -711,6 +716,7 @@ static int vma_replace_policy(struct vm_
+ 	if (IS_ERR(new))
+ 		return PTR_ERR(new);
+ 
++  vm_write_begin(vma);
+ 	if (vma->vm_ops && vma->vm_ops->set_policy) {
+ 		err = vma->vm_ops->set_policy(vma, new);
+ 		if (err)
+@@ -718,7 +724,8 @@ static int vma_replace_policy(struct vm_
+ 	}
+ 
+ 	old = vma->vm_policy;
+-	vma->vm_policy = new; /* protected by mmap_sem */
++	WRITE_ONCE(vma->vm_policy, new); /* protected by mmap_sem */
++  vm_write_end(vma);
+ 	mpol_put(old);
+ 
+ 	return 0;
+@@ -759,7 +766,7 @@ static int mbind_range(struct mm_struct
+ 			((vmstart - vma->vm_start) >> PAGE_SHIFT);
+ 		prev = vma_merge(mm, prev, vmstart, vmend, vma->vm_flags,
+ 				 vma->anon_vma, vma->vm_file, pgoff,
+-				 new_pol, vma->vm_userfaultfd_ctx);
++				 new_pol, vma->vm_userfaultfd_ctx, vma_get_anon_name(vma));
+ 		if (prev) {
+ 			vma = prev;
+ 			next = vma->vm_next;
+Index: rpi-kernel/mm/mlock.c
+===================================================================
+--- rpi-kernel.orig/mm/mlock.c
++++ rpi-kernel/mm/mlock.c
+@@ -445,7 +445,9 @@ static unsigned long __munlock_pagevec_f
+ void munlock_vma_pages_range(struct vm_area_struct *vma,
+ 			     unsigned long start, unsigned long end)
+ {
+-	vma->vm_flags &= VM_LOCKED_CLEAR_MASK;
++  vm_write_begin(vma);
++	WRITE_ONCE(vma->vm_flags, vma->vm_flags & VM_LOCKED_CLEAR_MASK);
++  vm_write_end(vma);
+ 
+ 	while (start < end) {
+ 		struct page *page;
+@@ -535,7 +537,7 @@ static int mlock_fixup(struct vm_area_st
+ 	pgoff = vma->vm_pgoff + ((start - vma->vm_start) >> PAGE_SHIFT);
+ 	*prev = vma_merge(mm, *prev, start, end, newflags, vma->anon_vma,
+ 			  vma->vm_file, pgoff, vma_policy(vma),
+-			  vma->vm_userfaultfd_ctx);
++			  vma->vm_userfaultfd_ctx, vma_get_anon_name(vma));
+ 	if (*prev) {
+ 		vma = *prev;
+ 		goto success;
+@@ -570,9 +572,11 @@ success:
+ 	 * set VM_LOCKED, populate_vma_page_range will bring it back.
+ 	 */
+ 
+-	if (lock)
+-		vma->vm_flags = newflags;
+-	else
++	if (lock) {
++    vm_write_begin(vma);
++		WRITE_ONCE(vma->vm_flags, newflags);
++    vm_write_end(vma);
++	} else
+ 		munlock_vma_pages_range(vma, start, end);
+ 
+ out:
+Index: rpi-kernel/mm/mprotect.c
+===================================================================
+--- rpi-kernel.orig/mm/mprotect.c
++++ rpi-kernel/mm/mprotect.c
+@@ -428,7 +428,7 @@ mprotect_fixup(struct vm_area_struct *vm
+ 	pgoff = vma->vm_pgoff + ((start - vma->vm_start) >> PAGE_SHIFT);
+ 	*pprev = vma_merge(mm, *pprev, start, end, newflags,
+ 			   vma->anon_vma, vma->vm_file, pgoff, vma_policy(vma),
+-			   vma->vm_userfaultfd_ctx);
++			   vma->vm_userfaultfd_ctx, vma_get_anon_name(vma));
+ 	if (*pprev) {
+ 		vma = *pprev;
+ 		VM_WARN_ON((vma->vm_flags ^ newflags) & ~VM_SOFTDIRTY);
+@@ -454,12 +454,14 @@ success:
+ 	 * vm_flags and vm_page_prot are protected by the mmap_sem
+ 	 * held in write mode.
+ 	 */
+-	vma->vm_flags = newflags;
++  vm_write_begin(vma);
++	WRITE_ONCE(vma->vm_flags, newflags);
+ 	dirty_accountable = vma_wants_writenotify(vma, vma->vm_page_prot);
+ 	vma_set_page_prot(vma);
+ 
+ 	change_protection(vma, start, end, vma->vm_page_prot,
+ 			  dirty_accountable, 0);
++  vm_write_end(vma);
+ 
+ 	/*
+ 	 * Private VM_LOCKED VMA becoming writable: trigger COW to avoid major
+Index: rpi-kernel/kernel/sys.c
+===================================================================
+--- rpi-kernel.orig/kernel/sys.c
++++ rpi-kernel/kernel/sys.c
+@@ -42,6 +42,7 @@
+ #include <linux/syscore_ops.h>
+ #include <linux/version.h>
+ #include <linux/ctype.h>
++#include <linux/mempolicy.h>
+ 
+ #include <linux/compat.h>
+ #include <linux/syscalls.h>
+@@ -2273,11 +2274,153 @@ int __weak arch_prctl_spec_ctrl_set(stru
+ 	return -EINVAL;
+ }
+ 
++#ifdef CONFIG_MMU
++static int prctl_update_vma_anon_name(struct vm_area_struct *vma,
++    struct vm_area_struct **prev,
++    unsigned long start, unsigned long end,
++    const char __user *name_addr)
++{
++  struct mm_struct *mm = vma->vm_mm;
++  int error = 0;
++  pgoff_t pgoff;
++
++  if (name_addr == vma_get_anon_name(vma)) {
++    *prev = vma;
++    goto out;
++  }
++
++  pgoff = vma->vm_pgoff + ((start - vma->vm_start) >> PAGE_SHIFT);
++  *prev = vma_merge(mm, *prev, start, end, vma->vm_flags, vma->anon_vma,
++        vma->vm_file, pgoff, vma_policy(vma),
++        vma->vm_userfaultfd_ctx, name_addr);
++  if (*prev) {
++    vma = *prev;
++    goto success;
++  }
++
++  *prev = vma;
++
++  if (start != vma->vm_start) {
++    error = split_vma(mm, vma, start, 1);
++    if (error)
++      goto out;
++  }
++
++  if (end != vma->vm_end) {
++    error = split_vma(mm, vma, end, 0);
++    if (error)
++      goto out;
++  }
++
++success:
++  if (!vma->vm_file)
++    vma->anon_name = name_addr;
++
++out:
++  if (error == -ENOMEM)
++    error = -EAGAIN;
++  return error;
++}
++
++static int prctl_set_vma_anon_name(unsigned long start, unsigned long end,
++      unsigned long arg)
++{
++  unsigned long tmp;
++  struct vm_area_struct *vma, *prev;
++  int unmapped_error = 0;
++  int error = -EINVAL;
++
++  /*
++   * If the interval [start,end) covers some unmapped address
++   * ranges, just ignore them, but return -ENOMEM at the end.
++   * - this matches the handling in madvise.
++   */
++  vma = find_vma_prev(current->mm, start, &prev);
++  if (vma && start > vma->vm_start)
++    prev = vma;
++
++  for (;;) {
++    /* Still start < end. */
++    error = -ENOMEM;
++    if (!vma)
++      return error;
++
++    /* Here start < (end|vma->vm_end). */
++    if (start < vma->vm_start) {
++      unmapped_error = -ENOMEM;
++      start = vma->vm_start;
++      if (start >= end)
++        return error;
++    }
++
++    /* Here vma->vm_start <= start < (end|vma->vm_end) */
++    tmp = vma->vm_end;
++    if (end < tmp)
++      tmp = end;
++
++    /* Here vma->vm_start <= start < tmp <= (end|vma->vm_end). */
++    error = prctl_update_vma_anon_name(vma, &prev, start, tmp,
++        (const char __user *)arg);
++    if (error)
++      return error;
++    start = tmp;
++    if (prev && start < prev->vm_end)
++      start = prev->vm_end;
++    error = unmapped_error;
++    if (start >= end)
++      return error;
++    if (prev)
++      vma = prev->vm_next;
++    else  /* madvise_remove dropped mmap_sem */
++      vma = find_vma(current->mm, start);
++  }
++}
++
++static int prctl_set_vma(unsigned long opt, unsigned long start,
++    unsigned long len_in, unsigned long arg)
++{
++  struct mm_struct *mm = current->mm;
++  int error;
++  unsigned long len;
++  unsigned long end;
++
++  if (start & ~PAGE_MASK)
++    return -EINVAL;
++  len = (len_in + ~PAGE_MASK) & PAGE_MASK;
++
++  /* Check to see whether len was rounded up from small -ve to zero */
++  if (len_in && !len)
++    return -EINVAL;
++
++  end = start + len;
++  if (end < start)
++    return -EINVAL;
++
++  if (end == start)
++    return 0;
++
++  down_write(&mm->mmap_sem);
++
++  switch (opt) {
++  case PR_SET_VMA_ANON_NAME:
++    error = prctl_set_vma_anon_name(start, end, arg);
++    break;
++  default:
++    error = -EINVAL;
++  }
++
++  up_write(&mm->mmap_sem);
++
++  return error;
++}
++#else /* CONFIG_MMU */
++
+ static int prctl_set_vma(unsigned long opt, unsigned long start,
+     unsigned long len_in, unsigned long arg)
+ {
+   return -EINVAL;
+ }
++#endif
+ 
+ int ksys_prctl(int option, unsigned long arg2, unsigned long arg3,
+          unsigned long arg4, unsigned long arg5)
+Index: rpi-kernel/mm/mremap.c
+===================================================================
+--- rpi-kernel.orig/mm/mremap.c
++++ rpi-kernel/mm/mremap.c
+@@ -357,6 +357,9 @@ static unsigned long move_vma(struct vm_
+ 	if (!new_vma)
+ 		return -ENOMEM;
+ 
++  if (vma != new_vma)
++    vm_raw_write_begin(vma);
++
+ 	moved_len = move_page_tables(vma, old_addr, new_vma, new_addr, old_len,
+ 				     need_rmap_locks);
+ 	if (moved_len < old_len) {
+@@ -373,6 +376,8 @@ static unsigned long move_vma(struct vm_
+ 		 */
+ 		move_page_tables(new_vma, new_addr, vma, old_addr, moved_len,
+ 				 true);
++    if (vma != new_vma)
++      vm_raw_write_end(vma);
+ 		vma = new_vma;
+ 		old_len = new_len;
+ 		old_addr = new_addr;
+@@ -381,7 +386,10 @@ static unsigned long move_vma(struct vm_
+ 		mremap_userfaultfd_prep(new_vma, uf);
+ 		arch_remap(mm, old_addr, old_addr + old_len,
+ 			   new_addr, new_addr + new_len);
++    if (vma != new_vma)
++      vm_raw_write_end(vma);
+ 	}
++  vm_raw_write_end(new_vma);
+ 
+ 	/* Conceal VM_ACCOUNT so old reservation is not undone */
+ 	if (vm_flags & VM_ACCOUNT) {
+Index: rpi-kernel/mm/rmap.c
+===================================================================
+--- rpi-kernel.orig/mm/rmap.c
++++ rpi-kernel/mm/rmap.c
+@@ -379,6 +379,7 @@ void unlink_anon_vmas(struct vm_area_str
+ 	struct anon_vma_chain *avc, *next;
+ 	struct anon_vma *root = NULL;
+ 
++  vm_raw_write_begin(vma);
+ 	/*
+ 	 * Unlink each anon_vma chained to the VMA.  This list is ordered
+ 	 * from newest to oldest, ensuring the root anon_vma gets freed last.
+@@ -419,6 +420,8 @@ void unlink_anon_vmas(struct vm_area_str
+ 		list_del(&avc->same_vma);
+ 		anon_vma_chain_free(avc);
+ 	}
++
++  vm_raw_write_end(vma);
+ }
+ 
+ static void anon_vma_ctor(void *data)

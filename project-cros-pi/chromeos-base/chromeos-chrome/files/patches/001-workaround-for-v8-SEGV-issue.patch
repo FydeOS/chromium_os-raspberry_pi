@@ -1,0 +1,13 @@
+diff --git a/BUILD.gn b/BUILD.gn
+index 5e3045bfdc..d038fb9b81 100644
+--- a/BUILD.gn
++++ b/BUILD.gn
+@@ -1086,6 +1086,8 @@ config("toolchain") {
+     defines += [ "DEBUG" ]
+   }
+ 
++  defines += [ "DEBUG" ]
++
+   if (v8_enable_verify_csa) {
+     defines += [ "ENABLE_VERIFY_CSA" ]
+   }

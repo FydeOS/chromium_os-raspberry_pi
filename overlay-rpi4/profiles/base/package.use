@@ -1,4 +1,4 @@
 chromeos-base/libchromeos-use-flags native_gpu_memory_buffers drm_atomic
-chromeos-base/chromeos-chrome chrome_media
+chromeos-base/chromeos-chrome chrome_media v4l2_codec
 chromeos-base/chromeos-base -cros_embedded
 sys-apps/gptfdisk -ncurses

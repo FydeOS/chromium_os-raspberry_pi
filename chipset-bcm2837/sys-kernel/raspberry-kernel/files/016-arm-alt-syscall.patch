@@ -1,0 +1,160 @@
+Index: rpi-kernel/arch/arm/Kconfig
+===================================================================
+--- rpi-kernel.orig/arch/arm/Kconfig
++++ rpi-kernel/arch/arm/Kconfig
+@@ -121,6 +121,7 @@ config ARM
+ 	select REFCOUNT_FULL
+ 	select RTC_LIB
+ 	select SYS_SUPPORTS_APM_EMULATION
++  select ARCH_HAS_ALT_SYSCALL
+ 	# Above selects are sorted alphabetically; please add new ones
+ 	# according to that.  Thanks.
+ 	help
+Index: rpi-kernel/kernel/time/posix-timers.c
+===================================================================
+--- rpi-kernel.orig/kernel/time/posix-timers.c
++++ rpi-kernel/kernel/time/posix-timers.c
+@@ -1087,12 +1087,6 @@ int do_clock_adjtime(const clockid_t whi
+ 	return kc->clock_adj(which_clock, ktx);
+ }
+ 
+-SYSCALL_DEFINE2(clock_adjtime, const clockid_t, which_clock,
+-		struct __kernel_timex __user *, utx)
+-{
+-  return ksys_clock_adjtime(which_clock, utx);
+-}
+-
+ int ksys_clock_adjtime(const clockid_t which_clock,
+            struct __kernel_timex __user * utx)
+ {
+@@ -1110,6 +1104,12 @@ int ksys_clock_adjtime(const clockid_t w
+ 	return err;
+ }
+ 
++SYSCALL_DEFINE2(clock_adjtime, const clockid_t, which_clock,
++		struct __kernel_timex __user *, utx)
++{
++  return ksys_clock_adjtime(which_clock, utx);
++}
++
+ SYSCALL_DEFINE2(clock_getres, const clockid_t, which_clock,
+ 		struct __kernel_timespec __user *, tp)
+ {
+@@ -1163,12 +1163,6 @@ SYSCALL_DEFINE2(clock_gettime32, clockid
+ 	return err;
+ }
+ 
+-SYSCALL_DEFINE2(clock_adjtime32, clockid_t, which_clock,
+-		struct old_timex32 __user *, utp)
+-{
+-  return ksys_clock_adjtime32(which_clock, utp);
+-}
+-
+ int ksys_clock_adjtime32(clockid_t which_clock, struct old_timex32 __user * utp)
+ {
+ 	struct __kernel_timex ktx;
+@@ -1186,6 +1180,12 @@ int ksys_clock_adjtime32(clockid_t which
+ 	return err;
+ }
+ 
++SYSCALL_DEFINE2(clock_adjtime32, clockid_t, which_clock,
++		struct old_timex32 __user *, utp)
++{
++  return ksys_clock_adjtime32(which_clock, utp);
++}
++
+ SYSCALL_DEFINE2(clock_getres_time32, clockid_t, which_clock,
+ 		struct old_timespec32 __user *, tp)
+ {
+Index: rpi-kernel/kernel/time/time.c
+===================================================================
+--- rpi-kernel.orig/kernel/time/time.c
++++ rpi-kernel/kernel/time/time.c
+@@ -268,10 +268,6 @@ COMPAT_SYSCALL_DEFINE2(settimeofday, str
+ #endif
+ 
+ #if !defined(CONFIG_64BIT_TIME) || defined(CONFIG_64BIT)
+-SYSCALL_DEFINE1(adjtimex, struct __kernel_timex __user *, txc_p)
+-{
+-  return ksys_adjtimex(txc_p);
+-}
+ 
+ int ksys_adjtimex(struct __kernel_timex __user * txc_p)
+ {
+@@ -287,6 +283,11 @@ int ksys_adjtimex(struct __kernel_timex
+ 	ret = do_adjtimex(&txc);
+ 	return copy_to_user(txc_p, &txc, sizeof(struct __kernel_timex)) ? -EFAULT : ret;
+ }
++
++SYSCALL_DEFINE1(adjtimex, struct __kernel_timex __user *, txc_p)
++{
++  return ksys_adjtimex(txc_p);
++}
+ #endif
+ 
+ #ifdef CONFIG_COMPAT_32BIT_TIME
+@@ -353,11 +354,6 @@ int put_old_timex32(struct old_timex32 _
+ 	return 0;
+ }
+ 
+-SYSCALL_DEFINE1(adjtimex_time32, struct old_timex32 __user *, utp)
+-{
+-  return ksys_adjtimex_time32(utp);
+-}
+-
+ int ksys_adjtimex_time32(struct old_timex32 __user * utp)
+ {
+ 	struct __kernel_timex txc;
+@@ -375,6 +371,12 @@ int ksys_adjtimex_time32(struct old_time
+ 
+ 	return ret;
+ }
++
++SYSCALL_DEFINE1(adjtimex_time32, struct old_timex32 __user *, utp)
++{
++  return ksys_adjtimex_time32(utp);
++}
++
+ #endif
+ 
+ /*
+Index: rpi-kernel/mm/memory.c
+===================================================================
+--- rpi-kernel.orig/mm/memory.c
++++ rpi-kernel/mm/memory.c
+@@ -3318,7 +3318,7 @@ static vm_fault_t do_anonymous_page(stru
+ 		goto release;
+ 
+ 	/* Deliver the page fault to userland, check inside PT lock */
+-	if (userfaultfd_missing(vma)) {
++	if (!(vmf->flags & FAULT_FLAG_SPECULATIVE) && userfaultfd_missing(vma)) {
+ 		pte_unmap_unlock(vmf->pte, vmf->ptl);
+ 		mem_cgroup_cancel_charge(page, memcg, false);
+ 		put_page(page);
+@@ -4097,6 +4097,8 @@ static vm_fault_t handle_pte_fault(struc
+ 	pte_t entry;
+ 
+ 	if (unlikely(pmd_none(*vmf->pmd))) {
++    if (vmf->flags & FAULT_FLAG_SPECULATIVE)
++       return VM_FAULT_RETRY;
+ 		/*
+ 		 * Leave __pte_alloc() until later: because vm_ops->fault may
+ 		 * want to allocate huge page, and if we expose page table
+@@ -4104,7 +4106,7 @@ static vm_fault_t handle_pte_fault(struc
+ 		 * concurrent faults and from rmap lookups.
+ 		 */
+ 		vmf->pte = NULL;
+-	} else {
++	} else if (!(vmf->flags & FAULT_FLAG_SPECULATIVE)) {
+ 		/* See comment in pte_alloc_one_map() */
+ 		if (pmd_devmap_trans_unstable(vmf->pmd))
+ 			return 0;
+@@ -4135,6 +4137,8 @@ static vm_fault_t handle_pte_fault(struc
+ 	if (!vmf->pte) {
+ 		if (vma_is_anonymous(vmf->vma))
+ 			return do_anonymous_page(vmf);
++    else if (vmf->flags & FAULT_FLAG_SPECULATIVE)
++      return VM_FAULT_RETRY;
+ 		else
+ 			return do_fault(vmf);
+ 	}

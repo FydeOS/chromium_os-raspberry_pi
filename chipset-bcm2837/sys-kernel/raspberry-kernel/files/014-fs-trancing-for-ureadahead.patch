@@ -1,0 +1,129 @@
+Index: rpi-kernel/fs/exec.c
+===================================================================
+--- rpi-kernel.orig/fs/exec.c
++++ rpi-kernel/fs/exec.c
+@@ -69,6 +69,7 @@
+ #include <asm/tlb.h>
+ 
+ #include <trace/events/task.h>
++#include <trace/events/fs.h>
+ #include "internal.h"
+ 
+ #include <trace/events/sched.h>
+@@ -150,6 +151,10 @@ SYSCALL_DEFINE1(uselib, const char __use
+ 
+ 	fsnotify_open(file);
+ 
++	tmp = getname(library);
++	trace_uselib(tmp);
++	putname(library);
++
+ 	error = -ENOEXEC;
+ 
+ 	read_lock(&binfmt_lock);
+@@ -865,6 +870,8 @@ static struct file *do_open_execat(int f
+ 	if (path_noexec(&file->f_path))
+ 		goto exit;
+ 
++	trace_open_exec(name->name);
++
+ 	err = deny_write_access(file);
+ 	if (err)
+ 		goto exit;
+Index: rpi-kernel/fs/open.c
+===================================================================
+--- rpi-kernel.orig/fs/open.c
++++ rpi-kernel/fs/open.c
+@@ -32,6 +32,8 @@
+ #include <linux/ima.h>
+ #include <linux/dnotify.h>
+ #include <linux/compat.h>
++#define CREATE_TRACE_POINTS
++#include <trace/events/fs.h>
+ 
+ #include "internal.h"
+ 
+@@ -1098,6 +1100,7 @@ long do_sys_open(int dfd, const char __u
+ 		} else {
+ 			fsnotify_open(f);
+ 			fd_install(fd, f);
++      trace_do_sys_open(tmp->name, flags, mode);
+ 		}
+ 	}
+ 	putname(tmp);
+Index: rpi-kernel/include/trace/events/fs.h
+===================================================================
+--- /dev/null
++++ rpi-kernel/include/trace/events/fs.h
+@@ -0,0 +1,71 @@
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM fs
++
++#if !defined(_TRACE_FS_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_FS_H
++
++#include <linux/fs.h>
++#include <linux/tracepoint.h>
++
++TRACE_EVENT(do_sys_open,
++
++	TP_PROTO(const char *filename, int flags, int mode),
++
++	TP_ARGS(filename, flags, mode),
++
++	TP_STRUCT__entry(
++		__string(	filename, filename		)
++		__field(	int, flags			)
++		__field(	int, mode			)
++	),
++
++	TP_fast_assign(
++		__assign_str(filename, filename);
++		__entry->flags = flags;
++		__entry->mode = mode;
++	),
++
++	TP_printk("\"%s\" %x %o",
++		  __get_str(filename), __entry->flags, __entry->mode)
++);
++
++TRACE_EVENT(uselib,
++
++	TP_PROTO(const char *filename),
++
++	TP_ARGS(filename),
++
++	TP_STRUCT__entry(
++		__string(	filename, filename		)
++	),
++
++	TP_fast_assign(
++		__assign_str(filename, filename);
++	),
++
++	TP_printk("\"%s\"",
++		  __get_str(filename))
++);
++
++TRACE_EVENT(open_exec,
++
++	TP_PROTO(const char *filename),
++
++	TP_ARGS(filename),
++
++	TP_STRUCT__entry(
++		__string(	filename, filename		)
++	),
++
++	TP_fast_assign(
++		__assign_str(filename, filename);
++	),
++
++	TP_printk("\"%s\"",
++		  __get_str(filename))
++);
++
++#endif /* _TRACE_FS_H */
++
++/* This part must be outside protection */
++#include <trace/define_trace.h>

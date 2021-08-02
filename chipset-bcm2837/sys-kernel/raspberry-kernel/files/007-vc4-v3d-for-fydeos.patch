@@ -1,0 +1,743 @@
+Index: rpi-linux-kernel/drivers/gpu/drm/drm_gem_cma_helper.c
+===================================================================
+--- rpi-linux-kernel.orig/drivers/gpu/drm/drm_gem_cma_helper.c
++++ rpi-linux-kernel/drivers/gpu/drm/drm_gem_cma_helper.c
+@@ -485,8 +485,10 @@ drm_gem_cma_prime_import_sg_table(struct
+ 			if (!sg_dma_len(s))
+ 				continue;
+ 
+-			if (sg_dma_address(s) != next_addr)
++			if (sg_dma_address(s) != next_addr) {
++        DRM_ERROR("the dma address is not continue.");
+ 				return ERR_PTR(-EINVAL);
++      }
+ 
+ 			next_addr = sg_dma_address(s) + sg_dma_len(s);
+ 		}
+@@ -500,7 +502,7 @@ drm_gem_cma_prime_import_sg_table(struct
+ 	cma_obj->paddr = sg_dma_address(sgt->sgl);
+ 	cma_obj->sgt = sgt;
+ 
+-	DRM_DEBUG_PRIME("dma_addr = %pad, size = %zu\n", &cma_obj->paddr, attach->dmabuf->size);
++	DRM_DEBUG_PRIME("cma: dma_addr = %pad, size = %zu\n", &cma_obj->paddr, attach->dmabuf->size);
+ 
+ 	return &cma_obj->base;
+ }
+Index: rpi-linux-kernel/drivers/gpu/drm/drm_prime.c
+===================================================================
+--- rpi-linux-kernel.orig/drivers/gpu/drm/drm_prime.c
++++ rpi-linux-kernel/drivers/gpu/drm/drm_prime.c
+@@ -306,7 +306,6 @@ int drm_gem_prime_fd_to_handle(struct dr
+ 			dma_buf, handle);
+ 	if (ret == 0)
+ 		goto out_put;
+-
+ 	/* never seen this one, need to import */
+ 	mutex_lock(&dev->object_name_lock);
+ 	if (dev->driver->gem_prime_import)
+@@ -862,7 +861,6 @@ struct drm_gem_object *drm_gem_prime_imp
+ 	struct sg_table *sgt;
+ 	struct drm_gem_object *obj;
+ 	int ret;
+-
+ 	if (dma_buf->ops == &drm_gem_prime_dmabuf_ops) {
+ 		obj = dma_buf->priv;
+ 		if (obj->dev == dev) {
+@@ -874,7 +872,6 @@ struct drm_gem_object *drm_gem_prime_imp
+ 			return obj;
+ 		}
+ 	}
+-
+ 	if (!dev->driver->gem_prime_import_sg_table)
+ 		return ERR_PTR(-EINVAL);
+ 
+@@ -898,7 +895,6 @@ struct drm_gem_object *drm_gem_prime_imp
+ 
+ 	obj->import_attach = attach;
+ 	obj->resv = dma_buf->resv;
+-
+ 	return obj;
+ 
+ fail_unmap:
+Index: rpi-linux-kernel/drivers/gpu/drm/v3d/Makefile
+===================================================================
+--- rpi-linux-kernel.orig/drivers/gpu/drm/v3d/Makefile
++++ rpi-linux-kernel/drivers/gpu/drm/v3d/Makefile
+@@ -4,6 +4,7 @@
+ # core driver code
+ v3d-y := \
+ 	v3d_bo.o \
++  v3d_vc4_bind.o \
+ 	v3d_drv.o \
+ 	v3d_fence.o \
+ 	v3d_gem.o \
+Index: rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_bo.c
+===================================================================
+--- rpi-linux-kernel.orig/drivers/gpu/drm/v3d/v3d_bo.c
++++ rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_bo.c
+@@ -24,6 +24,9 @@
+ 
+ #include "v3d_drv.h"
+ #include "uapi/drm/v3d_drm.h"
++#include "v3d_vc4_bind.h"
++
++#define ARC_CALLOC (1<<7)
+ 
+ /* Called DRM core on the last userspace/kernel unreference of the
+  * BO.
+@@ -46,12 +49,21 @@ void v3d_free_object(struct drm_gem_obje
+ 
+ 	/* GPU execution may have dirtied any pages in the BO. */
+ 	bo->base.pages_mark_dirty_on_put = true;
+-
++  if (bo->vc4_handle)
++    free_bo_from_vc4(&bo->vc4_handle);
+ 	drm_gem_shmem_free_object(obj);
+ }
+ 
++void v3d_close_object(struct drm_gem_object *obj, struct drm_file *file)
++{
++  struct v3d_bo *bo = to_v3d_bo(obj);
++  if (bo->vc4_handle)
++    free_bo_from_vc4(&bo->vc4_handle);
++}
++
+ static const struct drm_gem_object_funcs v3d_gem_funcs = {
+ 	.free = v3d_free_object,
++  .close = v3d_close_object,
+ 	.print_info = drm_gem_shmem_print_info,
+ 	.pin = drm_gem_shmem_pin,
+ 	.unpin = drm_gem_shmem_unpin,
+@@ -170,13 +182,29 @@ int v3d_create_bo_ioctl(struct drm_devic
+ 			struct drm_file *file_priv)
+ {
+ 	struct drm_v3d_create_bo *args = data;
++  struct drm_gem_object *gem_obj;
+ 	struct v3d_bo *bo = NULL;
++  u32 vc4_handle;
+ 	int ret;
+ 
+-	if (args->flags != 0) {
++	if (args->flags != 0 && args->flags != ARC_CALLOC) {
+ 		DRM_INFO("unknown create_bo flags: %d\n", args->flags);
+ 		return -EINVAL;
+ 	}
++  if (is_vc4_enable() && args->flags == ARC_CALLOC) {
++    ret = import_bo_from_vc4(dev, file_priv, PAGE_ALIGN(args->size), &vc4_handle, &args->handle);
++    if (!ret) {
++      gem_obj = drm_gem_object_lookup(file_priv, args->handle);
++      if (!gem_obj) {
++        DRM_DEBUG("Failed to look up new imported GEM BO %d\n", args->handle);
++        return -EINVAL;
++      }
++      bo = to_v3d_bo(gem_obj);
++      bo->vc4_handle = vc4_handle;
++      DRM_DEBUG("store vc4 handle:%u", bo->vc4_handle);
++      return ret;
++    }
++  }
+ 
+ 	bo = v3d_bo_create(dev, file_priv, PAGE_ALIGN(args->size));
+ 	if (IS_ERR(bo))
+Index: rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_debugfs.c
+===================================================================
+--- rpi-linux-kernel.orig/drivers/gpu/drm/v3d/v3d_debugfs.c
++++ rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_debugfs.c
+@@ -86,7 +86,7 @@ static int v3d_v3d_debugfs_regs(struct s
+ 	for (i = 0; i < ARRAY_SIZE(v3d_hub_reg_defs); i++) {
+ 		seq_printf(m, "%s (0x%04x): 0x%08x\n",
+ 			   v3d_hub_reg_defs[i].name, v3d_hub_reg_defs[i].reg,
+-			   V3D_READ(v3d_hub_reg_defs[i].reg));
++			   V3D_READ2(v3d_hub_reg_defs[i].reg));
+ 	}
+ 
+ 	if (v3d->ver < 41) {
+@@ -132,10 +132,10 @@ static int v3d_v3d_debugfs_ident(struct
+ 	int core;
+ 
+ 
+-	ident0 = V3D_READ(V3D_HUB_IDENT0);
+-	ident1 = V3D_READ(V3D_HUB_IDENT1);
+-	ident2 = V3D_READ(V3D_HUB_IDENT2);
+-	ident3 = V3D_READ(V3D_HUB_IDENT3);
++	ident0 = V3D_READ2(V3D_HUB_IDENT0);
++	ident1 = V3D_READ2(V3D_HUB_IDENT1);
++	ident2 = V3D_READ2(V3D_HUB_IDENT2);
++	ident3 = V3D_READ2(V3D_HUB_IDENT3);
+ 	cores = V3D_GET_FIELD(ident1, V3D_HUB_IDENT1_NCORES);
+ 
+ 	seq_printf(m, "Revision:   %d.%d.%d.%d\n",
+Index: rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_drv.c
+===================================================================
+--- rpi-linux-kernel.orig/drivers/gpu/drm/v3d/v3d_drv.c
++++ rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_drv.c
+@@ -28,6 +28,7 @@
+ #include <uapi/drm/v3d_drm.h>
+ 
+ #include "v3d_drv.h"
++#include "v3d_vc4_bind.h"
+ #include "v3d_regs.h"
+ 
+ #define DRIVER_NAME "v3d"
+@@ -107,7 +108,7 @@ static int v3d_get_param_ioctl(struct dr
+ 		    args->param <= DRM_V3D_PARAM_V3D_CORE0_IDENT2) {
+ 			args->value = V3D_CORE_READ(0, offset);
+ 		} else {
+-			args->value = V3D_READ(offset);
++			args->value = V3D_READ2(offset);
+ 		}
+ 		return 0;
+ 	}
+@@ -258,12 +259,12 @@ static int v3d_platform_drm_probe(struct
+ 	if (ret)
+ 		goto dev_free;
+ 
+-	mmu_debug = V3D_READ(V3D_MMU_DEBUG_INFO);
++	mmu_debug = V3D_READ2(V3D_MMU_DEBUG_INFO);
+ 	dma_set_mask_and_coherent(dev,
+ 		DMA_BIT_MASK(30 + V3D_GET_FIELD(mmu_debug, V3D_MMU_PA_WIDTH)));
+ 	v3d->va_width = 30 + V3D_GET_FIELD(mmu_debug, V3D_MMU_VA_WIDTH);
+ 
+-	ident1 = V3D_READ(V3D_HUB_IDENT1);
++	ident1 = V3D_READ2(V3D_HUB_IDENT1);
+ 	v3d->ver = (V3D_GET_FIELD(ident1, V3D_HUB_IDENT1_TVER) * 10 +
+ 		    V3D_GET_FIELD(ident1, V3D_HUB_IDENT1_REV));
+ 	v3d->cores = V3D_GET_FIELD(ident1, V3D_HUB_IDENT1_NCORES);
+@@ -336,6 +337,7 @@ static int v3d_platform_drm_probe(struct
+ 
+ 	ret = clk_set_rate(v3d->clk, v3d->clk_down_rate);
+ 	WARN_ON_ONCE(ret != 0);
++  init_v3d_vc4_bind();
+ 
+ 	return 0;
+ 
+Index: rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_drv.h
+===================================================================
+--- rpi-linux-kernel.orig/drivers/gpu/drm/v3d/v3d_drv.h
++++ rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_drv.h
+@@ -152,6 +152,8 @@ struct v3d_bo {
+ 	 * v3d_render_job->unref_list
+ 	 */
+ 	struct list_head unref_head;
++  u32 vc4_handle;
++  int vc4_fd;
+ };
+ 
+ static inline struct v3d_bo *
+@@ -174,8 +176,8 @@ to_v3d_fence(struct dma_fence *fence)
+ 	return (struct v3d_fence *)fence;
+ }
+ 
+-#define V3D_READ(offset) readl(v3d->hub_regs + offset)
+-#define V3D_WRITE(offset, val) writel(val, v3d->hub_regs + offset)
++#define V3D_READ2(offset) readl(v3d->hub_regs + offset)
++#define V3D_WRITE2(offset, val) writel(val, v3d->hub_regs + offset)
+ 
+ #define V3D_BRIDGE_READ(offset) readl(v3d->bridge_regs + offset)
+ #define V3D_BRIDGE_WRITE(offset, val) writel(val, v3d->bridge_regs + offset)
+@@ -260,14 +262,14 @@ struct v3d_csd_job {
+ };
+ 
+ /**
+- * __wait_for - magic wait macro
++ * __wait_for2 - magic wait macro
+  *
+  * Macro to help avoid open coding check/wait/timeout patterns. Note that it's
+  * important that we check the condition again after having timed out, since the
+  * timeout could be due to preemption or similar and we've never had a chance to
+  * check the condition before the timeout.
+  */
+-#define __wait_for(OP, COND, US, Wmin, Wmax) ({ \
++#define __wait_for2(OP, COND, US, Wmin, Wmax) ({ \
+ 	const ktime_t end__ = ktime_add_ns(ktime_get_raw(), 1000ll * (US)); \
+ 	long wait__ = (Wmin); /* recommended min for usleep is 10 us */	\
+ 	int ret__;							\
+@@ -292,9 +294,9 @@ struct v3d_csd_job {
+ 	ret__;								\
+ })
+ 
+-#define _wait_for(COND, US, Wmin, Wmax)	__wait_for(, (COND), (US), (Wmin), \
++#define _wait_for2(COND, US, Wmin, Wmax)	__wait_for2(, (COND), (US), (Wmin), \
+ 						   (Wmax))
+-#define wait_for(COND, MS)		_wait_for((COND), (MS) * 1000, 10, 1000)
++#define wait_for2(COND, MS)		_wait_for2((COND), (MS) * 1000, 10, 1000)
+ 
+ static inline unsigned long nsecs_to_jiffies_timeout(const u64 n)
+ {
+Index: rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_gem.c
+===================================================================
+--- rpi-linux-kernel.orig/drivers/gpu/drm/v3d/v3d_gem.c
++++ rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_gem.c
+@@ -91,7 +91,7 @@ v3d_idle_axi(struct v3d_dev *v3d, int co
+ {
+ 	V3D_CORE_WRITE(core, V3D_GMP_CFG, V3D_GMP_CFG_STOP_REQ);
+ 
+-	if (wait_for((V3D_CORE_READ(core, V3D_GMP_STATUS) &
++	if (wait_for2((V3D_CORE_READ(core, V3D_GMP_STATUS) &
+ 		      (V3D_GMP_STATUS_RD_COUNT_MASK |
+ 		       V3D_GMP_STATUS_WR_COUNT_MASK |
+ 		       V3D_GMP_STATUS_CFG_BUSY)) == 0, 100)) {
+@@ -107,7 +107,7 @@ v3d_idle_gca(struct v3d_dev *v3d)
+ 
+ 	V3D_GCA_WRITE(V3D_GCA_SAFE_SHUTDOWN, V3D_GCA_SAFE_SHUTDOWN_EN);
+ 
+-	if (wait_for((V3D_GCA_READ(V3D_GCA_SAFE_SHUTDOWN_ACK) &
++	if (wait_for2((V3D_GCA_READ(V3D_GCA_SAFE_SHUTDOWN_ACK) &
+ 		      V3D_GCA_SAFE_SHUTDOWN_ACK_ACKED) ==
+ 		     V3D_GCA_SAFE_SHUTDOWN_ACK_ACKED, 100)) {
+ 		DRM_ERROR("Failed to wait for safe GCA shutdown\n");
+@@ -127,7 +127,7 @@ v3d_reset_by_bridge(struct v3d_dev *v3d)
+ 		/* GFXH-1383: The SW_INIT may cause a stray write to address 0
+ 		 * of the unit, so reset it to its power-on value here.
+ 		 */
+-		V3D_WRITE(V3D_HUB_AXICFG, V3D_HUB_AXICFG_MAX_LEN_MASK);
++		V3D_WRITE2(V3D_HUB_AXICFG, V3D_HUB_AXICFG_MAX_LEN_MASK);
+ 	} else {
+ 		WARN_ON_ONCE(V3D_GET_FIELD(version,
+ 					   V3D_TOP_GR_BRIDGE_MAJOR) != 7);
+@@ -236,7 +236,7 @@ v3d_clean_caches(struct v3d_dev *v3d)
+ 	trace_v3d_cache_clean_begin(dev);
+ 
+ 	V3D_CORE_WRITE(core, V3D_CTL_L2TCACTL, V3D_L2TCACTL_TMUWCF);
+-	if (wait_for(!(V3D_CORE_READ(core, V3D_CTL_L2TCACTL) &
++	if (wait_for2(!(V3D_CORE_READ(core, V3D_CTL_L2TCACTL) &
+ 		       V3D_L2TCACTL_L2TFLS), 100)) {
+ 		DRM_ERROR("Timeout waiting for L1T write combiner flush\n");
+ 	}
+@@ -246,7 +246,7 @@ v3d_clean_caches(struct v3d_dev *v3d)
+ 		       V3D_L2TCACTL_L2TFLS |
+ 		       V3D_SET_FIELD(V3D_L2TCACTL_FLM_CLEAN, V3D_L2TCACTL_FLM));
+ 
+-	if (wait_for(!(V3D_CORE_READ(core, V3D_CTL_L2TCACTL) &
++	if (wait_for2(!(V3D_CORE_READ(core, V3D_CTL_L2TCACTL) &
+ 		       V3D_L2TCACTL_L2TFLS), 100)) {
+ 		DRM_ERROR("Timeout waiting for L2T clean\n");
+ 	}
+Index: rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_irq.c
+===================================================================
+--- rpi-linux-kernel.orig/drivers/gpu/drm/v3d/v3d_irq.c
++++ rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_irq.c
+@@ -146,10 +146,10 @@ v3d_hub_irq(int irq, void *arg)
+ 	u32 intsts;
+ 	irqreturn_t status = IRQ_NONE;
+ 
+-	intsts = V3D_READ(V3D_HUB_INT_STS);
++	intsts = V3D_READ2(V3D_HUB_INT_STS);
+ 
+ 	/* Acknowledge the interrupts we're handling here. */
+-	V3D_WRITE(V3D_HUB_INT_CLR, intsts);
++	V3D_WRITE2(V3D_HUB_INT_CLR, intsts);
+ 
+ 	if (intsts & V3D_HUB_INT_TFUC) {
+ 		struct v3d_fence *fence =
+@@ -163,8 +163,8 @@ v3d_hub_irq(int irq, void *arg)
+ 	if (intsts & (V3D_HUB_INT_MMU_WRV |
+ 		      V3D_HUB_INT_MMU_PTI |
+ 		      V3D_HUB_INT_MMU_CAP)) {
+-		u32 axi_id = V3D_READ(V3D_MMU_VIO_ID);
+-		u64 vio_addr = ((u64)V3D_READ(V3D_MMU_VIO_ADDR) <<
++		u32 axi_id = V3D_READ2(V3D_MMU_VIO_ID);
++		u64 vio_addr = ((u64)V3D_READ2(V3D_MMU_VIO_ADDR) <<
+ 				(v3d->va_width - 32));
+ 		static const char *const v3d41_axi_ids[] = {
+ 			"L2T",
+@@ -179,7 +179,7 @@ v3d_hub_irq(int irq, void *arg)
+ 		const char *client = "?";
+ 		static int logged_error;
+ 
+-		V3D_WRITE(V3D_MMU_CTL, V3D_READ(V3D_MMU_CTL));
++		V3D_WRITE2(V3D_MMU_CTL, V3D_READ2(V3D_MMU_CTL));
+ 
+ 		if (v3d->ver >= 41) {
+ 			axi_id = axi_id >> 5;
+@@ -215,7 +215,7 @@ v3d_irq_init(struct v3d_dev *v3d)
+ 	 */
+ 	for (core = 0; core < v3d->cores; core++)
+ 		V3D_CORE_WRITE(core, V3D_CTL_INT_CLR, V3D_CORE_IRQS);
+-	V3D_WRITE(V3D_HUB_INT_CLR, V3D_HUB_IRQS);
++	V3D_WRITE2(V3D_HUB_INT_CLR, V3D_HUB_IRQS);
+ 
+ 	irq1 = platform_get_irq_optional(v3d->pdev, 1);
+ 	if (irq1 == -EPROBE_DEFER)
+@@ -261,8 +261,8 @@ v3d_irq_enable(struct v3d_dev *v3d)
+ 		V3D_CORE_WRITE(core, V3D_CTL_INT_MSK_CLR, V3D_CORE_IRQS);
+ 	}
+ 
+-	V3D_WRITE(V3D_HUB_INT_MSK_SET, ~V3D_HUB_IRQS);
+-	V3D_WRITE(V3D_HUB_INT_MSK_CLR, V3D_HUB_IRQS);
++	V3D_WRITE2(V3D_HUB_INT_MSK_SET, ~V3D_HUB_IRQS);
++	V3D_WRITE2(V3D_HUB_INT_MSK_CLR, V3D_HUB_IRQS);
+ }
+ 
+ void
+@@ -273,12 +273,12 @@ v3d_irq_disable(struct v3d_dev *v3d)
+ 	/* Disable all interrupts. */
+ 	for (core = 0; core < v3d->cores; core++)
+ 		V3D_CORE_WRITE(core, V3D_CTL_INT_MSK_SET, ~0);
+-	V3D_WRITE(V3D_HUB_INT_MSK_SET, ~0);
++	V3D_WRITE2(V3D_HUB_INT_MSK_SET, ~0);
+ 
+ 	/* Clear any pending interrupts we might have left. */
+ 	for (core = 0; core < v3d->cores; core++)
+ 		V3D_CORE_WRITE(core, V3D_CTL_INT_CLR, V3D_CORE_IRQS);
+-	V3D_WRITE(V3D_HUB_INT_CLR, V3D_HUB_IRQS);
++	V3D_WRITE2(V3D_HUB_INT_CLR, V3D_HUB_IRQS);
+ 
+ 	cancel_work_sync(&v3d->overflow_mem_work);
+ }
+Index: rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_mmu.c
+===================================================================
+--- rpi-linux-kernel.orig/drivers/gpu/drm/v3d/v3d_mmu.c
++++ rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_mmu.c
+@@ -39,26 +39,26 @@ static int v3d_mmu_flush_all(struct v3d_
+ 	/* Make sure that another flush isn't already running when we
+ 	 * start this one.
+ 	 */
+-	ret = wait_for(!(V3D_READ(V3D_MMU_CTL) &
++	ret = wait_for2(!(V3D_READ2(V3D_MMU_CTL) &
+ 			 V3D_MMU_CTL_TLB_CLEARING), 100);
+ 	if (ret)
+ 		dev_err(v3d->dev, "TLB clear wait idle pre-wait failed\n");
+ 
+-	V3D_WRITE(V3D_MMU_CTL, V3D_READ(V3D_MMU_CTL) |
++	V3D_WRITE2(V3D_MMU_CTL, V3D_READ2(V3D_MMU_CTL) |
+ 		  V3D_MMU_CTL_TLB_CLEAR);
+ 
+-	V3D_WRITE(V3D_MMUC_CONTROL,
++	V3D_WRITE2(V3D_MMUC_CONTROL,
+ 		  V3D_MMUC_CONTROL_FLUSH |
+ 		  V3D_MMUC_CONTROL_ENABLE);
+ 
+-	ret = wait_for(!(V3D_READ(V3D_MMU_CTL) &
++	ret = wait_for2(!(V3D_READ2(V3D_MMU_CTL) &
+ 			 V3D_MMU_CTL_TLB_CLEARING), 100);
+ 	if (ret) {
+ 		dev_err(v3d->dev, "TLB clear wait idle failed\n");
+ 		return ret;
+ 	}
+ 
+-	ret = wait_for(!(V3D_READ(V3D_MMUC_CONTROL) &
++	ret = wait_for2(!(V3D_READ2(V3D_MMUC_CONTROL) &
+ 			 V3D_MMUC_CONTROL_FLUSHING), 100);
+ 	if (ret)
+ 		dev_err(v3d->dev, "MMUC flush wait idle failed\n");
+@@ -68,8 +68,8 @@ static int v3d_mmu_flush_all(struct v3d_
+ 
+ int v3d_mmu_set_page_table(struct v3d_dev *v3d)
+ {
+-	V3D_WRITE(V3D_MMU_PT_PA_BASE, v3d->pt_paddr >> V3D_MMU_PAGE_SHIFT);
+-	V3D_WRITE(V3D_MMU_CTL,
++	V3D_WRITE2(V3D_MMU_PT_PA_BASE, v3d->pt_paddr >> V3D_MMU_PAGE_SHIFT);
++	V3D_WRITE2(V3D_MMU_CTL,
+ 		  V3D_MMU_CTL_ENABLE |
+ 		  V3D_MMU_CTL_PT_INVALID_ENABLE |
+ 		  V3D_MMU_CTL_PT_INVALID_ABORT |
+@@ -78,10 +78,10 @@ int v3d_mmu_set_page_table(struct v3d_de
+ 		  V3D_MMU_CTL_WRITE_VIOLATION_INT |
+ 		  V3D_MMU_CTL_CAP_EXCEEDED_ABORT |
+ 		  V3D_MMU_CTL_CAP_EXCEEDED_INT);
+-	V3D_WRITE(V3D_MMU_ILLEGAL_ADDR,
++	V3D_WRITE2(V3D_MMU_ILLEGAL_ADDR,
+ 		  (v3d->mmu_scratch_paddr >> V3D_MMU_PAGE_SHIFT) |
+ 		  V3D_MMU_ILLEGAL_ADDR_ENABLE);
+-	V3D_WRITE(V3D_MMUC_CONTROL, V3D_MMUC_CONTROL_ENABLE);
++	V3D_WRITE2(V3D_MMUC_CONTROL, V3D_MMUC_CONTROL_ENABLE);
+ 
+ 	return v3d_mmu_flush_all(v3d);
+ }
+Index: rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_sched.c
+===================================================================
+--- rpi-linux-kernel.orig/drivers/gpu/drm/v3d/v3d_sched.c
++++ rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_sched.c
+@@ -199,20 +199,20 @@ v3d_tfu_job_run(struct drm_sched_job *sc
+ 
+ 	trace_v3d_submit_tfu(dev, to_v3d_fence(fence)->seqno);
+ 
+-	V3D_WRITE(V3D_TFU_IIA, job->args.iia);
+-	V3D_WRITE(V3D_TFU_IIS, job->args.iis);
+-	V3D_WRITE(V3D_TFU_ICA, job->args.ica);
+-	V3D_WRITE(V3D_TFU_IUA, job->args.iua);
+-	V3D_WRITE(V3D_TFU_IOA, job->args.ioa);
+-	V3D_WRITE(V3D_TFU_IOS, job->args.ios);
+-	V3D_WRITE(V3D_TFU_COEF0, job->args.coef[0]);
++	V3D_WRITE2(V3D_TFU_IIA, job->args.iia);
++	V3D_WRITE2(V3D_TFU_IIS, job->args.iis);
++	V3D_WRITE2(V3D_TFU_ICA, job->args.ica);
++	V3D_WRITE2(V3D_TFU_IUA, job->args.iua);
++	V3D_WRITE2(V3D_TFU_IOA, job->args.ioa);
++	V3D_WRITE2(V3D_TFU_IOS, job->args.ios);
++	V3D_WRITE2(V3D_TFU_COEF0, job->args.coef[0]);
+ 	if (job->args.coef[0] & V3D_TFU_COEF0_USECOEF) {
+-		V3D_WRITE(V3D_TFU_COEF1, job->args.coef[1]);
+-		V3D_WRITE(V3D_TFU_COEF2, job->args.coef[2]);
+-		V3D_WRITE(V3D_TFU_COEF3, job->args.coef[3]);
++		V3D_WRITE2(V3D_TFU_COEF1, job->args.coef[1]);
++		V3D_WRITE2(V3D_TFU_COEF2, job->args.coef[2]);
++		V3D_WRITE2(V3D_TFU_COEF3, job->args.coef[3]);
+ 	}
+ 	/* ICFG kicks off the job. */
+-	V3D_WRITE(V3D_TFU_ICFG, job->args.icfg | V3D_TFU_ICFG_IOC);
++	V3D_WRITE2(V3D_TFU_ICFG, job->args.icfg | V3D_TFU_ICFG_IOC);
+ 
+ 	return fence;
+ }
+Index: rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.c
+===================================================================
+--- /dev/null
++++ rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.c
+@@ -0,0 +1,57 @@
++#include <linux/mutex.h>
++#include <drm/drm_drv.h>
++#include <drm/drm_prime.h>
++#include "../vc4/vc4_drv.h"
++#include "v3d_vc4_bind.h"
++
++#include "uapi/drm/vc4_drm.h"
++
++struct mutex bind_lock;
++
++void init_v3d_vc4_bind() {
++  mutex_init(&bind_lock);
++}
++
++int import_bo_from_vc4(struct drm_device *dev, 
++    struct drm_file *file_priv, size_t unaligned_size, u32 *vc4_handle, u32 *handle)
++{
++  struct drm_vc4_create_bo args = {0};
++  int ret, prime_fd;
++
++  if (!is_vc4_enable())
++    return -ENODEV;
++
++  mutex_lock(&bind_lock);
++  args.size = unaligned_size;
++  args.flags = V3D_BIND;
++  ret = vc4_create_bo_ioctl(vc4_drm, &args, vc4_drm_file);
++  if (ret)
++    goto out;
++  *vc4_handle = args.handle;
++  ret = drm_gem_prime_handle_to_fd(vc4_drm, vc4_drm_file, args.handle,
++     DRM_CLOEXEC | DRM_RDWR, &prime_fd);
++  if (ret)
++    ret = drm_gem_prime_handle_to_fd(vc4_drm, vc4_drm_file, args.handle,
++         DRM_CLOEXEC, &prime_fd);
++  if (ret)
++    goto out;
++  
++  ret = drm_gem_prime_fd_to_handle(dev, file_priv, prime_fd, handle);
++  if (ret)
++    DRM_ERROR("Borrow bo from vc4 size:%u, vc4 handle:%u, fd:%d, v3d handle:%u\n", 
++      unaligned_size, *vc4_handle, prime_fd, *handle);
++out:
++  mutex_unlock(&bind_lock);
++  return ret; 
++}
++
++int free_bo_from_vc4(u32 *handle) {
++  int ret;
++  /* need releasing handle twice? */
++  ret = drm_gem_handle_delete(vc4_drm_file, *handle);
++  DRM_DEBUG("release borrowed vc4 handle:%d\n", *handle);
++  if (ret)
++    DRM_ERROR("Free handle:%u, from vc4, ret:%d\n", *handle, ret);
++  *handle = 0;
++  return ret;
++}
+Index: rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.h
+===================================================================
+--- /dev/null
++++ rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.h
+@@ -0,0 +1,18 @@
++// SPDX-License-Identifier: GPL-2.0+
++/* Copyright (C) 2020 FydeOS team */
++/* Author: Yang Tsao (yang@fydeos.io)*/
++
++#ifndef V3D_VC$_BIND_H
++#define V3D_VC$_BIND_H
++#include <drm/drm_drv.h>
++#include "../vc4/vc4_drv.h"
++static inline bool is_vc4_enable(void) {
++  return vc4_drm != NULL && vc4_drm_file != NULL; 
++}
++
++int import_bo_from_vc4(struct drm_device *dev, struct drm_file *file_priv, 
++  size_t unaligned_size, u32 *vc4_handle, u32 *handle);
++
++int free_bo_from_vc4(u32 *handle);
++void init_v3d_vc4_bind(void);
++#endif /* V3D_VC$_BIND_H */
+Index: rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_bo.c
+===================================================================
+--- rpi-linux-kernel.orig/drivers/gpu/drm/vc4/vc4_bo.c
++++ rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_bo.c
+@@ -30,6 +30,7 @@ static const char * const bo_type_names[
+ 	"RCL",
+ 	"BCL",
+ 	"kernel BO cache",
++  "V3D Bind",
+ };
+ 
+ static bool is_user_label(int label)
+@@ -671,12 +672,13 @@ struct dma_buf * vc4_prime_export(struct
+ 	 * exported BO is released. This shouldn't be a problem since we don't
+ 	 * expect exported BOs to be marked as purgeable.
+ 	 */
++  
+ 	ret = vc4_bo_inc_usecnt(bo);
+ 	if (ret) {
+ 		DRM_ERROR("Failed to increment BO usecnt\n");
+ 		return ERR_PTR(ret);
+ 	}
+-
++  
+ 	dmabuf = drm_gem_prime_export(obj, flags);
+ 	if (IS_ERR(dmabuf))
+ 		vc4_bo_dec_usecnt(bo);
+@@ -785,7 +787,6 @@ vc4_prime_import_sg_table(struct drm_dev
+ 			  struct sg_table *sgt)
+ {
+ 	struct drm_gem_object *obj;
+-
+ 	obj = drm_gem_cma_prime_import_sg_table(dev, attach, sgt);
+ 	if (IS_ERR(obj))
+ 		return obj;
+@@ -828,7 +829,8 @@ int vc4_create_bo_ioctl(struct drm_devic
+ 	 * We can't allocate from the BO cache, because the BOs don't
+ 	 * get zeroed, and that might leak data between users.
+ 	 */
+-	bo = vc4_bo_create(dev, args->size, false, VC4_BO_TYPE_V3D);
++	bo = vc4_bo_create(dev, args->size, false, args->flags == V3D_BIND ? 
++    VC4_BO_TYPE_V3D_BIND : VC4_BO_TYPE_V3D);
+ 	if (IS_ERR(bo))
+ 		return PTR_ERR(bo);
+ 
+@@ -1097,3 +1099,13 @@ int vc4_label_bo_ioctl(struct drm_device
+ 
+ 	return ret;
+ }
++
++void vc4_bo_close(struct drm_gem_object *gem_obj, struct drm_file *file_priv)
++{
++  struct vc4_bo *bo = to_vc4_bo(gem_obj);
++  if (bo->label == VC4_BO_TYPE_V3D_BIND) {
++    bo->madv = VC4_MADV_DONTNEED;
++    vc4_bo_dec_usecnt(bo);
++    DRM_DEBUG("vc4 exported gem closed, bo usercount:%d\n", bo->usecnt);
++  }
++}
+Index: rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_drv.c
+===================================================================
+--- rpi-linux-kernel.orig/drivers/gpu/drm/vc4/vc4_drv.c
++++ rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_drv.c
+@@ -48,6 +48,9 @@
+ #define DRIVER_MINOR 0
+ #define DRIVER_PATCHLEVEL 0
+ 
++struct drm_device *vc4_drm = NULL;
++struct drm_file *vc4_drm_file = NULL;
++
+ /* Helper function for mapping the regs on a platform device. */
+ void __iomem *vc4_ioremap_regs(struct platform_device *dev, int index)
+ {
+@@ -125,6 +128,8 @@ static int vc4_open(struct drm_device *d
+ 
+ 	vc4_perfmon_open_file(vc4file);
+ 	file->driver_priv = vc4file;
++  vc4_drm_file = file;
++  DRM_INFO("signed vc4_drm_file");
+ 	return 0;
+ }
+ 
+@@ -199,6 +204,7 @@ static struct drm_driver vc4_drm_driver
+ 
+ 	.gem_create_object = vc4_create_object,
+ 	.gem_free_object_unlocked = vc4_free_object,
++  .gem_close_object = vc4_bo_close,
+ 	.gem_vm_ops = &vc4_vm_ops,
+ 
+ 	.prime_handle_to_fd = drm_gem_prime_handle_to_fd,
+@@ -327,7 +333,8 @@ static int vc4_drm_bind(struct device *d
+ 		goto unbind_all;
+ 
+ 	drm_fbdev_generic_setup(drm, 16);
+-
++  vc4_drm = drm;
++  DRM_INFO("signed vc4_drm");
+ 	return 0;
+ 
+ unbind_all:
+@@ -338,6 +345,7 @@ gem_destroy:
+ 	vc4_bo_cache_destroy(drm);
+ dev_put:
+ 	drm_dev_put(drm);
++  vc4_drm = NULL;
+ 	return ret;
+ }
+ 
+Index: rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_drv.h
+===================================================================
+--- rpi-linux-kernel.orig/drivers/gpu/drm/vc4/vc4_drv.h
++++ rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_drv.h
+@@ -18,7 +18,7 @@
+ #include <drm/drm_modeset_lock.h>
+ 
+ #include "uapi/drm/vc4_drm.h"
+-
++#define V3D_BIND (1<<7)
+ struct drm_device;
+ struct drm_gem_object;
+ 
+@@ -37,7 +37,8 @@ enum vc4_kernel_bo_type {
+ 	VC4_BO_TYPE_RCL,
+ 	VC4_BO_TYPE_BCL,
+ 	VC4_BO_TYPE_KERNEL_CACHE,
+-	VC4_BO_TYPE_COUNT
++  VC4_BO_TYPE_V3D_BIND,
++	VC4_BO_TYPE_COUNT,
+ };
+ 
+ /* Performance monitor object. The perform lifetime is controlled by userspace
+@@ -781,6 +782,7 @@ int vc4_bo_inc_usecnt(struct vc4_bo *bo)
+ void vc4_bo_dec_usecnt(struct vc4_bo *bo);
+ void vc4_bo_add_to_purgeable_pool(struct vc4_bo *bo);
+ void vc4_bo_remove_from_purgeable_pool(struct vc4_bo *bo);
++void vc4_bo_close(struct drm_gem_object *, struct drm_file *file_priv);
+ 
+ /* vc4_crtc.c */
+ extern struct platform_driver vc4_crtc_driver;
+@@ -937,5 +939,6 @@ int vc4_perfmon_destroy_ioctl(struct drm
+ 			      struct drm_file *file_priv);
+ int vc4_perfmon_get_values_ioctl(struct drm_device *dev, void *data,
+ 				 struct drm_file *file_priv);
+-
++extern struct drm_device *vc4_drm;
++extern struct drm_file *vc4_drm_file;
+ #endif /* _VC4_DRV_H_ */
+Index: rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_plane.c
+===================================================================
+--- rpi-linux-kernel.orig/drivers/gpu/drm/vc4/vc4_plane.c
++++ rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_plane.c
+@@ -690,6 +690,9 @@ static int vc4_plane_mode_set(struct drm
+ 	u32 hvs_format = format->hvs;
+ 	unsigned int rotation;
+ 	int ret, i;
++  char f_name[4];
++  for (i=0; i< 4; i++) 
++    f_name[i] = (char) ((format->drm >> i*8) & 0xFF);
+ 
+ 	if (vc4_state->dlist_initialized)
+ 		return 0;
+@@ -1115,7 +1118,12 @@ static int vc4_plane_mode_set(struct drm
+ 	vc4_state->dlist_initialized = 1;
+ 
+ 	vc4_plane_calc_load(state);
+-
++/*
++  DRM_INFO("set mode format:%s, crt(x:%d,y:%d,w:%d,h:%d), src(x:%u,y:%u,w1:%u,h1:%u, w2:%u, h2:%u)\n", f_name,
++    vc4_state->crtc_x, vc4_state->crtc_y, vc4_state->crtc_w, vc4_state->crtc_h,
++    vc4_state->src_x, vc4_state->src_y, vc4_state->src_w[0],vc4_state->src_h[0],
++    vc4_state->src_w[1], vc4_state->src_h[1]);
++*/
+ 	return 0;
+ }
+ 

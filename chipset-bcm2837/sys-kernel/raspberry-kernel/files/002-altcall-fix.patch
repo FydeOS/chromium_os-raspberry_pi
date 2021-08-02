@@ -1,0 +1,480 @@
+Index: rpi-linux-kernel/arch/arm64/include/asm/syscall.h
+===================================================================
+--- rpi-linux-kernel.orig/arch/arm64/include/asm/syscall.h
++++ rpi-linux-kernel/arch/arm64/include/asm/syscall.h
+@@ -17,6 +17,8 @@ extern const syscall_fn_t sys_call_table
+ extern const syscall_fn_t compat_sys_call_table[];
+ #endif
+ 
++#define sys_call_ptr_t syscall_fn_t /* Needed for alt-syscall */
++
+ static inline int syscall_get_nr(struct task_struct *task,
+ 				 struct pt_regs *regs)
+ {
+Index: rpi-linux-kernel/arch/arm64/include/asm/sysreg.h
+===================================================================
+--- rpi-linux-kernel.orig/arch/arm64/include/asm/sysreg.h
++++ rpi-linux-kernel/arch/arm64/include/asm/sysreg.h
+@@ -808,12 +808,16 @@
+  * The "Z" constraint normally means a zero immediate, but when combined with
+  * the "%x0" template means XZR.
+  */
++#if defined(__aarch64__)
+ #define write_sysreg(v, r) do {					\
+ 	u64 __val = (u64)(v);					\
+ 	asm volatile("msr " __stringify(r) ", %x0"		\
+ 		     : : "rZ" (__val));				\
+ } while (0)
+ 
++#else
++#define write_sysreg(v, r) BUG()
++#endif
+ /*
+  * For registers without architectural names, or simply unsupported by
+  * GAS.
+@@ -824,10 +828,14 @@
+ 	__val;								\
+ })
+ 
++#if defined(__aarch64__)
+ #define write_sysreg_s(v, r) do {					\
+ 	u64 __val = (u64)(v);						\
+ 	asm volatile(__msr_s(r, "%x0") : : "rZ" (__val));		\
+ } while (0)
++#else
++#define write_sysreg_s(v, r) BUG()
++#endif
+ 
+ /*
+  * Modify bits in a sysreg. Bits in the clear mask are zeroed, then bits in the
+Index: rpi-linux-kernel/arch/arm64/kernel/Makefile
+===================================================================
+--- rpi-linux-kernel.orig/arch/arm64/kernel/Makefile
++++ rpi-linux-kernel/arch/arm64/kernel/Makefile
+@@ -66,6 +66,9 @@ obj-$(CONFIG_ARM64_PTR_AUTH)		+= pointer
+ 
+ obj-y					+= vdso/ probes/
+ obj-$(CONFIG_COMPAT_VDSO)		+= vdso32/
++
++obj-$(CONFIG_ALT_SYSCALL)   += alt-syscall.o
++
+ head-y					:= head.o
+ extra-y					+= $(head-y) vmlinux.lds
+ 
+Index: rpi-linux-kernel/arch/arm64/kernel/alt-syscall.c
+===================================================================
+--- /dev/null
++++ rpi-linux-kernel/arch/arm64/kernel/alt-syscall.c
+@@ -0,0 +1,78 @@
++/*
++ * AArch64 alt-syscall implementation
++ *
++ * Copyright (C) 2015 Google, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/alt-syscall.h>
++#include <linux/kernel.h>
++#include <linux/slab.h>
++#include <linux/syscalls.h>
++
++#include <asm/syscall.h>
++
++int arch_dup_sys_call_table(struct alt_sys_call_table *entry)
++{
++	int err;
++
++	if (!entry)
++		return -EINVAL;
++	if (entry->table)
++		return -EINVAL;
++#ifdef CONFIG_COMPAT
++	if (entry->compat_table)
++		return -EINVAL;
++#endif
++
++	entry->size = __NR_syscalls;
++	entry->table = kcalloc(entry->size, sizeof(sys_call_ptr_t), GFP_KERNEL);
++	if (!entry->table) {
++		err = -ENOMEM;
++		goto failed;
++	}
++	memcpy(entry->table, sys_call_table,
++	       entry->size * sizeof(sys_call_ptr_t));
++
++#ifdef CONFIG_COMPAT
++	entry->compat_size = __NR_compat_syscalls;
++	entry->compat_table = kcalloc(entry->compat_size,
++				      sizeof(sys_call_ptr_t), GFP_KERNEL);
++	if (!entry->compat_table) {
++		err = -ENOMEM;
++		goto compat_failed;
++	}
++	memcpy(entry->compat_table, compat_sys_call_table,
++	       entry->compat_size * sizeof(sys_call_ptr_t));
++#endif
++
++	return 0;
++
++#ifdef CONFIG_COMPAT
++compat_failed:
++	entry->compat_size = 0;
++	kfree(entry->table);
++	entry->table = NULL;
++#endif
++failed:
++	entry->size = 0;
++	return err;
++}
++
++int arch_set_sys_call_table(struct alt_sys_call_table *entry)
++{
++	if (!entry)
++		return -EINVAL;
++
++	current_thread_info()->nr_syscalls = entry->size;
++	current_thread_info()->sys_call_table = entry->table;
++#ifdef CONFIG_COMPAT
++	current_thread_info()->compat_nr_syscalls = entry->compat_size;
++	current_thread_info()->compat_sys_call_table = entry->compat_table;
++#endif
++
++	return 0;
++}
+Index: rpi-linux-kernel/arch/arm64/kernel/vdso32/Makefile
+===================================================================
+--- rpi-linux-kernel.orig/arch/arm64/kernel/vdso32/Makefile
++++ rpi-linux-kernel/arch/arm64/kernel/vdso32/Makefile
+@@ -10,7 +10,18 @@ include $(srctree)/lib/vdso/Makefile
+ 
+ # Same as cc-*option, but using CC_COMPAT instead of CC
+ ifeq ($(CONFIG_CC_IS_CLANG), y)
++COMPAT_GCC_TOOLCHAIN_DIR := $(dir $(shell which $(CROSS_COMPILE_COMPAT)elfedit))
++COMPAT_GCC_TOOLCHAIN := $(realpath $(COMPAT_GCC_TOOLCHAIN_DIR)/..)
++
++CC_COMPAT_CLANG_FLAGS := --target=$(notdir $(CROSS_COMPILE_COMPAT:%-=%))
++CC_COMPAT_CLANG_FLAGS += --prefix=$(COMPAT_GCC_TOOLCHAIN_DIR)
++CC_COMPAT_CLANG_FLAGS += -no-integrated-as -Qunused-arguments
++ifneq ($(COMPAT_GCC_TOOLCHAIN),)
++CC_COMPAT_CLANG_FLAGS += --gcc-toolchain=$(COMPAT_GCC_TOOLCHAIN)
++endif
++
+ CC_COMPAT ?= $(CC)
++CC_COMPAT += $(CC_COMPAT_CLANG_FLAGS)
+ else
+ CC_COMPAT ?= $(CROSS_COMPILE_COMPAT)gcc
+ endif
+@@ -94,6 +105,14 @@ VDSO_CFLAGS += -D__uint128_t='void*'
+ VDSO_CFLAGS += $(call cc32-disable-warning,shift-count-overflow)
+ VDSO_CFLAGS += -Wno-int-to-pointer-cast
+ 
++# Compile as THUMB2 or ARM. Unwinding via frame-pointers in THUMB2 is
++# unreliable.
++ifeq ($(CONFIG_THUMB2_COMPAT_VDSO), y)
++VDSO_CFLAGS += -mthumb -fomit-frame-pointer
++else
++VDSO_CFLAGS += -marm
++endif
++
+ VDSO_AFLAGS := $(VDSO_CAFLAGS)
+ VDSO_AFLAGS += -D__ASSEMBLY__
+ 
+@@ -190,7 +209,7 @@ quiet_cmd_vdsosym = VDSOSYM $@
+       cmd_vdsosym = $(NM) $< | $(gen-vdsosym) | LC_ALL=C sort > $@
+ 
+ # Install commands for the unstripped file
+-quiet_cmd_vdso_install = INSTALL32 $@
++quiet_cmd_vdso_install = INSTALL $@
+       cmd_vdso_install = cp $(obj)/$@.dbg $(MODLIB)/vdso/vdso32.so
+ 
+ vdso.so: $(obj)/vdso.so.dbg
+Index: rpi-linux-kernel/arch/arm64/kernel/vdso32/vgettimeofday.c
+===================================================================
+--- rpi-linux-kernel.orig/arch/arm64/kernel/vdso32/vgettimeofday.c
++++ rpi-linux-kernel/arch/arm64/kernel/vdso32/vgettimeofday.c
+@@ -5,26 +5,16 @@
+  * Copyright (C) 2018 ARM Limited
+  *
+  */
+-#include <linux/time.h>
+-#include <linux/types.h>
+ 
+ int __vdso_clock_gettime(clockid_t clock,
+ 			 struct old_timespec32 *ts)
+ {
+-	/* The checks below are required for ABI consistency with arm */
+-	if ((u32)ts >= TASK_SIZE_32)
+-		return -EFAULT;
+-
+ 	return __cvdso_clock_gettime32(clock, ts);
+ }
+ 
+ int __vdso_clock_gettime64(clockid_t clock,
+ 			   struct __kernel_timespec *ts)
+ {
+-	/* The checks below are required for ABI consistency with arm */
+-	if ((u32)ts >= TASK_SIZE_32)
+-		return -EFAULT;
+-
+ 	return __cvdso_clock_gettime(clock, ts);
+ }
+ 
+@@ -37,10 +27,6 @@ int __vdso_gettimeofday(struct __kernel_
+ int __vdso_clock_getres(clockid_t clock_id,
+ 			struct old_timespec32 *res)
+ {
+-	/* The checks below are required for ABI consistency with arm */
+-	if ((u32)res >= TASK_SIZE_32)
+-		return -EFAULT;
+-
+ 	return __cvdso_clock_getres_time32(clock_id, res);
+ }
+ 
+Index: rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_drv.c
+===================================================================
+--- rpi-linux-kernel.orig/drivers/gpu/drm/vc4/vc4_drv.c
++++ rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_drv.c
+@@ -179,7 +179,7 @@ static const struct drm_ioctl_desc vc4_d
+ 
+ static struct drm_driver vc4_drm_driver = {
+ 	.driver_features = (DRIVER_MODESET |
+-			    DRIVER_ATOMIC |
++	//		    DRIVER_ATOMIC |
+ 			    DRIVER_GEM |
+ 			    DRIVER_RENDER |
+ 			    DRIVER_SYNCOBJ),
+Index: rpi-linux-kernel/include/linux/sched.h
+===================================================================
+--- rpi-linux-kernel.orig/include/linux/sched.h
++++ rpi-linux-kernel/include/linux/sched.h
+@@ -1997,4 +1997,9 @@ int sched_trace_rq_cpu(struct rq *rq);
+ 
+ const struct cpumask *sched_trace_rd_span(struct root_domain *rd);
+ 
++#define task_set_core_sched(set, tsk) (-EINVAL)
++#define sched_core_irq_enter(void) do { } while (0)
++#define sched_core_irq_exit(void) do { } while (0)
++#define sched_core_user_enter(void) do { } while (0)
++
+ #endif
+Index: rpi-linux-kernel/include/linux/syscalls.h
+===================================================================
+--- rpi-linux-kernel.orig/include/linux/syscalls.h
++++ rpi-linux-kernel/include/linux/syscalls.h
+@@ -1420,5 +1420,23 @@ long ksys_old_shmctl(int shmid, int cmd,
+ long compat_ksys_semtimedop(int semid, struct sembuf __user *tsems,
+ 			    unsigned int nsops,
+ 			    const struct old_timespec32 __user *timeout);
++#ifdef CONFIG_ALT_SYSCALL
+ 
++/* Only used with ALT_SYSCALL enabled */
++
++int ksys_prctl(int option, unsigned long arg2, unsigned long arg3,
++         unsigned long arg4, unsigned long arg5);
++int ksys_setpriority(int which, int who, int niceval);
++int ksys_getpriority(int which, int who);
++int ksys_perf_event_open(
++    struct perf_event_attr __user *attr_uptr,
++    pid_t pid, int cpu, int group_fd, unsigned long flags);
++int ksys_clock_adjtime(const clockid_t which_clock, struct __kernel_timex __user * utx);
++int ksys_adjtimex(struct __kernel_timex __user *txc_p);
++int ksys_getcpu(unsigned __user *cpu, unsigned __user *node,
++    struct getcpu_cache __user *cache);
++int ksys_clock_adjtime32(clockid_t which_clock,
++       struct old_timex32 __user *utp);
++int ksys_adjtimex_time32(struct old_timex32 __user *utp);
++#endif /* CONFIG_ALT_SYSCALL */
+ #endif
+Index: rpi-linux-kernel/include/uapi/linux/prctl.h
+===================================================================
+--- rpi-linux-kernel.orig/include/uapi/linux/prctl.h
++++ rpi-linux-kernel/include/uapi/linux/prctl.h
+@@ -155,6 +155,9 @@ struct prctl_mm_map {
+ #define PR_SET_PTRACER 0x59616d61
+ # define PR_SET_PTRACER_ANY ((unsigned long)-1)
+ 
++#define PR_ALT_SYSCALL 0x43724f53
++# define PR_ALT_SYSCALL_SET_SYSCALL_TABLE 1
++
+ #define PR_SET_CHILD_SUBREAPER	36
+ #define PR_GET_CHILD_SUBREAPER	37
+ 
+@@ -234,4 +237,9 @@ struct prctl_mm_map {
+ #define PR_GET_TAGGED_ADDR_CTRL		56
+ # define PR_TAGGED_ADDR_ENABLE		(1UL << 0)
+ 
++#define PR_SET_CORE_SCHED   0x200
++
++#define PR_SET_VMA    0x53564d41
++# define PR_SET_VMA_ANON_NAME   0
++
+ #endif /* _LINUX_PRCTL_H */
+Index: rpi-linux-kernel/kernel/Makefile
+===================================================================
+--- rpi-linux-kernel.orig/kernel/Makefile
++++ rpi-linux-kernel/kernel/Makefile
+@@ -44,6 +44,7 @@ obj-y += rcu/
+ obj-y += livepatch/
+ obj-y += dma/
+ 
++obj-$(CONFIG_ALT_SYSCALL) += alt-syscall.o
+ obj-$(CONFIG_CHECKPOINT_RESTORE) += kcmp.o
+ obj-$(CONFIG_FREEZER) += freezer.o
+ obj-$(CONFIG_PROFILING) += profile.o
+Index: rpi-linux-kernel/kernel/alt-syscall.c
+===================================================================
+--- /dev/null
++++ rpi-linux-kernel/kernel/alt-syscall.c
+@@ -0,0 +1,66 @@
++/*
++ * Alternate Syscall Table Infrastructure
++ *
++ * Copyright 2014 Google Inc. All Rights Reserved
++ *
++ * Authors:
++ *      Kees Cook   <keescook@chromium.org>
++ *      Will Drewry <wad@chromium.org>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
++
++#include <linux/kernel.h>
++#include <linux/list.h>
++#include <linux/spinlock.h>
++#include <linux/slab.h>
++#include <linux/uaccess.h>
++#include <linux/alt-syscall.h>
++
++static LIST_HEAD(alt_sys_call_tables);
++static DEFINE_SPINLOCK(alt_sys_call_tables_lock);
++
++/* XXX: there is no "unregister" yet. */
++int register_alt_sys_call_table(struct alt_sys_call_table *entry)
++{
++	if (!entry)
++		return -EINVAL;
++
++	spin_lock(&alt_sys_call_tables_lock);
++	list_add(&entry->node, &alt_sys_call_tables);
++	spin_unlock(&alt_sys_call_tables_lock);
++
++	pr_info("table '%s' available.\n", entry->name);
++
++	return 0;
++}
++
++int set_alt_sys_call_table(char * __user uname)
++{
++	char name[ALT_SYS_CALL_NAME_MAX + 1] = { };
++	struct alt_sys_call_table *entry;
++
++	if (copy_from_user(name, uname, ALT_SYS_CALL_NAME_MAX))
++		return -EFAULT;
++
++	spin_lock(&alt_sys_call_tables_lock);
++	list_for_each_entry(entry, &alt_sys_call_tables, node) {
++		if (!strcmp(entry->name, name)) {
++			if (arch_set_sys_call_table(entry))
++				continue;
++			spin_unlock(&alt_sys_call_tables_lock);
++			return 0;
++		}
++	}
++	spin_unlock(&alt_sys_call_tables_lock);
++
++	return -ENOENT;
++}
+Index: rpi-linux-kernel/kernel/sys.c
+===================================================================
+--- rpi-linux-kernel.orig/kernel/sys.c
++++ rpi-linux-kernel/kernel/sys.c
+@@ -45,6 +45,7 @@
+ 
+ #include <linux/compat.h>
+ #include <linux/syscalls.h>
++#include <linux/alt-syscall.h>
+ #include <linux/kprobes.h>
+ #include <linux/user_namespace.h>
+ #include <linux/binfmts.h>
+@@ -2261,6 +2262,12 @@ int __weak arch_prctl_spec_ctrl_set(stru
+ 	return -EINVAL;
+ }
+ 
++static int prctl_set_vma(unsigned long opt, unsigned long start,
++    unsigned long len_in, unsigned long arg)
++{
++  return -EINVAL;
++}
++
+ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
+ 		unsigned long, arg4, unsigned long, arg5)
+ {
+@@ -2345,6 +2352,12 @@ SYSCALL_DEFINE5(prctl, int, option, unsi
+ 	case PR_SET_SECCOMP:
+ 		error = prctl_set_seccomp(arg2, (char __user *)arg3);
+ 		break;
++  case PR_ALT_SYSCALL:
++    if (arg2 == PR_ALT_SYSCALL_SET_SYSCALL_TABLE)
++      error = set_alt_sys_call_table((char __user *)arg3);
++    else
++      error = -EINVAL;
++    break;
+ 	case PR_GET_TSC:
+ 		error = GET_TSC_CTL(arg2);
+ 		break;
+@@ -2473,6 +2486,9 @@ SYSCALL_DEFINE5(prctl, int, option, unsi
+ 			return -EINVAL;
+ 		error = arch_prctl_spec_ctrl_set(me, arg2, arg3);
+ 		break;
++  case PR_SET_VMA:
++    error = prctl_set_vma(arg2, arg3, arg4, arg5);
++    break;
+ 	case PR_PAC_RESET_KEYS:
+ 		if (arg3 || arg4 || arg5)
+ 			return -EINVAL;
+@@ -2488,6 +2504,9 @@ SYSCALL_DEFINE5(prctl, int, option, unsi
+ 			return -EINVAL;
+ 		error = GET_TAGGED_ADDR_CTRL();
+ 		break;
++  case PR_SET_CORE_SCHED:
++    error = task_set_core_sched(arg2, NULL);
++    break;
+ 	default:
+ 		error = -EINVAL;
+ 		break;
+Index: rpi-linux-kernel/scripts/dtc/Makefile
+===================================================================
+--- rpi-linux-kernel.orig/scripts/dtc/Makefile
++++ rpi-linux-kernel/scripts/dtc/Makefile
+@@ -11,7 +11,7 @@ dtc-objs	+= dtc-lexer.lex.o dtc-parser.t
+ # Source files need to get at the userspace version of libfdt_env.h to compile
+ HOST_EXTRACFLAGS += -I $(srctree)/$(src)/libfdt
+ 
+-ifeq ($(shell pkg-config --exists yaml-0.1 2>/dev/null && echo yes),)
++ifeq ($(shell $(PKG_CONFIG) --exists yaml-0.1 2>/dev/null && echo yes),)
+ ifneq ($(CHECK_DTBS),)
+ $(error dtc needs libyaml for DT schema validation support. \
+ 	Install the necessary libyaml development package.)
+Index: rpi-linux-kernel/security/chromiumos/Makefile
+===================================================================
+--- rpi-linux-kernel.orig/security/chromiumos/Makefile
++++ rpi-linux-kernel/security/chromiumos/Makefile
+@@ -1,5 +1,5 @@
+-obj-$(CONFIG_SECURITY_CHROMIUMOS) := chromiumos_lsm.o
++#obj-$(CONFIG_SECURITY_CHROMIUMOS) := chromiumos_lsm.o
+ 
+-chromiumos_lsm-y := inode_mark.o lsm.o securityfs.o utils.o
++#chromiumos_lsm-y := inode_mark.o lsm.o securityfs.o utils.o
+ 
+ obj-$(CONFIG_ALT_SYSCALL_CHROMIUMOS) += alt-syscall.o

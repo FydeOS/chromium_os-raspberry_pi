@@ -1,0 +1,136 @@
+Index: rpi-linux-kernel/scripts/dtc/Makefile
+===================================================================
+--- rpi-linux-kernel.orig/scripts/dtc/Makefile
++++ rpi-linux-kernel/scripts/dtc/Makefile
+@@ -19,7 +19,7 @@ endif
+ HOST_EXTRACFLAGS += -DNO_YAML
+ else
+ dtc-objs	+= yamltree.o
+-HOSTLDLIBS_dtc	:= $(shell pkg-config yaml-0.1 --libs)
++HOSTLDLIBS_dtc	:= $(shell $(PKG_CONFIG) yaml-0.1 --libs)
+ endif
+ 
+ # Generated files need one more search path to include headers in source tree
+Index: rpi-linux-kernel/kernel/sys.c
+===================================================================
+--- rpi-linux-kernel.orig/kernel/sys.c
++++ rpi-linux-kernel/kernel/sys.c
+@@ -194,11 +194,6 @@ out:
+ 	return error;
+ }
+ 
+-SYSCALL_DEFINE3(setpriority, int, which, int, who, int, niceval)
+-{
+-  return ksys_setpriority(which, who, niceval);
+-}
+-
+ int ksys_setpriority(int which, int who, int niceval)
+ {
+ 	struct task_struct *g, *p;
+@@ -263,17 +258,18 @@ out:
+ 	return error;
+ }
+ 
++SYSCALL_DEFINE3(setpriority, int, which, int, who, int, niceval)
++{
++  return ksys_setpriority(which, who, niceval);
++}
++
++
+ /*
+  * Ugh. To avoid negative return values, "getpriority()" will
+  * not return the normal nice-value, but a negated value that
+  * has been offset by 20 (ie it returns 40..1 instead of -20..19)
+  * to stay compatible.
+  */
+-SYSCALL_DEFINE2(getpriority, int, which, int, who)
+-{
+-  return ksys_getpriority(which, who);
+-}
+-
+ int ksys_getpriority(int which, int who)
+ {
+ 	struct task_struct *g, *p;
+@@ -339,6 +335,11 @@ out_unlock:
+ 	return retval;
+ }
+ 
++SYSCALL_DEFINE2(getpriority, int, which, int, who)
++{
++  return ksys_getpriority(which, who);
++}
++
+ /*
+  * Unprivileged users may change the real gid to the effective gid
+  * or vice versa.  (BSD-style)
+@@ -2278,11 +2279,6 @@ static int prctl_set_vma(unsigned long o
+   return -EINVAL;
+ }
+ 
+-SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
+-		unsigned long, arg4, unsigned long, arg5) {
+-  return ksys_prctl(option, arg2, arg3, arg4, arg5);  
+-}
+-
+ int ksys_prctl(int option, unsigned long arg2, unsigned long arg3,
+          unsigned long arg4, unsigned long arg5)
+ {
+@@ -2529,10 +2525,9 @@ int ksys_prctl(int option, unsigned long
+ 	return error;
+ }
+ 
+-SYSCALL_DEFINE3(getcpu, unsigned __user *, cpup, unsigned __user *, nodep,
+-		struct getcpu_cache __user *, unused)
+-{
+-  return ksys_getcpu(cpup, nodep, unused);
++SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
++		unsigned long, arg4, unsigned long, arg5) {
++  return ksys_prctl(option, arg2, arg3, arg4, arg5);  
+ }
+ 
+ int ksys_getcpu(unsigned __user *cpup, unsigned __user *nodep,
+@@ -2548,6 +2543,12 @@ int ksys_getcpu(unsigned __user *cpup, u
+ 	return err ? -EFAULT : 0;
+ }
+ 
++SYSCALL_DEFINE3(getcpu, unsigned __user *, cpup, unsigned __user *, nodep,
++		struct getcpu_cache __user *, unused)
++{
++  return ksys_getcpu(cpup, nodep, unused);
++}
++
+ /**
+  * do_sysinfo - fill in sysinfo struct
+  * @info: pointer to buffer to fill
+Index: rpi-linux-kernel/kernel/events/core.c
+===================================================================
+--- rpi-linux-kernel.orig/kernel/events/core.c
++++ rpi-linux-kernel/kernel/events/core.c
+@@ -10904,13 +10904,6 @@ again:
+  * @cpu:		target cpu
+  * @group_fd:		group leader event fd
+  */
+-SYSCALL_DEFINE5(perf_event_open,
+-		struct perf_event_attr __user *, attr_uptr,
+-		pid_t, pid, int, cpu, int, group_fd, unsigned long, flags)
+-{
+-  return ksys_perf_event_open(attr_uptr, pid, cpu, group_fd, flags);  
+-}
+-
+ int ksys_perf_event_open(struct perf_event_attr __user * attr_uptr, pid_t pid,
+        int cpu, int group_fd, unsigned long flags)
+ {
+@@ -11351,6 +11344,13 @@ err_fd:
+ 	return err;
+ }
+ 
++SYSCALL_DEFINE5(perf_event_open,
++		struct perf_event_attr __user *, attr_uptr,
++		pid_t, pid, int, cpu, int, group_fd, unsigned long, flags)
++{
++  return ksys_perf_event_open(attr_uptr, pid, cpu, group_fd, flags);  
++}
++
+ /**
+  * perf_event_create_kernel_counter
+  *

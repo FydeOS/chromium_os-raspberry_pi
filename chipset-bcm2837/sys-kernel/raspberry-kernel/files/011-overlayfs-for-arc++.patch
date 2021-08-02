@@ -1,0 +1,240 @@
+Index: rpi-linux-kernel/arch/arm64/include/asm/archrandom.h
+===================================================================
+--- /dev/null
++++ rpi-linux-kernel/arch/arm64/include/asm/archrandom.h
+@@ -0,0 +1,67 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#ifndef _ASM_ARCHRANDOM_H
++#define _ASM_ARCHRANDOM_H
++
++#ifdef CONFIG_ARCH_RANDOM
++
++#include <linux/random.h>
++#include <asm/cpufeature.h>
++
++static inline bool __arm64_rndr(unsigned long *v)
++{
++	bool ok;
++
++	/*
++	 * Reads of RNDR set PSTATE.NZCV to 0b0000 on success,
++	 * and set PSTATE.NZCV to 0b0100 otherwise.
++	 */
++	asm volatile(
++		__mrs_s("%0", SYS_RNDR_EL0) "\n"
++	"	cset %w1, ne\n"
++	: "=r" (*v), "=r" (ok)
++	:
++	: "cc");
++
++	return ok;
++}
++
++static inline bool __must_check arch_get_random_long(unsigned long *v)
++{
++	return false;
++}
++
++static inline bool __must_check arch_get_random_int(unsigned int *v)
++{
++	return false;
++}
++
++static inline bool __must_check arch_get_random_seed_long(unsigned long *v)
++{
++	/*
++	 * Only support the generic interface after we have detected
++	 * the system wide capability, avoiding complexity with the
++	 * cpufeature code and with potential scheduling between CPUs
++	 * with and without the feature.
++	 */
++	if (!cpus_have_const_cap(ARM64_HAS_RNG))
++		return false;
++
++	return __arm64_rndr(v);
++}
++
++
++static inline bool __must_check arch_get_random_seed_int(unsigned int *v)
++{
++	unsigned long val;
++	bool ok = arch_get_random_seed_long(&val);
++
++	*v = val;
++	return ok;
++}
++
++#else
++
++static inline bool __arm64_rndr(unsigned long *v) { return false; }
++
++#endif /* CONFIG_ARCH_RANDOM */
++#endif /* _ASM_ARCHRANDOM_H */
+Index: rpi-linux-kernel/arch/arm64/include/asm/vdso/processor.h
+===================================================================
+--- /dev/null
++++ rpi-linux-kernel/arch/arm64/include/asm/vdso/processor.h
+@@ -0,0 +1,17 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/*
++ * Copyright (C) 2020 ARM Ltd.
++ */
++#ifndef __ASM_VDSO_PROCESSOR_H
++#define __ASM_VDSO_PROCESSOR_H
++
++#ifndef __ASSEMBLY__
++
++static inline void cpu_relax(void)
++{
++	asm volatile("yield" ::: "memory");
++}
++
++#endif /* __ASSEMBLY__ */
++
++#endif /* __ASM_VDSO_PROCESSOR_H */
+Index: rpi-linux-kernel/fs/overlayfs/overlayfs.h
+===================================================================
+--- rpi-linux-kernel.orig/fs/overlayfs/overlayfs.h
++++ rpi-linux-kernel/fs/overlayfs/overlayfs.h
+@@ -364,7 +364,7 @@ int ovl_permission(struct inode *inode,
+ int ovl_xattr_set(struct dentry *dentry, struct inode *inode, const char *name,
+ 		  const void *value, size_t size, int flags);
+ int ovl_xattr_get(struct dentry *dentry, struct inode *inode, const char *name,
+-		  void *value, size_t size);
++		  void *value, size_t size, int flags);
+ ssize_t ovl_listxattr(struct dentry *dentry, char *list, size_t size);
+ struct posix_acl *ovl_get_acl(struct inode *inode, int type);
+ int ovl_update_time(struct inode *inode, struct timespec64 *ts, int flags);
+Index: rpi-linux-kernel/fs/overlayfs/super.c
+===================================================================
+--- rpi-linux-kernel.orig/fs/overlayfs/super.c
++++ rpi-linux-kernel/fs/overlayfs/super.c
+@@ -855,9 +855,9 @@ static unsigned int ovl_split_lowerdirs(
+ static int __maybe_unused
+ ovl_posix_acl_xattr_get(const struct xattr_handler *handler,
+ 			struct dentry *dentry, struct inode *inode,
+-			const char *name, void *buffer, size_t size)
++			const char *name, void *buffer, size_t size, int flags)
+ {
+-	return ovl_xattr_get(dentry, inode, handler->name, buffer, size);
++	return ovl_xattr_get(dentry, inode, handler->name, buffer, size, flags);
+ }
+ 
+ static int __maybe_unused
+@@ -920,7 +920,7 @@ out_acl_release:
+ 
+ static int ovl_own_xattr_get(const struct xattr_handler *handler,
+ 			     struct dentry *dentry, struct inode *inode,
+-			     const char *name, void *buffer, size_t size)
++			     const char *name, void *buffer, size_t size, int flags)
+ {
+ 	return -EOPNOTSUPP;
+ }
+@@ -935,9 +935,9 @@ static int ovl_own_xattr_set(const struc
+ 
+ static int ovl_other_xattr_get(const struct xattr_handler *handler,
+ 			       struct dentry *dentry, struct inode *inode,
+-			       const char *name, void *buffer, size_t size)
++			       const char *name, void *buffer, size_t size, int flags)
+ {
+-	return ovl_xattr_get(dentry, inode, name, buffer, size);
++	return ovl_xattr_get(dentry, inode, name, buffer, size, flags);
+ }
+ 
+ static int ovl_other_xattr_set(const struct xattr_handler *handler,
+Index: rpi-linux-kernel/security/selinux/hooks.c
+===================================================================
+--- rpi-linux-kernel.orig/security/selinux/hooks.c
++++ rpi-linux-kernel/security/selinux/hooks.c
+@@ -102,6 +102,10 @@
+ #include "netlabel.h"
+ #include "audit.h"
+ #include "avc_ss.h"
++#define CONFIG_OVERLAY_FS
++#ifdef CONFIG_OVERLAY_FS
++#include "../../fs/overlayfs/ovl_entry.h"
++#endif
+ 
+ struct selinux_state selinux_state;
+ 
+@@ -506,10 +510,32 @@ static int selinux_is_genfs_special_hand
+ 		  !strcmp(sb->s_type->name, "cgroup2")));
+ }
+ 
++static bool is_overlay_sb(struct super_block *sb)
++{
++  const char* fstype = sb->s_type->name;
++  return strcmp(fstype, "overlay") == 0;
++}
++
++static bool is_overlay_inode(struct inode *inode)
++{
++  return is_overlay_sb(inode->i_sb); 
++}
++
++#ifdef CONFIG_OVERLAY_FS
++static struct inode *get_real_inode_from_ovl(struct inode *inode) {
++  struct ovl_inode *oi = OVL_I(inode);
++  struct dentry *upperdentry = ovl_upperdentry_dereference(oi);
++  return upperdentry ? d_inode(upperdentry) : oi->lower;
++}
++#endif
++
+ static int selinux_is_sblabel_mnt(struct super_block *sb)
+ {
+ 	struct superblock_security_struct *sbsec = sb->s_security;
+-
++#ifdef CONFIG_OVERLAY_FS
++  if(is_overlay_sb(sb)) 
++    return 1;
++#endif
+ 	/*
+ 	 * IMPORTANT: Double-check logic in this function when adding a new
+ 	 * SECURITY_FS_USE_* definition!
+@@ -3360,7 +3386,15 @@ static int selinux_inode_getsecurity(str
+ 	 * and lack of permission just means that we fall back to the
+ 	 * in-core context value, not a denial.
+ 	 */
+-	isec = inode_security(inode);
++  if (is_overlay_inode(inode)) {
++#ifdef CONFIG_OVERLAY_FS
++    isec = inode_security(get_real_inode_from_ovl(inode));
++#else
++    isec = inode_security(inode);
++#endif
++  }else {
++	  isec = inode_security(inode);
++  }
+ 	if (has_cap_mac_admin(false))
+ 		error = security_sid_to_context_force(&selinux_state,
+ 						      isec->sid, &context,
+@@ -3383,11 +3417,26 @@ out_nofree:
+ static int selinux_inode_setsecurity(struct inode *inode, const char *name,
+ 				     const void *value, size_t size, int flags)
+ {
+-	struct inode_security_struct *isec = inode_security_novalidate(inode);
+-	struct superblock_security_struct *sbsec = inode->i_sb->s_security;
++	struct inode_security_struct *isec;
++	struct superblock_security_struct *sbsec;
+ 	u32 newsid;
+ 	int rc;
+-
++#ifdef CONFIG_OVERLAY_FS
++  struct inode *ovl_inode;
++#endif
++  if (is_overlay_inode(inode)) {
++#ifdef CONFIG_OVERLAY_FS
++    ovl_inode = get_real_inode_from_ovl(inode);
++    isec = inode_security_novalidate(ovl_inode);
++    sbsec = ovl_inode->i_sb->s_security;
++#else
++    isec = inode_security_novalidate(inode);
++    sbsec = inode->i_sb->s_security;
++#endif
++  }else{
++    isec = inode_security_novalidate(inode);
++    sbsec = inode->i_sb->s_security;
++  }
+ 	if (strcmp(name, XATTR_SELINUX_SUFFIX))
+ 		return -EOPNOTSUPP;
+ 

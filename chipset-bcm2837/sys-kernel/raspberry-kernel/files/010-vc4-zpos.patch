@@ -1,0 +1,208 @@
+Index: rpi-linux-kernel/drivers/gpu/drm/drm_client_modeset.c
+===================================================================
+--- rpi-linux-kernel.orig/drivers/gpu/drm/drm_client_modeset.c
++++ rpi-linux-kernel/drivers/gpu/drm/drm_client_modeset.c
+@@ -903,7 +903,7 @@ static int drm_client_modeset_commit_ato
+ 	struct drm_modeset_acquire_ctx ctx;
+ 	struct drm_mode_set *mode_set;
+ 	int ret;
+-
++  DRM_DEBUG_KMS("commit atomic\n");
+ 	drm_modeset_acquire_init(&ctx, 0);
+ 
+ 	state = drm_atomic_state_alloc(dev);
+@@ -988,12 +988,13 @@ static int drm_client_modeset_commit_leg
+ 	struct drm_mode_set *mode_set;
+ 	struct drm_plane *plane;
+ 	int ret = 0;
+-
++  DRM_DEBUG_KMS("commit legacy\n");
+ 	drm_modeset_lock_all(dev);
+ 	drm_for_each_plane(plane, dev) {
++    
+ 		if (plane->type != DRM_PLANE_TYPE_PRIMARY)
+ 			drm_plane_force_disable(plane);
+-
++     
+ 		if (plane->rotation_property)
+ 			drm_mode_plane_set_obj_prop(plane,
+ 						    plane->rotation_property,
+Index: rpi-linux-kernel/drivers/gpu/drm/drm_plane.c
+===================================================================
+--- rpi-linux-kernel.orig/drivers/gpu/drm/drm_plane.c
++++ rpi-linux-kernel/drivers/gpu/drm/drm_plane.c
+@@ -682,7 +682,7 @@ static int __setplane_internal(struct dr
+ {
+ 	int ret = 0;
+ 
+-	WARN_ON(drm_drv_uses_atomic_modeset(plane->dev));
++	//WARN_ON(drm_drv_uses_atomic_modeset(plane->dev));
+ 
+ 	/* No fb means shut it down */
+ 	if (!fb) {
+@@ -734,7 +734,7 @@ static int __setplane_atomic(struct drm_
+ {
+ 	int ret;
+ 
+-	WARN_ON(!drm_drv_uses_atomic_modeset(plane->dev));
++//	WARN_ON(!drm_drv_uses_atomic_modeset(plane->dev));
+ 
+ 	/* No fb means shut it down */
+ 	if (!fb)
+@@ -869,6 +869,7 @@ static int drm_mode_cursor_universal(str
+ 	 */
+ 	if (req->flags & DRM_MODE_CURSOR_BO) {
+ 		if (req->handle) {
++      DRM_DEBUG_KMS("Create New Cursor with handle:%u",req->handle);
+ 			fb = drm_internal_framebuffer_create(dev, &fbreq, file_priv);
+ 			if (IS_ERR(fb)) {
+ 				DRM_DEBUG_KMS("failed to wrap cursor buffer in drm framebuffer\n");
+Index: rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.c
+===================================================================
+--- rpi-linux-kernel.orig/drivers/gpu/drm/v3d/v3d_vc4_bind.c
++++ rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.c
+@@ -37,8 +37,9 @@ int import_bo_from_vc4(struct drm_device
+     goto out;
+   
+   ret = drm_gem_prime_fd_to_handle(dev, file_priv, prime_fd, handle);
++  DRM_DEBUG_DRIVER("get vc4 handle:%u, v3d handle:%u\n", args.handle, *handle);
+   if (ret)
+-    DRM_ERROR("Borrow bo from vc4 size:%u, vc4 handle:%u, fd:%d, v3d handle:%u\n", 
++    DRM_ERROR("Borrow bo from vc4 size:%lu, vc4 handle:%u, fd:%d, v3d handle:%u\n", 
+       unaligned_size, *vc4_handle, prime_fd, *handle);
+ out:
+   mutex_unlock(&bind_lock);
+@@ -49,7 +50,7 @@ int free_bo_from_vc4(u32 *handle) {
+   int ret;
+   /* need releasing handle twice? */
+   ret = drm_gem_handle_delete(vc4_drm_file, *handle);
+-  DRM_DEBUG("release borrowed vc4 handle:%d\n", *handle);
++  DRM_DEBUG_DRIVER("release borrowed vc4 handle:%d\n", *handle);
+   if (ret)
+     DRM_ERROR("Free handle:%u, from vc4, ret:%d\n", *handle, ret);
+   *handle = 0;
+Index: rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_bo.c
+===================================================================
+--- rpi-linux-kernel.orig/drivers/gpu/drm/vc4/vc4_bo.c
++++ rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_bo.c
+@@ -528,6 +528,9 @@ void vc4_free_object(struct drm_gem_obje
+ 	struct vc4_bo *bo = to_vc4_bo(gem_bo);
+ 	struct list_head *cache_list;
+ 
++  if (bo->label == VC4_BO_TYPE_V3D_BIND) 
++    DRM_DEBUG_DRIVER("free vc4 v3d bo, usecnt:%u\n",refcount_read(&bo->usecnt));
++
+ 	/* Remove the BO from the purgeable list. */
+ 	mutex_lock(&bo->madv_lock);
+ 	if (bo->madv == VC4_MADV_DONTNEED && !refcount_read(&bo->usecnt))
+@@ -796,6 +799,7 @@ vc4_prime_import_sg_table(struct drm_dev
+ 
+ static int vc4_grab_bin_bo(struct vc4_dev *vc4, struct vc4_file *vc4file)
+ {
++#ifdef RPI3
+ 	int ret;
+ 
+ 	if (!vc4->v3d)
+@@ -807,7 +811,7 @@ static int vc4_grab_bin_bo(struct vc4_de
+ 	ret = vc4_v3d_bin_bo_get(vc4, &vc4file->bin_bo_used);
+ 	if (ret)
+ 		return ret;
+-
++#endif
+ 	return 0;
+ }
+ 
+@@ -821,7 +825,6 @@ int vc4_create_bo_ioctl(struct drm_devic
+ 	int ret;
+ 
+ 	ret = vc4_grab_bin_bo(vc4, vc4file);
+-  ret = 0;
+ 	if (ret)
+ 		return ret;
+ 
+@@ -888,7 +891,6 @@ vc4_create_shader_bo_ioctl(struct drm_de
+ 	}
+ 
+ 	ret = vc4_grab_bin_bo(vc4, vc4file);
+-  ret = 0;
+ 	if (ret)
+ 		return ret;
+ 
+@@ -1103,9 +1105,10 @@ int vc4_label_bo_ioctl(struct drm_device
+ void vc4_bo_close(struct drm_gem_object *gem_obj, struct drm_file *file_priv)
+ {
+   struct vc4_bo *bo = to_vc4_bo(gem_obj);
+-  if (bo->label == VC4_BO_TYPE_V3D_BIND) {
++  if (bo->label == VC4_BO_TYPE_V3D_BIND && bo->base.vaddr != NULL) {
+     bo->madv = VC4_MADV_DONTNEED;
+     vc4_bo_dec_usecnt(bo);
+-    DRM_DEBUG("vc4 exported gem closed, bo usercount:%d\n", bo->usecnt);
++    DRM_DEBUG_DRIVER("vc4 exported gem closed, bo usercount:%d\n", refcount_read(&bo->usecnt));
+   }
+ }
++
+Index: rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_crtc.c
+===================================================================
+--- rpi-linux-kernel.orig/drivers/gpu/drm/vc4/vc4_crtc.c
++++ rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_crtc.c
+@@ -1266,7 +1266,7 @@ static int vc4_crtc_bind(struct device *
+ 	 * requirement of the plane configuration, and reject ones
+ 	 * that will take too much.
+ 	 */
+-	primary_plane = vc4_plane_init(drm, DRM_PLANE_TYPE_PRIMARY);
++	primary_plane = vc4_plane_init(drm, DRM_PLANE_TYPE_PRIMARY , 0);
+ 	if (IS_ERR(primary_plane)) {
+ 		dev_err(dev, "failed to construct primary plane\n");
+ 		ret = PTR_ERR(primary_plane);
+Index: rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_drv.h
+===================================================================
+--- rpi-linux-kernel.orig/drivers/gpu/drm/vc4/vc4_drv.h
++++ rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_drv.h
+@@ -884,7 +884,7 @@ int vc4_kms_load(struct drm_device *dev)
+ 
+ /* vc4_plane.c */
+ struct drm_plane *vc4_plane_init(struct drm_device *dev,
+-				 enum drm_plane_type type);
++				 enum drm_plane_type type, unsigned int zpos);
+ int vc4_plane_create_additional_planes(struct drm_device *dev);
+ u32 vc4_plane_write_dlist(struct drm_plane *plane, u32 __iomem *dlist);
+ u32 vc4_plane_dlist_size(const struct drm_plane_state *state);
+Index: rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_plane.c
+===================================================================
+--- rpi-linux-kernel.orig/drivers/gpu/drm/vc4/vc4_plane.c
++++ rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_plane.c
+@@ -1434,7 +1434,7 @@ static const struct drm_plane_funcs vc4_
+ };
+ 
+ struct drm_plane *vc4_plane_init(struct drm_device *dev,
+-				 enum drm_plane_type type)
++				 enum drm_plane_type type, unsigned int zpos)
+ {
+ 	struct drm_plane *plane = NULL;
+ 	struct vc4_plane *vc4_plane;
+@@ -1488,6 +1488,7 @@ struct drm_plane *vc4_plane_init(struct
+ 					  DRM_COLOR_YCBCR_BT709,
+ 					  DRM_COLOR_YCBCR_LIMITED_RANGE);
+ 
++  drm_plane_create_zpos_property(plane, zpos, 0, 127);
+ 	return plane;
+ }
+ 
+@@ -1508,7 +1509,7 @@ int vc4_plane_create_additional_planes(s
+ 	 */
+ 	for (i = 0; i < 16; i++) {
+ 		struct drm_plane *plane =
+-			vc4_plane_init(drm, DRM_PLANE_TYPE_OVERLAY);
++			vc4_plane_init(drm, DRM_PLANE_TYPE_OVERLAY, i+1);
+ 
+ 		if (IS_ERR(plane))
+ 			continue;
+@@ -1522,7 +1523,7 @@ int vc4_plane_create_additional_planes(s
+ 		 * since we overlay planes on the CRTC in the order they were
+ 		 * initialized.
+ 		 */
+-		cursor_plane = vc4_plane_init(drm, DRM_PLANE_TYPE_CURSOR);
++		cursor_plane = vc4_plane_init(drm, DRM_PLANE_TYPE_CURSOR, 17);
+ 		if (!IS_ERR(cursor_plane)) {
+ 			cursor_plane->possible_crtcs = drm_crtc_mask(crtc);
+ 			crtc->cursor = cursor_plane;

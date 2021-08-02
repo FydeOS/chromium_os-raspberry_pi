@@ -14,6 +14,8 @@ IUSE=""
 RDEPEND="
   chromeos-base/baseboard-bsp
   virtual/fyde-packages
+  virtual/cros-camera-hal
+  virtual/cros-camera-hal-configs
   chromeos-base/chromeos-bsp-rpi4"
 
 DEPEND="${RDEPEND}"

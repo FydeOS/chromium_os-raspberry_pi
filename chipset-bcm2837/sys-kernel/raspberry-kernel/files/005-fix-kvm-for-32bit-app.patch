@@ -1,0 +1,142 @@
+Index: rpi-linux-kernel/kernel/events/core.c
+===================================================================
+--- rpi-linux-kernel.orig/kernel/events/core.c
++++ rpi-linux-kernel/kernel/events/core.c
+@@ -10908,6 +10908,12 @@ SYSCALL_DEFINE5(perf_event_open,
+ 		struct perf_event_attr __user *, attr_uptr,
+ 		pid_t, pid, int, cpu, int, group_fd, unsigned long, flags)
+ {
++  return ksys_perf_event_open(attr_uptr, pid, cpu, group_fd, flags);  
++}
++
++int ksys_perf_event_open(struct perf_event_attr __user * attr_uptr, pid_t pid,
++       int cpu, int group_fd, unsigned long flags)
++{
+ 	struct perf_event *group_leader = NULL, *output_event = NULL;
+ 	struct perf_event *event, *sibling;
+ 	struct perf_event_attr attr;
+Index: rpi-linux-kernel/kernel/sys.c
+===================================================================
+--- rpi-linux-kernel.orig/kernel/sys.c
++++ rpi-linux-kernel/kernel/sys.c
+@@ -196,6 +196,11 @@ out:
+ 
+ SYSCALL_DEFINE3(setpriority, int, which, int, who, int, niceval)
+ {
++  return ksys_setpriority(which, who, niceval);
++}
++
++int ksys_setpriority(int which, int who, int niceval)
++{
+ 	struct task_struct *g, *p;
+ 	struct user_struct *user;
+ 	const struct cred *cred = current_cred();
+@@ -266,6 +271,11 @@ out:
+  */
+ SYSCALL_DEFINE2(getpriority, int, which, int, who)
+ {
++  return ksys_getpriority(which, who);
++}
++
++int ksys_getpriority(int which, int who)
++{
+ 	struct task_struct *g, *p;
+ 	struct user_struct *user;
+ 	const struct cred *cred = current_cred();
+@@ -2269,7 +2279,12 @@ static int prctl_set_vma(unsigned long o
+ }
+ 
+ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
+-		unsigned long, arg4, unsigned long, arg5)
++		unsigned long, arg4, unsigned long, arg5) {
++  return ksys_prctl(option, arg2, arg3, arg4, arg5);  
++}
++
++int ksys_prctl(int option, unsigned long arg2, unsigned long arg3,
++         unsigned long arg4, unsigned long arg5)
+ {
+ 	struct task_struct *me = current;
+ 	unsigned char comm[sizeof(me->comm)];
+@@ -2517,6 +2532,12 @@ SYSCALL_DEFINE5(prctl, int, option, unsi
+ SYSCALL_DEFINE3(getcpu, unsigned __user *, cpup, unsigned __user *, nodep,
+ 		struct getcpu_cache __user *, unused)
+ {
++  return ksys_getcpu(cpup, nodep, unused);
++}
++
++int ksys_getcpu(unsigned __user *cpup, unsigned __user *nodep,
++    struct getcpu_cache __user *unused)
++{
+ 	int err = 0;
+ 	int cpu = raw_smp_processor_id();
+ 
+Index: rpi-linux-kernel/kernel/time/posix-timers.c
+===================================================================
+--- rpi-linux-kernel.orig/kernel/time/posix-timers.c
++++ rpi-linux-kernel/kernel/time/posix-timers.c
+@@ -1090,6 +1090,12 @@ int do_clock_adjtime(const clockid_t whi
+ SYSCALL_DEFINE2(clock_adjtime, const clockid_t, which_clock,
+ 		struct __kernel_timex __user *, utx)
+ {
++  return ksys_clock_adjtime(which_clock, utx);
++}
++
++int ksys_clock_adjtime(const clockid_t which_clock,
++           struct __kernel_timex __user * utx)
++{
+ 	struct __kernel_timex ktx;
+ 	int err;
+ 
+@@ -1160,6 +1166,11 @@ SYSCALL_DEFINE2(clock_gettime32, clockid
+ SYSCALL_DEFINE2(clock_adjtime32, clockid_t, which_clock,
+ 		struct old_timex32 __user *, utp)
+ {
++  return ksys_clock_adjtime32(which_clock, utp);
++}
++
++int ksys_clock_adjtime32(clockid_t which_clock, struct old_timex32 __user * utp)
++{
+ 	struct __kernel_timex ktx;
+ 	int err;
+ 
+Index: rpi-linux-kernel/kernel/time/time.c
+===================================================================
+--- rpi-linux-kernel.orig/kernel/time/time.c
++++ rpi-linux-kernel/kernel/time/time.c
+@@ -270,6 +270,11 @@ COMPAT_SYSCALL_DEFINE2(settimeofday, str
+ #if !defined(CONFIG_64BIT_TIME) || defined(CONFIG_64BIT)
+ SYSCALL_DEFINE1(adjtimex, struct __kernel_timex __user *, txc_p)
+ {
++  return ksys_adjtimex(txc_p);
++}
++
++int ksys_adjtimex(struct __kernel_timex __user * txc_p)
++{
+ 	struct __kernel_timex txc;		/* Local copy of parameter */
+ 	int ret;
+ 
+@@ -350,6 +355,11 @@ int put_old_timex32(struct old_timex32 _
+ 
+ SYSCALL_DEFINE1(adjtimex_time32, struct old_timex32 __user *, utp)
+ {
++  return ksys_adjtimex_time32(utp);
++}
++
++int ksys_adjtimex_time32(struct old_timex32 __user * utp)
++{
+ 	struct __kernel_timex txc;
+ 	int err, ret;
+ 
+Index: rpi-linux-kernel/virt/kvm/Kconfig
+===================================================================
+--- rpi-linux-kernel.orig/virt/kvm/Kconfig
++++ rpi-linux-kernel/virt/kvm/Kconfig
+@@ -47,7 +47,7 @@ config KVM_GENERIC_DIRTYLOG_READ_PROTECT
+ 
+ config KVM_COMPAT
+        def_bool y
+-       depends on KVM && COMPAT && !(S390 || ARM64)
++       depends on KVM && COMPAT && !S390
+ 
+ config HAVE_KVM_IRQ_BYPASS
+        bool
