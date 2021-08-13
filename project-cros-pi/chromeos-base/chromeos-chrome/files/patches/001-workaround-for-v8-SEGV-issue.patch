@@ -1,13 +1,13 @@
-diff --git a/BUILD.gn b/BUILD.gn
-index 5e3045bfdc..d038fb9b81 100644
---- a/BUILD.gn
-+++ b/BUILD.gn
-@@ -1086,6 +1086,8 @@ config("toolchain") {
-     defines += [ "DEBUG" ]
-   }
- 
-+  defines += [ "DEBUG" ]
-+
-   if (v8_enable_verify_csa) {
-     defines += [ "ENABLE_VERIFY_CSA" ]
-   }
+diff --git a/v8/src/parsing/parser-base.h b/v8/src/parsing/parser-base.h
+index d30c3f1b1f..dc1d073186 100644
+--- a/v8/src/parsing/parser-base.h
++++ b/v8/src/parsing/parser-base.h
+@@ -715,7 +715,7 @@ class ParserBase {
+   bool ContainsLabel(const ZonePtrList<const AstRawString>* labels,
+                      const AstRawString* label) {
+     DCHECK_NOT_NULL(label);
+-    if (labels != nullptr) {
++    if (labels != nullptr && label != nullptr) {
+       for (int i = labels->length(); i-- > 0;) {
+         if (labels->at(i) == label) return true;
+       }

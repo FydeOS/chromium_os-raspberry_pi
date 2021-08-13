@@ -1,7 +1,7 @@
-Index: rpi-linux-kernel/drivers/gpu/drm/drm_client_modeset.c
+Index: rpi-kernel/drivers/gpu/drm/drm_client_modeset.c
 ===================================================================
---- rpi-linux-kernel.orig/drivers/gpu/drm/drm_client_modeset.c
-+++ rpi-linux-kernel/drivers/gpu/drm/drm_client_modeset.c
+--- rpi-kernel.orig/drivers/gpu/drm/drm_client_modeset.c
++++ rpi-kernel/drivers/gpu/drm/drm_client_modeset.c
 @@ -903,7 +903,7 @@ static int drm_client_modeset_commit_ato
  	struct drm_modeset_acquire_ctx ctx;
  	struct drm_mode_set *mode_set;
@@ -27,10 +27,10 @@ Index: rpi-linux-kernel/drivers/gpu/drm/drm_client_modeset.c
  		if (plane->rotation_property)
  			drm_mode_plane_set_obj_prop(plane,
  						    plane->rotation_property,
-Index: rpi-linux-kernel/drivers/gpu/drm/drm_plane.c
+Index: rpi-kernel/drivers/gpu/drm/drm_plane.c
 ===================================================================
---- rpi-linux-kernel.orig/drivers/gpu/drm/drm_plane.c
-+++ rpi-linux-kernel/drivers/gpu/drm/drm_plane.c
+--- rpi-kernel.orig/drivers/gpu/drm/drm_plane.c
++++ rpi-kernel/drivers/gpu/drm/drm_plane.c
 @@ -682,7 +682,7 @@ static int __setplane_internal(struct dr
  {
  	int ret = 0;
@@ -57,10 +57,10 @@ Index: rpi-linux-kernel/drivers/gpu/drm/drm_plane.c
  			fb = drm_internal_framebuffer_create(dev, &fbreq, file_priv);
  			if (IS_ERR(fb)) {
  				DRM_DEBUG_KMS("failed to wrap cursor buffer in drm framebuffer\n");
-Index: rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.c
+Index: rpi-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.c
 ===================================================================
---- rpi-linux-kernel.orig/drivers/gpu/drm/v3d/v3d_vc4_bind.c
-+++ rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.c
+--- rpi-kernel.orig/drivers/gpu/drm/v3d/v3d_vc4_bind.c
++++ rpi-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.c
 @@ -37,8 +37,9 @@ int import_bo_from_vc4(struct drm_device
      goto out;
    
@@ -81,10 +81,10 @@ Index: rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.c
    if (ret)
      DRM_ERROR("Free handle:%u, from vc4, ret:%d\n", *handle, ret);
    *handle = 0;
-Index: rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_bo.c
+Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_bo.c
 ===================================================================
---- rpi-linux-kernel.orig/drivers/gpu/drm/vc4/vc4_bo.c
-+++ rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_bo.c
+--- rpi-kernel.orig/drivers/gpu/drm/vc4/vc4_bo.c
++++ rpi-kernel/drivers/gpu/drm/vc4/vc4_bo.c
 @@ -528,6 +528,9 @@ void vc4_free_object(struct drm_gem_obje
  	struct vc4_bo *bo = to_vc4_bo(gem_bo);
  	struct list_head *cache_list;
@@ -141,10 +141,10 @@ Index: rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_bo.c
    }
  }
 +
-Index: rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_crtc.c
+Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_crtc.c
 ===================================================================
---- rpi-linux-kernel.orig/drivers/gpu/drm/vc4/vc4_crtc.c
-+++ rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_crtc.c
+--- rpi-kernel.orig/drivers/gpu/drm/vc4/vc4_crtc.c
++++ rpi-kernel/drivers/gpu/drm/vc4/vc4_crtc.c
 @@ -1266,7 +1266,7 @@ static int vc4_crtc_bind(struct device *
  	 * requirement of the plane configuration, and reject ones
  	 * that will take too much.
@@ -154,10 +154,10 @@ Index: rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_crtc.c
  	if (IS_ERR(primary_plane)) {
  		dev_err(dev, "failed to construct primary plane\n");
  		ret = PTR_ERR(primary_plane);
-Index: rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_drv.h
+Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_drv.h
 ===================================================================
---- rpi-linux-kernel.orig/drivers/gpu/drm/vc4/vc4_drv.h
-+++ rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_drv.h
+--- rpi-kernel.orig/drivers/gpu/drm/vc4/vc4_drv.h
++++ rpi-kernel/drivers/gpu/drm/vc4/vc4_drv.h
 @@ -884,7 +884,7 @@ int vc4_kms_load(struct drm_device *dev)
  
  /* vc4_plane.c */
@@ -167,10 +167,10 @@ Index: rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_drv.h
  int vc4_plane_create_additional_planes(struct drm_device *dev);
  u32 vc4_plane_write_dlist(struct drm_plane *plane, u32 __iomem *dlist);
  u32 vc4_plane_dlist_size(const struct drm_plane_state *state);
-Index: rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_plane.c
+Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_plane.c
 ===================================================================
---- rpi-linux-kernel.orig/drivers/gpu/drm/vc4/vc4_plane.c
-+++ rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_plane.c
+--- rpi-kernel.orig/drivers/gpu/drm/vc4/vc4_plane.c
++++ rpi-kernel/drivers/gpu/drm/vc4/vc4_plane.c
 @@ -1434,7 +1434,7 @@ static const struct drm_plane_funcs vc4_
  };
  

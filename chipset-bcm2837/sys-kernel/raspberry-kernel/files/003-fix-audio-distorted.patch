@@ -1,7 +1,7 @@
-Index: rpi-linux-kernel/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c
+Index: rpi-kernel/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c
 ===================================================================
---- rpi-linux-kernel.orig/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c
-+++ rpi-linux-kernel/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c
+--- rpi-kernel.orig/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c
++++ rpi-kernel/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c
 @@ -14,14 +14,14 @@ static const struct snd_pcm_hardware snd
  		 SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_MMAP_VALID |
  		 SNDRV_PCM_INFO_SYNC_APPLPTR),

@@ -1,7 +1,7 @@
-Index: rpi-linux-kernel/drivers/md/dm-verity-target.c
+Index: rpi-kernel/drivers/md/dm-verity-target.c
 ===================================================================
---- rpi-linux-kernel.orig/drivers/md/dm-verity-target.c
-+++ rpi-linux-kernel/drivers/md/dm-verity-target.c
+--- rpi-kernel.orig/drivers/md/dm-verity-target.c
++++ rpi-kernel/drivers/md/dm-verity-target.c
 @@ -32,8 +32,9 @@
  #define DM_VERITY_OPT_RESTART		"restart_on_corruption"
  #define DM_VERITY_OPT_IGN_ZEROES	"ignore_zero_blocks"
@@ -218,10 +218,10 @@ Index: rpi-linux-kernel/drivers/md/dm-verity-target.c
  	return r;
  }
  
-Index: rpi-linux-kernel/drivers/md/dm-verity.h
+Index: rpi-kernel/drivers/md/dm-verity.h
 ===================================================================
---- rpi-linux-kernel.orig/drivers/md/dm-verity.h
-+++ rpi-linux-kernel/drivers/md/dm-verity.h
+--- rpi-kernel.orig/drivers/md/dm-verity.h
++++ rpi-kernel/drivers/md/dm-verity.h
 @@ -55,6 +55,7 @@ struct dm_verity {
  	int hash_failed;	/* set to 1 if hash of any block failed */
  	enum verity_mode mode;	/* mode for handling verification errors */

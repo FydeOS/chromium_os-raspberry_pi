@@ -1,7 +1,7 @@
-Index: rpi-linux-kernel/arch/arm64/include/asm/archrandom.h
+Index: rpi-kernel/arch/arm64/include/asm/archrandom.h
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/arch/arm64/include/asm/archrandom.h
++++ rpi-kernel/arch/arm64/include/asm/archrandom.h
 @@ -0,0 +1,67 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +#ifndef _ASM_ARCHRANDOM_H
@@ -70,10 +70,10 @@ Index: rpi-linux-kernel/arch/arm64/include/asm/archrandom.h
 +
 +#endif /* CONFIG_ARCH_RANDOM */
 +#endif /* _ASM_ARCHRANDOM_H */
-Index: rpi-linux-kernel/arch/arm64/include/asm/vdso/processor.h
+Index: rpi-kernel/arch/arm64/include/asm/vdso/processor.h
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/arch/arm64/include/asm/vdso/processor.h
++++ rpi-kernel/arch/arm64/include/asm/vdso/processor.h
 @@ -0,0 +1,17 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
@@ -92,10 +92,10 @@ Index: rpi-linux-kernel/arch/arm64/include/asm/vdso/processor.h
 +#endif /* __ASSEMBLY__ */
 +
 +#endif /* __ASM_VDSO_PROCESSOR_H */
-Index: rpi-linux-kernel/fs/overlayfs/overlayfs.h
+Index: rpi-kernel/fs/overlayfs/overlayfs.h
 ===================================================================
---- rpi-linux-kernel.orig/fs/overlayfs/overlayfs.h
-+++ rpi-linux-kernel/fs/overlayfs/overlayfs.h
+--- rpi-kernel.orig/fs/overlayfs/overlayfs.h
++++ rpi-kernel/fs/overlayfs/overlayfs.h
 @@ -364,7 +364,7 @@ int ovl_permission(struct inode *inode,
  int ovl_xattr_set(struct dentry *dentry, struct inode *inode, const char *name,
  		  const void *value, size_t size, int flags);
@@ -105,10 +105,10 @@ Index: rpi-linux-kernel/fs/overlayfs/overlayfs.h
  ssize_t ovl_listxattr(struct dentry *dentry, char *list, size_t size);
  struct posix_acl *ovl_get_acl(struct inode *inode, int type);
  int ovl_update_time(struct inode *inode, struct timespec64 *ts, int flags);
-Index: rpi-linux-kernel/fs/overlayfs/super.c
+Index: rpi-kernel/fs/overlayfs/super.c
 ===================================================================
---- rpi-linux-kernel.orig/fs/overlayfs/super.c
-+++ rpi-linux-kernel/fs/overlayfs/super.c
+--- rpi-kernel.orig/fs/overlayfs/super.c
++++ rpi-kernel/fs/overlayfs/super.c
 @@ -855,9 +855,9 @@ static unsigned int ovl_split_lowerdirs(
  static int __maybe_unused
  ovl_posix_acl_xattr_get(const struct xattr_handler *handler,
@@ -142,10 +142,10 @@ Index: rpi-linux-kernel/fs/overlayfs/super.c
  }
  
  static int ovl_other_xattr_set(const struct xattr_handler *handler,
-Index: rpi-linux-kernel/security/selinux/hooks.c
+Index: rpi-kernel/security/selinux/hooks.c
 ===================================================================
---- rpi-linux-kernel.orig/security/selinux/hooks.c
-+++ rpi-linux-kernel/security/selinux/hooks.c
+--- rpi-kernel.orig/security/selinux/hooks.c
++++ rpi-kernel/security/selinux/hooks.c
 @@ -102,6 +102,10 @@
  #include "netlabel.h"
  #include "audit.h"

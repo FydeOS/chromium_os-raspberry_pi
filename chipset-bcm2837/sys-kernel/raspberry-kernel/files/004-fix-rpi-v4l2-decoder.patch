@@ -1,7 +1,7 @@
-Index: rpi-linux-kernel/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
+Index: rpi-kernel/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
 ===================================================================
---- rpi-linux-kernel.orig/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
-+++ rpi-linux-kernel/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
+--- rpi-kernel.orig/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
++++ rpi-kernel/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
 @@ -653,7 +653,6 @@ static struct vchiq_mmal_port *get_port_
  static int job_ready(void *priv)
  {

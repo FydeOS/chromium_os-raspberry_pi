@@ -449,17 +449,16 @@ index d906dcf..116a9f1 100644
  }
 diff --git a/v3d.c b/v3d.c
 new file mode 100644
-index 0000000..135727b
+index 0000000..5757aa1
 --- /dev/null
 +++ b/v3d.c
-@@ -0,0 +1,114 @@
+@@ -0,0 +1,113 @@
 +/*
 + * Copyright 2019 The FydeOS Authors. All rights reserved.
 + * Use of this source code is governed by a BSD-style license that can be
 + * found in the LICENSE file.
 + * Author: Yang Tsao <yang@fydeos.io>
 + */
-+
 +#ifdef DRV_V3D
 +
 +#include <errno.h>
@@ -510,10 +509,10 @@ index 0000000..135727b
 +  drv_bo_from_format(bo, stride, height, format);
 +//  bo->meta.total_size = ALIGN(bo->meta.total_size, 4096);
 +  bo_create.size = bo->meta.total_size;
-+  bo->meta.format_modifiers[0] = modifier;
-+  #ifdef __ANDROID__
++  bo->meta.format_modifier = modifier;
++#ifdef __ANDROID__
 +  bo_create.flags = ARC_CALLOC;
-+  #endif
++#endif
 +  ret = drmIoctl(bo->drv->fd, DRM_IOCTL_V3D_CREATE_BO, &bo_create);
 +  if (ret) {
 +    drv_log("DRM_IOCTL_V3D_CREATE_BO failed (size=%zu), ret=%d, format:%s\n", bo->meta.total_size, ret, getDrmFormatString(format));
@@ -568,10 +567,18 @@ index 0000000..135727b
 +
 +#endif // DEV_V3D
 diff --git a/vc4.c b/vc4.c
-index 5ea4bc3..f9777db 100644
+index 5ea4bc3..1bf7408 100644
 --- a/vc4.c
 +++ b/vc4.c
-@@ -17,27 +17,33 @@
+@@ -3,7 +3,6 @@
+  * Use of this source code is governed by a BSD-style license that can be
+  * found in the LICENSE file.
+  */
+-
+ #ifdef DRV_VC4
+ 
+ #include <errno.h>
+@@ -17,27 +16,33 @@
  #include "helpers.h"
  #include "util.h"
  
@@ -620,7 +627,7 @@ index 5ea4bc3..f9777db 100644
  }
  
  static int vc4_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t height,
-@@ -48,36 +54,25 @@ static int vc4_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t he
+@@ -48,36 +53,25 @@ static int vc4_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t he
  	uint32_t stride;
  	struct drm_vc4_create_bo bo_create = { 0 };
  
@@ -633,10 +640,7 @@ index 5ea4bc3..f9777db 100644
 -	default:
 -		return -EINVAL;
 -	}
-+  stride = drv_stride_from_format(format, width, 0);
-+  stride = ALIGN(stride, 64);
-+  drv_bo_from_format(bo, stride, height, format);
- 
+-
 -	/*
 -	 * Since the ARM L1 cache line size is 64 bytes, align to that as a
 -	 * performance optimization.
@@ -644,22 +648,25 @@ index 5ea4bc3..f9777db 100644
 -	stride = drv_stride_from_format(format, width, 0);
 -	stride = ALIGN(stride, 64);
 -	drv_bo_from_format(bo, stride, height, format);
-+  memset(&bo_create, 0, sizeof(bo_create));
-+  bo_create.size = bo->meta.total_size;
++  stride = drv_stride_from_format(format, width, 0);
++  stride = ALIGN(stride, 64);
++  drv_bo_from_format(bo, stride, height, format);
  
 -	bo_create.size = bo->meta.total_size;
-+  ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VC4_CREATE_BO, &bo_create);
-+  if (ret) {
-+    drv_log("DRM_IOCTL_VC4_CREATE_BO failed (size=%zu)\n", bo->meta.total_size);
-+    return -errno;
-+  }
++  memset(&bo_create, 0, sizeof(bo_create));
++  bo_create.size = bo->meta.total_size;
  
 -	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VC4_CREATE_BO, &bo_create);
 -	if (ret) {
 -		drv_log("DRM_IOCTL_VC4_CREATE_BO failed (size=%zu)\n", bo->meta.total_size);
 -		return -errno;
 -	}
--
++  ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VC4_CREATE_BO, &bo_create);
++  if (ret) {
++    drv_log("DRM_IOCTL_VC4_CREATE_BO failed (size=%zu)\n", bo->meta.total_size);
++    return -errno;
++  }
+ 
 -	for (plane = 0; plane < bo->meta.num_planes; plane++)
 -		bo->handles[plane].u32 = bo_create.handle;
 -

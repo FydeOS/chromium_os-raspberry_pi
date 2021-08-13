@@ -3,6 +3,7 @@
 
 EAPI=7
 
+CXXEXCEPTIONS_FLAGS="-fno-exceptions"
 CROS_WORKON_COMMIT="e56f1f493560e0b641bbe36a528a13767817afed"
 CROS_WORKON_TREE="c8e597e8dc3dc91766fd0b28b32b1588bab63173"
 CROS_WORKON_PROJECT="chromiumos/third_party/libcamera"
@@ -16,7 +17,7 @@ HOMEPAGE="https://www.libcamera.org"
 LICENSE="LGPL-2.1+"
 SLOT="0"
 KEYWORDS="*"
-IUSE="debug dev doc ipu3 rkisp1 test udev raspberrypi"
+IUSE="debug dev doc ipu3 rkisp1 test udev"
 
 RDEPEND="
 	chromeos-base/cros-camera-libs
@@ -28,7 +29,6 @@ RDEPEND="
 	media-libs/libyuv
 	udev? ( virtual/libudev )
 "
-#	media-libs/libcamera-configs
 
 DEPEND="
 	${RDEPEND}
@@ -39,9 +39,9 @@ DEPEND="
 src_configure() {
 	local pipelines=(
 		"uvcvideo"
+    "raspberrypi"
 		$(usev ipu3)
 		$(usev rkisp1)
-    $(usev raspberrypi)
 	)
 
 	pipeline_list() {
@@ -60,6 +60,7 @@ src_configure() {
 		--buildtype "$(usex debug debug plain)"
 		--sysconfdir /etc/camera
 	)
+  cros_enable_cxx_exceptions
 	meson_src_configure
 }
 

@@ -1,7 +1,7 @@
-Index: rpi-linux-kernel/kernel/events/core.c
+Index: rpi-kernel/kernel/events/core.c
 ===================================================================
---- rpi-linux-kernel.orig/kernel/events/core.c
-+++ rpi-linux-kernel/kernel/events/core.c
+--- rpi-kernel.orig/kernel/events/core.c
++++ rpi-kernel/kernel/events/core.c
 @@ -10908,6 +10908,12 @@ SYSCALL_DEFINE5(perf_event_open,
  		struct perf_event_attr __user *, attr_uptr,
  		pid_t, pid, int, cpu, int, group_fd, unsigned long, flags)
@@ -15,10 +15,10 @@ Index: rpi-linux-kernel/kernel/events/core.c
  	struct perf_event *group_leader = NULL, *output_event = NULL;
  	struct perf_event *event, *sibling;
  	struct perf_event_attr attr;
-Index: rpi-linux-kernel/kernel/sys.c
+Index: rpi-kernel/kernel/sys.c
 ===================================================================
---- rpi-linux-kernel.orig/kernel/sys.c
-+++ rpi-linux-kernel/kernel/sys.c
+--- rpi-kernel.orig/kernel/sys.c
++++ rpi-kernel/kernel/sys.c
 @@ -196,6 +196,11 @@ out:
  
  SYSCALL_DEFINE3(setpriority, int, which, int, who, int, niceval)
@@ -70,10 +70,10 @@ Index: rpi-linux-kernel/kernel/sys.c
  	int err = 0;
  	int cpu = raw_smp_processor_id();
  
-Index: rpi-linux-kernel/kernel/time/posix-timers.c
+Index: rpi-kernel/kernel/time/posix-timers.c
 ===================================================================
---- rpi-linux-kernel.orig/kernel/time/posix-timers.c
-+++ rpi-linux-kernel/kernel/time/posix-timers.c
+--- rpi-kernel.orig/kernel/time/posix-timers.c
++++ rpi-kernel/kernel/time/posix-timers.c
 @@ -1090,6 +1090,12 @@ int do_clock_adjtime(const clockid_t whi
  SYSCALL_DEFINE2(clock_adjtime, const clockid_t, which_clock,
  		struct __kernel_timex __user *, utx)
@@ -99,10 +99,10 @@ Index: rpi-linux-kernel/kernel/time/posix-timers.c
  	struct __kernel_timex ktx;
  	int err;
  
-Index: rpi-linux-kernel/kernel/time/time.c
+Index: rpi-kernel/kernel/time/time.c
 ===================================================================
---- rpi-linux-kernel.orig/kernel/time/time.c
-+++ rpi-linux-kernel/kernel/time/time.c
+--- rpi-kernel.orig/kernel/time/time.c
++++ rpi-kernel/kernel/time/time.c
 @@ -270,6 +270,11 @@ COMPAT_SYSCALL_DEFINE2(settimeofday, str
  #if !defined(CONFIG_64BIT_TIME) || defined(CONFIG_64BIT)
  SYSCALL_DEFINE1(adjtimex, struct __kernel_timex __user *, txc_p)
@@ -127,10 +127,10 @@ Index: rpi-linux-kernel/kernel/time/time.c
  	struct __kernel_timex txc;
  	int err, ret;
  
-Index: rpi-linux-kernel/virt/kvm/Kconfig
+Index: rpi-kernel/virt/kvm/Kconfig
 ===================================================================
---- rpi-linux-kernel.orig/virt/kvm/Kconfig
-+++ rpi-linux-kernel/virt/kvm/Kconfig
+--- rpi-kernel.orig/virt/kvm/Kconfig
++++ rpi-kernel/virt/kvm/Kconfig
 @@ -47,7 +47,7 @@ config KVM_GENERIC_DIRTYLOG_READ_PROTECT
  
  config KVM_COMPAT

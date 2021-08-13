@@ -1,7 +1,7 @@
-Index: rpi-linux-kernel/scripts/dtc/Makefile
+Index: rpi-kernel/scripts/dtc/Makefile
 ===================================================================
---- rpi-linux-kernel.orig/scripts/dtc/Makefile
-+++ rpi-linux-kernel/scripts/dtc/Makefile
+--- rpi-kernel.orig/scripts/dtc/Makefile
++++ rpi-kernel/scripts/dtc/Makefile
 @@ -19,7 +19,7 @@ endif
  HOST_EXTRACFLAGS += -DNO_YAML
  else
@@ -11,10 +11,10 @@ Index: rpi-linux-kernel/scripts/dtc/Makefile
  endif
  
  # Generated files need one more search path to include headers in source tree
-Index: rpi-linux-kernel/kernel/sys.c
+Index: rpi-kernel/kernel/sys.c
 ===================================================================
---- rpi-linux-kernel.orig/kernel/sys.c
-+++ rpi-linux-kernel/kernel/sys.c
+--- rpi-kernel.orig/kernel/sys.c
++++ rpi-kernel/kernel/sys.c
 @@ -194,11 +194,6 @@ out:
  	return error;
  }
@@ -102,10 +102,10 @@ Index: rpi-linux-kernel/kernel/sys.c
  /**
   * do_sysinfo - fill in sysinfo struct
   * @info: pointer to buffer to fill
-Index: rpi-linux-kernel/kernel/events/core.c
+Index: rpi-kernel/kernel/events/core.c
 ===================================================================
---- rpi-linux-kernel.orig/kernel/events/core.c
-+++ rpi-linux-kernel/kernel/events/core.c
+--- rpi-kernel.orig/kernel/events/core.c
++++ rpi-kernel/kernel/events/core.c
 @@ -10904,13 +10904,6 @@ again:
   * @cpu:		target cpu
   * @group_fd:		group leader event fd

@@ -1,17 +1,7 @@
-Index: rpi-linux-kernel/.gitignore
+Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_hdmi_regs.h
 ===================================================================
---- rpi-linux-kernel.orig/.gitignore
-+++ rpi-linux-kernel/.gitignore
-@@ -147,3 +147,5 @@ x509.genkey
- 
- # Clang's compilation database file
- /compile_commands.json
-+/out_*/
-+/out-*/
-Index: rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_hdmi_regs.h
-===================================================================
---- rpi-linux-kernel.orig/drivers/gpu/drm/vc4/vc4_hdmi_regs.h
-+++ rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_hdmi_regs.h
+--- rpi-kernel.orig/drivers/gpu/drm/vc4/vc4_hdmi_regs.h
++++ rpi-kernel/drivers/gpu/drm/vc4/vc4_hdmi_regs.h
 @@ -39,7 +39,7 @@ enum vc4_hdmi_field {
  	HDMI_CEC_CPU_CLEAR,
  	HDMI_CEC_CPU_MASK_STATUS,
@@ -73,10 +63,10 @@ Index: rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_hdmi_regs.h
  		return 0;
  	}
  
-Index: rpi-linux-kernel/fs/namei.c
+Index: rpi-kernel/fs/namei.c
 ===================================================================
---- rpi-linux-kernel.orig/fs/namei.c
-+++ rpi-linux-kernel/fs/namei.c
+--- rpi-kernel.orig/fs/namei.c
++++ rpi-kernel/fs/namei.c
 @@ -1054,6 +1054,8 @@ const char *get_link(struct nameidata *n
  			return ERR_PTR(-ECHILD);
  		touch_atime(&last->link);
@@ -86,10 +76,10 @@ Index: rpi-linux-kernel/fs/namei.c
  
  	error = security_inode_follow_link(dentry, inode,
  					   nd->flags & LOOKUP_RCU);
-Index: rpi-linux-kernel/fs/namespace.c
+Index: rpi-kernel/fs/namespace.c
 ===================================================================
---- rpi-linux-kernel.orig/fs/namespace.c
-+++ rpi-linux-kernel/fs/namespace.c
+--- rpi-kernel.orig/fs/namespace.c
++++ rpi-kernel/fs/namespace.c
 @@ -3094,6 +3094,15 @@ long do_mount(const char *dev_name, cons
  	if (!(flags & MS_NOATIME))
  		mnt_flags |= MNT_RELATIME;
@@ -115,10 +105,10 @@ Index: rpi-linux-kernel/fs/namespace.c
  
  	/* The default atime for remount is preservation */
  	if ((flags & MS_REMOUNT) &&
-Index: rpi-linux-kernel/fs/proc_namespace.c
+Index: rpi-kernel/fs/proc_namespace.c
 ===================================================================
---- rpi-linux-kernel.orig/fs/proc_namespace.c
-+++ rpi-linux-kernel/fs/proc_namespace.c
+--- rpi-kernel.orig/fs/proc_namespace.c
++++ rpi-kernel/fs/proc_namespace.c
 @@ -70,6 +70,7 @@ static void show_mnt_opts(struct seq_fil
  		{ MNT_NOATIME, ",noatime" },
  		{ MNT_NODIRATIME, ",nodiratime" },
@@ -127,10 +117,10 @@ Index: rpi-linux-kernel/fs/proc_namespace.c
  		{ 0, NULL }
  	};
  	const struct proc_fs_info *fs_infop;
-Index: rpi-linux-kernel/fs/statfs.c
+Index: rpi-kernel/fs/statfs.c
 ===================================================================
---- rpi-linux-kernel.orig/fs/statfs.c
-+++ rpi-linux-kernel/fs/statfs.c
+--- rpi-kernel.orig/fs/statfs.c
++++ rpi-kernel/fs/statfs.c
 @@ -29,6 +29,8 @@ static int flags_by_mnt(int mnt_flags)
  		flags |= ST_NODIRATIME;
  	if (mnt_flags & MNT_RELATIME)
@@ -140,10 +130,10 @@ Index: rpi-linux-kernel/fs/statfs.c
  	return flags;
  }
  
-Index: rpi-linux-kernel/include/linux/mount.h
+Index: rpi-kernel/include/linux/mount.h
 ===================================================================
---- rpi-linux-kernel.orig/include/linux/mount.h
-+++ rpi-linux-kernel/include/linux/mount.h
+--- rpi-kernel.orig/include/linux/mount.h
++++ rpi-kernel/include/linux/mount.h
 @@ -30,6 +30,7 @@ struct fs_context;
  #define MNT_NODIRATIME	0x10
  #define MNT_RELATIME	0x20
@@ -161,10 +151,10 @@ Index: rpi-linux-kernel/include/linux/mount.h
  #define MNT_ATIME_MASK (MNT_NOATIME | MNT_NODIRATIME | MNT_RELATIME )
  
  #define MNT_INTERNAL_FLAGS (MNT_SHARED | MNT_WRITE_HOLD | MNT_INTERNAL | \
-Index: rpi-linux-kernel/include/linux/netfilter/xt_qtaguid.h
+Index: rpi-kernel/include/linux/netfilter/xt_qtaguid.h
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/include/linux/netfilter/xt_qtaguid.h
++++ rpi-kernel/include/linux/netfilter/xt_qtaguid.h
 @@ -0,0 +1,15 @@
 +#ifndef _XT_QTAGUID_MATCH_H
 +#define _XT_QTAGUID_MATCH_H
@@ -181,10 +171,10 @@ Index: rpi-linux-kernel/include/linux/netfilter/xt_qtaguid.h
 +
 +int qtaguid_untag(struct socket *sock, bool kernel);
 +#endif /* _XT_QTAGUID_MATCH_H */
-Index: rpi-linux-kernel/include/linux/statfs.h
+Index: rpi-kernel/include/linux/statfs.h
 ===================================================================
---- rpi-linux-kernel.orig/include/linux/statfs.h
-+++ rpi-linux-kernel/include/linux/statfs.h
+--- rpi-kernel.orig/include/linux/statfs.h
++++ rpi-kernel/include/linux/statfs.h
 @@ -40,6 +40,7 @@ struct kstatfs {
  #define ST_NOATIME	0x0400	/* do not update access times */
  #define ST_NODIRATIME	0x0800	/* do not update directory access times */
@@ -193,10 +183,10 @@ Index: rpi-linux-kernel/include/linux/statfs.h
  
  struct dentry;
  extern int vfs_get_fsid(struct dentry *dentry, __kernel_fsid_t *fsid);
-Index: rpi-linux-kernel/include/uapi/linux/mount.h
+Index: rpi-kernel/include/uapi/linux/mount.h
 ===================================================================
---- rpi-linux-kernel.orig/include/uapi/linux/mount.h
-+++ rpi-linux-kernel/include/uapi/linux/mount.h
+--- rpi-kernel.orig/include/uapi/linux/mount.h
++++ rpi-kernel/include/uapi/linux/mount.h
 @@ -16,6 +16,7 @@
  #define MS_REMOUNT	32	/* Alter flags of a mounted FS */
  #define MS_MANDLOCK	64	/* Allow mandatory locks on an FS */
@@ -205,10 +195,10 @@ Index: rpi-linux-kernel/include/uapi/linux/mount.h
  #define MS_NOATIME	1024	/* Do not update access times. */
  #define MS_NODIRATIME	2048	/* Do not update directory access times */
  #define MS_BIND		4096
-Index: rpi-linux-kernel/include/uapi/linux/netfilter/xt_IDLETIMER.h
+Index: rpi-kernel/include/uapi/linux/netfilter/xt_IDLETIMER.h
 ===================================================================
---- rpi-linux-kernel.orig/include/uapi/linux/netfilter/xt_IDLETIMER.h
-+++ rpi-linux-kernel/include/uapi/linux/netfilter/xt_IDLETIMER.h
+--- rpi-kernel.orig/include/uapi/linux/netfilter/xt_IDLETIMER.h
++++ rpi-kernel/include/uapi/linux/netfilter/xt_IDLETIMER.h
 @@ -34,11 +34,19 @@
  
  #define MAX_IDLETIMER_LABEL_SIZE 28
@@ -229,10 +219,10 @@ Index: rpi-linux-kernel/include/uapi/linux/netfilter/xt_IDLETIMER.h
  	/* for kernel module internal use only */
  	struct idletimer_tg *timer __attribute__((aligned(8)));
  };
-Index: rpi-linux-kernel/include/vdso/bits.h
+Index: rpi-kernel/include/vdso/bits.h
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/include/vdso/bits.h
++++ rpi-kernel/include/vdso/bits.h
 @@ -0,0 +1,9 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +#ifndef __VDSO_BITS_H
@@ -243,10 +233,10 @@ Index: rpi-linux-kernel/include/vdso/bits.h
 +#define BIT(nr)			(UL(1) << (nr))
 +
 +#endif	/* __VDSO_BITS_H */
-Index: rpi-linux-kernel/include/vdso/clocksource.h
+Index: rpi-kernel/include/vdso/clocksource.h
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/include/vdso/clocksource.h
++++ rpi-kernel/include/vdso/clocksource.h
 @@ -0,0 +1,19 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +#ifndef __VDSO_CLOCKSOURCE_H
@@ -267,10 +257,10 @@ Index: rpi-linux-kernel/include/vdso/clocksource.h
 +};
 +
 +#endif /* __VDSO_CLOCKSOURCE_H */
-Index: rpi-linux-kernel/include/vdso/const.h
+Index: rpi-kernel/include/vdso/const.h
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/include/vdso/const.h
++++ rpi-kernel/include/vdso/const.h
 @@ -0,0 +1,10 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +#ifndef __VDSO_CONST_H
@@ -282,10 +272,10 @@ Index: rpi-linux-kernel/include/vdso/const.h
 +#define ULL(x)		(_ULL(x))
 +
 +#endif /* __VDSO_CONST_H */
-Index: rpi-linux-kernel/include/vdso/jiffies.h
+Index: rpi-kernel/include/vdso/jiffies.h
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/include/vdso/jiffies.h
++++ rpi-kernel/include/vdso/jiffies.h
 @@ -0,0 +1,11 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +#ifndef __VDSO_JIFFIES_H
@@ -298,10 +288,10 @@ Index: rpi-linux-kernel/include/vdso/jiffies.h
 +#define TICK_NSEC ((NSEC_PER_SEC+HZ/2)/HZ)
 +
 +#endif /* __VDSO_JIFFIES_H */
-Index: rpi-linux-kernel/include/vdso/ktime.h
+Index: rpi-kernel/include/vdso/ktime.h
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/include/vdso/ktime.h
++++ rpi-kernel/include/vdso/ktime.h
 @@ -0,0 +1,16 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +#ifndef __VDSO_KTIME_H
@@ -319,10 +309,10 @@ Index: rpi-linux-kernel/include/vdso/ktime.h
 +#define KTIME_LOW_RES		(LOW_RES_NSEC)
 +
 +#endif /* __VDSO_KTIME_H */
-Index: rpi-linux-kernel/include/vdso/limits.h
+Index: rpi-kernel/include/vdso/limits.h
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/include/vdso/limits.h
++++ rpi-kernel/include/vdso/limits.h
 @@ -0,0 +1,19 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +#ifndef __VDSO_LIMITS_H
@@ -343,10 +333,10 @@ Index: rpi-linux-kernel/include/vdso/limits.h
 +#define UINTPTR_MAX	ULONG_MAX
 +
 +#endif /* __VDSO_LIMITS_H */
-Index: rpi-linux-kernel/include/vdso/math64.h
+Index: rpi-kernel/include/vdso/math64.h
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/include/vdso/math64.h
++++ rpi-kernel/include/vdso/math64.h
 @@ -0,0 +1,24 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +#ifndef __VDSO_MATH64_H
@@ -372,10 +362,10 @@ Index: rpi-linux-kernel/include/vdso/math64.h
 +}
 +
 +#endif /* __VDSO_MATH64_H */
-Index: rpi-linux-kernel/include/vdso/processor.h
+Index: rpi-kernel/include/vdso/processor.h
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/include/vdso/processor.h
++++ rpi-kernel/include/vdso/processor.h
 @@ -0,0 +1,14 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +/*
@@ -391,10 +381,10 @@ Index: rpi-linux-kernel/include/vdso/processor.h
 +#endif /* __ASSEMBLY__ */
 +
 +#endif /* __VDSO_PROCESSOR_H */
-Index: rpi-linux-kernel/include/vdso/time.h
+Index: rpi-kernel/include/vdso/time.h
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/include/vdso/time.h
++++ rpi-kernel/include/vdso/time.h
 @@ -0,0 +1,7 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +#ifndef __VDSO_TIME_H
@@ -403,10 +393,10 @@ Index: rpi-linux-kernel/include/vdso/time.h
 +#include <uapi/linux/types.h>
 +
 +#endif /* __VDSO_TIME_H */
-Index: rpi-linux-kernel/include/vdso/time32.h
+Index: rpi-kernel/include/vdso/time32.h
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/include/vdso/time32.h
++++ rpi-kernel/include/vdso/time32.h
 @@ -0,0 +1,17 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +#ifndef __VDSO_TIME32_H
@@ -425,10 +415,10 @@ Index: rpi-linux-kernel/include/vdso/time32.h
 +};
 +
 +#endif /* __VDSO_TIME32_H */
-Index: rpi-linux-kernel/include/vdso/time64.h
+Index: rpi-kernel/include/vdso/time64.h
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/include/vdso/time64.h
++++ rpi-kernel/include/vdso/time64.h
 @@ -0,0 +1,14 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +#ifndef __VDSO_TIME64_H
@@ -444,10 +434,10 @@ Index: rpi-linux-kernel/include/vdso/time64.h
 +#define FSEC_PER_SEC	1000000000000000LL
 +
 +#endif /* __VDSO_TIME64_H */
-Index: rpi-linux-kernel/net/ipv4/af_inet.c
+Index: rpi-kernel/net/ipv4/af_inet.c
 ===================================================================
---- rpi-linux-kernel.orig/net/ipv4/af_inet.c
-+++ rpi-linux-kernel/net/ipv4/af_inet.c
+--- rpi-kernel.orig/net/ipv4/af_inet.c
++++ rpi-kernel/net/ipv4/af_inet.c
 @@ -85,6 +85,7 @@
  #include <linux/netfilter_ipv4.h>
  #include <linux/random.h>
@@ -466,10 +456,10 @@ Index: rpi-linux-kernel/net/ipv4/af_inet.c
  		/* Applications forget to leave groups before exiting */
  		ip_mc_drop_socket(sk);
  
-Index: rpi-linux-kernel/net/netfilter/Kconfig
+Index: rpi-kernel/net/netfilter/Kconfig
 ===================================================================
---- rpi-linux-kernel.orig/net/netfilter/Kconfig
-+++ rpi-linux-kernel/net/netfilter/Kconfig
+--- rpi-kernel.orig/net/netfilter/Kconfig
++++ rpi-kernel/net/netfilter/Kconfig
 @@ -1474,6 +1474,22 @@ config NETFILTER_XT_MATCH_PKTTYPE
  
  	  To compile it as a module, choose M here.  If unsure, say N.
@@ -493,10 +483,10 @@ Index: rpi-linux-kernel/net/netfilter/Kconfig
  config NETFILTER_XT_MATCH_QUOTA
  	tristate '"quota" match support'
  	depends on NETFILTER_ADVANCED
-Index: rpi-linux-kernel/net/netfilter/Makefile
+Index: rpi-kernel/net/netfilter/Makefile
 ===================================================================
---- rpi-linux-kernel.orig/net/netfilter/Makefile
-+++ rpi-linux-kernel/net/netfilter/Makefile
+--- rpi-kernel.orig/net/netfilter/Makefile
++++ rpi-kernel/net/netfilter/Makefile
 @@ -191,6 +191,7 @@ obj-$(CONFIG_NETFILTER_XT_MATCH_CGROUP)
  obj-$(CONFIG_NETFILTER_XT_MATCH_PHYSDEV) += xt_physdev.o
  obj-$(CONFIG_NETFILTER_XT_MATCH_PKTTYPE) += xt_pkttype.o
@@ -505,10 +495,10 @@ Index: rpi-linux-kernel/net/netfilter/Makefile
  obj-$(CONFIG_NETFILTER_XT_MATCH_QUOTA) += xt_quota.o
  obj-$(CONFIG_NETFILTER_XT_MATCH_RATEEST) += xt_rateest.o
  obj-$(CONFIG_NETFILTER_XT_MATCH_REALM) += xt_realm.o
-Index: rpi-linux-kernel/net/netfilter/xt_IDLETIMER.c
+Index: rpi-kernel/net/netfilter/xt_IDLETIMER.c
 ===================================================================
---- rpi-linux-kernel.orig/net/netfilter/xt_IDLETIMER.c
-+++ rpi-linux-kernel/net/netfilter/xt_IDLETIMER.c
+--- rpi-kernel.orig/net/netfilter/xt_IDLETIMER.c
++++ rpi-kernel/net/netfilter/xt_IDLETIMER.c
 @@ -6,6 +6,7 @@
   * After timer expires a kevent will be sent.
   *
@@ -907,10 +897,10 @@ Index: rpi-linux-kernel/net/netfilter/xt_IDLETIMER.c
  MODULE_ALIAS("ipt_IDLETIMER");
  MODULE_ALIAS("ip6t_IDLETIMER");
 +MODULE_ALIAS("arpt_IDLETIMER");
-Index: rpi-linux-kernel/net/netfilter/xt_qtaguid.c
+Index: rpi-kernel/net/netfilter/xt_qtaguid.c
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/net/netfilter/xt_qtaguid.c
++++ rpi-kernel/net/netfilter/xt_qtaguid.c
 @@ -0,0 +1,3333 @@
 +/*
 + * Kernel iptables module to track stats for packets based on user tags.
@@ -4245,10 +4235,10 @@ Index: rpi-linux-kernel/net/netfilter/xt_qtaguid.c
 +MODULE_ALIAS("ip6t_owner");
 +MODULE_ALIAS("ipt_qtaguid");
 +MODULE_ALIAS("ip6t_qtaguid");
-Index: rpi-linux-kernel/net/netfilter/xt_qtaguid_internal.h
+Index: rpi-kernel/net/netfilter/xt_qtaguid_internal.h
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/net/netfilter/xt_qtaguid_internal.h
++++ rpi-kernel/net/netfilter/xt_qtaguid_internal.h
 @@ -0,0 +1,353 @@
 +/*
 + * Kernel iptables module to track stats for packets based on user tags.
@@ -4603,10 +4593,10 @@ Index: rpi-linux-kernel/net/netfilter/xt_qtaguid_internal.h
 +
 +/*----------------------------------------------*/
 +#endif  /* ifndef __XT_QTAGUID_INTERNAL_H__ */
-Index: rpi-linux-kernel/net/netfilter/xt_qtaguid_print.c
+Index: rpi-kernel/net/netfilter/xt_qtaguid_print.c
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/net/netfilter/xt_qtaguid_print.c
++++ rpi-kernel/net/netfilter/xt_qtaguid_print.c
 @@ -0,0 +1,565 @@
 +/*
 + * Pretty printing Support for iptables xt_qtaguid module.
@@ -5173,10 +5163,10 @@ Index: rpi-linux-kernel/net/netfilter/xt_qtaguid_print.c
 +		return "bad event num";
 +	return netdev_event_strings[netdev_event];
 +}
-Index: rpi-linux-kernel/net/netfilter/xt_qtaguid_print.h
+Index: rpi-kernel/net/netfilter/xt_qtaguid_print.h
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/net/netfilter/xt_qtaguid_print.h
++++ rpi-kernel/net/netfilter/xt_qtaguid_print.h
 @@ -0,0 +1,120 @@
 +/*
 + * Pretty printing Support for iptables xt_qtaguid module.
@@ -5298,10 +5288,10 @@ Index: rpi-linux-kernel/net/netfilter/xt_qtaguid_print.h
 +/*------------------------------------------*/
 +const char *netdev_evt_str(int netdev_event);
 +#endif  /* ifndef __XT_QTAGUID_PRINT_H__ */
-Index: rpi-linux-kernel/security/chromiumos/Makefile
+Index: rpi-kernel/security/chromiumos/Makefile
 ===================================================================
---- rpi-linux-kernel.orig/security/chromiumos/Makefile
-+++ rpi-linux-kernel/security/chromiumos/Makefile
+--- rpi-kernel.orig/security/chromiumos/Makefile
++++ rpi-kernel/security/chromiumos/Makefile
 @@ -1,5 +1,5 @@
 -#obj-$(CONFIG_SECURITY_CHROMIUMOS) := chromiumos_lsm.o
 +obj-$(CONFIG_SECURITY_CHROMIUMOS) := chromiumos_lsm.o

@@ -1605,7 +1605,29 @@ Index: rpi-kernel/kernel/sysctl.c
 ===================================================================
 --- rpi-kernel.orig/kernel/sysctl.c
 +++ rpi-kernel/kernel/sysctl.c
-@@ -1303,6 +1303,15 @@ static struct ctl_table vm_table[] = {
+@@ -111,6 +111,7 @@ extern char core_pattern[];
+ extern unsigned int core_pipe_limit;
+ #endif
+ extern int pid_max;
++extern int extra_free_kbytes;
+ extern int pid_max_min, pid_max_max;
+ extern int percpu_pagelist_fraction;
+ extern int latencytop_enabled;
+@@ -465,6 +466,13 @@ static struct ctl_table kern_table[] = {
+ 		.mode		= 0644,
+ 		.proc_handler	= sysctl_sched_uclamp_handler,
+ 	},
++  {
++    .procname       = "sched_util_clamp_min_rt_default",
++    .data           = &sysctl_sched_uclamp_util_min_rt_default,
++    .maxlen         = sizeof(unsigned int),
++    .mode           = 0644,
++    .proc_handler   = sysctl_sched_uclamp_handler,
++  },
+ #endif
+ #ifdef CONFIG_SCHED_AUTOGROUP
+ 	{
+@@ -1303,6 +1311,15 @@ static struct ctl_table vm_table[] = {
  		.extra1		= SYSCTL_ZERO,
  		.extra2		= &two,
  	},
@@ -2505,3 +2527,138 @@ Index: rpi-kernel/mm/rmap.c
  }
  
  static void anon_vma_ctor(void *data)
+Index: rpi-kernel/include/linux/sched/sysctl.h
+===================================================================
+--- rpi-kernel.orig/include/linux/sched/sysctl.h
++++ rpi-kernel/include/linux/sched/sysctl.h
+@@ -59,6 +59,7 @@ extern int sysctl_sched_rt_runtime;
+ #ifdef CONFIG_UCLAMP_TASK
+ extern unsigned int sysctl_sched_uclamp_util_min;
+ extern unsigned int sysctl_sched_uclamp_util_max;
++extern unsigned int sysctl_sched_uclamp_util_min_rt_default;
+ #endif
+ 
+ #ifdef CONFIG_CFS_BANDWIDTH
+Index: rpi-kernel/kernel/sched/core.c
+===================================================================
+--- rpi-kernel.orig/kernel/sched/core.c
++++ rpi-kernel/kernel/sched/core.c
+@@ -791,6 +791,8 @@ unsigned int sysctl_sched_uclamp_util_mi
+ /* Max allowed maximum utilization */
+ unsigned int sysctl_sched_uclamp_util_max = SCHED_CAPACITY_SCALE;
+ 
++unsigned int sysctl_sched_uclamp_util_min_rt_default = SCHED_CAPACITY_SCALE;
++
+ /* All clamps are required to be less or equal than these values */
+ static struct uclamp_se uclamp_default[UCLAMP_CNT];
+ 
+@@ -893,6 +895,64 @@ unsigned int uclamp_rq_max_value(struct
+ 	return uclamp_idle_value(rq, clamp_id, clamp_value);
+ }
+ 
++static void __uclamp_update_util_min_rt_default(struct task_struct *p)
++{
++  unsigned int default_util_min;
++  struct uclamp_se *uc_se;
++
++  lockdep_assert_held(&p->pi_lock);
++
++  uc_se = &p->uclamp_req[UCLAMP_MIN];
++
++  /* Only sync if user didn't override the default */
++  if (uc_se->user_defined)
++    return;
++
++  default_util_min = sysctl_sched_uclamp_util_min_rt_default;
++  uclamp_se_set(uc_se, default_util_min, false);
++}
++
++static void uclamp_update_util_min_rt_default(struct task_struct *p)
++{
++  struct rq_flags rf;
++  struct rq *rq;
++
++  if (!rt_task(p))
++    return;
++
++  /* Protect updates to p->uclamp_* */
++  rq = task_rq_lock(p, &rf);
++  __uclamp_update_util_min_rt_default(p);
++  task_rq_unlock(rq, p, &rf);
++}
++
++static void uclamp_sync_util_min_rt_default(void)
++{
++  struct task_struct *g, *p;
++
++  /*
++   * copy_process()     sysctl_uclamp
++   *            uclamp_min_rt = X;
++   *   write_lock(&tasklist_lock)     read_lock(&tasklist_lock)
++   *   // link thread       smp_mb__after_spinlock()
++   *   write_unlock(&tasklist_lock)   read_unlock(&tasklist_lock);
++   *   sched_post_fork()        for_each_process_thread()
++   *     __uclamp_sync_rt()       __uclamp_sync_rt()
++   *
++   * Ensures that either sched_post_fork() will observe the new
++   * uclamp_min_rt or for_each_process_thread() will observe the new
++   * task.
++   */
++  read_lock(&tasklist_lock);
++  smp_mb__after_spinlock();
++  read_unlock(&tasklist_lock);
++
++  rcu_read_lock();
++  for_each_process_thread(g, p)
++    uclamp_update_util_min_rt_default(p);
++  rcu_read_unlock();
++}
++
+ static inline struct uclamp_se
+ uclamp_tg_restrict(struct task_struct *p, enum uclamp_id clamp_id)
+ {
+@@ -1181,12 +1241,13 @@ int sysctl_sched_uclamp_handler(struct c
+ 				loff_t *ppos)
+ {
+ 	bool update_root_tg = false;
+-	int old_min, old_max;
++	int old_min, old_max, old_min_rt;
+ 	int result;
+ 
+ 	mutex_lock(&uclamp_mutex);
+ 	old_min = sysctl_sched_uclamp_util_min;
+ 	old_max = sysctl_sched_uclamp_util_max;
++  old_min_rt = sysctl_sched_uclamp_util_min_rt_default;
+ 
+ 	result = proc_dointvec(table, write, buffer, lenp, ppos);
+ 	if (result)
+@@ -1195,7 +1256,8 @@ int sysctl_sched_uclamp_handler(struct c
+ 		goto done;
+ 
+ 	if (sysctl_sched_uclamp_util_min > sysctl_sched_uclamp_util_max ||
+-	    sysctl_sched_uclamp_util_max > SCHED_CAPACITY_SCALE) {
++	    sysctl_sched_uclamp_util_max > SCHED_CAPACITY_SCALE ||
++      sysctl_sched_uclamp_util_min_rt_default > SCHED_CAPACITY_SCALE) {
+ 		result = -EINVAL;
+ 		goto undo;
+ 	}
+@@ -1216,6 +1278,11 @@ int sysctl_sched_uclamp_handler(struct c
+ 		uclamp_update_root_tg();
+ 	}
+ 
++  if (old_min_rt != sysctl_sched_uclamp_util_min_rt_default) {
++    static_branch_enable(&sched_uclamp_used);
++    uclamp_sync_util_min_rt_default();
++  }
++
+ 	/*
+ 	 * We update all RUNNABLE tasks only when task groups are in use.
+ 	 * Otherwise, keep it simple and do just a lazy update at each next
+@@ -1227,6 +1294,7 @@ int sysctl_sched_uclamp_handler(struct c
+ undo:
+ 	sysctl_sched_uclamp_util_min = old_min;
+ 	sysctl_sched_uclamp_util_max = old_max;
++  sysctl_sched_uclamp_util_min_rt_default = old_min_rt;
+ done:
+ 	mutex_unlock(&uclamp_mutex);
+ 

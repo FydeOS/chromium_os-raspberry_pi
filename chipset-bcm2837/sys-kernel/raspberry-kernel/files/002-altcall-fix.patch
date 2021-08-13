@@ -1,7 +1,7 @@
-Index: rpi-linux-kernel/arch/arm64/include/asm/syscall.h
+Index: rpi-kernel/arch/arm64/include/asm/syscall.h
 ===================================================================
---- rpi-linux-kernel.orig/arch/arm64/include/asm/syscall.h
-+++ rpi-linux-kernel/arch/arm64/include/asm/syscall.h
+--- rpi-kernel.orig/arch/arm64/include/asm/syscall.h
++++ rpi-kernel/arch/arm64/include/asm/syscall.h
 @@ -17,6 +17,8 @@ extern const syscall_fn_t sys_call_table
  extern const syscall_fn_t compat_sys_call_table[];
  #endif
@@ -11,10 +11,10 @@ Index: rpi-linux-kernel/arch/arm64/include/asm/syscall.h
  static inline int syscall_get_nr(struct task_struct *task,
  				 struct pt_regs *regs)
  {
-Index: rpi-linux-kernel/arch/arm64/include/asm/sysreg.h
+Index: rpi-kernel/arch/arm64/include/asm/sysreg.h
 ===================================================================
---- rpi-linux-kernel.orig/arch/arm64/include/asm/sysreg.h
-+++ rpi-linux-kernel/arch/arm64/include/asm/sysreg.h
+--- rpi-kernel.orig/arch/arm64/include/asm/sysreg.h
++++ rpi-kernel/arch/arm64/include/asm/sysreg.h
 @@ -808,12 +808,16 @@
   * The "Z" constraint normally means a zero immediate, but when combined with
   * the "%x0" template means XZR.
@@ -47,10 +47,10 @@ Index: rpi-linux-kernel/arch/arm64/include/asm/sysreg.h
  
  /*
   * Modify bits in a sysreg. Bits in the clear mask are zeroed, then bits in the
-Index: rpi-linux-kernel/arch/arm64/kernel/Makefile
+Index: rpi-kernel/arch/arm64/kernel/Makefile
 ===================================================================
---- rpi-linux-kernel.orig/arch/arm64/kernel/Makefile
-+++ rpi-linux-kernel/arch/arm64/kernel/Makefile
+--- rpi-kernel.orig/arch/arm64/kernel/Makefile
++++ rpi-kernel/arch/arm64/kernel/Makefile
 @@ -66,6 +66,9 @@ obj-$(CONFIG_ARM64_PTR_AUTH)		+= pointer
  
  obj-y					+= vdso/ probes/
@@ -61,10 +61,10 @@ Index: rpi-linux-kernel/arch/arm64/kernel/Makefile
  head-y					:= head.o
  extra-y					+= $(head-y) vmlinux.lds
  
-Index: rpi-linux-kernel/arch/arm64/kernel/alt-syscall.c
+Index: rpi-kernel/arch/arm64/kernel/alt-syscall.c
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/arch/arm64/kernel/alt-syscall.c
++++ rpi-kernel/arch/arm64/kernel/alt-syscall.c
 @@ -0,0 +1,78 @@
 +/*
 + * AArch64 alt-syscall implementation
@@ -144,10 +144,10 @@ Index: rpi-linux-kernel/arch/arm64/kernel/alt-syscall.c
 +
 +	return 0;
 +}
-Index: rpi-linux-kernel/arch/arm64/kernel/vdso32/Makefile
+Index: rpi-kernel/arch/arm64/kernel/vdso32/Makefile
 ===================================================================
---- rpi-linux-kernel.orig/arch/arm64/kernel/vdso32/Makefile
-+++ rpi-linux-kernel/arch/arm64/kernel/vdso32/Makefile
+--- rpi-kernel.orig/arch/arm64/kernel/vdso32/Makefile
++++ rpi-kernel/arch/arm64/kernel/vdso32/Makefile
 @@ -10,7 +10,18 @@ include $(srctree)/lib/vdso/Makefile
  
  # Same as cc-*option, but using CC_COMPAT instead of CC
@@ -191,10 +191,10 @@ Index: rpi-linux-kernel/arch/arm64/kernel/vdso32/Makefile
        cmd_vdso_install = cp $(obj)/$@.dbg $(MODLIB)/vdso/vdso32.so
  
  vdso.so: $(obj)/vdso.so.dbg
-Index: rpi-linux-kernel/arch/arm64/kernel/vdso32/vgettimeofday.c
+Index: rpi-kernel/arch/arm64/kernel/vdso32/vgettimeofday.c
 ===================================================================
---- rpi-linux-kernel.orig/arch/arm64/kernel/vdso32/vgettimeofday.c
-+++ rpi-linux-kernel/arch/arm64/kernel/vdso32/vgettimeofday.c
+--- rpi-kernel.orig/arch/arm64/kernel/vdso32/vgettimeofday.c
++++ rpi-kernel/arch/arm64/kernel/vdso32/vgettimeofday.c
 @@ -5,26 +5,16 @@
   * Copyright (C) 2018 ARM Limited
   *
@@ -233,10 +233,10 @@ Index: rpi-linux-kernel/arch/arm64/kernel/vdso32/vgettimeofday.c
  	return __cvdso_clock_getres_time32(clock_id, res);
  }
  
-Index: rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_drv.c
+Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_drv.c
 ===================================================================
---- rpi-linux-kernel.orig/drivers/gpu/drm/vc4/vc4_drv.c
-+++ rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_drv.c
+--- rpi-kernel.orig/drivers/gpu/drm/vc4/vc4_drv.c
++++ rpi-kernel/drivers/gpu/drm/vc4/vc4_drv.c
 @@ -179,7 +179,7 @@ static const struct drm_ioctl_desc vc4_d
  
  static struct drm_driver vc4_drm_driver = {
@@ -246,10 +246,10 @@ Index: rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_drv.c
  			    DRIVER_GEM |
  			    DRIVER_RENDER |
  			    DRIVER_SYNCOBJ),
-Index: rpi-linux-kernel/include/linux/sched.h
+Index: rpi-kernel/include/linux/sched.h
 ===================================================================
---- rpi-linux-kernel.orig/include/linux/sched.h
-+++ rpi-linux-kernel/include/linux/sched.h
+--- rpi-kernel.orig/include/linux/sched.h
++++ rpi-kernel/include/linux/sched.h
 @@ -1997,4 +1997,9 @@ int sched_trace_rq_cpu(struct rq *rq);
  
  const struct cpumask *sched_trace_rd_span(struct root_domain *rd);
@@ -260,10 +260,10 @@ Index: rpi-linux-kernel/include/linux/sched.h
 +#define sched_core_user_enter(void) do { } while (0)
 +
  #endif
-Index: rpi-linux-kernel/include/linux/syscalls.h
+Index: rpi-kernel/include/linux/syscalls.h
 ===================================================================
---- rpi-linux-kernel.orig/include/linux/syscalls.h
-+++ rpi-linux-kernel/include/linux/syscalls.h
+--- rpi-kernel.orig/include/linux/syscalls.h
++++ rpi-kernel/include/linux/syscalls.h
 @@ -1420,5 +1420,23 @@ long ksys_old_shmctl(int shmid, int cmd,
  long compat_ksys_semtimedop(int semid, struct sembuf __user *tsems,
  			    unsigned int nsops,
@@ -288,10 +288,10 @@ Index: rpi-linux-kernel/include/linux/syscalls.h
 +int ksys_adjtimex_time32(struct old_timex32 __user *utp);
 +#endif /* CONFIG_ALT_SYSCALL */
  #endif
-Index: rpi-linux-kernel/include/uapi/linux/prctl.h
+Index: rpi-kernel/include/uapi/linux/prctl.h
 ===================================================================
---- rpi-linux-kernel.orig/include/uapi/linux/prctl.h
-+++ rpi-linux-kernel/include/uapi/linux/prctl.h
+--- rpi-kernel.orig/include/uapi/linux/prctl.h
++++ rpi-kernel/include/uapi/linux/prctl.h
 @@ -155,6 +155,9 @@ struct prctl_mm_map {
  #define PR_SET_PTRACER 0x59616d61
  # define PR_SET_PTRACER_ANY ((unsigned long)-1)
@@ -312,10 +312,10 @@ Index: rpi-linux-kernel/include/uapi/linux/prctl.h
 +# define PR_SET_VMA_ANON_NAME   0
 +
  #endif /* _LINUX_PRCTL_H */
-Index: rpi-linux-kernel/kernel/Makefile
+Index: rpi-kernel/kernel/Makefile
 ===================================================================
---- rpi-linux-kernel.orig/kernel/Makefile
-+++ rpi-linux-kernel/kernel/Makefile
+--- rpi-kernel.orig/kernel/Makefile
++++ rpi-kernel/kernel/Makefile
 @@ -44,6 +44,7 @@ obj-y += rcu/
  obj-y += livepatch/
  obj-y += dma/
@@ -324,10 +324,10 @@ Index: rpi-linux-kernel/kernel/Makefile
  obj-$(CONFIG_CHECKPOINT_RESTORE) += kcmp.o
  obj-$(CONFIG_FREEZER) += freezer.o
  obj-$(CONFIG_PROFILING) += profile.o
-Index: rpi-linux-kernel/kernel/alt-syscall.c
+Index: rpi-kernel/kernel/alt-syscall.c
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/kernel/alt-syscall.c
++++ rpi-kernel/kernel/alt-syscall.c
 @@ -0,0 +1,66 @@
 +/*
 + * Alternate Syscall Table Infrastructure
@@ -395,10 +395,10 @@ Index: rpi-linux-kernel/kernel/alt-syscall.c
 +
 +	return -ENOENT;
 +}
-Index: rpi-linux-kernel/kernel/sys.c
+Index: rpi-kernel/kernel/sys.c
 ===================================================================
---- rpi-linux-kernel.orig/kernel/sys.c
-+++ rpi-linux-kernel/kernel/sys.c
+--- rpi-kernel.orig/kernel/sys.c
++++ rpi-kernel/kernel/sys.c
 @@ -45,6 +45,7 @@
  
  #include <linux/compat.h>
@@ -453,10 +453,10 @@ Index: rpi-linux-kernel/kernel/sys.c
  	default:
  		error = -EINVAL;
  		break;
-Index: rpi-linux-kernel/scripts/dtc/Makefile
+Index: rpi-kernel/scripts/dtc/Makefile
 ===================================================================
---- rpi-linux-kernel.orig/scripts/dtc/Makefile
-+++ rpi-linux-kernel/scripts/dtc/Makefile
+--- rpi-kernel.orig/scripts/dtc/Makefile
++++ rpi-kernel/scripts/dtc/Makefile
 @@ -11,7 +11,7 @@ dtc-objs	+= dtc-lexer.lex.o dtc-parser.t
  # Source files need to get at the userspace version of libfdt_env.h to compile
  HOST_EXTRACFLAGS += -I $(srctree)/$(src)/libfdt
@@ -466,10 +466,10 @@ Index: rpi-linux-kernel/scripts/dtc/Makefile
  ifneq ($(CHECK_DTBS),)
  $(error dtc needs libyaml for DT schema validation support. \
  	Install the necessary libyaml development package.)
-Index: rpi-linux-kernel/security/chromiumos/Makefile
+Index: rpi-kernel/security/chromiumos/Makefile
 ===================================================================
---- rpi-linux-kernel.orig/security/chromiumos/Makefile
-+++ rpi-linux-kernel/security/chromiumos/Makefile
+--- rpi-kernel.orig/security/chromiumos/Makefile
++++ rpi-kernel/security/chromiumos/Makefile
 @@ -1,5 +1,5 @@
 -obj-$(CONFIG_SECURITY_CHROMIUMOS) := chromiumos_lsm.o
 +#obj-$(CONFIG_SECURITY_CHROMIUMOS) := chromiumos_lsm.o
