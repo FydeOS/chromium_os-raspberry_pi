@@ -2,3 +2,4 @@ chromeos-base/vpd::chromiumos
 chromeos-base/chromeos-chrome::chromiumos
 chromeos-base/libwidevine::chromiumos
 chromeos-base/chromeos-installer::chromiumos
+chromeos-base/vpd::patches

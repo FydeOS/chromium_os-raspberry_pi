@@ -7,7 +7,7 @@ EAPI="6"
 CROS_WORKON_COMMIT="e925e97746afa471b86e4f9608498f15fe9b2956"
 CROS_WORKON_TREE="cde5431fb6fb5b6843049a5df677de47050df448"
 CROS_WORKON_PROJECT="chromiumos/third_party/mesa"
-CROS_WORKON_LOCALNAME="arc-mesa-virgl"
+#CROS_WORKON_LOCALNAME="arc-mesa-virgl"
 CROS_WORKON_MANUAL_UPREV="1"
 
 EGIT_REPO_URI="git://anongit.freedesktop.org/mesa/mesa"
@@ -161,7 +161,7 @@ src_configure() {
 
 		arc-build-select-clang
 	fi
-
+  export CHOST_arm=armv7-linux-androideabi
 	multilib-minimal_src_configure
 }
 
@@ -231,6 +231,7 @@ multilib_src_configure() {
 		# define the macro ANDROID_API_LEVEL. Arc emulates that here.
 		if [[ -n "${ARC_PLATFORM_SDK_VERSION}" ]]; then
 			CPPFLAGS+=" -DANDROID_API_LEVEL=${ARC_PLATFORM_SDK_VERSION}"
+      CFLAGS+=" -DANDROID_API_LEVEL=${ARC_PLATFORM_SDK_VERSION}"
 		fi
 
 		#
@@ -241,7 +242,6 @@ multilib_src_configure() {
 	if ! use llvm; then
 		export LLVM_CONFIG="no"
 	fi
-
 	arc-build-create-cross-file
 
 	emesonargs+=(

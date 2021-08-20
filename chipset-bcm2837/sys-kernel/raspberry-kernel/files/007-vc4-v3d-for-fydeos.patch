@@ -85,30 +85,27 @@ Index: rpi-kernel/drivers/gpu/drm/v3d/v3d_bo.c
  
  /* Called DRM core on the last userspace/kernel unreference of the
   * BO.
-@@ -46,12 +49,21 @@ void v3d_free_object(struct drm_gem_obje
+@@ -32,7 +35,7 @@ void v3d_free_object(struct drm_gem_obje
+ {
+ 	struct v3d_dev *v3d = to_v3d_dev(obj->dev);
+ 	struct v3d_bo *bo = to_v3d_bo(obj);
+-
++	u32 vc4_handle = bo->vc4_handle;
+ 	v3d_mmu_remove_ptes(bo);
+ 
+ 	mutex_lock(&v3d->bo_lock);
+@@ -46,8 +49,9 @@ void v3d_free_object(struct drm_gem_obje
  
  	/* GPU execution may have dirtied any pages in the BO. */
  	bo->base.pages_mark_dirty_on_put = true;
 -
-+  if (bo->vc4_handle)
-+    free_bo_from_vc4(&bo->vc4_handle);
  	drm_gem_shmem_free_object(obj);
++	if (vc4_handle)
++	  free_bo_from_vc4(vc4_handle);
  }
  
-+void v3d_close_object(struct drm_gem_object *obj, struct drm_file *file)
-+{
-+  struct v3d_bo *bo = to_v3d_bo(obj);
-+  if (bo->vc4_handle)
-+    free_bo_from_vc4(&bo->vc4_handle);
-+}
-+
  static const struct drm_gem_object_funcs v3d_gem_funcs = {
- 	.free = v3d_free_object,
-+  .close = v3d_close_object,
- 	.print_info = drm_gem_shmem_print_info,
- 	.pin = drm_gem_shmem_pin,
- 	.unpin = drm_gem_shmem_unpin,
-@@ -170,13 +182,29 @@ int v3d_create_bo_ioctl(struct drm_devic
+@@ -170,13 +174,30 @@ int v3d_create_bo_ioctl(struct drm_devic
  			struct drm_file *file_priv)
  {
  	struct drm_v3d_create_bo *args = data;
@@ -133,6 +130,7 @@ Index: rpi-kernel/drivers/gpu/drm/v3d/v3d_bo.c
 +      bo = to_v3d_bo(gem_obj);
 +      bo->vc4_handle = vc4_handle;
 +      DRM_DEBUG("store vc4 handle:%u", bo->vc4_handle);
++      drm_gem_object_put_unlocked(gem_obj);
 +      return ret;
 +    }
 +  }
@@ -563,7 +561,7 @@ Index: rpi-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.h
 +int import_bo_from_vc4(struct drm_device *dev, struct drm_file *file_priv, 
 +  size_t unaligned_size, u32 *vc4_handle, u32 *handle);
 +
-+int free_bo_from_vc4(u32 *handle);
++int free_bo_from_vc4(u32 handle);
 +void init_v3d_vc4_bind(void);
 +#endif /* V3D_VC$_BIND_H */
 Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_bo.c

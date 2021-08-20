@@ -11,10 +11,18 @@ index e45a898..765818f 100644
  
  MINIGBM_CPPFLAGS := -std=c++14
 diff --git a/drv.c b/drv.c
-index 9b43e9f..48a4934 100644
+index 9b43e9f..0fe60f0 100644
 --- a/drv.c
 +++ b/drv.c
-@@ -46,6 +46,9 @@ extern const struct backend backend_rockchip;
+@@ -15,7 +15,6 @@
+ #include <sys/types.h>
+ #include <unistd.h>
+ #include <xf86drm.h>
+-
+ #ifdef __ANDROID__
+ #include <cutils/log.h>
+ #include <libgen.h>
+@@ -46,6 +45,9 @@ extern const struct backend backend_rockchip;
  #ifdef DRV_VC4
  extern const struct backend backend_vc4;
  #endif
@@ -24,7 +32,7 @@ index 9b43e9f..48a4934 100644
  
  // Dumb / generic drivers
  extern const struct backend backend_evdi;
-@@ -90,6 +93,9 @@ static const struct backend *drv_get_backend(int fd)
+@@ -90,6 +92,9 @@ static const struct backend *drv_get_backend(int fd)
  #endif
  #ifdef DRV_VC4
  		&backend_vc4,
@@ -34,7 +42,7 @@ index 9b43e9f..48a4934 100644
  #endif
  		&backend_evdi,	   &backend_marvell, &backend_meson,	 &backend_nouveau,
  		&backend_komeda,   &backend_radeon,  &backend_synaptics, &backend_virtgpu,
-@@ -100,6 +106,9 @@ static const struct backend *drv_get_backend(int fd)
+@@ -100,6 +105,9 @@ static const struct backend *drv_get_backend(int fd)
  		const struct backend *b = backend_list[i];
  		if (!strcmp(drm_version->name, b->name)) {
  			drmFreeVersion(drm_version);
@@ -449,10 +457,10 @@ index d906dcf..116a9f1 100644
  }
 diff --git a/v3d.c b/v3d.c
 new file mode 100644
-index 0000000..5757aa1
+index 0000000..3858114
 --- /dev/null
 +++ b/v3d.c
-@@ -0,0 +1,113 @@
+@@ -0,0 +1,118 @@
 +/*
 + * Copyright 2019 The FydeOS Authors. All rights reserved.
 + * Use of this source code is governed by a BSD-style license that can be
@@ -460,7 +468,6 @@ index 0000000..5757aa1
 + * Author: Yang Tsao <yang@fydeos.io>
 + */
 +#ifdef DRV_V3D
-+
 +#include <errno.h>
 +#include <stdio.h>
 +#include <string.h>
@@ -476,7 +483,7 @@ index 0000000..5757aa1
 + DRM_FORMAT_ARGB8888, DRM_FORMAT_XRGB8888, DRM_FORMAT_ABGR8888, DRM_FORMAT_XBGR8888 };
 +
 +static const uint32_t texture_target_formats[] = {
-+             DRM_FORMAT_YVU420, DRM_FORMAT_NV12
++ DRM_FORMAT_YVU420, DRM_FORMAT_NV12,DRM_FORMAT_YVU420_ANDROID
 +      };
 +
 +static int v3d_init(struct driver *drv) {
@@ -490,7 +497,8 @@ index 0000000..5757aa1
 +  drv_modify_combination(drv, DRM_FORMAT_NV12, &LINEAR_METADATA,
 +           BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
 +           BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
-+  drv_modify_combination(drv, DRM_FORMAT_R8, &LINEAR_METADATA, BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT);
++  drv_modify_combination(drv, DRM_FORMAT_R8, &LINEAR_METADATA, BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
++  	   BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
 +  drv_modify_combination(drv, DRM_FORMAT_ARGB8888, &LINEAR_METADATA, BO_USE_CURSOR | BO_USE_SCANOUT);
 +  drv_log("v3d driver init.\n");
 +  return 0;
@@ -503,16 +511,21 @@ index 0000000..5757aa1
 +  uint32_t stride;
 +  struct drm_v3d_create_bo bo_create;
 +  memset(&bo_create, 0, sizeof(bo_create));
-+
 +  stride = drv_stride_from_format(format, width, 0);
-+  stride = ALIGN(stride, 4096);
++  if (height > 320 && width > 320)
++    stride = ALIGN(stride, 32) + 512;
++  else
++    stride = ALIGN(stride, 32) + 32;
 +  drv_bo_from_format(bo, stride, height, format);
-+//  bo->meta.total_size = ALIGN(bo->meta.total_size, 4096);
++  bo->meta.total_size = ALIGN(bo->meta.total_size, 4096);
++  if  (height > 320 && width > 320)
++    bo->meta.total_size += bo->meta.num_planes * 8192; 
++  if ( width * height == 1) // don't bother vc4 if only need 1 pixel.
++    bo_create.flags = 0;
++  else
++    bo_create.flags = ARC_CALLOC;
 +  bo_create.size = bo->meta.total_size;
 +  bo->meta.format_modifier = modifier;
-+#ifdef __ANDROID__
-+  bo_create.flags = ARC_CALLOC;
-+#endif
 +  ret = drmIoctl(bo->drv->fd, DRM_IOCTL_V3D_CREATE_BO, &bo_create);
 +  if (ret) {
 +    drv_log("DRM_IOCTL_V3D_CREATE_BO failed (size=%zu), ret=%d, format:%s\n", bo->meta.total_size, ret, getDrmFormatString(format));
@@ -522,7 +535,7 @@ index 0000000..5757aa1
 +  for (plane = 0; plane < bo->meta.num_planes; plane++)
 +    bo->handles[plane].u32 = bo_create.handle;
 +#ifdef DEBUG
-+ drv_log("create bo handler:0x%x, size:%d, format:%s, width:%u, height:%u\n",
++ drv_log("create bo handler:0x%x, size:%zu, format:%s, width:%u, height:%u\n",
 +   bo_create.handle, bo->meta.total_size, getDrmFormatString(format), width, height);
 +#endif
 +  return 0;
@@ -567,18 +580,20 @@ index 0000000..5757aa1
 +
 +#endif // DEV_V3D
 diff --git a/vc4.c b/vc4.c
-index 5ea4bc3..1bf7408 100644
+index 5ea4bc3..239e6d1 100644
 --- a/vc4.c
 +++ b/vc4.c
-@@ -3,7 +3,6 @@
+@@ -3,9 +3,7 @@
   * Use of this source code is governed by a BSD-style license that can be
   * found in the LICENSE file.
   */
 -
  #ifdef DRV_VC4
- 
+-
  #include <errno.h>
-@@ -17,27 +16,33 @@
+ #include <stdio.h>
+ #include <string.h>
+@@ -17,27 +15,34 @@
  #include "helpers.h"
  #include "util.h"
  
@@ -620,7 +635,8 @@ index 5ea4bc3..1bf7408 100644
 +                              BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
 +                              BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
 +  drv_modify_combination(drv, DRM_FORMAT_R8, &metadata, BO_USE_CAMERA_READ |
-+                              BO_USE_CAMERA_WRITE | BO_USE_SCANOUT);
++                              BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
++			      BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
 +
 +  drv_log("vc4 driver inited.\n");
 +  return drv_modify_linear_combinations(drv); 
@@ -640,7 +656,10 @@ index 5ea4bc3..1bf7408 100644
 -	default:
 -		return -EINVAL;
 -	}
--
++  stride = drv_stride_from_format(format, width, 0);
++  stride = ALIGN(stride, 64);
++  drv_bo_from_format(bo, stride, height, format);
+ 
 -	/*
 -	 * Since the ARM L1 cache line size is 64 bytes, align to that as a
 -	 * performance optimization.
@@ -648,25 +667,22 @@ index 5ea4bc3..1bf7408 100644
 -	stride = drv_stride_from_format(format, width, 0);
 -	stride = ALIGN(stride, 64);
 -	drv_bo_from_format(bo, stride, height, format);
-+  stride = drv_stride_from_format(format, width, 0);
-+  stride = ALIGN(stride, 64);
-+  drv_bo_from_format(bo, stride, height, format);
- 
--	bo_create.size = bo->meta.total_size;
 +  memset(&bo_create, 0, sizeof(bo_create));
 +  bo_create.size = bo->meta.total_size;
  
--	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VC4_CREATE_BO, &bo_create);
--	if (ret) {
--		drv_log("DRM_IOCTL_VC4_CREATE_BO failed (size=%zu)\n", bo->meta.total_size);
--		return -errno;
--	}
+-	bo_create.size = bo->meta.total_size;
 +  ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VC4_CREATE_BO, &bo_create);
 +  if (ret) {
 +    drv_log("DRM_IOCTL_VC4_CREATE_BO failed (size=%zu)\n", bo->meta.total_size);
 +    return -errno;
 +  }
  
+-	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VC4_CREATE_BO, &bo_create);
+-	if (ret) {
+-		drv_log("DRM_IOCTL_VC4_CREATE_BO failed (size=%zu)\n", bo->meta.total_size);
+-		return -errno;
+-	}
+-
 -	for (plane = 0; plane < bo->meta.num_planes; plane++)
 -		bo->handles[plane].u32 = bo_create.handle;
 -
@@ -674,7 +690,7 @@ index 5ea4bc3..1bf7408 100644
 +  for (plane = 0; plane < bo->meta.num_planes; plane++)
 +    bo->handles[plane].u32 = bo_create.handle;
 +#ifdef DEBUG
-+  drv_log("create bo for vc4: handle:0x%x, size:%d, format:%s\n", bo_create.handle, bo->meta.total_size, getDrmFormatString(format));
++  drv_log("create bo for vc4: handle:0x%x, size:%zu, format:%s\n", bo_create.handle, bo->meta.total_size, getDrmFormatString(format));
 +#endif
 +  return 0;
  }
