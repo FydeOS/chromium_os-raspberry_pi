@@ -1,0 +1,28 @@
+Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_bo.c
+===================================================================
+--- rpi-kernel.orig/drivers/gpu/drm/vc4/vc4_bo.c
++++ rpi-kernel/drivers/gpu/drm/vc4/vc4_bo.c
+@@ -799,7 +799,7 @@ vc4_prime_import_sg_table(struct drm_dev
+ 
+ static int vc4_grab_bin_bo(struct vc4_dev *vc4, struct vc4_file *vc4file)
+ {
+-#ifdef RPI3
++#ifndef CONFIG_DRM_V3D
+ 	int ret;
+ 
+ 	if (!vc4->v3d)
+Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_drv.c
+===================================================================
+--- rpi-kernel.orig/drivers/gpu/drm/vc4/vc4_drv.c
++++ rpi-kernel/drivers/gpu/drm/vc4/vc4_drv.c
+@@ -184,7 +184,9 @@ static const struct drm_ioctl_desc vc4_d
+ 
+ static struct drm_driver vc4_drm_driver = {
+ 	.driver_features = (DRIVER_MODESET |
+-	//		    DRIVER_ATOMIC |
++#ifndef CONFIG_DRM_V3D
++			    DRIVER_ATOMIC |
++#endif
+ 			    DRIVER_GEM |
+ 			    DRIVER_RENDER |
+ 			    DRIVER_SYNCOBJ),
