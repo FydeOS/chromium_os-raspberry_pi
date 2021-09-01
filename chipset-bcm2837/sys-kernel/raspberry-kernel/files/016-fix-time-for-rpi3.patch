@@ -1,0 +1,31 @@
+Index: rpi-kernel/arch/arm/Kconfig
+===================================================================
+--- rpi-kernel.orig/arch/arm/Kconfig
++++ rpi-kernel/arch/arm/Kconfig
+@@ -18,6 +18,7 @@ config ARM
+ 	select ARCH_HAS_PHYS_TO_DMA
+ 	select ARCH_HAS_SETUP_DMA_OPS
+ 	select ARCH_HAS_SET_MEMORY
++  select ARCH_HAS_ALT_SYSCALL
+ 	select ARCH_HAS_STRICT_KERNEL_RWX if MMU && !XIP_KERNEL
+ 	select ARCH_HAS_STRICT_MODULE_RWX if MMU
+ 	select ARCH_HAS_SYNC_DMA_FOR_DEVICE if SWIOTLB
+Index: rpi-kernel/include/linux/syscalls.h
+===================================================================
+--- rpi-kernel.orig/include/linux/syscalls.h
++++ rpi-kernel/include/linux/syscalls.h
+@@ -1431,12 +1431,12 @@ int ksys_getpriority(int which, int who)
+ int ksys_perf_event_open(
+     struct perf_event_attr __user *attr_uptr,
+     pid_t pid, int cpu, int group_fd, unsigned long flags);
+-int ksys_clock_adjtime(const clockid_t which_clock, struct __kernel_timex __user * utx);
+ int ksys_adjtimex(struct __kernel_timex __user *txc_p);
+ int ksys_getcpu(unsigned __user *cpu, unsigned __user *node,
+     struct getcpu_cache __user *cache);
++#endif /* CONFIG_ALT_SYSCALL */
++int ksys_clock_adjtime(const clockid_t which_clock, struct __kernel_timex __user * utx);
+ int ksys_clock_adjtime32(clockid_t which_clock,
+        struct old_timex32 __user *utp);
+ int ksys_adjtimex_time32(struct old_timex32 __user *utp);
+-#endif /* CONFIG_ALT_SYSCALL */
+ #endif

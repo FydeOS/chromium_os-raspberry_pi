@@ -10,7 +10,7 @@ CROS_WORKON_LOCALNAME="mesa-freedreno"
 CROS_WORKON_EGIT_BRANCH="chromeos-freedreno"
 #ECLASS_DEBUG_OUTPUT="on"
 
-KEYWORDS="~*"
+KEYWORDS="*"
 
 inherit base meson flag-o-matic cros-workon
 
@@ -48,7 +48,7 @@ src_configure() {
 		-Dglx=disabled
 		-Degl=enabled
 		-Dgbm=disabled
-		-Dgles1=disabled
+		-Dgles1=enabled
 		-Dgles2=enabled
 		-Dshared-glapi=enabled
 		-Ddri-drivers=
