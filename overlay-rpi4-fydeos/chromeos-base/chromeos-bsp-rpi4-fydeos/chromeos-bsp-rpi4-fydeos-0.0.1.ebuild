@@ -15,6 +15,7 @@ RDEPEND="
     chromeos-base/arc-user-env
     media-libs/vulkan-loader
     chromeos-base/device-appid
+    chromeos-base/bluetooth-input-fix
 "
 
 DEPEND="${RDEPEND}"
