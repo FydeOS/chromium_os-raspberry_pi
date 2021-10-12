@@ -1,0 +1,24 @@
+diff --git a/diagnostics/cros_healthd/utils/file_utils.cc b/diagnostics/cros_healthd/utils/file_utils.cc
+index 62126a5866..682655724e 100644
+--- a/diagnostics/cros_healthd/utils/file_utils.cc
++++ b/diagnostics/cros_healthd/utils/file_utils.cc
+@@ -18,9 +18,16 @@ bool ReadAndTrimString(const base::FilePath& directory,
+ 
+ bool ReadAndTrimString(const base::FilePath& file_path, std::string* out) {
+   DCHECK(out);
+-
+-  if (!base::ReadFileToString(file_path, out))
+-    return false;
++  base::FilePath target;
++  if (base::IsLink(file_path)) {
++    if (!base::ReadSymbolicLink(file_path, &target))
++      return false;
++    if (!base::ReadFileToString(target, out))
++      return false;
++  }else{
++    if (!base::ReadFileToString(file_path, out))
++      return false;
++  }
+ 
+   base::TrimWhitespaceASCII(*out, base::TRIM_TRAILING, out);
+   return true;
