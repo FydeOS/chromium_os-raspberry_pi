@@ -1,1 +1,0 @@
-diagnostics-0.0.1-r962.ebuild
