@@ -2,6 +2,8 @@
 #config_hdmi_boost=7
 disable_overscan=1
 dtparam=audio=on
+cma_lwm=16
+cma_hwm=32
 
 # better graphic performance,but need fydeos-force-cursor-compositing in /etc/chrome_dev.conf
 dtoverlay=vc4-kms-v3d-pi4
@@ -10,7 +12,7 @@ dtoverlay=vc4-kms-v3d-pi4
 #dtoverlay=vc4-fkms-v3d
 
 # for more power
-force_turbo=1
+#force_turbo=1
 
 # for debug
 #enable_uart=1
