@@ -5,11 +5,11 @@
 #over_voltage=2
 config_hdmi_boost=7
 disable_overscan=1
-gpu_mem=256
-cma_lwm=16
-cma_hwm=256
+gpu_mem=16
+#cma_lwm=16
+#cma_hwm=256
 dtparam=audio=on
-dtoverlay=vc4-kms-v3d,cma-256
+dtoverlay=vc4-kms-v3d,cma-128
 #mask_gpu_interrupt0=0x400   # KMS/DRM
 #avoid_warnings=2            # KMS/DRM
 #arm_control=0x200           # open armV8 mode
