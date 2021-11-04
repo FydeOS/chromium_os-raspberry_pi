@@ -15,14 +15,101 @@ Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_drv.c
 ===================================================================
 --- rpi-kernel.orig/drivers/gpu/drm/vc4/vc4_drv.c
 +++ rpi-kernel/drivers/gpu/drm/vc4/vc4_drv.c
-@@ -184,7 +184,9 @@ static const struct drm_ioctl_desc vc4_d
+@@ -184,7 +184,7 @@ static const struct drm_ioctl_desc vc4_d
  
  static struct drm_driver vc4_drm_driver = {
  	.driver_features = (DRIVER_MODESET |
 -	//		    DRIVER_ATOMIC |
-+#ifndef CONFIG_DRM_V3D
 +			    DRIVER_ATOMIC |
-+#endif
  			    DRIVER_GEM |
  			    DRIVER_RENDER |
  			    DRIVER_SYNCOBJ),
+Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_crtc.c
+===================================================================
+--- rpi-kernel.orig/drivers/gpu/drm/vc4/vc4_crtc.c
++++ rpi-kernel/drivers/gpu/drm/vc4/vc4_crtc.c
+@@ -1237,7 +1237,7 @@ static int vc4_crtc_bind(struct device *
+ 	struct vc4_dev *vc4 = to_vc4_dev(drm);
+ 	struct vc4_crtc *vc4_crtc;
+ 	struct drm_crtc *crtc;
+-	struct drm_plane *primary_plane, *destroy_plane, *temp;
++	struct drm_plane *primary_plane, *destroy_plane, *temp, *cursor_plane;
+ 	const struct of_device_id *match;
+ 	int ret, i;
+ 
+@@ -1272,8 +1272,14 @@ static int vc4_crtc_bind(struct device *
+ 		ret = PTR_ERR(primary_plane);
+ 		goto err;
+ 	}
++  cursor_plane = vc4_plane_init(drm, DRM_PLANE_TYPE_CURSOR, VC4_KMS_OVERLAY_PLANE_NUM + 1);
++  if (IS_ERR(cursor_plane)) {
++    dev_err(dev, "failed to construct cusrsor plane\n");
++    ret = PTR_ERR(primary_plane);
++    goto err;
++  }
+ 
+-	drm_crtc_init_with_planes(drm, crtc, primary_plane, NULL,
++	drm_crtc_init_with_planes(drm, crtc, primary_plane, cursor_plane,
+ 				  &vc4_crtc_funcs, NULL);
+ 	drm_crtc_helper_add(crtc, &vc4_crtc_helper_funcs);
+ 
+Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_drv.h
+===================================================================
+--- rpi-kernel.orig/drivers/gpu/drm/vc4/vc4_drv.h
++++ rpi-kernel/drivers/gpu/drm/vc4/vc4_drv.h
+@@ -19,6 +19,7 @@
+ 
+ #include "uapi/drm/vc4_drm.h"
+ #define V3D_BIND (1<<7)
++#define VC4_KMS_OVERLAY_PLANE_NUM 8
+ struct drm_device;
+ struct drm_gem_object;
+ 
+Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_plane.c
+===================================================================
+--- rpi-kernel.orig/drivers/gpu/drm/vc4/vc4_plane.c
++++ rpi-kernel/drivers/gpu/drm/vc4/vc4_plane.c
+@@ -1487,15 +1487,12 @@ struct drm_plane *vc4_plane_init(struct
+ 					  BIT(DRM_COLOR_YCBCR_FULL_RANGE),
+ 					  DRM_COLOR_YCBCR_BT709,
+ 					  DRM_COLOR_YCBCR_LIMITED_RANGE);
+-
+   drm_plane_create_zpos_property(plane, zpos, 0, 127);
+ 	return plane;
+ }
+ 
+ int vc4_plane_create_additional_planes(struct drm_device *drm)
+ {
+-	struct drm_plane *cursor_plane;
+-	struct drm_crtc *crtc;
+ 	unsigned int i;
+ 
+ 	/* Set up some arbitrary number of planes.  We're not limited
+@@ -1507,7 +1504,7 @@ int vc4_plane_create_additional_planes(s
+ 	 * modest number of planes to expose, that should hopefully
+ 	 * still cover any sane usecase.
+ 	 */
+-	for (i = 0; i < 16; i++) {
++	for (i = 0; i < VC4_KMS_OVERLAY_PLANE_NUM; i++) {
+ 		struct drm_plane *plane =
+ 			vc4_plane_init(drm, DRM_PLANE_TYPE_OVERLAY, i+1);
+ 
+@@ -1517,18 +1514,5 @@ int vc4_plane_create_additional_planes(s
+ 		plane->possible_crtcs =
+ 			GENMASK(drm->mode_config.num_crtc - 1, 0);
+ 	}
+-
+-	drm_for_each_crtc(crtc, drm) {
+-		/* Set up the legacy cursor after overlay initialization,
+-		 * since we overlay planes on the CRTC in the order they were
+-		 * initialized.
+-		 */
+-		cursor_plane = vc4_plane_init(drm, DRM_PLANE_TYPE_CURSOR, 17);
+-		if (!IS_ERR(cursor_plane)) {
+-			cursor_plane->possible_crtcs = drm_crtc_mask(crtc);
+-			crtc->cursor = cursor_plane;
+-		}
+-	}
+-
+ 	return 0;
+ }

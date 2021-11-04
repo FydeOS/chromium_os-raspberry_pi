@@ -812,6 +812,9 @@ setup_compile_flags() {
 	# https://crbug.com/1190544
 	use arm && append-ldflags "-Wl,--no-fatal-warnings"
 	use vtable_verify && append-ldflags -fvtable-verify=preinit
+  
+  #link flags for raspberry mmal video decoder layer in ffmpeg
+  append-ldflags -lmmal -lmmal_core -lmmal_util -lmmal_vc_client -lbcm_host
 
 	local flags
 	einfo "Building with the compiler settings:"
