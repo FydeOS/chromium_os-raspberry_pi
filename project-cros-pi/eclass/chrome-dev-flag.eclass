@@ -36,11 +36,11 @@ src_compile() {
     cat ${ROOT}/etc/chrome_dev.conf > $CHROME_TMP_CONFIG
     if [ -n "$CHROME_DEV_FLAGS" ]; then
       einfo "append flags: ${CHROME_DEV_FLAGS}"
-      append_flags $CHROME_DEV_FLAGS
+      append_flags "$CHROME_DEV_FLAGS"
     fi
     if [ -n "$CHROME_REMOVE_FLAGS" ]; then
       einfo "remove flags: ${CHROME_DEV_FLAGS}"
-      remove_flags $CHROME_REMOVE_FLAGS
+      remove_flags "$CHROME_REMOVE_FLAGS"
     fi
 }
 
