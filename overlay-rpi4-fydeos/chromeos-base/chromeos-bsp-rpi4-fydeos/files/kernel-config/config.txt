@@ -22,3 +22,4 @@ dtoverlay=vc4-kms-v3d-pi4
 arm_64bit=1
 max_framebuffers=2
 kernel=kernel8_a.img
+disable_splash=1
