@@ -30,4 +30,5 @@ src_install() {
   doins "${FILESDIR}/kernel-config"/*
   exeinto /usr/share/cros/init
   doexe "${FILESDIR}"/audio/set-hdmi.sh
+  dosym /lib/firmware /etc/firmware
 }

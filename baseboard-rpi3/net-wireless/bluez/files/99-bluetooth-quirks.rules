@@ -1,0 +1,19 @@
+# Copyright 2016 The Chromium OS Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# The rules in this file are supposed to be applied after
+# 50-udev-default.rules in which all built-in rules are applied.
+
+# Twist the INPUT properties by checking blutooth related properties.
+# If a bluetooth device advertises itself as a mouse, the properties
+# ID_INPUT_KEYBOARD and ID_INPUT_KEY must be set to empty. This helps
+# chrome OOBE to make correct decision for pairing bluetooth keyboard
+# and mouse.
+# Microsoft Sculpt Touch Mouse is an example. It is a pure mouse but
+# reports capabilities of both mouse events and keyboard events. This
+# makes OOBE to pair with it as keyboard and mouse which prevents
+# other actual bluetooth keyboard from being paired.
+SUBSYSTEM=="input", ACTION=="add|change", ENV{ID_INPUT}=="1", PROGRAM="/usr/bin/get_bluetooth_device_class.sh $attr{device/uniq}"
+RESULT=="mouse", ENV{ID_INPUT_KEYBOARD}=="1", ENV{ID_INPUT_KEYBOARD}=""
+RESULT=="mouse", ENV{ID_INPUT_KEY}=="1", ENV{ID_INPUT_KEY}=""

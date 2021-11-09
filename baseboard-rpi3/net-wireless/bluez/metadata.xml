@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "http://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+	<maintainer>
+		<email>pacho@gentoo.org</email>
+		<name>Pacho Ramos</name>
+	</maintainer>
+	<use>
+		<flag name='consolekit'>Use <pkg>sys-auth/pambase[consolekit]</pkg> to
+			determine access to bluetooth devices based on whether a user is
+			logged in locally or remotely</flag>
+		<flag name='test-programs'>Install tools for testing of
+			various Bluetooth functions</flag>
+	</use>
+	<upstream>
+		<remote-id type="cpe">cpe:/a:bluez:bluez</remote-id>
+		<remote-id type="cpe">cpe:/a:bluez:bluez-libs</remote-id>
+	</upstream>
+</pkgmetadata>

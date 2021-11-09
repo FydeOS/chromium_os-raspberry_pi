@@ -36,4 +36,5 @@ src_install() {
   doins ${FILESDIR}/power_policy/power.json
   insinto /etc
   doins ${FILESDIR}/etc/hardware_features.xml
+  dosym /lib/firmware /etc/firmware
 }

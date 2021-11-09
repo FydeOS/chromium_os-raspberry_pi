@@ -1,0 +1,4 @@
+# Make the /dev/uhid device only accessible by the Bluetooth daemon user
+# and the 'bluetooth' group for additional daemons (e.g. u2fd or WiFi Direct?)
+# providing HID transport.
+KERNEL=="uhid", OWNER="bluetooth", GROUP="bluetooth", MODE="0660"

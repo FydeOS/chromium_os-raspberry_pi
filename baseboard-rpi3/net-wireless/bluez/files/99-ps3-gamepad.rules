@@ -1,0 +1,12 @@
+# Copyright 2014 The Chromium OS Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# Match the PS3 Controller RAW HID device when plugged in via USB,
+# place in the bluetooth group so bluetoothd can set pairing information.
+SUBSYSTEM=="hidraw", SUBSYSTEMS=="usb", ATTRS{idVendor}=="054c", ATTRS{idProduct}=="0268", GROUP="bluetooth", MODE="0660"
+
+# Match the PS3 Controller RAW HID device when connected via Bluetooth,
+# place in the bluetooth group so bluetoothd can update pairing information
+# and stop the lights from flashing.
+SUBSYSTEM=="hidraw", SUBSYSTEMS=="hid", KERNELS=="*:054C:0268.*", GROUP="bluetooth", MODE="0660"

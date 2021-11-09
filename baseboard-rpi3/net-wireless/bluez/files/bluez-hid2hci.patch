@@ -1,0 +1,14 @@
+--- a/tools/hid2hci.rules
++++ b/tools/hid2hci.rules
+@@ -16,12 +16,6 @@ KERNEL=="hiddev*", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="c70[345abce]|c71[
+ 
+ ENV{DEVTYPE}!="usb_device", GOTO="hid2hci_end"
+ 
+-# When a Dell device recovers from S3, the mouse child needs to be repoked
+-# Unfortunately the only event seen is the BT device disappearing, so the mouse
+-# device needs to be chased down on the USB bus.
+-ATTR{bDeviceClass}=="e0", ATTR{bDeviceSubClass}=="01", ATTR{bDeviceProtocol}=="01", ATTR{idVendor}=="413c", \
+-  ENV{REMOVE_CMD}="/sbin/udevadm trigger --action=change --subsystem-match=usb --property-match=HID2HCI_SWITCH=1"
+-
+ # CSR devices
+ ATTR{idVendor}=="0a12|0458|05ac", ATTR{idProduct}=="1000", RUN+="hid2hci --method=csr --devpath=%p"
