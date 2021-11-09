@@ -16,6 +16,7 @@ RDEPEND="
   virtual/fyde-packages
   virtual/cros-camera-hal
   virtual/cros-camera-hal-configs
+  app-editors/nano
   chromeos-base/chromeos-bsp-rpi4"
 
 DEPEND="${RDEPEND}"
