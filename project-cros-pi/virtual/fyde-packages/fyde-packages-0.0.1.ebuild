@@ -18,6 +18,7 @@ RDEPEND="
   widevine? ( chromeos-base/libwidevine )
   kiosk_demo? ( chromeos-base/fyde-kiosk-demo )
   fyde_extension? ( chromeos-base/fyde-shell-daemon-bin )
+  chromeos-base/edit-pi-config
 "
 
 DEPEND="${RDEPEND}"

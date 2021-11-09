@@ -1,0 +1,77 @@
+#!/bin/bash
+
+set -o errexit
+
+EDITOR="/usr/local/bin/nano"
+EDITOR_ALT="/bin/nano"
+CONFIG_FILE="config.txt"
+EFI_TYPE="c12a7328-f81f-11d2-ba4b-00a0c93ec93b"
+
+PARTITION=""
+TARGET_PATH=""
+
+error() {
+  echo "error: $*" >&2
+}
+
+die() {
+  error "$*"
+  exit 1
+}
+
+check_user() {
+  if [[ $EUID -ne 0 ]]; then
+    die "Please run this script as root or prepend sudo, abort."
+  fi
+}
+
+check_editor() {
+  if [[ ! -x $EDITOR ]]; then
+    EDITOR="$EDITOR_ALT"
+  fi
+  if [[ ! -x $EDITOR ]]; then
+    die "editor nano not found, abort."
+  fi
+}
+
+find_root_dev() {
+  local dev=""
+  dev=$(rootdev -d)
+  if [[ "$dev" = "/dev/"* ]]; then
+    dev="${dev:5}"
+  fi
+  echo "$dev"
+}
+
+find_efi_part() {
+  local ROOT_DEV=""
+  local PARTITION_NAME=""
+  ROOT_DEV=$(find_root_dev)
+  if [[ -z $ROOT_DEV ]]; then
+    die "rootdev not found, abort."
+  fi
+  PARTITION_NAME=$(lsblk -l -o NAME,PARTTYPE | grep "$EFI_TYPE" | awk '$1 ~ /'"$ROOT_DEV"'.*/ {print $1}')
+  if [[ -z $PARTITION_NAME ]]; then
+    die "no EFI partition found, abort."
+  fi
+
+  PARTITION="/dev/$PARTITION_NAME"
+  TARGET_PATH="/tmp/$PARTITION_NAME"
+}
+
+main() {
+  check_editor
+  check_user
+
+  find_efi_part
+
+  mkdir -p "$TARGET_PATH"
+  umount "$PARTITION" || true
+  mount "$PARTITION" "$TARGET_PATH" || die "mount failed"
+
+  $EDITOR "${TARGET_PATH}/${CONFIG_FILE}"
+
+  umount "$TARGET_PATH"
+}
+
+main
