@@ -49,7 +49,7 @@ src_configure() {
 		-Dgles2=enabled
 		-Dshared-glapi=enabled
 		-Ddri-drivers=
-		-Dgallium-drivers=vc4,v3d
+		-Dgallium-drivers=vc4,v3d,kmsro
 		-Dgallium-vdpau=disabled
 		-Dgallium-xa=disabled
 		-Dplatforms=
