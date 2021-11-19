@@ -1,0 +1,337 @@
+/*
+ * Copyright 2019 The FydeOS Authors. All rights reserved.
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ * Author: Yang Tsao <yang@fydeos.io>
+ */
+#ifdef DRV_V3D
+#include <errno.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/mman.h>
+#include <xf86drm.h>
+
+#include "drv_priv.h"
+#include "helpers.h"
+#include "util.h"
+#include "external/v3d_drm.h"
+#define ARC_CALLOC (1<<7)
+#define MAX2( A, B )   ( (A)>(B) ? (A) : (B) )
+
+#define DEBUG 1
+
+enum v3d_tiling_mode {
+        /* Untiled resources.  Not valid as texture inputs. */
+        V3D_TILING_RASTER,
+
+        /* Single line of u-tiles. */
+        V3D_TILING_LINEARTILE,
+
+        /* Departure from standard 4-UIF block column format. */
+        V3D_TILING_UBLINEAR_1_COLUMN,
+
+        /* Departure from standard 4-UIF block column format. */
+        V3D_TILING_UBLINEAR_2_COLUMN,
+
+        /* Normal tiling format: grouped in 4x4 UIFblocks, each of which is
+         * split 2x2 into utiles.
+         */
+        V3D_TILING_UIF_NO_XOR,
+
+        /* Normal tiling format: grouped in 4x4 UIFblocks, each of which is
+         * split 2x2 into utiles.
+         */
+        V3D_TILING_UIF_XOR,
+};
+
+static const uint32_t render_target_formats[] = { DRM_FORMAT_RGB565, 
+ DRM_FORMAT_ARGB8888, DRM_FORMAT_XRGB8888, DRM_FORMAT_ABGR8888, DRM_FORMAT_XBGR8888 };
+
+static const uint32_t texture_target_formats[] = {
+ DRM_FORMAT_YVU420, DRM_FORMAT_NV12, DRM_FORMAT_YVU420_ANDROID, DRM_FORMAT_R8
+      };
+
+static int v3d_init(struct driver *drv) {
+  uint64_t render_use_flags = BO_USE_RENDER_MASK | BO_USE_SCANOUT;
+  uint64_t texture_use_flags = BO_USE_TEXTURE_MASK | BO_USE_HW_VIDEO_DECODER;
+  uint64_t sw_flags = (BO_USE_RENDERSCRIPT | BO_USE_SW_MASK | BO_USE_LINEAR | BO_USE_FRONT_RENDERING);
+  struct format_metadata metadata;
+  drv_add_combinations(drv, render_target_formats, ARRAY_SIZE(render_target_formats),
+           &LINEAR_METADATA, render_use_flags);
+  drv_add_combinations(drv, texture_target_formats, ARRAY_SIZE(texture_target_formats),
+           &LINEAR_METADATA, BO_USE_TEXTURE_MASK);
+  drv_modify_combination(drv, DRM_FORMAT_YVU420, &LINEAR_METADATA,  
+           BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
+           BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
+  drv_modify_combination(drv, DRM_FORMAT_NV12, &LINEAR_METADATA,
+           BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
+           BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
+  drv_modify_combination(drv, DRM_FORMAT_R8, &LINEAR_METADATA, BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT | 
+  	   BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
+
+  metadata.tiling = V3D_TILING_UIF_NO_XOR;
+  metadata.priority = 2;
+  metadata.modifier = DRM_FORMAT_MOD_BROADCOM_UIF;
+  render_use_flags &= ~sw_flags;
+  texture_use_flags &= ~sw_flags;
+  drv_add_combinations(drv, render_target_formats, ARRAY_SIZE(render_target_formats),
+    &metadata, BO_USE_RENDER_MASK);
+  drv_add_combinations(drv, texture_target_formats, ARRAY_SIZE(texture_target_formats),
+    &metadata, texture_use_flags);
+  drv_log("v3d driver init.\n");
+  return drv_modify_linear_combinations(drv);
+}
+
+static unsigned u_minify(unsigned value, unsigned levels) {
+  return MAX2(1, value >> levels);
+}
+
+static bool util_is_power_of_two_or_zero(unsigned v) {
+	return (v & (v - 1)) == 0;
+}
+
+static unsigned util_next_power_of_two(unsigned x) {
+  unsigned val = x;
+
+   if (x <= 1)
+      return 1;
+
+   if (util_is_power_of_two_or_zero(x))
+      return x;
+
+   val--;
+   val = (val >> 1) | val;
+   val = (val >> 2) | val;
+   val = (val >> 4) | val;
+   val = (val >> 8) | val;
+   val = (val >> 16) | val;
+   val++;
+   return val;
+}
+
+static uint32_t v3d_utile_width(int cpp) {
+        switch (cpp) {
+        case 1:
+        case 2:
+                return 8;
+        case 4:
+        case 8:
+                return 4;
+        case 16:
+                return 2;
+        default:
+                return 4;
+        }
+}
+
+/** Return the height in pixels of a 64-byte microtile. */
+static uint32_t v3d_utile_height(int cpp) {
+        switch (cpp) {
+        case 1:
+                return 8;
+        case 2:
+        case 4:
+                return 4;
+        case 8:
+        case 16:
+                return 2;
+        default:
+                return 4;
+        }
+}
+
+#define V3D_UIFCFG_PAGE_SIZE 4096
+#define V3D_UBLOCK_SIZE 64
+#define V3D_UIFBLOCK_SIZE (4 * V3D_UBLOCK_SIZE)
+#define V3D_UIFBLOCK_ROW_SIZE (4 * V3D_UIFBLOCK_SIZE)
+#define PAGE_UB_ROWS (V3D_UIFCFG_PAGE_SIZE / V3D_UIFBLOCK_ROW_SIZE)
+#define PAGE_UB_ROWS_TIMES_1_5 ((PAGE_UB_ROWS * 3) >> 1)
+#define V3D_UIFCFG_PAGE_SIZE 4096
+#define V3D_UIFCFG_BANKS 8
+#define V3D_PAGE_CACHE_SIZE (V3D_UIFCFG_PAGE_SIZE * V3D_UIFCFG_BANKS)
+#define PAGE_CACHE_UB_ROWS (V3D_PAGE_CACHE_SIZE / V3D_UIFBLOCK_ROW_SIZE)
+#define PAGE_CACHE_MINUS_1_5_UB_ROWS (PAGE_CACHE_UB_ROWS - PAGE_UB_ROWS_TIMES_1_5)
+
+static uint32_t v3d_get_ub_pad(int cpp, uint32_t height) {
+  uint32_t utile_h = v3d_utile_height(cpp);
+  uint32_t uif_block_h = utile_h * 2;
+  uint32_t height_ub = height / uif_block_h;
+  uint32_t height_offset_in_pc = height_ub % PAGE_CACHE_UB_ROWS;
+  if (height_offset_in_pc == 0)
+    return 0;
+  if (height_offset_in_pc < PAGE_UB_ROWS_TIMES_1_5) {
+		if (height_ub < PAGE_CACHE_UB_ROWS)
+			return 0;
+		else
+			return PAGE_UB_ROWS_TIMES_1_5 - height_offset_in_pc;
+  }
+	if (height_offset_in_pc > PAGE_CACHE_MINUS_1_5_UB_ROWS)
+		return PAGE_CACHE_UB_ROWS - height_offset_in_pc;
+  return 0;
+}
+
+static int v3d_bo_create_for_modifiers(struct bo *bo, uint32_t width, uint32_t height,
+               uint32_t format, uint64_t modifier) {
+  int ret;
+  size_t plane;
+  struct drm_v3d_create_bo bo_create;
+  int cpp = 4;
+  //bool uif_top = true;
+  uint32_t pot_width = 2 * util_next_power_of_two(u_minify(width, 1));
+  uint32_t pot_height = 2 * util_next_power_of_two(u_minify(height, 1));
+  uint32_t pot_depth = 2 * util_next_power_of_two(u_minify(1, 1));
+  uint32_t utile_w = v3d_utile_width(cpp);
+  uint32_t utile_h = v3d_utile_height(cpp);
+  uint32_t uif_block_w = utile_w * 2;
+  uint32_t uif_block_h = utile_h * 2;
+  uint32_t block_width = 1;
+  uint32_t block_height = 1;
+  uint32_t offset = 0;
+  uint32_t level_width, level_height, level_depth;
+  size_t num_planes = drv_num_planes_from_format(format);
+  uint32_t page_align_offset = 0;
+
+  for (size_t i = 0; i < num_planes; i++) {
+		if ( i < 2) {
+            level_width = u_minify(width, i);
+            level_height = u_minify(height, i);
+    } else {
+            level_width = u_minify(pot_width, i);
+            level_height = u_minify(pot_height, i);
+    }
+    if (i < 1)
+            level_depth = u_minify(1, i);
+    else
+            level_depth = u_minify(pot_depth, i);
+    level_width = DIV_ROUND_UP(level_width, block_width);
+    level_height = DIV_ROUND_UP(level_height, block_height);
+    if (modifier == DRM_FORMAT_MOD_LINEAR) {
+      bo->meta.tiling = V3D_TILING_RASTER;
+      level_width = ALIGN(level_width, 8);
+    } else {
+    	level_width = ALIGN(level_width, 4 * uif_block_w);
+    	level_height = ALIGN(level_height, uif_block_h);
+    	level_height += v3d_get_ub_pad(cpp, level_height) * uif_block_h;
+			if ((level_height / uif_block_h) % (V3D_PAGE_CACHE_SIZE /
+					V3D_UIFBLOCK_ROW_SIZE) == 0) {
+				bo->meta.tiling = V3D_TILING_UIF_XOR;
+			} else {
+				bo->meta.tiling = V3D_TILING_UIF_NO_XOR;
+			}
+    }
+    level_width = ALIGN(level_width * 12 / 10, 64);
+    level_height = ALIGN(level_height * 12 / 10, 64);
+    bo->meta.offsets[i] = offset;
+    bo->meta.strides[i] = level_width * cpp;
+    bo->meta.sizes[i] = bo->meta.strides[i] * level_height * level_depth;
+    if (i == 1 &&
+      level_width > 4 * uif_block_w &&
+      level_height > PAGE_CACHE_MINUS_1_5_UB_ROWS * uif_block_h) {
+          bo->meta.sizes[i] = ALIGN(bo->meta.sizes[i],
+                                   V3D_UIFCFG_PAGE_SIZE);
+    }
+    offset += bo->meta.sizes[i];
+	}
+
+  page_align_offset = (ALIGN(offset, 4096) - offset);
+  if (page_align_offset) {
+    offset += page_align_offset;
+    for (size_t i = 0; i < num_planes; i++) 
+			bo->meta.offsets[i] += page_align_offset;
+  }
+  bo->meta.format_modifier = modifier; 
+  bo->meta.total_size = offset;
+
+  memset(&bo_create, 0, sizeof(bo_create));
+  
+  //if (height * width > 1) // don't bother vc4 if only need 1 page.
+    bo_create.flags = ARC_CALLOC;
+  //else
+  //  bo_create.flags = 0;
+  
+  bo_create.size = bo->meta.total_size;
+  bo->meta.format_modifier = modifier;
+  ret = drmIoctl(bo->drv->fd, DRM_IOCTL_V3D_CREATE_BO, &bo_create);
+  if (ret) {
+    drv_log("DRM_IOCTL_V3D_CREATE_BO failed (size=%zu), ret=%d, format:%s\n", bo->meta.total_size, ret, getDrmFormatString(format));
+    return -errno;
+  }
+
+  for (plane = 0; plane < bo->meta.num_planes; plane++)
+    bo->handles[plane].u32 = bo_create.handle;
+#ifdef DEBUG
+ drv_log("create bo handler:0x%x, size:%zu, format:%s, width:%u, height:%u\n",
+   bo_create.handle, bo->meta.total_size, getDrmFormatString(format), width, height);
+#endif
+  return 0;
+}
+
+static int v3d_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint32_t height,
+           uint32_t format, const uint64_t *modifiers, uint32_t count) {
+  static const uint64_t modifier_order[] = {
+    DRM_FORMAT_MOD_BROADCOM_UIF,
+    DRM_FORMAT_MOD_LINEAR,
+  };
+  uint64_t modifier =
+		drv_pick_modifier(modifiers, count, modifier_order, ARRAY_SIZE(modifier_order));
+  return v3d_bo_create_for_modifiers(bo, width, height, format, modifier/*modifier*/);
+}
+
+static int v3d_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t format,
+       uint64_t use_flags) {
+  return v3d_bo_create_for_modifiers(bo, width, height, format, DRM_FORMAT_MOD_LINEAR/*modifier*/);
+}
+
+static void *v3d_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags) {
+  int ret;
+  struct drm_v3d_mmap_bo bo_map;
+  memset(&bo_map, 0, sizeof(bo_map));
+  bo_map.handle = bo->handles[0].u32;
+
+  ret = drmIoctl(bo->drv->fd, DRM_IOCTL_V3D_MMAP_BO, &bo_map);
+  if (ret) {
+    drv_log("DRM_V3D_MMAP_BO failed\n");
+    return MAP_FAILED;
+  }
+  vma->length = bo->meta.total_size;
+  return mmap(NULL, bo->meta.total_size, drv_get_prot(map_flags), MAP_SHARED, bo->drv->fd,
+        bo_map.offset);
+}
+
+static uint32_t v3d_resolve_format(struct driver *drv, uint32_t format, uint64_t use_flags)
+{
+        switch (format) {
+        case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED:
+                if (use_flags & (BO_USE_CAMERA_WRITE | BO_USE_CAMERA_READ))
+                        return DRM_FORMAT_NV12;
+
+                /*HACK: See b/28671744 */
+                return DRM_FORMAT_XBGR8888;
+        case DRM_FORMAT_FLEX_YCbCr_420_888:
+                // TODO(hiroh): Switch to use NV12 for video decoder on MT8173 as well.
+                if (use_flags & (BO_USE_HW_VIDEO_DECODER)) {
+                        return DRM_FORMAT_NV12;
+                }
+                if (use_flags &
+                    (BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_ENCODER)) {
+                        return DRM_FORMAT_NV12;
+                }
+                return DRM_FORMAT_YVU420;
+        default:
+                return format;
+        }
+}
+
+const struct backend backend_v3d = {
+  .name = "v3d",
+  .init = v3d_init,
+  .bo_create = v3d_bo_create,
+  .bo_create_with_modifiers = v3d_bo_create_with_modifiers,
+  .bo_import = drv_prime_bo_import,
+  .bo_destroy = drv_gem_bo_destroy,
+  .bo_map = v3d_bo_map,
+  .bo_unmap = drv_bo_munmap,
+  .resolve_format = v3d_resolve_format,
+};
+
+#endif // DEV_V3D
