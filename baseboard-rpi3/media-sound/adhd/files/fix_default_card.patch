@@ -1,8 +1,8 @@
-diff --git a/cras/src/server/cras_alsa_io.c b/cras/src/server/cras_alsa_io.c
-index 5498733..b3b8d3f 100644
---- a/cras/src/server/cras_alsa_io.c
-+++ b/cras/src/server/cras_alsa_io.c
-@@ -580,15 +580,17 @@ static int flush_buffer(struct cras_iodev *iodev)
+Index: adhd/cras/src/server/cras_alsa_io.c
+===================================================================
+--- adhd.orig/cras/src/server/cras_alsa_io.c
++++ adhd/cras/src/server/cras_alsa_io.c
+@@ -639,15 +639,17 @@ static int flush_buffer(struct cras_iode
  static struct cras_ionode *first_plugged_node(struct cras_iodev *iodev)
  {
  	struct cras_ionode *n;

@@ -1,8 +1,8 @@
-Index: rpi-kernel/arch/arm/boot/dts/overlays/vc4-kms-v3d-pi4-overlay.dts
+Index: rpi-linux-kernel/arch/arm/boot/dts/overlays/vc4-kms-v3d-pi4-overlay.dts
 ===================================================================
---- rpi-kernel.orig/arch/arm/boot/dts/overlays/vc4-kms-v3d-pi4-overlay.dts
-+++ rpi-kernel/arch/arm/boot/dts/overlays/vc4-kms-v3d-pi4-overlay.dts
-@@ -141,7 +141,7 @@
+--- rpi-linux-kernel.orig/arch/arm/boot/dts/overlays/vc4-kms-v3d-pi4-overlay.dts
++++ rpi-linux-kernel/arch/arm/boot/dts/overlays/vc4-kms-v3d-pi4-overlay.dts
+@@ -145,7 +145,7 @@
  	fragment@19 {
  		target = <&audio>;
  		__overlay__  {
@@ -11,3 +11,37 @@ Index: rpi-kernel/arch/arm/boot/dts/overlays/vc4-kms-v3d-pi4-overlay.dts
  		};
  	};
  
+Index: rpi-linux-kernel/arch/arm/boot/dts/overlays/vc4-kms-v3d-overlay.dts
+===================================================================
+--- rpi-linux-kernel.orig/arch/arm/boot/dts/overlays/vc4-kms-v3d-overlay.dts
++++ rpi-linux-kernel/arch/arm/boot/dts/overlays/vc4-kms-v3d-overlay.dts
+@@ -111,7 +111,7 @@
+ 	fragment@14 {
+ 		target = <&audio>;
+ 		__overlay__  {
+-		    brcm,disable-hdmi;
++		    brcm,enable-hdmi;
+ 		};
+ 	};
+ 
+Index: rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_hdmi.c
+===================================================================
+--- rpi-linux-kernel.orig/drivers/gpu/drm/vc4/vc4_hdmi.c
++++ rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_hdmi.c
+@@ -1791,13 +1791,15 @@ static inline struct vc4_hdmi *dai_to_hd
+ 
+ static bool vc4_hdmi_audio_can_stream(struct vc4_hdmi *vc4_hdmi)
+ {
++  struct drm_encoder *encoder = &vc4_hdmi->encoder.base.base;
+ 	lockdep_assert_held(&vc4_hdmi->mutex);
+ 
+ 	/*
+ 	 * If the encoder is currently in DVI mode, treat the codec DAI
+ 	 * as missing.
+ 	 */
+-	if (!vc4_hdmi->encoder.hdmi_monitor)
++	if (!encoder->crtc || !(HDMI_READ(HDMI_RAM_PACKET_CONFIG) &
++        VC4_HDMI_RAM_PACKET_ENABLE))
+ 		return false;
+ 
+ 	return true;

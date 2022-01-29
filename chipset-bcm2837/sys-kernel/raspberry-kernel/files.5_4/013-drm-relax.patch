@@ -1,0 +1,74 @@
+Index: rpi-kernel/drivers/gpu/drm/drm_drv.c
+===================================================================
+--- rpi-kernel.orig/drivers/gpu/drm/drm_drv.c
++++ rpi-kernel/drivers/gpu/drm/drm_drv.c
+@@ -1121,6 +1121,8 @@ out_unlock:
+ 	return err;
+ }
+ 
++bool drm_master_relax;
++
+ static const struct file_operations drm_stub_fops = {
+ 	.owner = THIS_MODULE,
+ 	.open = drm_stub_open,
+@@ -1151,6 +1153,12 @@ static int __init drm_core_init(void)
+ 
+ 	drm_debugfs_root = debugfs_create_dir("dri", NULL);
+ 
++  if (!debugfs_create_bool("drm_master_relax", S_IRUSR | S_IWUSR,
++        drm_debugfs_root, &drm_master_relax)) {
++    DRM_ERROR(
++        "Cannot create /sys/kernel/debug/dri/drm_master_relax\n");
++  }
++
+ 	ret = register_chrdev(DRM_MAJOR, "drm", &drm_stub_fops);
+ 	if (ret < 0)
+ 		goto error;
+Index: rpi-kernel/drivers/gpu/drm/drm_ioctl.c
+===================================================================
+--- rpi-kernel.orig/drivers/gpu/drm/drm_ioctl.c
++++ rpi-kernel/drivers/gpu/drm/drm_ioctl.c
+@@ -819,6 +819,7 @@ long drm_ioctl(struct file *filp,
+ 	char *kdata = NULL;
+ 	unsigned int in_size, out_size, drv_size, ksize;
+ 	bool is_driver_ioctl;
++  int flags;
+ 
+ 	dev = file_priv->minor->dev;
+ 
+@@ -856,6 +857,14 @@ long drm_ioctl(struct file *filp,
+ 		  (long)old_encode_dev(file_priv->minor->kdev->devt),
+ 		  file_priv->authenticated, ioctl->name);
+ 
++  flags = ioctl->flags;
++  if (drm_master_relax) {
++    if (nr == DRM_IOCTL_NR(DRM_IOCTL_SET_MASTER))
++      flags = DRM_AUTH;
++    else if (nr == DRM_IOCTL_NR(DRM_IOCTL_DROP_MASTER))
++      flags = DRM_MASTER;
++  }
++
+ 	/* Do not trust userspace, use our own definition */
+ 	func = ioctl->func;
+ 
+@@ -883,7 +892,7 @@ long drm_ioctl(struct file *filp,
+ 	if (ksize > in_size)
+ 		memset(kdata + in_size, 0, ksize - in_size);
+ 
+-	retcode = drm_ioctl_kernel(filp, func, kdata, ioctl->flags);
++	retcode = drm_ioctl_kernel(filp, func, kdata, flags);
+ 	if (copy_to_user((void __user *)arg, kdata, out_size) != 0)
+ 		retcode = -EFAULT;
+ 
+Index: rpi-kernel/include/drm/drm_drv.h
+===================================================================
+--- rpi-kernel.orig/include/drm/drm_drv.h
++++ rpi-kernel/include/drm/drm_drv.h
+@@ -779,6 +779,7 @@ struct drm_driver {
+ };
+ 
+ extern unsigned int drm_debug;
++extern bool drm_master_relax;
+ 
+ int drm_dev_init(struct drm_device *dev,
+ 		 struct drm_driver *driver,

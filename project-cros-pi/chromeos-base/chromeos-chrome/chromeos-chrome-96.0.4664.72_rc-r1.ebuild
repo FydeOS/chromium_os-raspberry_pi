@@ -24,7 +24,7 @@ SRC_URI=""
 
 LICENSE="BSD-Google chrome_internal? ( Google-TOS )"
 SLOT="0"
-KEYWORDS="~*"
+KEYWORDS="*"
 IUSE="
 	+afdo_use
 	afdo_verify
@@ -179,6 +179,7 @@ RDEPEND="${RDEPEND}
 	)
 	oobe_config? ( chromeos-base/oobe_config )
 	iioservice? ( chromeos-base/iioservice )
+  media-libs/raspberrypi-userland
 	"
 
 DEPEND="${DEPEND}
@@ -641,6 +642,23 @@ add_api_keys() {
 	)
 }
 
+patch_widevine() {
+  info "patching for widevine..."
+  local target_dir="${CHROME_ROOT}/src/third_party/widevine/cdm/chromeos/arm"
+  local bin_file="${target_dir}/libwidevinecdm.so"
+  if [ ! -f ${bin_file} ]; then
+    epatch ${FILESDIR}/widevine/widevine_gni.patch
+    mkdir -p $target_dir || true
+    cp ${FILESDIR}/widevine/widevine_cdm_version.h $target_dir || die "Could not copy file to $target_dir"
+    cp ${FILESDIR}/widevine/libwidevinecdm.so $target_dir || die "Could not copy file to $bin_file"
+  fi
+}
+
+patch_workaround() {
+  info "patching for workaground..."
+  epatch ${FILESDIR}/patches/*.patch
+}
+
 src_prepare() {
 	# Must call eapply_user in EAPI 7, but this function is a no-op here.
 	eapply_user
@@ -682,6 +700,10 @@ src_prepare() {
 			add_api_keys "${GAPI_CONFIG_FILE}"
 		fi
 	fi
+  if [[ "${CHROME_ORIGIN}" == "SERVER_SOURCE" ]]; then
+    use widevine && patch_widevine
+    patch_workaround
+  fi
 }
 
 setup_test_lists() {
@@ -793,6 +815,9 @@ setup_compile_flags() {
 		append-cxxflags "-stdlib=libc++"
 		append-ldflags "-stdlib=libc++"
 	fi
+
+  #link flags for raspberry mmal video decoder layer in ffmpeg
+  append-ldflags -lmmal -lmmal_core -lmmal_util -lmmal_vc_client -lbcm_host
 
 	# Workaround: Disable fatal linker warnings on arm64/lld.
 	# https://crbug.com/913071

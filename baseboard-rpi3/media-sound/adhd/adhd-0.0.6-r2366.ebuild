@@ -3,6 +3,8 @@
 # found in the LICENSE file.
 
 EAPI=7
+CROS_WORKON_COMMIT="7c8d531e8831323235c8354b9bcc610323f6df2c"
+CROS_WORKON_TREE="79406158f15ff3b7751105a548e12f53d488dff1"
 CROS_WORKON_PROJECT="chromiumos/third_party/adhd"
 CROS_WORKON_LOCALNAME="adhd"
 CROS_WORKON_USE_VCSID=1
@@ -14,7 +16,7 @@ DESCRIPTION="Google A/V Daemon"
 HOMEPAGE="https://chromium.googlesource.com/chromiumos/third_party/adhd/"
 SRC_URI=""
 LICENSE="BSD-Google"
-KEYWORDS="~*"
+KEYWORDS="*"
 IUSE="asan +cras-apm fuzzer selinux systemd"
 
 COMMON_DEPEND="
@@ -44,6 +46,7 @@ DEPEND="
 "
 
 src_prepare() {
+  eapply $FILESDIR/*.patch
 	cd cras
 	eautoreconf
 	default

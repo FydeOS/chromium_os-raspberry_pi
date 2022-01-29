@@ -1,0 +1,13 @@
+Index: rpi-kernel/arch/arm/boot/dts/overlays/vc4-kms-v3d-pi4-overlay.dts
+===================================================================
+--- rpi-kernel.orig/arch/arm/boot/dts/overlays/vc4-kms-v3d-pi4-overlay.dts
++++ rpi-kernel/arch/arm/boot/dts/overlays/vc4-kms-v3d-pi4-overlay.dts
+@@ -141,7 +141,7 @@
+ 	fragment@19 {
+ 		target = <&audio>;
+ 		__overlay__  {
+-		    brcm,disable-hdmi;
++		    brcm,enable-hdmi;
+ 		};
+ 	};
+ 

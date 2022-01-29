@@ -4,16 +4,22 @@
 
 EAPI=7
 
+MESON_AUTO_DEPEND=no
+
+CROS_WORKON_COMMIT="997a5e622774da30930e5d35b2d2a398a14e7b0c"
+CROS_WORKON_TREE="80dc2ebe7f0b4590dfd9f91955aa59cccf2bb5f8"
+
 EGIT_REPO_URI="git://anongit.freedesktop.org/mesa/mesa"
 CROS_WORKON_PROJECT="chromiumos/third_party/mesa"
 CROS_WORKON_MANUAL_UPREV="1"
+CROS_WORKON_EGIT_BRANCH="mesa-21.1"
 
 if [[ ${PV} = 9999* ]]; then
 	GIT_ECLASS="git-2"
 	EXPERIMENTAL="true"
 fi
 
-inherit base flag-o-matic meson toolchain-funcs ${GIT_ECLASS} cros-workon
+inherit base multilib flag-o-matic meson toolchain-funcs ${GIT_ECLASS} cros-workon
 
 FOLDER="${PV/_rc*/}"
 [[ ${PV/_rc*/} == ${PV} ]] || FOLDER+="/RC"
@@ -33,7 +39,8 @@ fi
 # ralloc is LGPL-3
 # GLES[2]/gl[2]{,ext,platform}.h are SGI-B-2.0
 LICENSE="MIT LGPL-3 SGI-B-2.0"
-KEYWORDS="~*"
+SLOT="0"
+KEYWORDS="*"
 
 INTEL_CARDS="intel"
 RADEON_CARDS="amdgpu radeon"
@@ -44,47 +51,43 @@ done
 
 IUSE="${IUSE_VIDEO_CARDS}
 	+classic debug dri drm egl +gallium -gbm gles1 gles2 kernel_FreeBSD
-	kvm_guest llvm +nptl pic selinux shared-glapi +vulkan wayland xlib-glx X
+	kvm_guest llvm +nptl pic selinux shared-glapi vulkan wayland xlib-glx X
 	libglvnd"
 
-LIBDRM_DEPSTRING=">=x11-libs/libdrm-2.4.60:="
+LIBDRM_DEPSTRING=">=x11-libs/libdrm-2.4.60"
 
 REQUIRED_USE="video_cards_amdgpu? ( llvm )
 	video_cards_llvmpipe? ( llvm )"
 
-COMMON_DEPEND="
-	dev-libs/expat:=
-	dev-libs/libgcrypt:=
-	llvm? ( sys-devel/llvm:= )
-	llvm? ( virtual/libelf:= )
-	virtual/udev:=
+# keep correct libdrm and dri2proto dep
+# keep blocks in rdepend for binpkg
+RDEPEND="
+	libglvnd? ( media-libs/libglvnd )
+	!libglvnd? ( !media-libs/libglvnd )
 	X? (
-		!<x11-base/xorg-server-1.7:=
-		>=x11-libs/libX11-1.3.99.901:=
-		x11-libs/libXdamage:=
-		x11-libs/libXext:=
-		x11-libs/libXrandr:=
-		x11-libs/libxshmfence:=
-		x11-libs/libXxf86vm:=
+		!<x11-base/xorg-server-1.7
+		>=x11-libs/libX11-1.3.99.901
+		x11-libs/libXdamage
+		x11-libs/libXext
+		x11-libs/libXrandr
+		x11-libs/libxshmfence
+		x11-libs/libXxf86vm
 	)
+	llvm? ( virtual/libelf )
+	dev-libs/expat
+	dev-libs/libgcrypt
+	virtual/udev
 	${LIBDRM_DEPSTRING}
 "
 
-RDEPEND="${COMMON_DEPEND}
-	libglvnd? ( media-libs/libglvnd )
-	!libglvnd? ( !media-libs/libglvnd )
-"
-
-DEPEND="${COMMON_DEPEND}
-	dev-libs/libxml2:=
-	x11-base/xorg-proto:=
-	wayland? ( >=dev-libs/wayland-protocols-1.8:= )
-"
-
-BDEPEND="
-	virtual/pkgconfig
+DEPEND="${RDEPEND}
+	dev-libs/libxml2
 	sys-devel/bison
 	sys-devel/flex
+	virtual/pkgconfig
+	x11-base/xorg-proto
+	wayland? ( >=dev-libs/wayland-protocols-1.8 )
+	llvm? ( sys-devel/llvm )
 "
 
 driver_list() {
@@ -99,9 +102,6 @@ src_prepare() {
 			-e "s/-DHAVE_POSIX_MEMALIGN//" \
 			configure.ac || die
 	fi
-
-	# Produce a dummy git_sha1.h file because .git will not be copied to portage tmp directory
-	echo '#define MESA_GIT_SHA1 "git-0000000"' > src/git_sha1.h
 	default
 }
 
@@ -112,7 +112,7 @@ src_configure() {
 	# For llvmpipe on ARM we'll get errors about being unable to resolve
 	# "__aeabi_unwind_cpp_pr1" if we don't include this flag; seems wise
 	# to include it for all platforms though.
-	use video_cards_llvmpipe && append-flags "-rtlib=libgcc -shared-libgcc"
+	use video_cards_llvmpipe && append-flags "-rtlib=libgcc -shared-libgcc --unwindlib=libgcc"
 
 	if use !gallium && use !classic && use !vulkan; then
 		ewarn "You enabled neither classic, gallium, nor vulkan "

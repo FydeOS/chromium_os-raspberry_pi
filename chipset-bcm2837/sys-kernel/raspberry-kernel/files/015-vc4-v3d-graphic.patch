@@ -1,0 +1,321 @@
+Index: rpi-linux-kernel/drivers/gpu/drm/v3d/Makefile
+===================================================================
+--- rpi-linux-kernel.orig/drivers/gpu/drm/v3d/Makefile
++++ rpi-linux-kernel/drivers/gpu/drm/v3d/Makefile
+@@ -4,6 +4,7 @@
+ # core driver code
+ v3d-y := \
+ 	v3d_bo.o \
++  v3d_vc4_bind.o \
+ 	v3d_drv.o \
+ 	v3d_fence.o \
+ 	v3d_gem.o \
+Index: rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_bo.c
+===================================================================
+--- rpi-linux-kernel.orig/drivers/gpu/drm/v3d/v3d_bo.c
++++ rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_bo.c
+@@ -24,6 +24,7 @@
+ 
+ #include "v3d_drv.h"
+ #include "uapi/drm/v3d_drm.h"
++#include "v3d_vc4_bind.h"
+ 
+ /* Called DRM core on the last userspace/kernel unreference of the
+  * BO.
+@@ -32,6 +33,7 @@ void v3d_free_object(struct drm_gem_obje
+ {
+ 	struct v3d_dev *v3d = to_v3d_dev(obj->dev);
+ 	struct v3d_bo *bo = to_v3d_bo(obj);
++  u32 vc4_handle = bo->vc4_handle;
+ 
+ 	v3d_mmu_remove_ptes(bo);
+ 
+@@ -48,6 +50,8 @@ void v3d_free_object(struct drm_gem_obje
+ 	bo->base.pages_mark_dirty_on_put = true;
+ 
+ 	drm_gem_shmem_free_object(obj);
++  if (vc4_handle)
++    free_bo_from_vc4(vc4_handle);
+ }
+ 
+ static const struct drm_gem_object_funcs v3d_gem_funcs = {
+@@ -170,14 +174,32 @@ int v3d_create_bo_ioctl(struct drm_devic
+ 			struct drm_file *file_priv)
+ {
+ 	struct drm_v3d_create_bo *args = data;
++  struct drm_gem_object *gem_obj;
+ 	struct v3d_bo *bo = NULL;
++  u32 vc4_handle;
+ 	int ret;
+ 
+-	if (args->flags != 0) {
++	if (args->flags != 0 && args->flags != ARC_CALLOC) {
+ 		DRM_INFO("unknown create_bo flags: %d\n", args->flags);
+ 		return -EINVAL;
+ 	}
+ 
++  if (is_vc4_enable() && args->flags == ARC_CALLOC) {
++    ret = import_bo_from_vc4(dev, file_priv, PAGE_ALIGN(args->size), &vc4_handle, &args->handle);
++    if (!ret) {
++      gem_obj = drm_gem_object_lookup(file_priv, args->handle);
++      if (!gem_obj) {
++        DRM_DEBUG("Failed to look up new imported GEM BO %d\n", args->handle);
++        return -EINVAL;
++      }
++      bo = to_v3d_bo(gem_obj);
++      bo->vc4_handle = vc4_handle;
++      DRM_DEBUG("store vc4 handle:%u", bo->vc4_handle);
++      drm_gem_object_put(gem_obj);
++      return 0;
++    }
++  }
++
+ 	bo = v3d_bo_create(dev, file_priv, PAGE_ALIGN(args->size));
+ 	if (IS_ERR(bo))
+ 		return PTR_ERR(bo);
+Index: rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.h
+===================================================================
+--- /dev/null
++++ rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.h
+@@ -0,0 +1,21 @@
++// SPDX-License-Identifier: GPL-2.0+
++/* Copyright (C) 2020 FydeOS team */
++/* Author: Yang Tsao (yang@fydeos.io)*/
++
++#ifndef V3D_VC4_BIND_H
++#define V3D_VC4_BIND_H
++#include <drm/drm_device.h>
++
++#define ARC_CALLOC (1<<7)
++extern struct drm_device *vc4_drm;
++extern struct drm_file *vc4_drm_file;
++
++static inline bool is_vc4_enable(void) {
++  return vc4_drm != NULL && vc4_drm_file != NULL;
++}
++
++int import_bo_from_vc4(struct drm_device *dev, struct drm_file *file_priv,
++  size_t unaligned_size, u32 *vc4_handle, u32 *handle);
++
++void free_bo_from_vc4(u32 handle);
++#endif /* V3D_VC4_BIND_H */
+Index: rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_drv.c
+===================================================================
+--- rpi-linux-kernel.orig/drivers/gpu/drm/v3d/v3d_drv.c
++++ rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_drv.c
+@@ -178,14 +178,14 @@ DEFINE_DRM_GEM_FOPS(v3d_drm_fops);
+  * need to stay DRM_AUTH until we do buffer size/offset validation.
+  */
+ static const struct drm_ioctl_desc v3d_drm_ioctls[] = {
+-	DRM_IOCTL_DEF_DRV(V3D_SUBMIT_CL, v3d_submit_cl_ioctl, DRM_RENDER_ALLOW | DRM_AUTH),
++	DRM_IOCTL_DEF_DRV(V3D_SUBMIT_CL, v3d_submit_cl_ioctl, DRM_RENDER_ALLOW),
+ 	DRM_IOCTL_DEF_DRV(V3D_WAIT_BO, v3d_wait_bo_ioctl, DRM_RENDER_ALLOW),
+ 	DRM_IOCTL_DEF_DRV(V3D_CREATE_BO, v3d_create_bo_ioctl, DRM_RENDER_ALLOW),
+ 	DRM_IOCTL_DEF_DRV(V3D_MMAP_BO, v3d_mmap_bo_ioctl, DRM_RENDER_ALLOW),
+ 	DRM_IOCTL_DEF_DRV(V3D_GET_PARAM, v3d_get_param_ioctl, DRM_RENDER_ALLOW),
+ 	DRM_IOCTL_DEF_DRV(V3D_GET_BO_OFFSET, v3d_get_bo_offset_ioctl, DRM_RENDER_ALLOW),
+-	DRM_IOCTL_DEF_DRV(V3D_SUBMIT_TFU, v3d_submit_tfu_ioctl, DRM_RENDER_ALLOW | DRM_AUTH),
+-	DRM_IOCTL_DEF_DRV(V3D_SUBMIT_CSD, v3d_submit_csd_ioctl, DRM_RENDER_ALLOW | DRM_AUTH),
++	DRM_IOCTL_DEF_DRV(V3D_SUBMIT_TFU, v3d_submit_tfu_ioctl, DRM_RENDER_ALLOW),
++	DRM_IOCTL_DEF_DRV(V3D_SUBMIT_CSD, v3d_submit_csd_ioctl, DRM_RENDER_ALLOW),
+ };
+ 
+ static struct drm_driver v3d_drm_driver = {
+@@ -332,6 +332,7 @@ static int v3d_platform_drm_probe(struct
+ 
+ 	ret = clk_set_rate(v3d->clk, v3d->clk_down_rate);
+ 	WARN_ON_ONCE(ret != 0);
++//  init_v3d_vc4_bind();
+ 
+ 	return 0;
+ 
+Index: rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_drv.h
+===================================================================
+--- rpi-linux-kernel.orig/drivers/gpu/drm/v3d/v3d_drv.h
++++ rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_drv.h
+@@ -151,6 +151,7 @@ struct v3d_bo {
+ 	 * v3d_render_job->unref_list
+ 	 */
+ 	struct list_head unref_head;
++  u32 vc4_handle;
+ };
+ 
+ static inline struct v3d_bo *
+Index: rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.c
+===================================================================
+--- /dev/null
++++ rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.c
+@@ -0,0 +1,51 @@
++#include <linux/mutex.h>
++#include <drm/drm_drv.h>
++#include <drm/drm_prime.h>
++#include "../vc4/vc4_drv.h"
++#include "v3d_vc4_bind.h"
++
++#include "uapi/drm/vc4_drm.h"
++
++int import_bo_from_vc4(struct drm_device *dev,
++    struct drm_file *file_priv, size_t unaligned_size, u32 *vc4_handle, u32 *handle)
++{
++  struct drm_vc4_create_bo args = {0};
++  int ret, prime_fd;
++
++  if (!is_vc4_enable())
++    return -ENODEV;
++
++  args.size = unaligned_size;
++  args.flags = V3D_BIND;
++  ret = vc4_create_bo_ioctl(vc4_drm, &args, vc4_drm_file);
++  if (ret)
++    goto out;
++  *vc4_handle = args.handle;
++  ret = drm_gem_prime_handle_to_fd(vc4_drm, vc4_drm_file, args.handle,
++     DRM_CLOEXEC | DRM_RDWR, &prime_fd);
++  if (ret)
++    ret = drm_gem_prime_handle_to_fd(vc4_drm, vc4_drm_file, args.handle,
++         DRM_CLOEXEC, &prime_fd);
++  if (ret)
++    goto release_vc4_bo;
++
++  if (!drm_gem_prime_fd_to_handle(dev, file_priv, prime_fd, handle))
++		goto out;
++ 
++release_vc4_bo:
++  free_bo_from_vc4(args.handle);
++out:
++  if (ret)
++  	DRM_ERROR("Borrow bo from vc4 size:%uk, vc4 handle:%u, fd:%d, v3d handle:%u, ret:%d\n",
++      (u32) (unaligned_size / 1024), *vc4_handle, prime_fd, *handle, ret);
++  return ret;
++}
++
++void free_bo_from_vc4(u32 handle) {
++  int ret;
++  /* need releasing handle twice? */
++  ret = drm_gem_handle_delete(vc4_drm_file, handle);
++  DRM_DEBUG("release borrowed vc4 handle:%d\n", handle);
++  if (ret)
++    DRM_ERROR("Free handle:%u, from vc4, ret:%d\n", handle, ret);
++}
+Index: rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_bo.c
+===================================================================
+--- rpi-linux-kernel.orig/drivers/gpu/drm/vc4/vc4_bo.c
++++ rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_bo.c
+@@ -30,6 +30,7 @@ static const char * const bo_type_names[
+ 	"RCL",
+ 	"BCL",
+ 	"kernel BO cache",
++  "V3D Bind",
+ };
+ 
+ static bool is_user_label(int label)
+@@ -795,6 +796,7 @@ vc4_prime_import_sg_table(struct drm_dev
+ 
+ static int vc4_grab_bin_bo(struct vc4_dev *vc4, struct vc4_file *vc4file)
+ {
++#ifndef CONFIG_DRM_V3D
+ 	int ret;
+ 
+ 	if (!vc4->v3d)
+@@ -806,7 +808,7 @@ static int vc4_grab_bin_bo(struct vc4_de
+ 	ret = vc4_v3d_bin_bo_get(vc4, &vc4file->bin_bo_used);
+ 	if (ret)
+ 		return ret;
+-
++#endif
+ 	return 0;
+ }
+ 
+@@ -827,7 +829,8 @@ int vc4_create_bo_ioctl(struct drm_devic
+ 	 * We can't allocate from the BO cache, because the BOs don't
+ 	 * get zeroed, and that might leak data between users.
+ 	 */
+-	bo = vc4_bo_create(dev, args->size, false, VC4_BO_TYPE_V3D);
++	bo = vc4_bo_create(dev, args->size, false, args->flags == V3D_BIND ?
++        VC4_BO_TYPE_V3D_BIND : VC4_BO_TYPE_V3D);
+ 	if (IS_ERR(bo))
+ 		return PTR_ERR(bo);
+ 
+@@ -1096,3 +1099,15 @@ int vc4_label_bo_ioctl(struct drm_device
+ 
+ 	return ret;
+ }
++
++void vc4_bo_close(struct drm_gem_object *gem_obj, struct drm_file *file_priv)
++{
++  struct vc4_bo *bo = to_vc4_bo(gem_obj);
++  if (bo->label == VC4_BO_TYPE_V3D_BIND && bo->base.vaddr != NULL) {
++    mutex_lock(&bo->madv_lock);
++    bo->madv = VC4_MADV_DONTNEED;
++    mutex_unlock(&bo->madv_lock);
++    vc4_bo_dec_usecnt(bo);
++    DRM_DEBUG_DRIVER("vc4 exported gem closed, bo usercount:%u\n", refcount_read(&bo->usecnt));
++  }
++}
+Index: rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_drv.c
+===================================================================
+--- rpi-linux-kernel.orig/drivers/gpu/drm/vc4/vc4_drv.c
++++ rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_drv.c
+@@ -50,6 +50,9 @@
+ #define DRIVER_MINOR 0
+ #define DRIVER_PATCHLEVEL 0
+ 
++struct drm_device *vc4_drm = NULL;
++struct drm_file *vc4_drm_file = NULL;
++
+ /* Helper function for mapping the regs on a platform device. */
+ void __iomem *vc4_ioremap_regs(struct platform_device *dev, int index)
+ {
+@@ -127,6 +130,7 @@ static int vc4_open(struct drm_device *d
+ 
+ 	vc4_perfmon_open_file(vc4file);
+ 	file->driver_priv = vc4file;
++  vc4_drm_file = file;
+ 	return 0;
+ }
+ 
+Index: rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_drv.h
+===================================================================
+--- rpi-linux-kernel.orig/drivers/gpu/drm/vc4/vc4_drv.h
++++ rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_drv.h
+@@ -21,6 +21,9 @@
+ #include "uapi/drm/vc4_drm.h"
+ #include "vc4_regs.h"
+ 
++#define CURSOR_TIMEOUT_MSEC 20
++#define V3D_BIND (1<<7)
++
+ struct drm_device;
+ struct drm_gem_object;
+ 
+@@ -39,6 +42,7 @@ enum vc4_kernel_bo_type {
+ 	VC4_BO_TYPE_RCL,
+ 	VC4_BO_TYPE_BCL,
+ 	VC4_BO_TYPE_KERNEL_CACHE,
++  VC4_BO_TYPE_V3D_BIND,
+ 	VC4_BO_TYPE_COUNT
+ };
+ 
+Index: rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_kms.c
+===================================================================
+--- rpi-linux-kernel.orig/drivers/gpu/drm/vc4/vc4_kms.c
++++ rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_kms.c
+@@ -444,6 +444,7 @@ static int vc4_atomic_commit(struct drm_
+ {
+ 	struct vc4_dev *vc4 = to_vc4_dev(dev);
+ 	int ret;
++  unsigned long before_wait;
+ 
+ 	if (state->async_update) {
+ 		ret = down_interruptible(&vc4->async_modeset);
+@@ -489,8 +490,9 @@ static int vc4_atomic_commit(struct drm_
+ 	}
+ 
+ 	if (!nonblock) {
++    before_wait = jiffies;
+ 		ret = drm_atomic_helper_wait_for_fences(dev, state, true);
+-		if (ret) {
++		if (ret || (jiffies_to_msecs(jiffies - before_wait) > CURSOR_TIMEOUT_MSEC)) {
+ 			drm_atomic_helper_cleanup_planes(dev, state);
+ 			up(&vc4->async_modeset);
+ 			return ret;

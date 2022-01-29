@@ -3,13 +3,12 @@
 
 EAPI=7
 
-CXXEXCEPTIONS_FLAGS="-fno-exceptions"
-CROS_WORKON_COMMIT="e56f1f493560e0b641bbe36a528a13767817afed"
-CROS_WORKON_TREE="c8e597e8dc3dc91766fd0b28b32b1588bab63173"
+CROS_WORKON_COMMIT="962df634bd0afe12e6f38464f5e602cf1460c430"
+CROS_WORKON_TREE="c66f4eadb3ce21b120447bb910bc9606c3fc499b"
 CROS_WORKON_PROJECT="chromiumos/third_party/libcamera"
-CROS_WORKON_INCREMENTAL_BUILD="1"
+#CROS_WORKON_INCREMENTAL_BUILD="1"
 
-inherit cros-workon meson
+inherit cros-camera cros-workon meson
 
 DESCRIPTION="Camera support library for Linux"
 HOMEPAGE="https://www.libcamera.org"
@@ -23,11 +22,13 @@ RDEPEND="
 	chromeos-base/cros-camera-libs
 	dev? ( dev-libs/libevent[threads] )
 	dev-libs/libyaml
+	media-libs/libcamera-configs
 	media-libs/libjpeg-turbo
 	media-libs/libexif
 	>=net-libs/gnutls-3.3:=
 	media-libs/libyuv
 	udev? ( virtual/libudev )
+  dev-libs/boost
 "
 
 DEPEND="
@@ -57,10 +58,11 @@ src_configure() {
 		-Dandroid="enabled"
 		-Dandroid_platform="cros"
 		-Dpipelines="$(pipeline_list "${pipelines[@]}")"
+    -Dipas="raspberrypi"
 		--buildtype "$(usex debug debug plain)"
 		--sysconfdir /etc/camera
 	)
-  cros_enable_cxx_exceptions
+ # append-flags '-Wno-error=shadow' '-std=c99'
 	meson_src_configure
 }
 
@@ -71,7 +73,7 @@ src_compile() {
 src_install() {
 	meson_src_install
 
-	dosym ../libcamera.so "/usr/$(get_libdir)/camera_hal/libcamera.so"
+	cros-camera_dohal "${D}/usr/$(get_libdir)/libcamera-hal.so" libcamera-hal.so
 
 	dostrip -x "/usr/$(get_libdir)/libcamera/"
 }

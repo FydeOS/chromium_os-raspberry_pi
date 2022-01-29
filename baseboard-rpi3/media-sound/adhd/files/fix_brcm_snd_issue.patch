@@ -1,8 +1,8 @@
-diff --git a/cras/src/server/audio_thread.c b/cras/src/server/audio_thread.c
-index 68ecb0e..7df8313 100644
---- a/cras/src/server/audio_thread.c
-+++ b/cras/src/server/audio_thread.c
-@@ -882,6 +882,8 @@ static void *audio_io_thread(void *arg)
+Index: adhd/cras/src/server/audio_thread.c
+===================================================================
+--- adhd.orig/cras/src/server/audio_thread.c
++++ adhd/cras/src/server/audio_thread.c
+@@ -897,6 +897,8 @@ static void *audio_io_thread(void *arg)
  		if (wait_ts)
  			check_busyloop(wait_ts);
  
@@ -11,11 +11,11 @@ index 68ecb0e..7df8313 100644
  		/* Sync atlog with shared memory. */
  		__sync_synchronize();
  		atlog->sync_write_pos = atlog->write_pos;
-diff --git a/cras/src/tools/cras_monitor/cras_monitor.c b/cras/src/tools/cras_monitor/cras_monitor.c
-index d021669..424dc36 100644
---- a/cras/src/tools/cras_monitor/cras_monitor.c
-+++ b/cras/src/tools/cras_monitor/cras_monitor.c
-@@ -166,12 +166,21 @@ static void input_node_gain_changed(void *context, cras_node_id_t node_id,
+Index: adhd/cras/src/tools/cras_monitor/cras_monitor.c
+===================================================================
+--- adhd.orig/cras/src/tools/cras_monitor/cras_monitor.c
++++ adhd/cras/src/tools/cras_monitor/cras_monitor.c
+@@ -162,12 +162,21 @@ static void input_node_gain_changed(void
  	free((void *)node_name);
  }
  
@@ -37,7 +37,7 @@ index d021669..424dc36 100644
  }
  
  static void server_connection_callback(struct cras_client *client,
-@@ -308,6 +317,7 @@ int main(int argc, char **argv)
+@@ -302,6 +311,7 @@ int main(int argc, char **argv)
  		rc = read(STDIN_FILENO, &c, 1);
  		if (rc < 0 || c == 'q')
  			return 0;
