@@ -34,7 +34,7 @@ disable_splash=1
 # Should you run into display issues, such as black-screen or GUI graphics not being able
 # to render properly, you can toggle the display mode to "fkms" to enable a compatibility
 # mode, by commenting/uncommenting the corresponding lines.
-dtoverlay=vc4-kms-v3d
+dtoverlay=vc4-kms-v3d-pi4
 #dtoverlay=vc4-fkms-v3d
 
 

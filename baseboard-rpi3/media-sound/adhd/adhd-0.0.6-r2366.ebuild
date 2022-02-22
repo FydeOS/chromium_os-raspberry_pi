@@ -130,6 +130,8 @@ src_install() {
 			--dict "${S}/cras/src/fuzz/cras_hfp_slc.dict" \
 			--comp "${fuzzer_component_id}"
 	fi
+  insinto /etc/init
+  doins $FILESDIR/cras_monitor.conf
 }
 
 pkg_preinst() {

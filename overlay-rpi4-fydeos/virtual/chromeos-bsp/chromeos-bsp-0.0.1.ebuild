@@ -19,12 +19,12 @@ RDEPEND="
   chromeos-base/fydeos-dev-remote-patch
   chromeos-base/fydeos-stateful-updater
   chromeos-base/license-utils
-  chromeos-base/google-drive-fs
   chromeos-base/fydeos-opengapps-scripts
   chromeos-base/baseboard-bsp
   virtual/fyde-packages
   virtual/fydemina
-  app-i18n/google-ime-tools
+  app-i18n/rime-server
+  app-i18n/chromeos-pinyin
   chromeos-base/chromeos-bsp-rpi4-fydeos"
 
 DEPEND="${RDEPEND}"

@@ -10,7 +10,7 @@ gpu_mem=256
 dtoverlay=vc4-kms-v3d-pi4
 
 # fit for rpi3/rpi4
-#dtoverlay=vc4-fkms-v3d
+#dtoverlay=vc4-fkms-v3d-rpi4
 
 # for more power
 #force_turbo=1

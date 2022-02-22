@@ -1,0 +1,949 @@
+{
+	"ociVersion": "1.0.0-rc1",
+	"platform": {
+		"os": "linux",
+		"arch": "all"
+	},
+	"process": {
+		"terminal": true,
+		"user": {
+			"uid": 0,
+			"gid": 0,
+			"additionalGids": [5005]
+		},
+		"umask": 0,
+		"args": [
+			"/init"
+		],
+		"env": [
+			"INIT_SELINUX_TOOK=1500",
+			"INIT_STARTED_AT=1000",
+			"INIT_SECOND_STAGE=y",
+			"PATH=/sbin:/system/sbin:/system/bin:/system/xbin:/odm/bin:/vendor/bin:/vendor/xbin"
+		],
+		"rlimits": [
+			{
+				"type": "RLIMIT_NICE",
+				"hard": 40,
+				"soft": 40
+			}
+		],
+		"cwd": "/",
+		"selinuxLabel": "u:r:init:s0",
+		"capabilities": {
+			"effective": [
+				"CAP_CHOWN",
+				"CAP_DAC_OVERRIDE",
+				"CAP_DAC_READ_SEARCH",
+				"CAP_FOWNER",
+				"CAP_FSETID",
+				"CAP_KILL",
+				"CAP_SETGID",
+				"CAP_SETUID",
+				"CAP_SETPCAP",
+				"CAP_NET_BIND_SERVICE",
+				"CAP_NET_BROADCAST",
+				"CAP_NET_ADMIN",
+				"CAP_NET_RAW",
+				"CAP_IPC_LOCK",
+				"CAP_IPC_OWNER",
+				"CAP_SYS_RAWIO",
+				"CAP_SYS_CHROOT",
+				"CAP_SYS_PTRACE",
+				"CAP_SYS_ADMIN",
+				"CAP_SYS_NICE",
+				"CAP_SYS_RESOURCE",
+				"CAP_SYS_TTY_CONFIG",
+				"CAP_MKNOD",
+				"CAP_AUDIT_WRITE",
+				"CAP_AUDIT_CONTROL"
+			],
+			"bounding": [
+				"CAP_CHOWN",
+				"CAP_DAC_OVERRIDE",
+				"CAP_DAC_READ_SEARCH",
+				"CAP_FOWNER",
+				"CAP_FSETID",
+				"CAP_KILL",
+				"CAP_SETGID",
+				"CAP_SETUID",
+				"CAP_SETPCAP",
+				"CAP_NET_BIND_SERVICE",
+				"CAP_NET_BROADCAST",
+				"CAP_NET_ADMIN",
+				"CAP_NET_RAW",
+				"CAP_IPC_LOCK",
+				"CAP_IPC_OWNER",
+				"CAP_SYS_RAWIO",
+				"CAP_SYS_CHROOT",
+				"CAP_SYS_PTRACE",
+				"CAP_SYS_ADMIN",
+				"CAP_SYS_NICE",
+				"CAP_SYS_RESOURCE",
+				"CAP_SYS_TTY_CONFIG",
+				"CAP_MKNOD",
+				"CAP_AUDIT_WRITE",
+				"CAP_AUDIT_CONTROL"
+			],
+			"inheritable": [
+				"CAP_CHOWN",
+				"CAP_DAC_OVERRIDE",
+				"CAP_DAC_READ_SEARCH",
+				"CAP_FOWNER",
+				"CAP_FSETID",
+				"CAP_KILL",
+				"CAP_SETGID",
+				"CAP_SETUID",
+				"CAP_SETPCAP",
+				"CAP_NET_BIND_SERVICE",
+				"CAP_NET_BROADCAST",
+				"CAP_NET_ADMIN",
+				"CAP_NET_RAW",
+				"CAP_IPC_LOCK",
+				"CAP_IPC_OWNER",
+				"CAP_SYS_RAWIO",
+				"CAP_SYS_CHROOT",
+				"CAP_SYS_PTRACE",
+				"CAP_SYS_ADMIN",
+				"CAP_SYS_NICE",
+				"CAP_SYS_RESOURCE",
+				"CAP_SYS_TTY_CONFIG",
+				"CAP_MKNOD",
+				"CAP_AUDIT_WRITE",
+				"CAP_AUDIT_CONTROL"
+			],
+			"permitted": [
+				"CAP_CHOWN",
+				"CAP_DAC_OVERRIDE",
+				"CAP_DAC_READ_SEARCH",
+				"CAP_FOWNER",
+				"CAP_FSETID",
+				"CAP_KILL",
+				"CAP_SETGID",
+				"CAP_SETUID",
+				"CAP_SETPCAP",
+				"CAP_NET_BIND_SERVICE",
+				"CAP_NET_BROADCAST",
+				"CAP_NET_ADMIN",
+				"CAP_NET_RAW",
+				"CAP_IPC_LOCK",
+				"CAP_IPC_OWNER",
+				"CAP_SYS_RAWIO",
+				"CAP_SYS_CHROOT",
+				"CAP_SYS_PTRACE",
+				"CAP_SYS_ADMIN",
+				"CAP_SYS_NICE",
+				"CAP_SYS_RESOURCE",
+				"CAP_SYS_TTY_CONFIG",
+				"CAP_MKNOD",
+				"CAP_AUDIT_WRITE",
+				"CAP_AUDIT_CONTROL"
+			],
+			"ambient": [
+				"CAP_CHOWN",
+				"CAP_DAC_OVERRIDE",
+				"CAP_DAC_READ_SEARCH",
+				"CAP_FOWNER",
+				"CAP_FSETID",
+				"CAP_KILL",
+				"CAP_SETGID",
+				"CAP_SETUID",
+				"CAP_SETPCAP",
+				"CAP_NET_BIND_SERVICE",
+				"CAP_NET_BROADCAST",
+				"CAP_NET_ADMIN",
+				"CAP_NET_RAW",
+				"CAP_IPC_LOCK",
+				"CAP_IPC_OWNER",
+				"CAP_SYS_RAWIO",
+				"CAP_SYS_CHROOT",
+				"CAP_SYS_PTRACE",
+				"CAP_SYS_ADMIN",
+				"CAP_SYS_NICE",
+				"CAP_SYS_RESOURCE",
+				"CAP_SYS_TTY_CONFIG",
+				"CAP_MKNOD",
+				"CAP_AUDIT_WRITE",
+				"CAP_AUDIT_CONTROL"
+			]
+		}
+	},
+	"root": {
+		"path": "rootfs/root"
+	},
+	"hostname": "android",
+	"mounts": [
+		{
+			"destination": "/",
+			"type": "bind",
+			"source": "rootfs/root",
+			"options": [
+				"rslave",
+				"suid",
+				"exec"
+			],
+			"performInIntermediateNamespace": true
+		},
+		{
+			"destination": "/vendor",
+			"type": "squashfs",
+			"source": "/opt/google/containers/android/vendor.raw.img",
+			"options": [
+				"loop",
+				"ro",
+				"nodev"
+			]
+		},
+		{
+			"destination": "/data/dalvik-cache/arm",
+			"type": "bind",
+			"source": "/mnt/stateful_partition/unencrypted/art-data/dalvik-cache/arm",
+			"options": [
+				"bind"
+			]
+		},
+		{
+                        "destination": "/data/dalvik-cache/arm64",
+                        "type": "bind",
+                        "source": "/mnt/stateful_partition/unencrypted/art-data/dalvik-cache/arm64",
+                        "options": [
+                                "bind"
+                        ]
+                },
+		{
+			"destination": "/data/dalvik-cache/x86",
+			"type": "bind",
+			"source": "/mnt/stateful_partition/unencrypted/art-data/dalvik-cache/x86",
+			"options": [
+				"bind"
+			]
+		},
+		{
+			"destination": "/data/dalvik-cache/x86_64",
+			"type": "bind",
+			"source": "/mnt/stateful_partition/unencrypted/art-data/dalvik-cache/x86_64",
+			"options": [
+				"bind"
+			]
+		},
+		{
+			"destination": "/dev",
+			"type": "tmpfs",
+			"source": "tmpfs",
+			"options": [
+				"mode=755",
+				"uid=655360",
+				"gid=655360",
+				"nosuid"
+			],
+			"performInIntermediateNamespace": true
+		},
+		{
+			"destination": "/dev/pts",
+			"type": "devpts",
+			"source": "devpts",
+			"options": [
+				"newinstance",
+				"noexec",
+				"nosuid",
+				"ptmxmode=0666"
+			]
+		},
+		{
+			"destination": "/dev/ptmx",
+			"type": "bind",
+			"source": "rootfs/root/dev/pts/ptmx",
+			"options": [
+				"bind",
+				"rw",
+				"dev"
+			]
+		},
+		{
+			"destination": "/dev/socket",
+			"type": "tmpfs",
+			"source": "tmpfs",
+			"options": [
+				"mode=755",
+				"nosuid",
+				"nodev",
+				"noexec"
+			]
+		},
+		{
+			"destination": "/dev/usb-ffs/adb",
+			"type": "bind",
+			"source": "/run/arc/adbd",
+			"options": [
+				"rbind",
+				"rslave"
+			]
+		},
+		{
+			"destination": "/dev/kmsg",
+			"type": "bind",
+			"source": "/run/arc/android.kmsg.fifo",
+			"options": [
+				"bind"
+			]
+		},
+		{
+			"destination": "/var/run/arc",
+			"type": "tmpfs",
+			"source": "tmpfs",
+			"options": [
+				"mode=775",
+				"gid=1000",
+				"noexec",
+				"nodev",
+				"nosuid"
+			]
+		},
+		{
+			"destination": "/var/run/arc/sdcard",
+			"type": "bind",
+			"source": "/run/arc/sdcard",
+			"options": [
+				"rbind"
+			]
+		},
+		{
+			"destination": "/var/run/arc/shared_mounts",
+			"type": "bind",
+			"source": "/run/arc/shared_mounts",
+			"options": [
+				"rbind",
+				"rslave"
+			]
+		},
+		{
+			"destination": "/var/run/chrome",
+			"type": "bind",
+			"source": "/run/chrome",
+			"options": [
+				"bind"
+			]
+		},
+		{
+			"destination": "/var/run/cras",
+			"type": "bind",
+			"source": "/run/cras",
+			"options": [
+				"bind"
+			]
+		},
+		{
+			"destination": "/sys",
+			"type": "sysfs",
+			"source": "none",
+			"options": [
+				"nosuid",
+				"noexec",
+				"nodev"
+			]
+		},
+		{
+			"destination": "/sys/fs/selinux",
+			"type": "bind",
+			"source": "/sys/fs/selinux",
+			"options": [
+				"bind"
+			]
+		},
+		{
+			"destination": "/sys/kernel/debug",
+			"type": "tmpfs",
+			"source": "tmpfs",
+			"options": [
+				"mode=755",
+				"nosuid",
+				"nodev",
+				"noexec"
+			]
+		},
+		{
+			"destination": "/sys/kernel/debug/sync",
+			"type": "bind",
+			"source": "/run/arc/debugfs/sync",
+			"options": [
+				"bind"
+			]
+		},
+		{
+			"_comment": "arc_setup.cc is supposed to mount this into Android only in dev mode",
+			"destination": "/sys/kernel/debug/tracing",
+			"type": "bind",
+			"source": "/run/arc/debugfs/tracing",
+			"options": [
+				"bind"
+			]
+		},
+		{
+			"destination": "/proc",
+			"type": "proc",
+			"source": "proc",
+			"options": [
+				"nosuid",
+				"noexec",
+				"nodev"
+			]
+		},
+		{
+			"destination": "/proc/cmdline",
+			"type": "bind",
+			"source": "/run/arc/cmdline.android",
+			"options": [
+				"bind"
+			]
+		},
+		{
+			"destination": "/proc/sys/vm/mmap_rnd_bits",
+			"type": "bind",
+			"source": "/run/arc/fake_mmap_rnd_bits",
+			"options": [
+				"bind"
+			]
+		},
+		{
+			"destination": "/proc/sys/kernel/kptr_restrict",
+			"type": "bind",
+			"source": "/run/arc/fake_kptr_restrict",
+			"options": [
+				"bind"
+			]
+		},
+		{
+			"destination": "/config/sdcardfs",
+			"type": "bind",
+			"source": "/sys/kernel/config/sdcardfs",
+			"options": [
+				"bind"
+			]
+		},
+		{
+			"destination": "/oem/etc",
+			"type": "bind",
+			"source": "/run/arc/oem/etc",
+			"options": [
+				"bind"
+			]
+		},
+		{
+			"destination": "/var/run/arc/adb",
+			"type": "bind",
+			"source": "/run/arc/adb",
+			"options": [
+				"bind"
+			]
+		},
+		{
+			"destination": "/var/run/arc/apkcache",
+			"type": "bind",
+			"source": "/mnt/stateful_partition/unencrypted/apkcache",
+			"options": [
+				"bind"
+			]
+		},
+		{
+			"destination": "/var/run/arc/dalvik-cache",
+			"type": "bind",
+			"source": "/mnt/stateful_partition/unencrypted/art-data/dalvik-cache",
+			"options": [
+				"bind"
+			]
+		},
+		{
+			"destination": "/var/run/arc/obb",
+			"type": "bind",
+			"source": "/run/arc/obb",
+			"options": [
+				"rbind"
+			]
+		},
+		{
+			"destination": "/var/run/arc/media",
+			"type": "bind",
+			"source": "/run/arc/media",
+			"options": [
+				"rbind"
+			]
+		},
+		{
+			"destination": "/default.prop",
+			"type": "bind",
+			"source": "/run/arc/host_generated/default.prop",
+			"options": [
+				"bind"
+			]
+		},
+		{
+			"destination": "/system/build.prop",
+			"type": "bind",
+			"source": "/run/arc/host_generated/build.prop",
+			"options": [
+				"bind"
+			]
+		},
+		{
+			"destination": "/vendor/build.prop",
+			"type": "bind",
+			"source": "/run/arc/host_generated/vendor_build.prop",
+			"options": [
+				"bind"
+			]
+		},
+		{
+			"destination": "/mnt",
+			"type": "tmpfs",
+			"source": "tmpfs",
+			"options": [
+				"mode=755",
+				"gid=1000",
+				"nosuid",
+				"nodev",
+				"noexec"
+			]
+		}
+	],
+	"hooks": {
+		"precreate": [
+			{
+				"path": "/usr/sbin/arc-setup",
+				"args": [
+					"arc-setup",
+					"--log_tag=arc-setup-precreate",
+					"--mode=setup"
+				],
+				"timeout": 90
+			}
+		],
+		"prechroot": [
+			{
+				"path": "/usr/sbin/arc-setup",
+				"args": [
+					"arc-setup",
+					"--log_tag=arc-setup-prechroot",
+					"--mode=pre-chroot"
+				],
+				"timeout": 8
+			}
+		]
+	},
+	"linux": {
+		"altSyscall": "android",
+		"coreSched": true,
+		"cgroupsPath": "/session_manager_containers",
+		"cpu": {
+			"realtimeRuntime": 200000,
+			"realtimePeriod": 1000000
+		},
+		"skipSecurebits": [
+			"KEEP_CAPS",
+			"KEEP_CAPS_LOCKED"
+		],
+		"namespaces": [
+			{
+				"type": "cgroup"
+			},
+			{
+				"type": "pid"
+			},
+			{
+				"type": "network"
+			},
+			{
+				"type": "ipc"
+			},
+			{
+				"type": "user"
+			},
+			{
+				"type": "uts"
+			},
+			{
+				"type": "mount"
+			}
+		],
+		"devices": [
+			{
+				"path": "/dev/binder",
+				"type": "c",
+				"major": 10,
+				"dynamicMinor": true,
+				"fileMode": 438,
+				"uid": 0,
+				"gid": 0
+			},
+			{
+				"path": "/dev/console",
+				"type": "c",
+				"major": 5,
+				"minor": 1,
+				"fileMode": 384,
+				"uid": 0,
+				"gid": 0
+			},
+			{
+				"path": "/dev/hwbinder",
+				"type": "c",
+				"major": 10,
+				"dynamicMinor": true,
+				"fileMode": 438,
+				"uid": 0,
+				"gid": 0
+			},
+			{
+				"path": "/dev/vndbinder",
+				"type": "c",
+				"major": 10,
+				"dynamicMinor": true,
+				"fileMode": 438,
+				"uid": 0,
+				"gid": 0
+			},
+			{
+				"path": "/dev/null",
+				"type": "c",
+				"major": 1,
+				"minor": 3,
+				"fileMode": 438,
+				"uid": 0,
+				"gid": 0
+			},
+			{
+				"path": "/dev/random",
+				"type": "c",
+				"major": 1,
+				"minor": 8,
+				"fileMode": 438,
+				"uid": 0,
+				"gid": 0
+			},
+			{
+				"path": "/dev/urandom",
+				"type": "c",
+				"major": 1,
+				"minor": 9,
+				"fileMode": 438,
+				"uid": 0,
+				"gid": 0
+			},
+			{
+				"path": "/dev/zero",
+				"type": "c",
+				"major": 1,
+				"minor": 5,
+				"fileMode": 438,
+				"uid": 0,
+				"gid": 0
+			},
+			{
+				"path": "/dev/tty",
+				"type": "c",
+				"major": 5,
+				"minor": 0,
+				"fileMode": 438,
+				"uid": 0,
+				"gid": 0
+			},
+			{
+				"path": "/dev/ashmem",
+				"type": "c",
+				"major": 10,
+				"dynamicMinor": true,
+				"fileMode": 438,
+				"uid": 0,
+				"gid": 0
+			},
+			{
+				"path": "/dev/dri/card0",
+				"type": "c",
+				"major": 226,
+				"minor": 0,
+				"fileMode": 438,
+				"uid": 0,
+				"gid": 0
+			},
+			{
+				"path": "/dev/dri/card1",
+				"type": "c",
+				"major": 226,
+				"minor": 1,
+				"fileMode": 438,
+				"uid": 0,
+				"gid": 0
+			},
+			{
+				"path": "/dev/dri/controlD64",
+				"type": "c",
+				"major": 226,
+				"minor": 64,
+				"fileMode": 438,
+				"uid": 0,
+				"gid": 0
+			},
+			{
+				"path": "/dev/dri/renderD128",
+				"type": "c",
+				"major": 226,
+				"minor": 128,
+				"fileMode": 438,
+				"uid": 0,
+				"gid": 0
+			},
+			{
+				"path": "/dev/dri/renderD129",
+				"type": "c",
+				"major": 226,
+				"minor": 129,
+				"fileMode": 438,
+				"uid": 0,
+				"gid": 0
+			},
+			{
+				"path": "/dev/dri/renderD130",
+				"type": "c",
+				"major": 226,
+				"minor": 130,
+				"fileMode": 438,
+				"uid": 0,
+				"gid": 0
+			},
+			{
+				"path": "/dev/pvr_sync",
+				"type": "c",
+				"major": 10,
+				"dynamicMinor": true,
+				"fileMode": 438,
+				"uid": 0,
+				"gid": 1003
+			},
+			{
+				"path": "/dev/mali0",
+				"type": "c",
+				"major": 10,
+				"dynamicMinor": true,
+				"fileMode": 438,
+				"uid": 0,
+				"gid": 0
+			},
+			{
+				"path": "/dev/full",
+				"type": "c",
+				"major": 1,
+				"minor": 7,
+				"fileMode": 438,
+				"uid": 0,
+				"gid": 0
+			},
+			{
+				"path": "/dev/goldfish_pipe",
+				"type": "c",
+				"major": 10,
+				"dynamicMinor": true,
+				"fileMode": 438,
+				"uid": 0,
+				"gid": 0
+			},
+			{
+				"path": "/dev/ion",
+				"type": "c",
+				"major": 10,
+				"dynamicMinor": true,
+				"fileMode": 438,
+				"uid": 0,
+				"gid": 0
+			},
+			{
+				"path": "/dev/ppp",
+				"type": "c",
+				"major": 108,
+				"minor": 0,
+				"fileMode": 432,
+				"uid": 1001,
+				"gid": 1016
+			},
+			{
+				"path": "/dev/sw_sync",
+				"type": "c",
+				"major": 10,
+				"dynamicMinor": true,
+				"fileMode": 432,
+				"uid": 1000,
+				"gid": 1000
+			},
+			{
+				"path": "/dev/tun",
+				"type": "c",
+				"major": 10,
+				"minor": 200,
+				"fileMode": 432,
+				"uid": 1000,
+				"gid": 1016
+			},
+			{
+				"path": "/dev/xt_qtaguid",
+				"type": "c",
+				"major": 10,
+				"dynamicMinor": true,
+				"fileMode": 420,
+				"uid": 0,
+				"gid": 0
+			}
+		],
+		"uidMappings": [
+			{
+				"hostID": 655360,
+				"containerID": 0,
+				"size": 5000
+			},
+			{
+				"hostID": 600,
+				"containerID": 5000,
+				"size": 50
+			},
+			{
+				"hostID": 660410,
+				"containerID": 5050,
+				"size": 1994950
+			}
+		],
+		"gidMappings": [
+			{
+				"_comment": "Shift GID 0..1064 (inclusive) in container by 655360",
+				"hostID": 655360,
+				"containerID": 0,
+				"size": 1065
+			},
+			{
+				"_comment": "Map GID 1065 in container (Android's AID_RESERVED_DISK) to 20119, since ext4 resgid is 16-bit",
+				"hostID": 20119,
+				"containerID": 1065,
+				"size": 1
+			},
+			{
+				"_comment": "Shift GID 1066..4999 (inclusive) in container by 655360",
+				"hostID": 656426,
+				"containerID": 1066,
+				"size": 3934
+			},
+			{
+				"hostID": 600,
+				"containerID": 5000,
+				"size": 50
+			},
+			{
+				"hostID": 660410,
+				"containerID": 5050,
+				"size": 1994950
+			}
+		],
+		"resources": {
+			"devices": [
+				{
+					"allow": true,
+					"access": "rw",
+					"type": "c",
+					"major": 10
+				},
+				{
+					"allow": true,
+					"access": "rw",
+					"type": "c",
+					"major": 1,
+					"minor": 3
+				},
+				{
+					"allow": true,
+					"access": "rw",
+					"type": "c",
+					"major": 1,
+					"minor": 8
+				},
+				{
+					"allow": true,
+					"access": "rw",
+					"type": "c",
+					"major": 1,
+					"minor": 9
+				},
+				{
+					"allow": true,
+					"access": "rw",
+					"type": "c",
+					"major": 1,
+					"minor": 5
+				},
+				{
+					"allow": true,
+					"access": "rw",
+					"type": "c",
+					"major": 226,
+					"minor": 0
+				},
+				{
+					"allow": true,
+					"access": "rw",
+					"type": "c",
+					"major": 226,
+					"minor": 1
+				},
+				{
+					"allow": true,
+					"access": "rw",
+					"type": "c",
+					"major": 226,
+					"minor": 64
+				},
+				{
+					"allow": true,
+					"access": "rw",
+					"type": "c",
+					"major": 226,
+					"minor": 128
+				},
+				{
+					"allow": true,
+					"access": "rw",
+					"type": "c",
+					"major": 226,
+					"minor": 129
+				},
+				{
+					"allow": true,
+					"access": "rw",
+					"type": "c",
+					"major": 226,
+					"minor": 130
+				},
+				{
+					"allow": true,
+					"access": "rw",
+					"type": "c",
+					"major": 1,
+					"minor": 7
+				},
+				{
+					"allow": true,
+					"access": "rw",
+					"type": "c",
+					"major": 108,
+					"minor": 0
+				},
+				{
+					"allow": true,
+					"access": "rw",
+					"type": "c",
+					"major": 5
+				},
+				{
+					"_comment": "Allow pts device access",
+					"allow": true,
+					"access": "rwm",
+					"type": "c",
+					"major": 136
+				}
+			]
+		}
+	}
+}

@@ -4,8 +4,10 @@
 
 EAPI=6
 
+CROS_WORKON_COMMIT="227fed4a34b9e1fcd4b3c77f9115044e6220e28e"
+CROS_WORKON_TREE="1b4b66aace92c123597a3a80ebabae09b3852ea5"
 CROS_WORKON_PROJECT="chromiumos/third_party/mesa"
-CROS_WORKON_LOCALNAME="mesa"
+CROS_WORKON_LOCALNAME="mesa-freedreno"
 CROS_WORKON_EGIT_BRANCH="chromeos-freedreno"
 
 inherit base meson multilib-minimal flag-o-matic toolchain-funcs cros-workon arc-build
@@ -98,7 +100,7 @@ multilib_src_install() {
 
 	exeinto "${ARC_PREFIX}/vendor/$(get_libdir)/dri"
 	newexe "${BUILD_DIR}/src/gallium/targets/dri/libgallium_dri.so" v3d_dri.so
-  dosym v3d_dri.so "${ARC_PREFIX}"/vendor/$(get_libdir)/dri/vc4_dri.so
+  dosym v3d_dri.so "${ARC_PREFIX}/vendor/$(get_libdir)/dri/vc4_dri.so"
 
 	if use vulkan; then
 		exeinto "${ARC_PREFIX}/vendor/$(get_libdir)/hw"
@@ -115,8 +117,7 @@ multilib_src_install_all() {
 
 	# Install init files to advertise supported API versions.
 	insinto "${ARC_PREFIX}/vendor/etc/init"
-	#doins "${FILESDIR}/gles31.rc"
-  doins ${FILESDIR}/gles31/init.gpu.rc
+	doins "${FILESDIR}/gles31.rc"
 
 	# Install vulkan files
 	if use vulkan; then
@@ -143,3 +144,5 @@ multilib_src_install_all() {
 	insinto "${ARC_PREFIX}/vendor/etc/permissions"
 	doins "${FILESDIR}/android.hardware.opengles.aep.xml"
 }
+
+PATCHES=( "${FILESDIR}/gles31/0001-limit-gles-version.patch" )

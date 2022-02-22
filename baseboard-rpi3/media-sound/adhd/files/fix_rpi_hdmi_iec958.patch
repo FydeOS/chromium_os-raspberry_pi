@@ -1,0 +1,28 @@
+diff --git a/cras/src/server/cras_alsa_card.c b/cras/src/server/cras_alsa_card.c
+index b0f944ab..890ace83 100644
+--- a/cras/src/server/cras_alsa_card.c
++++ b/cras/src/server/cras_alsa_card.c
+@@ -103,11 +103,20 @@ struct cras_iodev *create_iodev_for_device(
+ 	new_dev = calloc(1, sizeof(*new_dev));
+ 	if (new_dev == NULL)
+ 		return NULL;
+-
++  syslog(LOG_ERR, "create pcm device for card:%s %s:%s:%s [%u]",
++          alsa_card->name, card_name, dev_name, dev_id, device_index);
+ 	/* Append device index to card namem, ex: 'hw:0', for the PCM name of
+ 	 * target iodev. */
+-	snprintf(pcm_name, MAX_ALSA_PCM_NAME_LENGTH, "%s,%u", alsa_card->name,
+-		 device_index);
++  if (!strncmp(card_name, "vc4-hdmi-0",10)){
++	  snprintf(pcm_name, MAX_ALSA_PCM_NAME_LENGTH, "%s,%u", "iec958:0",
++		  device_index);
++  } else if (!strncmp(card_name, "vc4-hdmi-1",10)) {
++    snprintf(pcm_name, MAX_ALSA_PCM_NAME_LENGTH, "%s,%u", "iec958:1",
++      device_index);
++  } else {
++    snprintf(pcm_name, MAX_ALSA_PCM_NAME_LENGTH, "%s,%u", alsa_card->name,
++      device_index); 
++  }
+ 
+ 	new_dev->direction = direction;
+ 	new_dev->iodev =

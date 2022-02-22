@@ -3,3 +3,4 @@ chromeos-base/chromeos-chrome chrome_media -v4l2_codec -iioservice
 chromeos-base/chromeos-base -cros_embedded
 sys-apps/gptfdisk -ncurses
 chromeos-base/shill -wireguard
+chromeos-base/crosvm -crosvm-video-decoder -crosvm-video-encoder

@@ -1,7 +1,7 @@
-Index: rpi-linux-kernel/drivers/gpu/drm/v3d/Makefile
+Index: rpi-kernel/drivers/gpu/drm/v3d/Makefile
 ===================================================================
---- rpi-linux-kernel.orig/drivers/gpu/drm/v3d/Makefile
-+++ rpi-linux-kernel/drivers/gpu/drm/v3d/Makefile
+--- rpi-kernel.orig/drivers/gpu/drm/v3d/Makefile
++++ rpi-kernel/drivers/gpu/drm/v3d/Makefile
 @@ -4,6 +4,7 @@
  # core driver code
  v3d-y := \
@@ -10,10 +10,10 @@ Index: rpi-linux-kernel/drivers/gpu/drm/v3d/Makefile
  	v3d_drv.o \
  	v3d_fence.o \
  	v3d_gem.o \
-Index: rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_bo.c
+Index: rpi-kernel/drivers/gpu/drm/v3d/v3d_bo.c
 ===================================================================
---- rpi-linux-kernel.orig/drivers/gpu/drm/v3d/v3d_bo.c
-+++ rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_bo.c
+--- rpi-kernel.orig/drivers/gpu/drm/v3d/v3d_bo.c
++++ rpi-kernel/drivers/gpu/drm/v3d/v3d_bo.c
 @@ -24,6 +24,7 @@
  
  #include "v3d_drv.h"
@@ -39,7 +39,7 @@ Index: rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_bo.c
  }
  
  static const struct drm_gem_object_funcs v3d_gem_funcs = {
-@@ -170,14 +174,32 @@ int v3d_create_bo_ioctl(struct drm_devic
+@@ -170,13 +174,31 @@ int v3d_create_bo_ioctl(struct drm_devic
  			struct drm_file *file_priv)
  {
  	struct drm_v3d_create_bo *args = data;
@@ -53,7 +53,7 @@ Index: rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_bo.c
  		DRM_INFO("unknown create_bo flags: %d\n", args->flags);
  		return -EINVAL;
  	}
- 
++  
 +  if (is_vc4_enable() && args->flags == ARC_CALLOC) {
 +    ret = import_bo_from_vc4(dev, file_priv, PAGE_ALIGN(args->size), &vc4_handle, &args->handle);
 +    if (!ret) {
@@ -69,15 +69,14 @@ Index: rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_bo.c
 +      return 0;
 +    }
 +  }
-+
+ 
  	bo = v3d_bo_create(dev, file_priv, PAGE_ALIGN(args->size));
  	if (IS_ERR(bo))
- 		return PTR_ERR(bo);
-Index: rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.h
+Index: rpi-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.h
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.h
-@@ -0,0 +1,21 @@
++++ rpi-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.h
+@@ -0,0 +1,22 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/* Copyright (C) 2020 FydeOS team */
 +/* Author: Yang Tsao (yang@fydeos.io)*/
@@ -85,24 +84,25 @@ Index: rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.h
 +#ifndef V3D_VC4_BIND_H
 +#define V3D_VC4_BIND_H
 +#include <drm/drm_device.h>
++#include <drm/drm_file.h>
 +
 +#define ARC_CALLOC (1<<7)
 +extern struct drm_device *vc4_drm;
 +extern struct drm_file *vc4_drm_file;
 +
 +static inline bool is_vc4_enable(void) {
-+  return vc4_drm != NULL && vc4_drm_file != NULL;
-+}
++  return vc4_drm != NULL && vc4_drm_file != NULL;  
++} 
 +
 +int import_bo_from_vc4(struct drm_device *dev, struct drm_file *file_priv,
 +  size_t unaligned_size, u32 *vc4_handle, u32 *handle);
 +
 +void free_bo_from_vc4(u32 handle);
 +#endif /* V3D_VC4_BIND_H */
-Index: rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_drv.c
+Index: rpi-kernel/drivers/gpu/drm/v3d/v3d_drv.c
 ===================================================================
---- rpi-linux-kernel.orig/drivers/gpu/drm/v3d/v3d_drv.c
-+++ rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_drv.c
+--- rpi-kernel.orig/drivers/gpu/drm/v3d/v3d_drv.c
++++ rpi-kernel/drivers/gpu/drm/v3d/v3d_drv.c
 @@ -178,14 +178,14 @@ DEFINE_DRM_GEM_FOPS(v3d_drm_fops);
   * need to stay DRM_AUTH until we do buffer size/offset validation.
   */
@@ -129,10 +129,10 @@ Index: rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_drv.c
  
  	return 0;
  
-Index: rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_drv.h
+Index: rpi-kernel/drivers/gpu/drm/v3d/v3d_drv.h
 ===================================================================
---- rpi-linux-kernel.orig/drivers/gpu/drm/v3d/v3d_drv.h
-+++ rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_drv.h
+--- rpi-kernel.orig/drivers/gpu/drm/v3d/v3d_drv.h
++++ rpi-kernel/drivers/gpu/drm/v3d/v3d_drv.h
 @@ -151,6 +151,7 @@ struct v3d_bo {
  	 * v3d_render_job->unref_list
  	 */
@@ -141,16 +141,15 @@ Index: rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_drv.h
  };
  
  static inline struct v3d_bo *
-Index: rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.c
+Index: rpi-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.c
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.c
-@@ -0,0 +1,51 @@
-+#include <linux/mutex.h>
++++ rpi-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.c
+@@ -0,0 +1,50 @@
 +#include <drm/drm_drv.h>
 +#include <drm/drm_prime.h>
-+#include "../vc4/vc4_drv.h"
 +#include "v3d_vc4_bind.h"
++#include "../vc4/vc4_drv.h"
 +
 +#include "uapi/drm/vc4_drm.h"
 +
@@ -164,7 +163,7 @@ Index: rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.c
 +    return -ENODEV;
 +
 +  args.size = unaligned_size;
-+  args.flags = V3D_BIND;
++  args.flags = ARC_CALLOC;
 +  ret = vc4_create_bo_ioctl(vc4_drm, &args, vc4_drm_file);
 +  if (ret)
 +    goto out;
@@ -197,10 +196,10 @@ Index: rpi-linux-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.c
 +  if (ret)
 +    DRM_ERROR("Free handle:%u, from vc4, ret:%d\n", handle, ret);
 +}
-Index: rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_bo.c
+Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_bo.c
 ===================================================================
---- rpi-linux-kernel.orig/drivers/gpu/drm/vc4/vc4_bo.c
-+++ rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_bo.c
+--- rpi-kernel.orig/drivers/gpu/drm/vc4/vc4_bo.c
++++ rpi-kernel/drivers/gpu/drm/vc4/vc4_bo.c
 @@ -30,6 +30,7 @@ static const char * const bo_type_names[
  	"RCL",
  	"BCL",
@@ -252,21 +251,31 @@ Index: rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_bo.c
 +    DRM_DEBUG_DRIVER("vc4 exported gem closed, bo usercount:%u\n", refcount_read(&bo->usecnt));
 +  }
 +}
-Index: rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_drv.c
+Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_drv.c
 ===================================================================
---- rpi-linux-kernel.orig/drivers/gpu/drm/vc4/vc4_drv.c
-+++ rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_drv.c
-@@ -50,6 +50,9 @@
+--- rpi-kernel.orig/drivers/gpu/drm/vc4/vc4_drv.c
++++ rpi-kernel/drivers/gpu/drm/vc4/vc4_drv.c
+@@ -42,6 +42,7 @@
+ 
+ #include "vc4_drv.h"
+ #include "vc4_regs.h"
++#include "../v3d/v3d_vc4_bind.h"
+ 
+ #define DRIVER_NAME "vc4"
+ #define DRIVER_DESC "Broadcom VC4 graphics"
+@@ -50,6 +51,11 @@
  #define DRIVER_MINOR 0
  #define DRIVER_PATCHLEVEL 0
  
 +struct drm_device *vc4_drm = NULL;
++EXPORT_SYMBOL(vc4_drm);
 +struct drm_file *vc4_drm_file = NULL;
++EXPORT_SYMBOL(vc4_drm_file);
 +
  /* Helper function for mapping the regs on a platform device. */
  void __iomem *vc4_ioremap_regs(struct platform_device *dev, int index)
  {
-@@ -127,6 +130,7 @@ static int vc4_open(struct drm_device *d
+@@ -127,6 +133,7 @@ static int vc4_open(struct drm_device *d
  
  	vc4_perfmon_open_file(vc4file);
  	file->driver_priv = vc4file;
@@ -274,10 +283,67 @@ Index: rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_drv.c
  	return 0;
  }
  
-Index: rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_drv.h
+@@ -137,7 +144,6 @@ static void vc4_close(struct drm_device
+ 
+ 	if (vc4file->bin_bo_used)
+ 		vc4_v3d_bin_bo_put(vc4);
+-
+ 	vc4_perfmon_close_file(vc4file);
+ 	kfree(vc4file);
+ }
+@@ -198,6 +204,7 @@ static struct drm_driver vc4_drm_driver
+ 
+ 	.gem_create_object = vc4_create_object,
+ 	.gem_free_object_unlocked = vc4_free_object,
++  .gem_close_object = vc4_bo_close,
+ 	.gem_vm_ops = &vc4_vm_ops,
+ 
+ 	.prime_handle_to_fd = drm_gem_prime_handle_to_fd,
+@@ -290,12 +297,15 @@ static int vc4_drm_bind(struct device *d
+ 	node = of_find_matching_node_and_match(NULL, vc4_dma_range_matches,
+ 					       NULL);
+ 	if (node) {
++    pr_info("vc4 dma node name:%s(%s)\n", node->full_name, node->name);
+ 		ret = of_dma_configure(dev, node, true);
+ 		of_node_put(node);
+ 
+ 		if (ret)
+ 			return ret;
+-	}
++	}else {
++    pr_info("vc4 dma no node configure\n");
++  }
+ 
+ 	vc4 = devm_drm_dev_alloc(dev, &vc4_drm_driver, struct vc4_dev, base);
+ 	if (IS_ERR(vc4))
+@@ -362,19 +372,21 @@ static int vc4_drm_bind(struct device *d
+ 		goto unbind_all;
+ 
+ 	drm_fbdev_generic_setup(drm, 16);
++  vc4_drm = drm;
+ 
+ 	return 0;
+ 
+ unbind_all:
+ 	component_unbind_all(dev, drm);
+-
++  
+ 	return ret;
+ }
+ 
+ static void vc4_drm_unbind(struct device *dev)
+ {
+ 	struct drm_device *drm = dev_get_drvdata(dev);
+-
++  vc4_drm = NULL;
++  vc4_drm_file = NULL;
+ 	drm_dev_unregister(drm);
+ 
+ 	drm_atomic_helper_shutdown(drm);
+Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_drv.h
 ===================================================================
---- rpi-linux-kernel.orig/drivers/gpu/drm/vc4/vc4_drv.h
-+++ rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_drv.h
+--- rpi-kernel.orig/drivers/gpu/drm/vc4/vc4_drv.h
++++ rpi-kernel/drivers/gpu/drm/vc4/vc4_drv.h
 @@ -21,6 +21,9 @@
  #include "uapi/drm/vc4_drm.h"
  #include "vc4_regs.h"
@@ -296,10 +362,24 @@ Index: rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_drv.h
  	VC4_BO_TYPE_COUNT
  };
  
-Index: rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_kms.c
+@@ -876,6 +880,7 @@ int vc4_bo_inc_usecnt(struct vc4_bo *bo)
+ void vc4_bo_dec_usecnt(struct vc4_bo *bo);
+ void vc4_bo_add_to_purgeable_pool(struct vc4_bo *bo);
+ void vc4_bo_remove_from_purgeable_pool(struct vc4_bo *bo);
++void vc4_bo_close(struct drm_gem_object *, struct drm_file *file_priv);
+ 
+ /* vc4_crtc.c */
+ extern struct platform_driver vc4_crtc_driver;
+@@ -1047,5 +1052,4 @@ int vc4_perfmon_destroy_ioctl(struct drm
+ 			      struct drm_file *file_priv);
+ int vc4_perfmon_get_values_ioctl(struct drm_device *dev, void *data,
+ 				 struct drm_file *file_priv);
+-
+ #endif /* _VC4_DRV_H_ */
+Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_kms.c
 ===================================================================
---- rpi-linux-kernel.orig/drivers/gpu/drm/vc4/vc4_kms.c
-+++ rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_kms.c
+--- rpi-kernel.orig/drivers/gpu/drm/vc4/vc4_kms.c
++++ rpi-kernel/drivers/gpu/drm/vc4/vc4_kms.c
 @@ -444,6 +444,7 @@ static int vc4_atomic_commit(struct drm_
  {
  	struct vc4_dev *vc4 = to_vc4_dev(dev);
@@ -319,3 +399,17 @@ Index: rpi-linux-kernel/drivers/gpu/drm/vc4/vc4_kms.c
  			drm_atomic_helper_cleanup_planes(dev, state);
  			up(&vc4->async_modeset);
  			return ret;
+Index: rpi-kernel/drivers/gpu/drm/Makefile
+===================================================================
+--- rpi-kernel.orig/drivers/gpu/drm/Makefile
++++ rpi-kernel/drivers/gpu/drm/Makefile
+@@ -72,8 +72,8 @@ obj-$(CONFIG_DRM_MGA)	+= mga/
+ obj-$(CONFIG_DRM_I810)	+= i810/
+ obj-$(CONFIG_DRM_I915)	+= i915/
+ obj-$(CONFIG_DRM_MGAG200) += mgag200/
+-obj-$(CONFIG_DRM_V3D)  += v3d/
+ obj-$(CONFIG_DRM_VC4)  += vc4/
++obj-$(CONFIG_DRM_V3D)  += v3d/
+ obj-$(CONFIG_DRM_SIS)   += sis/
+ obj-$(CONFIG_DRM_SAVAGE)+= savage/
+ obj-$(CONFIG_DRM_VMWGFX)+= vmwgfx/

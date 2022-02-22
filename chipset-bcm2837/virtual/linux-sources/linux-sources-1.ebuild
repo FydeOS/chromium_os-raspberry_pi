@@ -20,6 +20,7 @@ IUSE_KERNEL_VERS=(
 	kernel-4_19
 	kernel-4_19-ht
 	kernel-5_4
+  kernel-5_10
 	kernel-experimental
 	kernel-next
 	kernel-upstream
