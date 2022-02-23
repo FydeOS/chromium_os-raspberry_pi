@@ -6,6 +6,7 @@ kernelB=4
 rootA=3
 rootB=5
 CMDFILE="cmdline.txt"
+BOOTLOADER="/usr/share/raspberry-boot"
 
 . /usr/share/cros/update_kernel_lib.sh
 
@@ -87,6 +88,9 @@ main() {
  mount $efi_dev $tmpdir || die "error mounting"
  modify_root ${tmpdir}/${CMDFILE} $root_uuid || die "error when modified cmdline.txt"
  update_root_kernel $root_dev
+ if [ -d $BOOTLOADER ]; then
+   cp -r $BOOTLOADER/* $tmpdir
+ fi
  umount $tmpdir
  rmdir $tmpdir
 }

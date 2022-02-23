@@ -57,7 +57,7 @@ src_prepare() {
 }
 
 src_configure() {
-	append-ldflags $(no-as-needed)
+	append-ldflags $(no-as-needed) 
 
 	mycmakeargs=(
 		-DVMCS_INSTALL_PREFIX="${EPREFIX}/usr"

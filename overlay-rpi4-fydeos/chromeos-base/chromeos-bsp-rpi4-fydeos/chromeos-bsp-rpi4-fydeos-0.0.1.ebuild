@@ -17,6 +17,7 @@ RDEPEND="
     chromeos-base/device-appid
     chromeos-base/bluetooth-input-fix
     chromeos-base/arc-base
+    chromeos-base/raspberry-bootloader-update
 "
 
 DEPEND="${RDEPEND}"
