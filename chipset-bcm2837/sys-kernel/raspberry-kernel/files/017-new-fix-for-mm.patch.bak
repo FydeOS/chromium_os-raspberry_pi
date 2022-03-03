@@ -1,0 +1,2477 @@
+Index: rpi-kernel/mm/page_alloc.c
+===================================================================
+--- rpi-kernel.orig/mm/page_alloc.c
++++ rpi-kernel/mm/page_alloc.c
+@@ -70,6 +70,7 @@
+ #include <linux/psi.h>
+ #include <linux/padata.h>
+ #include <linux/khugepaged.h>
++#include <linux/low-mem-notify.h>
+ 
+ #include <asm/sections.h>
+ #include <asm/tlbflush.h>
+@@ -362,6 +363,8 @@ int watermark_boost_factor __read_mostly
+ #endif
+ int watermark_scale_factor = 10;
+ 
++int extra_free_kbytes = 0;
++
+ static unsigned long nr_kernel_pages __initdata;
+ static unsigned long nr_all_pages __initdata;
+ static unsigned long dma_reserve __initdata;
+@@ -4509,6 +4512,7 @@ should_reclaim_retry(gfp_t gfp_mask, uns
+ 	 * several times in the row.
+ 	 */
+ 	if (*no_progress_loops > MAX_RECLAIM_RETRIES) {
++    low_mem_notify();
+ 		/* Before OOM, exhaust highatomic_reserve */
+ 		return unreserve_highatomic_pageblock(ac, true);
+ 	}
+@@ -4941,6 +4945,7 @@ __alloc_pages_nodemask(gfp_t gfp_mask, u
+ 	if (!prepare_alloc_pages(gfp_mask, order, preferred_nid, nodemask, &ac, &alloc_mask, &alloc_flags))
+ 		return NULL;
+ 
++  low_mem_check();
+ 	/*
+ 	 * Forbid the first pass from falling back to types that fragment
+ 	 * memory until all local zones are considered.
+@@ -7845,6 +7850,7 @@ static void setup_per_zone_lowmem_reserv
+ static void __setup_per_zone_wmarks(void)
+ {
+ 	unsigned long pages_min = min_free_kbytes >> (PAGE_SHIFT - 10);
++  unsigned long pages_low = extra_free_kbytes >> (PAGE_SHIFT - 10);
+ 	unsigned long lowmem_pages = 0;
+ 	struct zone *zone;
+ 	unsigned long flags;
+@@ -7856,11 +7862,13 @@ static void __setup_per_zone_wmarks(void
+ 	}
+ 
+ 	for_each_zone(zone) {
+-		u64 tmp;
++		u64 tmp, low;
+ 
+ 		spin_lock_irqsave(&zone->lock, flags);
+ 		tmp = (u64)pages_min * zone_managed_pages(zone);
+ 		do_div(tmp, lowmem_pages);
++    low = (u64)pages_low * zone_managed_pages(zone);
++    do_div(low, nr_free_zone_pages(gfp_zone(GFP_HIGHUSER_MOVABLE)));
+ 		if (is_highmem(zone)) {
+ 			/*
+ 			 * __GFP_HIGH and PF_MEMALLOC allocations usually don't
+@@ -7894,8 +7902,8 @@ static void __setup_per_zone_wmarks(void
+ 				      watermark_scale_factor, 10000));
+ 
+ 		zone->watermark_boost = 0;
+-		zone->_watermark[WMARK_LOW]  = min_wmark_pages(zone) + tmp;
+-		zone->_watermark[WMARK_HIGH] = min_wmark_pages(zone) + tmp * 2;
++		zone->_watermark[WMARK_LOW]  = min_wmark_pages(zone) + low + tmp;
++		zone->_watermark[WMARK_HIGH] = min_wmark_pages(zone) + low + tmp * 2;
+ 
+ 		spin_unlock_irqrestore(&zone->lock, flags);
+ 	}
+@@ -8594,6 +8602,8 @@ int alloc_contig_range(unsigned long sta
+ 
+ 	/* Make sure the range is really isolated. */
+ 	if (test_pages_isolated(outer_start, end, 0)) {
++    pr_info_ratelimited("%s: [%lx, %lx) PFNs busy\n",
++       __func__, outer_start, end);
+ 		ret = -EBUSY;
+ 		goto done;
+ 	}
+Index: rpi-kernel/mm/swapfile.c
+===================================================================
+--- rpi-kernel.orig/mm/swapfile.c
++++ rpi-kernel/mm/swapfile.c
+@@ -2935,6 +2935,7 @@ static int claim_swapfile(struct swap_in
+ 	int error;
+ 
+ 	if (S_ISBLK(inode->i_mode)) {
++    char name[BDEVNAME_SIZE];
+ 		p->bdev = blkdev_get_by_dev(inode->i_rdev,
+ 				   FMODE_READ | FMODE_WRITE | FMODE_EXCL, p);
+ 		if (IS_ERR(p->bdev)) {
+@@ -2942,6 +2943,12 @@ static int claim_swapfile(struct swap_in
+ 			p->bdev = NULL;
+ 			return error;
+ 		}
++    bdevname(p->bdev, name);
++    if (strncmp(name, "zram", strlen("zram"))) {
++      bdput(p->bdev);
++      p->bdev = NULL;
++      return -EINVAL;
++    }
+ 		p->old_block_size = block_size(p->bdev);
+ 		error = set_blocksize(p->bdev, PAGE_SIZE);
+ 		if (error < 0)
+Index: rpi-kernel/fs/proc/Kconfig
+===================================================================
+--- rpi-kernel.orig/fs/proc/Kconfig
++++ rpi-kernel/fs/proc/Kconfig
+@@ -107,3 +107,9 @@ config PROC_PID_ARCH_STATUS
+ config PROC_CPU_RESCTRL
+ 	def_bool n
+ 	depends on PROC_FS
++
++config PROC_LATSENSE
++  def_bool y
++  depends on PROC_FS && UCLAMP_TASK
++  help
++  Enable /proc/pid/tasks/tid latency sensitive scheduler attribute
+Index: rpi-kernel/include/linux/sched.h
+===================================================================
+--- rpi-kernel.orig/include/linux/sched.h
++++ rpi-kernel/include/linux/sched.h
+@@ -699,10 +699,15 @@ struct task_struct {
+ 	const struct sched_class	*sched_class;
+ 	struct sched_entity		se;
+ 	struct sched_rt_entity		rt;
++  struct sched_dl_entity    dl;
++#ifdef CONFIG_SCHED_CORE
++  struct rb_node      core_node;
++  unsigned long     core_cookie;
++  unsigned int      core_occupation;
++#endif
+ #ifdef CONFIG_CGROUP_SCHED
+ 	struct task_group		*sched_task_group;
+ #endif
+-	struct sched_dl_entity		dl;
+ 
+ #ifdef CONFIG_UCLAMP_TASK
+ 	/*
+@@ -716,6 +721,9 @@ struct task_struct {
+ 	 */
+ 	struct uclamp_se		uclamp[UCLAMP_CNT];
+ #endif
++#ifdef CONFIG_PROC_LATSENSE
++  int proc_latency_sensitive;
++#endif
+ 
+ #ifdef CONFIG_PREEMPT_NOTIFIERS
+ 	/* List of struct preempt_notifier: */
+@@ -896,6 +904,10 @@ struct task_struct {
+ 	u64				stimescaled;
+ #endif
+ 	u64				gtime;
++#ifdef CONFIG_CPU_FREQ_TIMES
++  u64       *time_in_state;
++  unsigned int      max_state;
++#endif
+ 	struct prev_cputime		prev_cputime;
+ #ifdef CONFIG_VIRT_CPU_ACCOUNTING_GEN
+ 	struct vtime			vtime;
+@@ -1764,6 +1776,7 @@ extern struct task_struct *find_get_task
+ 
+ extern int wake_up_state(struct task_struct *tsk, unsigned int state);
+ extern int wake_up_process(struct task_struct *tsk);
++extern int wake_up_process_prefer_current_cpu(struct task_struct *tsk);
+ extern void wake_up_new_task(struct task_struct *tsk);
+ 
+ #ifdef CONFIG_SMP
+@@ -2091,4 +2104,14 @@ int sched_trace_rq_nr_running(struct rq
+ 
+ const struct cpumask *sched_trace_rd_span(struct root_domain *rd);
+ 
++#ifdef CONFIG_SCHED_CORE
++extern void sched_core_free(struct task_struct *tsk);
++extern void sched_core_fork(struct task_struct *p);
++extern int sched_core_share_pid(unsigned int cmd, pid_t pid, enum pid_type type,
++       unsigned long uaddr);
++#else
++static inline void sched_core_free(struct task_struct *tsk) { }
++static inline void sched_core_fork(struct task_struct *p) { }
++#endif
++
+ #endif
+Index: rpi-kernel/kernel/Kconfig.preempt
+===================================================================
+--- rpi-kernel.orig/kernel/Kconfig.preempt
++++ rpi-kernel/kernel/Kconfig.preempt
+@@ -80,3 +80,8 @@ config PREEMPT_COUNT
+ config PREEMPTION
+        bool
+        select PREEMPT_COUNT
++
++config SCHED_CORE
++  bool "Core Scheduling for SMT"
++  default y
++  depends on SCHED_SMT
+Index: rpi-kernel/kernel/sched/Makefile
+===================================================================
+--- rpi-kernel.orig/kernel/sched/Makefile
++++ rpi-kernel/kernel/sched/Makefile
+@@ -36,3 +36,5 @@ obj-$(CONFIG_CPU_FREQ_GOV_SCHEDUTIL) +=
+ obj-$(CONFIG_MEMBARRIER) += membarrier.o
+ obj-$(CONFIG_CPU_ISOLATION) += isolation.o
+ obj-$(CONFIG_PSI) += psi.o
++obj-$(CONFIG_SCHED_CORE) += core_sched.o
++obj-$(CONFIG_PROC_LATSENSE) += latsense.o
+Index: rpi-kernel/kernel/signal.c
+===================================================================
+--- rpi-kernel.orig/kernel/signal.c
++++ rpi-kernel/kernel/signal.c
+@@ -2097,6 +2097,15 @@ static inline bool may_ptrace_stop(void)
+ 	return true;
+ }
+ 
++/*
++ * Return non-zero if there is a SIGKILL that should be waking us up.
++ * Called with the siglock held.
++ */
++static bool sigkill_pending(struct task_struct *tsk)
++{
++ return sigismember(&tsk->pending.signal, SIGKILL) ||
++        sigismember(&tsk->signal->shared_pending.signal, SIGKILL);
++}
+ 
+ /*
+  * This must be called with current->sighand->siglock held.
+@@ -2127,6 +2136,8 @@ static void ptrace_stop(int exit_code, i
+ 		spin_unlock_irq(&current->sighand->siglock);
+ 		arch_ptrace_stop(exit_code, info);
+ 		spin_lock_irq(&current->sighand->siglock);
++		if (sigkill_pending(current))
++			return;
+ 	}
+ 
+ 	/*
+Index: rpi-kernel/kernel/sys.c
+===================================================================
+--- rpi-kernel.orig/kernel/sys.c
++++ rpi-kernel/kernel/sys.c
+@@ -2692,6 +2692,11 @@ int ksys_prctl(int option, unsigned long
+ 
+ 		error = (current->flags & PR_IO_FLUSHER) == PR_IO_FLUSHER;
+ 		break;
++#ifdef CONFIG_SCHED_CORE
++ case PR_SCHED_CORE:
++   error = sched_core_share_pid(arg2, arg3, arg4, arg5);
++   break;
++#endif
+ 	default:
+ 		error = -EINVAL;
+ 		break;
+Index: rpi-kernel/fs/proc/Makefile
+===================================================================
+--- rpi-kernel.orig/fs/proc/Makefile
++++ rpi-kernel/fs/proc/Makefile
+@@ -27,6 +27,7 @@ proc-y	+= softirqs.o
+ proc-y	+= namespaces.o
+ proc-y	+= self.o
+ proc-y	+= thread_self.o
++proc-$(CONFIG_PROC_LATSENSE)  += latsense.o
+ proc-$(CONFIG_PROC_SYSCTL)	+= proc_sysctl.o
+ proc-$(CONFIG_NET)		+= proc_net.o
+ proc-$(CONFIG_PROC_KCORE)	+= kcore.o
+Index: rpi-kernel/fs/proc/latsense.c
+===================================================================
+--- /dev/null
++++ rpi-kernel/fs/proc/latsense.c
+@@ -0,0 +1,94 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright 2019 Google, Inc.
++ *
++ * Support for setting tasks as latency sensitive
++ * using /proc/pid/tasks/tid/latency_sensitive interface.
++ */
++
++#include <linux/types.h>
++#include <linux/errno.h>
++#include <linux/kernel.h>
++#include <linux/sched/task.h>
++#include <linux/sched/latsense.h>
++#include <linux/proc_fs.h>
++#include <linux/seq_file.h>
++#include <linux/fs_struct.h>
++
++#include "internal.h"
++
++/*
++ * Print out latsense related information:
++ */
++static int sched_latsense_show(struct seq_file *m, void *v)
++{
++	struct inode *inode = m->private;
++	struct task_struct *p;
++
++	p = get_proc_task(inode);
++	if (!p)
++		return -ESRCH;
++
++	seq_printf(m, "%d\n", !!proc_sched_get_latency_sensitive(p));
++
++	put_task_struct(p);
++
++	return 0;
++}
++
++static ssize_t
++sched_latsense_write(struct file *file, const char __user *buf,
++	    size_t count, loff_t *offset)
++{
++	struct inode *inode = file_inode(file);
++	struct task_struct *p;
++	char buffer[PROC_NUMBUF];
++	int val;
++	int err;
++
++	memset(buffer, 0, sizeof(buffer));
++	if (count > sizeof(buffer) - 1)
++		count = sizeof(buffer) - 1;
++	if (copy_from_user(buffer, buf, count))
++		return -EFAULT;
++
++	err = kstrtoint(strstrip(buffer), 0, &val);
++	if (err < 0)
++		return err;
++
++	if (val != 0 && val != 1)
++		return -EINVAL;
++
++	p = get_proc_task(inode);
++	if (!p)
++		return -ESRCH;
++
++	err = proc_sched_set_latency_sensitive(p, val);
++	if (err)
++		count = err;
++
++	put_task_struct(p);
++
++	return count;
++}
++
++static int sched_latsense_open(struct inode *inode, struct file *filp)
++{
++	int ret;
++
++	ret = single_open(filp, sched_latsense_show, NULL);
++	if (!ret) {
++		struct seq_file *m = filp->private_data;
++
++		m->private = inode;
++	}
++	return ret;
++}
++
++const struct file_operations proc_tid_latsense_operations = {
++	.open		= sched_latsense_open,
++	.read		= seq_read,
++	.write		= sched_latsense_write,
++	.llseek		= seq_lseek,
++	.release	= single_release,
++};
+Index: rpi-kernel/fs/proc/base.c
+===================================================================
+--- rpi-kernel.orig/fs/proc/base.c
++++ rpi-kernel/fs/proc/base.c
+@@ -96,6 +96,7 @@
+ #include <linux/posix-timers.h>
+ #include <linux/time_namespace.h>
+ #include <linux/resctrl.h>
++#include <linux/cpufreq_times.h>
+ #include <trace/events/oom.h>
+ #include "internal.h"
+ #include "fd.h"
+@@ -3276,6 +3277,9 @@ static const struct pid_entry tgid_base_
+ #ifdef CONFIG_PROC_PID_ARCH_STATUS
+ 	ONE("arch_status", S_IRUGO, proc_pid_arch_status),
+ #endif
++#ifdef CONFIG_CPU_FREQ_TIMES
++  ONE("time_in_state", 0444, proc_time_in_state_show),
++#endif
+ };
+ 
+ static int proc_tgid_base_readdir(struct file *file, struct dir_context *ctx)
+@@ -3605,6 +3609,12 @@ static const struct pid_entry tid_base_s
+ #ifdef CONFIG_PROC_PID_ARCH_STATUS
+ 	ONE("arch_status", S_IRUGO, proc_pid_arch_status),
+ #endif
++#ifdef CONFIG_CPU_FREQ_TIMES
++  ONE("time_in_state", 0444, proc_time_in_state_show),
++#endif
++#ifdef CONFIG_PROC_LATSENSE
++  REG("latency_sensitive",  S_IRUGO|S_IWUSR, proc_tid_latsense_operations),
++#endif
+ };
+ 
+ static int proc_tid_base_readdir(struct file *file, struct dir_context *ctx)
+Index: rpi-kernel/fs/proc/internal.h
+===================================================================
+--- rpi-kernel.orig/fs/proc/internal.h
++++ rpi-kernel/fs/proc/internal.h
+@@ -146,6 +146,7 @@ unsigned name_to_int(const struct qstr *
+  * array.c
+  */
+ extern const struct file_operations proc_tid_children_operations;
++extern const struct file_operations proc_tid_latsense_operations;
+ 
+ extern void proc_task_name(struct seq_file *m, struct task_struct *p,
+ 			   bool escape);
+Index: rpi-kernel/kernel/sched/latsense.c
+===================================================================
+--- /dev/null
++++ rpi-kernel/kernel/sched/latsense.c
+@@ -0,0 +1,17 @@
++// SPDX-License-Identifier: GPL-2.0
++#include "sched.h"
++
++int proc_sched_set_latency_sensitive(struct task_struct *p, int val)
++{
++	if (val != 0 && val != 1)
++		return -EINVAL;
++
++	p->proc_latency_sensitive = val;
++
++	return 0;
++}
++
++int proc_sched_get_latency_sensitive(struct task_struct *p)
++{
++	return p->proc_latency_sensitive;
++}
+Index: rpi-kernel/kernel/sched/core.c
+===================================================================
+--- rpi-kernel.orig/kernel/sched/core.c
++++ rpi-kernel/kernel/sched/core.c
+@@ -74,6 +74,290 @@ unsigned int sysctl_sched_rt_period = 10
+ 
+ __read_mostly int scheduler_running;
+ 
++#ifdef CONFIG_SCHED_CORE
++
++DEFINE_STATIC_KEY_FALSE(__sched_core_enabled);
++
++/* kernel prio, less is more */
++static inline int __task_prio(struct task_struct *p)
++{
++  if (p->sched_class == &stop_sched_class) /* trumps deadline */
++    return -2;
++
++  if (rt_prio(p->prio)) /* includes deadline */
++    return p->prio; /* [-1, 99] */
++
++  if (p->sched_class == &idle_sched_class)
++    return MAX_RT_PRIO + NICE_WIDTH; /* 140 */
++
++  return MAX_RT_PRIO + MAX_NICE; /* 120, squash fair */
++}
++
++/*
++ * l(a,b)
++ * le(a,b) := !l(b,a)
++ * g(a,b)  := l(b,a)
++ * ge(a,b) := !l(a,b)
++ */
++
++/* real prio, less is less */
++static inline bool prio_less(struct task_struct *a, struct task_struct *b, bool in_fi)
++{
++
++  int pa = __task_prio(a), pb = __task_prio(b);
++
++  if (-pa < -pb)
++    return true;
++
++  if (-pb < -pa)
++    return false;
++
++  if (pa == -1) /* dl_prio() doesn't work because of stop_class above */
++    return !dl_time_before(a->dl.deadline, b->dl.deadline);
++
++  if (pa == MAX_RT_PRIO + MAX_NICE) /* fair */
++    return cfs_prio_less(a, b, in_fi);
++
++  return false;
++}
++
++static inline bool __sched_core_less(struct task_struct *a, struct task_struct *b)
++{
++  if (a->core_cookie < b->core_cookie)
++    return true;
++
++  if (a->core_cookie > b->core_cookie)
++    return false;
++
++  /* flip prio, so high prio is leftmost */
++  if (prio_less(b, a, task_rq(a)->core->core_forceidle))
++    return true;
++
++  return false;
++}
++
++#define __node_2_sc(node) rb_entry((node), struct task_struct, core_node)
++static inline bool rb_sched_core_less(struct rb_node *a, const struct rb_node *b)
++{
++  return __sched_core_less(__node_2_sc(a), __node_2_sc(b));
++}
++
++static inline int rb_sched_core_cmp(const void *key, const struct rb_node *node)
++{
++  const struct task_struct *p = __node_2_sc(node);
++  unsigned long cookie = (unsigned long)key;
++
++  if (cookie < p->core_cookie)
++    return -1;
++
++  if (cookie > p->core_cookie)
++    return 1;
++
++  return 0;
++}
++
++void sched_core_enqueue(struct rq *rq, struct task_struct *p)
++{
++  rq->core->core_task_seq++;
++
++  if (!p->core_cookie)
++    return;
++
++  rb_add(&p->core_node, &rq->core_tree, rb_sched_core_less);
++}
++
++void sched_core_dequeue(struct rq *rq, struct task_struct *p)
++{
++  rq->core->core_task_seq++;
++
++  if (!sched_core_enqueued(p))
++    return;
++
++  rb_erase(&p->core_node, &rq->core_tree);
++  RB_CLEAR_NODE(&p->core_node);
++}
++
++/*
++ * Find left-most (aka, highest priority) task matching @cookie.
++ */
++static struct task_struct *sched_core_find(struct rq *rq, unsigned long cookie)
++{
++  struct rb_node *node;
++
++  node = rb_find_first((void *)cookie, &rq->core_tree, rb_sched_core_cmp);
++  /*
++   * The idle task always matches any cookie!
++   */
++  if (!node)
++    return idle_sched_class.pick_task(rq);
++
++  return __node_2_sc(node);
++}
++
++static struct task_struct *sched_core_next(struct task_struct *p, unsigned long cookie)
++{
++  struct rb_node *node = &p->core_node;
++
++  node = rb_next(node);
++  if (!node)
++    return NULL;
++
++  p = container_of(node, struct task_struct, core_node);
++  if (p->core_cookie != cookie)
++    return NULL;
++
++  return p;
++}
++
++/*
++ * Magic required such that:
++ *
++ *  raw_spin_rq_lock(rq);
++ *  ...
++ *  raw_spin_rq_unlock(rq);
++ *
++ * ends up locking and unlocking the _same_ lock, and all CPUs
++ * always agree on what rq has what lock.
++ *
++ * XXX entirely possible to selectively enable cores, don't bother for now.
++ */
++
++static DEFINE_MUTEX(sched_core_mutex);
++static atomic_t sched_core_count;
++static struct cpumask sched_core_mask;
++
++static void sched_core_lock(int cpu, unsigned long *flags)
++{
++  const struct cpumask *smt_mask = cpu_smt_mask(cpu);
++  int t, i = 0;
++
++  local_irq_save(*flags);
++  for_each_cpu(t, smt_mask)
++    raw_spin_lock_nested(&cpu_rq(t)->__lock, i++);
++}
++
++static void sched_core_unlock(int cpu, unsigned long *flags)
++{
++  const struct cpumask *smt_mask = cpu_smt_mask(cpu);
++  int t;
++
++  for_each_cpu(t, smt_mask)
++    raw_spin_unlock(&cpu_rq(t)->__lock);
++  local_irq_restore(*flags);
++}
++
++static void __sched_core_flip(bool enabled)
++{
++  unsigned long flags;
++  int cpu, t;
++
++  cpus_read_lock();
++
++  /*
++   * Toggle the online cores, one by one.
++   */
++  cpumask_copy(&sched_core_mask, cpu_online_mask);
++  for_each_cpu(cpu, &sched_core_mask) {
++    const struct cpumask *smt_mask = cpu_smt_mask(cpu);
++
++    sched_core_lock(cpu, &flags);
++
++    for_each_cpu(t, smt_mask)
++      cpu_rq(t)->core_enabled = enabled;
++
++    sched_core_unlock(cpu, &flags);
++
++    cpumask_andnot(&sched_core_mask, &sched_core_mask, smt_mask);
++  }
++
++  /*
++   * Toggle the offline CPUs.
++   */
++  cpumask_copy(&sched_core_mask, cpu_possible_mask);
++  cpumask_andnot(&sched_core_mask, &sched_core_mask, cpu_online_mask);
++
++  for_each_cpu(cpu, &sched_core_mask)
++    cpu_rq(cpu)->core_enabled = enabled;
++
++  cpus_read_unlock();
++}
++
++static void sched_core_assert_empty(void)
++{
++  int cpu;
++
++  for_each_possible_cpu(cpu)
++    WARN_ON_ONCE(!RB_EMPTY_ROOT(&cpu_rq(cpu)->core_tree));
++}
++
++static void __sched_core_enable(void)
++{
++  static_branch_enable(&__sched_core_enabled);
++  /*
++   * Ensure all previous instances of raw_spin_rq_*lock() have finished
++   * and future ones will observe !sched_core_disabled().
++   */
++  synchronize_rcu();
++  __sched_core_flip(true);
++  sched_core_assert_empty();
++}
++
++static void __sched_core_disable(void)
++{
++  sched_core_assert_empty();
++  __sched_core_flip(false);
++  static_branch_disable(&__sched_core_enabled);
++}
++
++DEFINE_STATIC_KEY_TRUE(sched_coresched_supported);
++
++void sched_core_get(void)
++{
++  if (atomic_inc_not_zero(&sched_core_count))
++    return;
++  if (!static_branch_likely(&sched_coresched_supported))
++    return;
++  mutex_lock(&sched_core_mutex);
++  if (!atomic_read(&sched_core_count))
++    __sched_core_enable();
++
++  smp_mb__before_atomic();
++  atomic_inc(&sched_core_count);
++  mutex_unlock(&sched_core_mutex);
++}
++
++static void __sched_core_put(struct work_struct *work)
++{
++  if (!static_branch_likely(&sched_coresched_supported))
++    return;
++  if (atomic_dec_and_mutex_lock(&sched_core_count, &sched_core_mutex)) {
++    __sched_core_disable();
++    mutex_unlock(&sched_core_mutex);
++  }
++}
++
++void sched_core_put(void)
++{
++  static DECLARE_WORK(_work, __sched_core_put);
++
++  /*
++   * "There can be only one"
++   *
++   * Either this is the last one, or we don't actually need to do any
++   * 'work'. If it is the last *again*, we rely on
++   * WORK_STRUCT_PENDING_BIT.
++   */
++  if (!atomic_add_unless(&sched_core_count, -1, 1))
++    schedule_work(&_work);
++}
++
++#else /* !CONFIG_SCHED_CORE */
++
++static inline void sched_core_enqueue(struct rq *rq, struct task_struct *p) { }
++static inline void sched_core_dequeue(struct rq *rq, struct task_struct *p) { }
++
++#endif /* CONFIG_SCHED_CORE */
++
+ /*
+  * part of the period that we allow rt tasks to run in us.
+  * default: 0.95s
+@@ -1581,10 +1865,14 @@ static inline void enqueue_task(struct r
+ 
+ 	uclamp_rq_inc(rq, p);
+ 	p->sched_class->enqueue_task(rq, p, flags);
++  if (sched_core_enabled(rq))
++    sched_core_enqueue(rq, p);
+ }
+ 
+ static inline void dequeue_task(struct rq *rq, struct task_struct *p, int flags)
+ {
++  if (sched_core_enabled(rq))
++    sched_core_dequeue(rq, p);
+ 	if (!(flags & DEQUEUE_NOCLOCK))
+ 		update_rq_clock(rq);
+ 
+@@ -3263,6 +3551,9 @@ int sched_fork(unsigned long clone_flags
+ 		p->prio = p->normal_prio = p->static_prio;
+ 		set_load_weight(p, false);
+ 
++#ifdef CONFIG_PROC_LATSENSE
++    p->proc_latency_sensitive = 0;
++#endif
+ 		/*
+ 		 * We don't need the reset flag anymore after the fork. It has
+ 		 * fulfilled its duty:
+@@ -4340,7 +4631,7 @@ static void put_prev_task_balance(struct
+  * Pick up the highest-prio task:
+  */
+ static inline struct task_struct *
+-pick_next_task(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
++__pick_next_task(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
+ {
+ 	const struct sched_class *class;
+ 	struct task_struct *p;
+@@ -4380,6 +4671,526 @@ restart:
+ 	BUG();
+ }
+ 
++#ifdef CONFIG_SCHED_CORE
++static inline bool is_task_rq_idle(struct task_struct *t)
++{
++  return (task_rq(t)->idle == t);
++}
++
++static inline bool cookie_equals(struct task_struct *a, unsigned long cookie)
++{
++  return is_task_rq_idle(a) || (a->core_cookie == cookie);
++}
++
++static inline bool cookie_match(struct task_struct *a, struct task_struct *b)
++{
++  if (is_task_rq_idle(a) || is_task_rq_idle(b))
++    return true;
++
++  return a->core_cookie == b->core_cookie;
++}
++
++// XXX fairness/fwd progress conditions
++/*
++ * Returns
++ * - NULL if there is no runnable task for this class.
++ * - the highest priority task for this runqueue if it matches
++ *   rq->core->core_cookie or its priority is greater than max.
++ * - Else returns idle_task.
++ */
++static struct task_struct *
++pick_task(struct rq *rq, const struct sched_class *class, struct task_struct *max, bool in_fi)
++{
++  struct task_struct *class_pick, *cookie_pick;
++  unsigned long cookie = rq->core->core_cookie;
++
++  class_pick = class->pick_task(rq);
++  if (!class_pick)
++    return NULL;
++
++  if (!cookie) {
++    /*
++     * If class_pick is tagged, return it only if it has
++     * higher priority than max.
++     */
++    if (max && class_pick->core_cookie &&
++        prio_less(class_pick, max, in_fi))
++      return idle_sched_class.pick_task(rq);
++
++    return class_pick;
++  }
++
++  /*
++   * If class_pick is idle or matches cookie, return early.
++   */
++  if (cookie_equals(class_pick, cookie))
++    return class_pick;
++
++  cookie_pick = sched_core_find(rq, cookie);
++
++  /*
++   * If class > max && class > cookie, it is the highest priority task on
++   * the core (so far) and it must be selected, otherwise we must go with
++   * the cookie pick in order to satisfy the constraint.
++   */
++  if (prio_less(cookie_pick, class_pick, in_fi) &&
++      (!max || prio_less(max, class_pick, in_fi)))
++    return class_pick;
++
++  return cookie_pick;
++}
++
++extern void task_vruntime_update(struct rq *rq, struct task_struct *p, bool in_fi);
++
++static struct task_struct *
++pick_next_task(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
++{
++  struct task_struct *next, *max = NULL;
++  const struct sched_class *class;
++  const struct cpumask *smt_mask;
++  bool fi_before = false;
++  int i, j, cpu, occ = 0;
++  bool need_sync;
++
++  if (!sched_core_enabled(rq))
++    return __pick_next_task(rq, prev, rf);
++
++  cpu = cpu_of(rq);
++
++  /* Stopper task is switching into idle, no need core-wide selection. */
++  if (cpu_is_offline(cpu)) {
++    /*
++     * Reset core_pick so that we don't enter the fastpath when
++     * coming online. core_pick would already be migrated to
++     * another cpu during offline.
++     */
++    rq->core_pick = NULL;
++    return __pick_next_task(rq, prev, rf);
++  }
++
++  /*
++   * If there were no {en,de}queues since we picked (IOW, the task
++   * pointers are all still valid), and we haven't scheduled the last
++   * pick yet, do so now.
++   *
++   * rq->core_pick can be NULL if no selection was made for a CPU because
++   * it was either offline or went offline during a sibling's core-wide
++   * selection. In this case, do a core-wide selection.
++   */
++  if (rq->core->core_pick_seq == rq->core->core_task_seq &&
++      rq->core->core_pick_seq != rq->core_sched_seq &&
++      rq->core_pick) {
++    WRITE_ONCE(rq->core_sched_seq, rq->core->core_pick_seq);
++
++    next = rq->core_pick;
++    if (next != prev) {
++      put_prev_task(rq, prev);
++      set_next_task(rq, next);
++    }
++
++    rq->core_pick = NULL;
++    return next;
++  }
++
++  put_prev_task_balance(rq, prev, rf);
++
++  smt_mask = cpu_smt_mask(cpu);
++  need_sync = !!rq->core->core_cookie;
++
++  /* reset state */
++  rq->core->core_cookie = 0UL;
++  if (rq->core->core_forceidle) {
++    need_sync = true;
++    fi_before = true;
++    rq->core->core_forceidle = false;
++  }
++
++  /*
++   * core->core_task_seq, core->core_pick_seq, rq->core_sched_seq
++   *
++   * @task_seq guards the task state ({en,de}queues)
++   * @pick_seq is the @task_seq we did a selection on
++   * @sched_seq is the @pick_seq we scheduled
++   *
++   * However, preemptions can cause multiple picks on the same task set.
++   * 'Fix' this by also increasing @task_seq for every pick.
++   */
++  rq->core->core_task_seq++;
++
++  /*
++   * Optimize for common case where this CPU has no cookies
++   * and there are no cookied tasks running on siblings.
++   */
++  if (!need_sync) {
++    for_each_class(class) {
++      next = class->pick_task(rq);
++      if (next)
++        break;
++    }
++
++    if (!next->core_cookie) {
++      rq->core_pick = NULL;
++      /*
++       * For robustness, update the min_vruntime_fi for
++       * unconstrained picks as well.
++       */
++      WARN_ON_ONCE(fi_before);
++      task_vruntime_update(rq, next, false);
++      goto done;
++    }
++  }
++
++  for_each_cpu(i, smt_mask) {
++    struct rq *rq_i = cpu_rq(i);
++
++    rq_i->core_pick = NULL;
++
++    if (i != cpu)
++      update_rq_clock(rq_i);
++  }
++
++  /*
++   * Try and select tasks for each sibling in decending sched_class
++   * order.
++   */
++  for_each_class(class) {
++again:
++    for_each_cpu_wrap(i, smt_mask, cpu) {
++      struct rq *rq_i = cpu_rq(i);
++      struct task_struct *p;
++
++      if (rq_i->core_pick)
++        continue;
++
++      /*
++       * If this sibling doesn't yet have a suitable task to
++       * run; ask for the most elegible task, given the
++       * highest priority task already selected for this
++       * core.
++       */
++      p = pick_task(rq_i, class, max, fi_before);
++      if (!p)
++        continue;
++
++      if (!is_task_rq_idle(p))
++        occ++;
++
++      rq_i->core_pick = p;
++      if (rq_i->idle == p && rq_i->nr_running) {
++        rq->core->core_forceidle = true;
++        if (!fi_before)
++          rq->core->core_forceidle_seq++;
++      }
++
++      /*
++       * If this new candidate is of higher priority than the
++       * previous; and they're incompatible; we need to wipe
++       * the slate and start over. pick_task makes sure that
++       * p's priority is more than max if it doesn't match
++       * max's cookie.
++       *
++       * NOTE: this is a linear max-filter and is thus bounded
++       * in execution time.
++       */
++      if (!max || !cookie_match(max, p)) {
++        struct task_struct *old_max = max;
++
++        rq->core->core_cookie = p->core_cookie;
++        max = p;
++
++        if (old_max) {
++          rq->core->core_forceidle = false;
++          for_each_cpu(j, smt_mask) {
++            if (j == i)
++              continue;
++
++            cpu_rq(j)->core_pick = NULL;
++          }
++          occ = 1;
++          goto again;
++        }
++      }
++    }
++  }
++
++  rq->core->core_pick_seq = rq->core->core_task_seq;
++  next = rq->core_pick;
++  rq->core_sched_seq = rq->core->core_pick_seq;
++
++  /* Something should have been selected for current CPU */
++  WARN_ON_ONCE(!next);
++
++  /*
++   * Reschedule siblings
++   *
++   * NOTE: L1TF -- at this point we're no longer running the old task and
++   * sending an IPI (below) ensures the sibling will no longer be running
++   * their task. This ensures there is no inter-sibling overlap between
++   * non-matching user state.
++   */
++  for_each_cpu(i, smt_mask) {
++    struct rq *rq_i = cpu_rq(i);
++    /*
++     * An online sibling might have gone offline before a task
++     * could be picked for it, or it might be offline but later
++     * happen to come online, but its too late and nothing was
++     * picked for it.  That's Ok - it will pick tasks for itself,
++     * so ignore it.
++     */
++    if (!rq_i->core_pick)
++      continue;
++
++    /*
++     * Update for new !FI->FI transitions, or if continuing to be in !FI:
++     * fi_before     fi      update?
++     *  0            0       1
++     *  0            1       1
++     *  1            0       1
++     *  1            1       0
++     */
++    if (!(fi_before && rq->core->core_forceidle))
++      task_vruntime_update(rq_i, rq_i->core_pick, rq->core->core_forceidle);
++
++    rq_i->core_pick->core_occupation = occ;
++
++    if (i == cpu) {
++      rq_i->core_pick = NULL;
++      continue;
++    }
++
++    /* Did we break L1TF mitigation requirements? */
++    WARN_ON_ONCE(!cookie_match(next, rq_i->core_pick));
++
++    if (rq_i->curr == rq_i->core_pick) {
++      rq_i->core_pick = NULL;
++      continue;
++    }
++
++    resched_curr(rq_i);
++  }
++
++done:
++  set_next_task(rq, next);
++  return next;
++}
++
++static bool try_steal_cookie(int this, int that)
++{
++  struct rq *dst = cpu_rq(this), *src = cpu_rq(that);
++  struct task_struct *p;
++  unsigned long cookie;
++  bool success = false;
++
++  local_irq_disable();
++  double_rq_lock(dst, src);
++
++  cookie = dst->core->core_cookie;
++  if (!cookie)
++    goto unlock;
++
++  if (dst->curr != dst->idle)
++    goto unlock;
++
++  p = sched_core_find(src, cookie);
++  if (p == src->idle)
++    goto unlock;
++
++  do {
++    if (p == src->core_pick || p == src->curr)
++      goto next;
++
++    if (!cpumask_test_cpu(this, &p->cpus_mask))
++      goto next;
++
++    if (p->core_occupation > dst->idle->core_occupation)
++      goto next;
++
++    p->on_rq = TASK_ON_RQ_MIGRATING;
++    deactivate_task(src, p, 0);
++    set_task_cpu(p, this);
++    activate_task(dst, p, 0);
++    p->on_rq = TASK_ON_RQ_QUEUED;
++
++    resched_curr(dst);
++
++    success = true;
++    break;
++
++next:
++    p = sched_core_next(p, cookie);
++  } while (p);
++
++unlock:
++  double_rq_unlock(dst, src);
++  local_irq_enable();
++
++  return success;
++}
++
++static bool steal_cookie_task(int cpu, struct sched_domain *sd)
++{
++  int i;
++
++  for_each_cpu_wrap(i, sched_domain_span(sd), cpu) {
++    if (i == cpu)
++      continue;
++
++    if (need_resched())
++      break;
++
++    if (try_steal_cookie(cpu, i))
++      return true;
++  }
++
++  return false;
++}
++
++static void sched_core_balance(struct rq *rq)
++{
++  struct sched_domain *sd;
++  int cpu = cpu_of(rq);
++
++  preempt_disable();
++  rcu_read_lock();
++  raw_spin_rq_unlock_irq(rq);
++  for_each_domain(cpu, sd) {
++    if (need_resched())
++      break;
++
++    if (steal_cookie_task(cpu, sd))
++      break;
++  }
++  raw_spin_rq_lock_irq(rq);
++  rcu_read_unlock();
++  preempt_enable();
++}
++
++static DEFINE_PER_CPU(struct callback_head, core_balance_head);
++
++void queue_core_balance(struct rq *rq)
++{
++  if (!sched_core_enabled(rq))
++    return;
++
++  if (!rq->core->core_cookie)
++    return;
++
++  if (!rq->nr_running) /* not forced idle */
++    return;
++
++  queue_balance_callback(rq, &per_cpu(core_balance_head, rq->cpu), sched_core_balance);
++}
++
++static void sched_core_cpu_starting(unsigned int cpu)
++{
++  const struct cpumask *smt_mask = cpu_smt_mask(cpu);
++  struct rq *rq = cpu_rq(cpu), *core_rq = NULL;
++  unsigned long flags;
++  int t;
++sched_core_lock(cpu, &flags);
++
++  WARN_ON_ONCE(rq->core != rq);
++
++  /* if we're the first, we'll be our own leader */
++  if (cpumask_weight(smt_mask) == 1)
++    goto unlock;
++
++  /* find the leader */
++  for_each_cpu(t, smt_mask) {
++    if (t == cpu)
++      continue;
++    rq = cpu_rq(t);
++    if (rq->core == rq) {
++      core_rq = rq;
++      break;
++    }
++  }
++
++  if (WARN_ON_ONCE(!core_rq)) /* whoopsie */
++    goto unlock;
++
++  /* install and validate core_rq */
++  for_each_cpu(t, smt_mask) {
++    rq = cpu_rq(t);
++
++    if (t == cpu)
++      rq->core = core_rq;
++
++    WARN_ON_ONCE(rq->core != core_rq);
++  }
++
++unlock:
++  sched_core_unlock(cpu, &flags);
++}
++
++static void sched_core_cpu_deactivate(unsigned int cpu)
++{
++  const struct cpumask *smt_mask = cpu_smt_mask(cpu);
++  struct rq *rq = cpu_rq(cpu), *core_rq = NULL;
++  unsigned long flags;
++  int t;
++
++  sched_core_lock(cpu, &flags);
++
++  /* if we're the last man standing, nothing to do */
++  if (cpumask_weight(smt_mask) == 1) {
++    WARN_ON_ONCE(rq->core != rq);
++    goto unlock;
++  }
++
++  /* if we're not the leader, nothing to do */
++  if (rq->core != rq)
++    goto unlock;
++
++  /* find a new leader */
++  for_each_cpu(t, smt_mask) {
++    if (t == cpu)
++      continue;
++    core_rq = cpu_rq(t);
++    break;
++  }
++
++  if (WARN_ON_ONCE(!core_rq)) /* impossible */
++    goto unlock;
++
++  /* copy the shared state to the new leader */
++  core_rq->core_task_seq      = rq->core_task_seq;
++  core_rq->core_pick_seq      = rq->core_pick_seq;
++  core_rq->core_cookie        = rq->core_cookie;
++  core_rq->core_forceidle     = rq->core_forceidle;
++  core_rq->core_forceidle_seq = rq->core_forceidle_seq;
++
++  /* install new leader */
++  for_each_cpu(t, smt_mask) {
++    rq = cpu_rq(t);
++    rq->core = core_rq;
++  }
++unlock:
++  sched_core_unlock(cpu, &flags);
++}
++
++static inline void sched_core_cpu_dying(unsigned int cpu)
++{
++  struct rq *rq = cpu_rq(cpu);
++
++  if (rq->core != rq)
++    rq->core = rq;
++}
++
++#else /* !CONFIG_SCHED_CORE */
++
++static inline void sched_core_cpu_starting(unsigned int cpu) {}
++static inline void sched_core_cpu_deactivate(unsigned int cpu) {}
++static inline void sched_core_cpu_dying(unsigned int cpu) {}
++
++static struct task_struct *
++pick_next_task(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
++{
++  return __pick_next_task(rq, prev, rf);
++}
++
++#endif /* CONFIG_SCHED_CORE */
++
+ /*
+  * __schedule() is the main scheduler function.
+  *
+@@ -6932,6 +7743,7 @@ int sched_cpu_deactivate(unsigned int cp
+ 	 */
+ 	if (cpumask_weight(cpu_smt_mask(cpu)) == 2)
+ 		static_branch_dec_cpuslocked(&sched_smt_present);
++  sched_core_cpu_deactivate(cpu);
+ #endif
+ 
+ 	if (!sched_smp_initialized)
+@@ -6956,6 +7768,7 @@ static void sched_rq_cpu_starting(unsign
+ 
+ int sched_cpu_starting(unsigned int cpu)
+ {
++  sched_core_cpu_starting(cpu);
+ 	sched_rq_cpu_starting(cpu);
+ 	sched_tick_start(cpu);
+ 	return 0;
+@@ -6983,6 +7796,7 @@ int sched_cpu_dying(unsigned int cpu)
+ 	update_max_interval();
+ 	nohz_balance_exit_idle(rq);
+ 	hrtick_clear(rq);
++  sched_core_cpu_dying(cpu);
+ 	return 0;
+ }
+ #endif
+@@ -7186,6 +8000,15 @@ void __init sched_init(void)
+ #endif /* CONFIG_SMP */
+ 		hrtick_rq_init(rq);
+ 		atomic_set(&rq->nr_iowait, 0);
++#ifdef CONFIG_SCHED_CORE
++    rq->core = rq;
++    rq->core_pick = NULL;
++    rq->core_enabled = 0;
++    rq->core_tree = RB_ROOT;
++    rq->core_forceidle = false;
++
++    rq->core_cookie = 0UL;
++#endif
+ 	}
+ 
+ 	set_load_weight(&init_task, false);
+Index: rpi-kernel/kernel/sched/fair.c
+===================================================================
+--- rpi-kernel.orig/kernel/sched/fair.c
++++ rpi-kernel/kernel/sched/fair.c
+@@ -6618,8 +6618,13 @@ static int find_energy_efficient_cpu(str
+ {
+ 	unsigned long prev_delta = ULONG_MAX, best_delta = ULONG_MAX;
+ 	struct root_domain *rd = cpu_rq(smp_processor_id())->rd;
++  int max_spare_cap_cpu_ls = prev_cpu, best_idle_cpu = -1;
+ 	unsigned long cpu_cap, util, base_energy = 0;
++  unsigned long max_spare_cap_ls = 0, target_cap;
++  bool boosted, latency_sensitive = false;
++  unsigned int min_exit_lat = UINT_MAX;
+ 	int cpu, best_energy_cpu = prev_cpu;
++  struct cpuidle_state *idle;
+ 	struct sched_domain *sd;
+ 	struct perf_domain *pd;
+ 
+@@ -6641,7 +6646,9 @@ static int find_energy_efficient_cpu(str
+ 	sync_entity_load_avg(&p->se);
+ 	if (!task_util_est(p))
+ 		goto unlock;
+-
++  latency_sensitive = uclamp_latency_sensitive(p);
++  boosted = uclamp_boosted(p);
++  target_cap = boosted ? 0 : ULONG_MAX;
+ 	for (; pd; pd = pd->next) {
+ 		unsigned long cur_delta, spare_cap, max_spare_cap = 0;
+ 		unsigned long base_energy_pd;
+@@ -6672,7 +6679,7 @@ static int find_energy_efficient_cpu(str
+ 				continue;
+ 
+ 			/* Always use prev_cpu as a candidate. */
+-			if (cpu == prev_cpu) {
++			if (!latency_sensitive && cpu == prev_cpu) {
+ 				prev_delta = compute_energy(p, prev_cpu, pd);
+ 				prev_delta -= base_energy_pd;
+ 				best_delta = min(best_delta, prev_delta);
+@@ -6686,6 +6693,28 @@ static int find_energy_efficient_cpu(str
+ 				max_spare_cap = spare_cap;
+ 				max_spare_cap_cpu = cpu;
+ 			}
++
++      if (!latency_sensitive)
++        continue;
++      if (idle_cpu(cpu)) {
++        cpu_cap = capacity_orig_of(cpu);
++        if (boosted && cpu_cap < target_cap)
++          continue;
++        if (!boosted && cpu_cap > target_cap)
++          continue;
++        idle = idle_get_state(cpu_rq(cpu));
++        if (idle && idle->exit_latency > min_exit_lat &&
++            cpu_cap == target_cap)
++          continue;
++
++        if (idle)
++          min_exit_lat = idle->exit_latency;
++        target_cap = cpu_cap;
++        best_idle_cpu = cpu;
++      } else if (spare_cap > max_spare_cap_ls) {
++        max_spare_cap_ls = spare_cap;
++        max_spare_cap_cpu_ls = cpu;
++      }
+ 		}
+ 
+ 		/* Evaluate the energy impact of using this CPU. */
+@@ -6701,6 +6730,9 @@ static int find_energy_efficient_cpu(str
+ unlock:
+ 	rcu_read_unlock();
+ 
++  if (latency_sensitive)
++    return best_idle_cpu >= 0 ? best_idle_cpu : max_spare_cap_cpu_ls;
++
+ 	/*
+ 	 * Pick the best CPU if prev_cpu cannot be used, or if it saves at
+ 	 * least 6% of the energy used by prev_cpu.
+@@ -10723,6 +10755,119 @@ static void rq_offline_fair(struct rq *r
+ 
+ #endif /* CONFIG_SMP */
+ 
++#ifdef CONFIG_SCHED_CORE
++static inline bool
++__entity_slice_used(struct sched_entity *se, int min_nr_tasks)
++{
++  u64 slice = sched_slice(cfs_rq_of(se), se);
++  u64 rtime = se->sum_exec_runtime - se->prev_sum_exec_runtime;
++
++  return (rtime * min_nr_tasks > slice);
++}
++
++#define MIN_NR_TASKS_DURING_FORCEIDLE 2
++static inline void task_tick_core(struct rq *rq, struct task_struct *curr)
++{
++  if (!sched_core_enabled(rq))
++    return;
++
++  /*
++   * If runqueue has only one task which used up its slice and
++   * if the sibling is forced idle, then trigger schedule to
++   * give forced idle task a chance.
++   *
++   * sched_slice() considers only this active rq and it gets the
++   * whole slice. But during force idle, we have siblings acting
++   * like a single runqueue and hence we need to consider runnable
++   * tasks on this cpu and the forced idle cpu. Ideally, we should
++   * go through the forced idle rq, but that would be a perf hit.
++   * We can assume that the forced idle cpu has atleast
++   * MIN_NR_TASKS_DURING_FORCEIDLE - 1 tasks and use that to check
++   * if we need to give up the cpu.
++   */
++  if (rq->core->core_forceidle && rq->cfs.nr_running == 1 &&
++      __entity_slice_used(&curr->se, MIN_NR_TASKS_DURING_FORCEIDLE))
++    resched_curr(rq);
++}
++
++/*
++ * se_fi_update - Update the cfs_rq->min_vruntime_fi in a CFS hierarchy if needed.
++ */
++static void se_fi_update(struct sched_entity *se, unsigned int fi_seq, bool forceidle)
++{
++  for_each_sched_entity(se) {
++    struct cfs_rq *cfs_rq = cfs_rq_of(se);
++
++    if (forceidle) {
++      if (cfs_rq->forceidle_seq == fi_seq)
++        break;
++      cfs_rq->forceidle_seq = fi_seq;
++    }
++
++    cfs_rq->min_vruntime_fi = cfs_rq->min_vruntime;
++  }
++}
++
++void task_vruntime_update(struct rq *rq, struct task_struct *p, bool in_fi)
++{
++  struct sched_entity *se = &p->se;
++
++  if (p->sched_class != &fair_sched_class)
++    return;
++
++  se_fi_update(se, rq->core->core_forceidle_seq, in_fi);
++}
++
++bool cfs_prio_less(struct task_struct *a, struct task_struct *b, bool in_fi)
++{
++  struct rq *rq = task_rq(a);
++  struct sched_entity *sea = &a->se;
++  struct sched_entity *seb = &b->se;
++  struct cfs_rq *cfs_rqa;
++  struct cfs_rq *cfs_rqb;
++  s64 delta;
++
++  SCHED_WARN_ON(task_rq(b)->core != rq->core);
++
++#ifdef CONFIG_FAIR_GROUP_SCHED
++  /*
++   * Find an se in the hierarchy for tasks a and b, such that the se's
++   * are immediate siblings.
++   */
++  while (sea->cfs_rq->tg != seb->cfs_rq->tg) {
++    int sea_depth = sea->depth;
++    int seb_depth = seb->depth;
++
++    if (sea_depth >= seb_depth)
++      sea = parent_entity(sea);
++    if (sea_depth <= seb_depth)
++      seb = parent_entity(seb);
++  }
++
++  se_fi_update(sea, rq->core->core_forceidle_seq, in_fi);
++  se_fi_update(seb, rq->core->core_forceidle_seq, in_fi);
++
++  cfs_rqa = sea->cfs_rq;
++  cfs_rqb = seb->cfs_rq;
++#else
++  cfs_rqa = &task_rq(a)->cfs;
++  cfs_rqb = &task_rq(b)->cfs;
++#endif
++
++  /*
++   * Find delta after normalizing se's vruntime with its cfs_rq's
++   * min_vruntime_fi, which would have been updated in prior calls
++   * to se_fi_update().
++   */
++  delta = (s64)(sea->vruntime - seb->vruntime) +
++    (s64)(cfs_rqb->min_vruntime_fi - cfs_rqa->min_vruntime_fi);
++
++  return delta > 0;
++}
++#else
++static inline void task_tick_core(struct rq *rq, struct task_struct *curr) {}
++#endif
++
+ /*
+  * scheduler tick hitting a task of our scheduling class.
+  *
+@@ -10746,6 +10891,7 @@ static void task_tick_fair(struct rq *rq
+ 
+ 	update_misfit_status(curr, rq);
+ 	update_overutilized_status(task_rq(curr));
++  task_tick_core(rq, curr);
+ }
+ 
+ /*
+Index: rpi-kernel/kernel/sched/sched.h
+===================================================================
+--- rpi-kernel.orig/kernel/sched/sched.h
++++ rpi-kernel/kernel/sched/sched.h
+@@ -431,6 +431,7 @@ struct task_group {
+ 	struct uclamp_se	uclamp_req[UCLAMP_CNT];
+ 	/* Effective clamp values used for a task group */
+ 	struct uclamp_se	uclamp[UCLAMP_CNT];
++  unsigned int    latency_sensitive;
+ #endif
+ 
+ };
+@@ -527,6 +528,10 @@ struct cfs_rq {
+ 
+ 	u64			exec_clock;
+ 	u64			min_vruntime;
++#ifdef CONFIG_SCHED_CORE
++  unsigned int    forceidle_seq;
++  u64     min_vruntime_fi;
++#endif
+ #ifndef CONFIG_64BIT
+ 	u64			min_vruntime_copy;
+ #endif
+@@ -1052,6 +1057,21 @@ struct rq {
+ 	/* Must be inspected within a rcu lock section */
+ 	struct cpuidle_state	*idle_state;
+ #endif
++#ifdef CONFIG_SCHED_CORE
++  /* per rq */
++  struct rq   *core;
++  struct task_struct  *core_pick;
++  unsigned int    core_enabled;
++  unsigned int    core_sched_seq;
++  struct rb_root    core_tree;
++
++  /* shared state -- careful with sched_core_cpu_deactivate() */
++  unsigned int    core_task_seq;
++  unsigned int    core_pick_seq;
++  unsigned long   core_cookie;
++  unsigned char   core_forceidle;
++  unsigned int    core_forceidle_seq;
++#endif
+ };
+ 
+ #ifdef CONFIG_FAIR_GROUP_SCHED
+@@ -1079,6 +1099,161 @@ static inline int cpu_of(struct rq *rq)
+ #endif
+ }
+ 
++struct sched_group;
++#ifdef CONFIG_SCHED_CORE
++static inline struct cpumask *sched_group_span(struct sched_group *sg);
++
++DECLARE_STATIC_KEY_FALSE(__sched_core_enabled);
++
++static inline bool sched_core_enabled(struct rq *rq)
++{
++  return static_branch_unlikely(&__sched_core_enabled) && rq->core_enabled;
++}
++
++static inline bool sched_core_disabled(void)
++{
++  return !static_branch_unlikely(&__sched_core_enabled);
++}
++
++/*
++ * Be careful with this function; not for general use. The return value isn't
++ * stable unless you actually hold a relevant rq->__lock.
++ */
++static inline raw_spinlock_t *rq_lockp(struct rq *rq)
++{
++  if (sched_core_enabled(rq))
++    return &rq->core->__lock;
++
++  return &rq->__lock;
++}
++
++static inline raw_spinlock_t *__rq_lockp(struct rq *rq)
++{
++  if (rq->core_enabled)
++    return &rq->core->__lock;
++
++  return &rq->__lock;
++}
++
++bool cfs_prio_less(struct task_struct *a, struct task_struct *b, bool fi);
++
++/*
++ * Helpers to check if the CPU's core cookie matches with the task's cookie
++ * when core scheduling is enabled.
++ * A special case is that the task's cookie always matches with CPU's core
++ * cookie if the CPU is in an idle core.
++ */
++static inline bool sched_cpu_cookie_match(struct rq *rq, struct task_struct *p)
++{
++  /* Ignore cookie match if core scheduler is not enabled on the CPU. */
++  if (!sched_core_enabled(rq))
++    return true;
++
++  return rq->core->core_cookie == p->core_cookie;
++}
++
++static inline bool sched_core_cookie_match(struct rq *rq, struct task_struct *p)
++{
++  bool idle_core = true;
++  int cpu;
++
++  /* Ignore cookie match if core scheduler is not enabled on the CPU. */
++  if (!sched_core_enabled(rq))
++    return true;
++
++  for_each_cpu(cpu, cpu_smt_mask(cpu_of(rq))) {
++    if (!available_idle_cpu(cpu)) {
++      idle_core = false;
++      break;
++    }
++  }
++
++  /*
++   * A CPU in an idle core is always the best choice for tasks with
++   * cookies.
++   */
++  return idle_core || rq->core->core_cookie == p->core_cookie;
++}
++
++static inline bool sched_group_cookie_match(struct rq *rq,
++              struct task_struct *p,
++              struct sched_group *group)
++{
++  int cpu;
++
++  /* Ignore cookie match if core scheduler is not enabled on the CPU. */
++  if (!sched_core_enabled(rq))
++    return true;
++
++  for_each_cpu_and(cpu, sched_group_span(group), p->cpus_ptr) {
++    if (sched_core_cookie_match(rq, p))
++      return true;
++  }
++  return false;
++}
++
++extern void queue_core_balance(struct rq *rq);
++
++static inline bool sched_core_enqueued(struct task_struct *p)
++{
++  return !RB_EMPTY_NODE(&p->core_node);
++}
++
++extern void sched_core_enqueue(struct rq *rq, struct task_struct *p);
++extern void sched_core_dequeue(struct rq *rq, struct task_struct *p);
++
++extern void sched_core_get(void);
++extern void sched_core_put(void);
++
++extern unsigned long sched_core_alloc_cookie(void);
++extern void sched_core_put_cookie(unsigned long cookie);
++extern unsigned long sched_core_get_cookie(unsigned long cookie);
++extern unsigned long sched_core_update_cookie(struct task_struct *p, unsigned long cookie);
++
++#else /* !CONFIG_SCHED_CORE */
++
++static inline bool sched_core_enabled(struct rq *rq)
++{
++  return false;
++}
++
++static inline bool sched_core_disabled(void)
++{
++  return true;
++}
++
++static inline raw_spinlock_t *rq_lockp(struct rq *rq)
++{
++  return &rq->lock;
++}
++
++static inline raw_spinlock_t *__rq_lockp(struct rq *rq)
++{
++  return &rq->lock;
++}
++
++static inline void queue_core_balance(struct rq *rq)
++{
++}
++
++static inline bool sched_cpu_cookie_match(struct rq *rq, struct task_struct *p)
++{
++  return true;
++}
++
++static inline bool sched_core_cookie_match(struct rq *rq, struct task_struct *p)
++{
++  return true;
++}
++
++static inline bool sched_group_cookie_match(struct rq *rq,
++              struct task_struct *p,
++              struct sched_group *group)
++{
++  return true;
++}
++#endif /* CONFIG_SCHED_CORE */
++
+ 
+ #ifdef CONFIG_SCHED_SMT
+ extern void __update_idle_core(struct rq *rq);
+@@ -2456,6 +2631,11 @@ out:
+ 	return clamp(util, min_util, max_util);
+ }
+ 
++static inline bool uclamp_boosted(struct task_struct *p)
++{
++  return uclamp_eff_value(p, UCLAMP_MIN) > 0;
++}
++
+ /*
+  * When uclamp is compiled in, the aggregation at rq level is 'turned off'
+  * by default in the fast path and only gets turned on once userspace performs
+@@ -2476,12 +2656,46 @@ unsigned long uclamp_rq_util_with(struct
+ 	return util;
+ }
+ 
++static inline bool uclamp_boosted(struct task_struct *p)
++{
++  return false;
++}
++
+ static inline bool uclamp_is_used(void)
+ {
+ 	return false;
+ }
+ #endif /* CONFIG_UCLAMP_TASK */
+ 
++#ifdef CONFIG_UCLAMP_TASK_GROUP
++static inline bool uclamp_latency_sensitive(struct task_struct *p)
++{
++  struct cgroup_subsys_state *css = task_css(p, cpu_cgrp_id);
++  struct task_group *tg;
++
++#ifdef CONFIG_PROC_LATSENSE
++  /* Over CGroup interface with task-interface. */
++  if (p->proc_latency_sensitive)
++    return true;
++#endif
++
++  if (!css)
++    return false;
++  tg = container_of(css, struct task_group, css);
++
++  return tg->latency_sensitive;
++}
++#else
++static inline bool uclamp_latency_sensitive(struct task_struct *p)
++{
++#ifdef CONFIG_PROC_LATSENSE
++  return !!p->proc_latency_sensitive;
++#endif
++  return false;
++}
++
++#endif /* CONFIG_UCLAMP_TASK_GROUP */
++
+ #ifdef arch_scale_freq_capacity
+ # ifndef arch_scale_freq_invariant
+ #  define arch_scale_freq_invariant()	true
+Index: rpi-kernel/include/linux/cpufreq_times.h
+===================================================================
+--- /dev/null
++++ rpi-kernel/include/linux/cpufreq_times.h
+@@ -0,0 +1,42 @@
++/* drivers/cpufreq/cpufreq_times.c
++ *
++ * Copyright (C) 2018 Google, Inc.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef _LINUX_CPUFREQ_TIMES_H
++#define _LINUX_CPUFREQ_TIMES_H
++
++#include <linux/cpufreq.h>
++#include <linux/pid.h>
++
++#ifdef CONFIG_CPU_FREQ_TIMES
++void cpufreq_task_times_init(struct task_struct *p);
++void cpufreq_task_times_alloc(struct task_struct *p);
++void cpufreq_task_times_exit(struct task_struct *p);
++int proc_time_in_state_show(struct seq_file *m, struct pid_namespace *ns,
++			    struct pid *pid, struct task_struct *p);
++void cpufreq_acct_update_power(struct task_struct *p, u64 cputime);
++void cpufreq_times_create_policy(struct cpufreq_policy *policy);
++void cpufreq_times_record_transition(struct cpufreq_policy *policy,
++                                     unsigned int new_freq);
++#else
++static inline void cpufreq_task_times_init(struct task_struct *p) {}
++static inline void cpufreq_task_times_alloc(struct task_struct *p) {}
++static inline void cpufreq_task_times_exit(struct task_struct *p) {}
++static inline void cpufreq_acct_update_power(struct task_struct *p,
++					     u64 cputime) {}
++static inline void cpufreq_times_create_policy(struct cpufreq_policy *policy) {}
++static inline void cpufreq_times_record_transition(
++	struct cpufreq_policy *policy, unsigned int new_freq) {}
++#endif /* CONFIG_CPU_FREQ_TIMES */
++#endif /* _LINUX_CPUFREQ_TIMES_H */
+Index: rpi-kernel/drivers/cpufreq/cpufreq_times.c
+===================================================================
+--- /dev/null
++++ rpi-kernel/drivers/cpufreq/cpufreq_times.c
+@@ -0,0 +1,211 @@
++/* drivers/cpufreq/cpufreq_times.c
++ *
++ * Copyright (C) 2018 Google, Inc.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#include <linux/cpufreq.h>
++#include <linux/cpufreq_times.h>
++#include <linux/jiffies.h>
++#include <linux/sched.h>
++#include <linux/seq_file.h>
++#include <linux/slab.h>
++#include <linux/spinlock.h>
++#include <linux/threads.h>
++
++static DEFINE_SPINLOCK(task_time_in_state_lock); /* task->time_in_state */
++
++/**
++ * struct cpu_freqs - per-cpu frequency information
++ * @offset: start of these freqs' stats in task time_in_state array
++ * @max_state: number of entries in freq_table
++ * @last_index: index in freq_table of last frequency switched to
++ * @freq_table: list of available frequencies
++ */
++struct cpu_freqs {
++	unsigned int offset;
++	unsigned int max_state;
++	unsigned int last_index;
++	unsigned int freq_table[0];
++};
++
++static struct cpu_freqs *all_freqs[NR_CPUS];
++
++static unsigned int next_offset;
++
++void cpufreq_task_times_init(struct task_struct *p)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&task_time_in_state_lock, flags);
++	p->time_in_state = NULL;
++	spin_unlock_irqrestore(&task_time_in_state_lock, flags);
++	p->max_state = 0;
++}
++
++void cpufreq_task_times_alloc(struct task_struct *p)
++{
++	void *temp;
++	unsigned long flags;
++	unsigned int max_state = READ_ONCE(next_offset);
++
++	/* We use one array to avoid multiple allocs per task */
++	temp = kcalloc(max_state, sizeof(p->time_in_state[0]), GFP_ATOMIC);
++	if (!temp)
++		return;
++
++	spin_lock_irqsave(&task_time_in_state_lock, flags);
++	p->time_in_state = temp;
++	spin_unlock_irqrestore(&task_time_in_state_lock, flags);
++	p->max_state = max_state;
++}
++
++/* Caller must hold task_time_in_state_lock */
++static int cpufreq_task_times_realloc_locked(struct task_struct *p)
++{
++	void *temp;
++	unsigned int max_state = READ_ONCE(next_offset);
++
++	temp = krealloc(p->time_in_state, max_state * sizeof(u64), GFP_ATOMIC);
++	if (!temp)
++		return -ENOMEM;
++	p->time_in_state = temp;
++	memset(p->time_in_state + p->max_state, 0,
++	       (max_state - p->max_state) * sizeof(u64));
++	p->max_state = max_state;
++	return 0;
++}
++
++void cpufreq_task_times_exit(struct task_struct *p)
++{
++	unsigned long flags;
++	void *temp;
++
++	if (!p->time_in_state)
++		return;
++
++	spin_lock_irqsave(&task_time_in_state_lock, flags);
++	temp = p->time_in_state;
++	p->time_in_state = NULL;
++	spin_unlock_irqrestore(&task_time_in_state_lock, flags);
++	kfree(temp);
++}
++
++int proc_time_in_state_show(struct seq_file *m, struct pid_namespace *ns,
++	struct pid *pid, struct task_struct *p)
++{
++	unsigned int cpu, i;
++	u64 cputime;
++	unsigned long flags;
++	struct cpu_freqs *freqs;
++	struct cpu_freqs *last_freqs = NULL;
++
++	spin_lock_irqsave(&task_time_in_state_lock, flags);
++	for_each_possible_cpu(cpu) {
++		freqs = all_freqs[cpu];
++		if (!freqs || freqs == last_freqs)
++			continue;
++		last_freqs = freqs;
++
++		seq_printf(m, "cpu%u\n", cpu);
++		for (i = 0; i < freqs->max_state; i++) {
++			cputime = 0;
++			if (freqs->offset + i < p->max_state &&
++			    p->time_in_state)
++				cputime = p->time_in_state[freqs->offset + i];
++			seq_printf(m, "%u %lu\n", freqs->freq_table[i],
++				   (unsigned long)nsec_to_clock_t(cputime));
++		}
++	}
++	spin_unlock_irqrestore(&task_time_in_state_lock, flags);
++	return 0;
++}
++
++void cpufreq_acct_update_power(struct task_struct *p, u64 cputime)
++{
++	unsigned long flags;
++	unsigned int state;
++	struct cpu_freqs *freqs = all_freqs[task_cpu(p)];
++
++	if (!freqs || is_idle_task(p) || p->flags & PF_EXITING)
++		return;
++
++	state = freqs->offset + READ_ONCE(freqs->last_index);
++
++	spin_lock_irqsave(&task_time_in_state_lock, flags);
++	if ((state < p->max_state || !cpufreq_task_times_realloc_locked(p)) &&
++	    p->time_in_state)
++		p->time_in_state[state] += cputime;
++	spin_unlock_irqrestore(&task_time_in_state_lock, flags);
++}
++
++static int cpufreq_times_get_index(struct cpu_freqs *freqs, unsigned int freq)
++{
++	int index;
++        for (index = 0; index < freqs->max_state; ++index) {
++		if (freqs->freq_table[index] == freq)
++			return index;
++        }
++	return -1;
++}
++
++void cpufreq_times_create_policy(struct cpufreq_policy *policy)
++{
++	int cpu, index = 0;
++	unsigned int count = 0;
++	struct cpufreq_frequency_table *pos, *table;
++	struct cpu_freqs *freqs;
++	void *tmp;
++
++	if (all_freqs[policy->cpu])
++		return;
++
++	table = policy->freq_table;
++	if (!table)
++		return;
++
++	cpufreq_for_each_valid_entry(pos, table)
++		count++;
++
++	tmp =  kzalloc(sizeof(*freqs) + sizeof(freqs->freq_table[0]) * count,
++		       GFP_KERNEL);
++	if (!tmp)
++		return;
++
++	freqs = tmp;
++	freqs->max_state = count;
++
++	cpufreq_for_each_valid_entry(pos, table)
++		freqs->freq_table[index++] = pos->frequency;
++
++	index = cpufreq_times_get_index(freqs, policy->cur);
++	if (index >= 0)
++		WRITE_ONCE(freqs->last_index, index);
++
++	freqs->offset = next_offset;
++	WRITE_ONCE(next_offset, freqs->offset + count);
++	for_each_cpu(cpu, policy->related_cpus)
++		all_freqs[cpu] = freqs;
++}
++
++void cpufreq_times_record_transition(struct cpufreq_policy *policy,
++	unsigned int new_freq)
++{
++	int index;
++	struct cpu_freqs *freqs = all_freqs[policy->cpu];
++	if (!freqs)
++		return;
++
++	index = cpufreq_times_get_index(freqs, new_freq);
++	if (index >= 0)
++		WRITE_ONCE(freqs->last_index, index);
++}
+Index: rpi-kernel/drivers/cpufreq/Kconfig
+===================================================================
+--- rpi-kernel.orig/drivers/cpufreq/Kconfig
++++ rpi-kernel/drivers/cpufreq/Kconfig
+@@ -34,6 +34,13 @@ config CPU_FREQ_STAT
+ 
+ 	  If in doubt, say N.
+ 
++config CPU_FREQ_TIMES
++  bool "CPU frequency time-in-state statistics"
++  help
++    Export CPU time-in-state information through procfs.
++
++    If in doubt, say N.
++
+ choice
+ 	prompt "Default CPUFreq governor"
+ 	default CPU_FREQ_DEFAULT_GOV_USERSPACE if ARM_SA1100_CPUFREQ || ARM_SA1110_CPUFREQ
+Index: rpi-kernel/drivers/cpufreq/Makefile
+===================================================================
+--- rpi-kernel.orig/drivers/cpufreq/Makefile
++++ rpi-kernel/drivers/cpufreq/Makefile
+@@ -5,6 +5,9 @@ obj-$(CONFIG_CPU_FREQ)			+= cpufreq.o fr
+ # CPUfreq stats
+ obj-$(CONFIG_CPU_FREQ_STAT)             += cpufreq_stats.o
+ 
++# CPUfreq times
++obj-$(CONFIG_CPU_FREQ_TIMES)    += cpufreq_times.o
++
+ # CPUfreq governors 
+ obj-$(CONFIG_CPU_FREQ_GOV_PERFORMANCE)	+= cpufreq_performance.o
+ obj-$(CONFIG_CPU_FREQ_GOV_POWERSAVE)	+= cpufreq_powersave.o
+Index: rpi-kernel/kernel/sysctl.c
+===================================================================
+--- rpi-kernel.orig/kernel/sysctl.c
++++ rpi-kernel/kernel/sysctl.c
+@@ -106,6 +106,7 @@
+ 
+ #if defined(CONFIG_SYSCTL)
+ 
++extern int extra_free_kbytes;
+ /* Constants used for minimum and  maximum */
+ #ifdef CONFIG_LOCKUP_DETECTOR
+ static int sixty = 60;
+@@ -2923,6 +2924,14 @@ static struct ctl_table vm_table[] = {
+ 		.extra1		= SYSCTL_ONE,
+ 		.extra2		= &one_thousand,
+ 	},
++  {
++    .procname = "extra_free_kbytes",
++    .data   = &extra_free_kbytes,
++    .maxlen   = sizeof(extra_free_kbytes),
++    .mode   = 0644,
++    .proc_handler = min_free_kbytes_sysctl_handler,
++    .extra1   = SYSCTL_ZERO,
++  },
+ 	{
+ 		.procname	= "percpu_pagelist_fraction",
+ 		.data		= &percpu_pagelist_fraction,
+Index: rpi-kernel/include/linux/sched/latsense.h
+===================================================================
+--- /dev/null
++++ rpi-kernel/include/linux/sched/latsense.h
+@@ -0,0 +1,8 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#ifndef _LINUX_SCHED_LATSENSE_H
++#define _LINUX_SCHED_LATSENSE_H
++
++extern int proc_sched_set_latency_sensitive(struct task_struct *p, int val);
++extern int proc_sched_get_latency_sensitive(struct task_struct *p);
++
++#endif /* _LINUX_SCHED_LATSENSE_H */
+Index: rpi-kernel/include/linux/sched/smt.h
+===================================================================
+--- rpi-kernel.orig/include/linux/sched/smt.h
++++ rpi-kernel/include/linux/sched/smt.h
+@@ -17,4 +17,7 @@ static inline bool sched_smt_active(void
+ 
+ void arch_smt_update(void);
+ 
++#ifdef CONFIG_SCHED_CORE
++extern struct static_key_true sched_coresched_supported;
++#endif
+ #endif
+Index: rpi-kernel/include/uapi/linux/prctl.h
+===================================================================
+--- rpi-kernel.orig/include/uapi/linux/prctl.h
++++ rpi-kernel/include/uapi/linux/prctl.h
+@@ -253,4 +253,12 @@ struct prctl_mm_map {
+ #define PR_SET_VMA    0x53564d41
+ # define PR_SET_VMA_ANON_NAME   0
+ 
++/* Request the scheduler to share a core */
++#define PR_SCHED_CORE     62
++# define PR_SCHED_CORE_GET    0
++# define PR_SCHED_CORE_CREATE   1 /* create unique core_sched cookie */
++# define PR_SCHED_CORE_SHARE_TO   2 /* push core_sched cookie to pid */
++# define PR_SCHED_CORE_SHARE_FROM 3 /* pull core_sched cookie to pid */
++# define PR_SCHED_CORE_MAX    4
++
+ #endif /* _LINUX_PRCTL_H */
+Index: rpi-kernel/kernel/cpu.c
+===================================================================
+--- rpi-kernel.orig/kernel/cpu.c
++++ rpi-kernel/kernel/cpu.c
+@@ -2612,3 +2612,48 @@ bool cpu_mitigations_auto_nosmt(void)
+ 	return cpu_mitigations == CPU_MITIGATIONS_AUTO_NOSMT;
+ }
+ EXPORT_SYMBOL_GPL(cpu_mitigations_auto_nosmt);
++
++#ifdef CONFIG_SCHED_CORE
++/*
++ * These are used for a global "coresched=" cmdline option for controlling
++ * core scheduling. Note that core sched may be needed for usecases other
++ * than security as well.
++ */
++enum coresched_cmds {
++  CORE_SCHED_OFF,
++  CORE_SCHED_SECURE,
++  CORE_SCHED_ON,
++};
++
++static enum coresched_cmds coresched_cmd __ro_after_init = CORE_SCHED_SECURE;
++
++static int __init coresched_parse_cmdline(char *arg)
++{
++  if (!strcmp(arg, "off"))
++    coresched_cmd = CORE_SCHED_OFF;
++  else if (!strcmp(arg, "on"))
++    coresched_cmd = CORE_SCHED_ON;
++  else if (!strcmp(arg, "secure"))
++    /*
++     * On x86, coresched=secure means coresched is enabled only if
++     * system has MDS/L1TF vulnerability (see x86/bugs.c).
++     */
++    coresched_cmd = CORE_SCHED_SECURE;
++  else
++    pr_crit("Unsupported coresched=%s, defaulting to secure.\n",
++      arg);
++
++  if (coresched_cmd == CORE_SCHED_OFF)
++    static_branch_disable(&sched_coresched_supported);
++
++  return 0;
++}
++early_param("coresched", coresched_parse_cmdline);
++
++/* coresched=secure */
++bool coresched_cmd_secure(void)
++{
++  return coresched_cmd == CORE_SCHED_SECURE;
++}
++EXPORT_SYMBOL_GPL(coresched_cmd_secure);
++#endif
+Index: rpi-kernel/kernel/sched/debug.c
+===================================================================
+--- rpi-kernel.orig/kernel/sched/debug.c
++++ rpi-kernel/kernel/sched/debug.c
+@@ -798,6 +798,10 @@ static void sched_debug_header(struct se
+ 		"sysctl_sched_tunable_scaling",
+ 		sysctl_sched_tunable_scaling,
+ 		sched_tunable_scaling_names[sysctl_sched_tunable_scaling]);
++#ifdef CONFIG_SCHED_CORE
++  SEQ_printf(m, "  .%-40s: %d\n", "core_sched_enabled",
++       !!static_branch_likely(&__sched_core_enabled));
++#endif
+ 	SEQ_printf(m, "\n");
+ }
+ 
+@@ -1041,6 +1045,10 @@ void proc_sched_show_task(struct task_st
+ 		__PS("clock-delta", t1-t0);
+ 	}
+ 
++#ifdef CONFIG_SCHED_CORE
++  __PS("core_cookie", p->core_cookie);
++#endif
++
+ 	sched_show_numa(p, m);
+ }
+ 
+Index: rpi-kernel/include/linux/cpu.h
+===================================================================
+--- rpi-kernel.orig/include/linux/cpu.h
++++ rpi-kernel/include/linux/cpu.h
+@@ -227,5 +227,5 @@ static inline int cpuhp_smt_disable(enum
+ 
+ extern bool cpu_mitigations_off(void);
+ extern bool cpu_mitigations_auto_nosmt(void);
+-
++extern bool coresched_cmd_secure(void);
+ #endif /* _LINUX_CPU_H_ */
+Index: rpi-kernel/drivers/block/zram/zram_drv.c
+===================================================================
+--- rpi-kernel.orig/drivers/block/zram/zram_drv.c
++++ rpi-kernel/drivers/block/zram/zram_drv.c
+@@ -907,7 +907,7 @@ static ssize_t read_block_state(struct f
+ 			zram_test_flag(zram, index, ZRAM_HUGE) ? 'h' : '.',
+ 			zram_test_flag(zram, index, ZRAM_IDLE) ? 'i' : '.');
+ 
+-		if (count <= copied) {
++		if (count < copied) {
+ 			zram_slot_unlock(zram, index);
+ 			break;
+ 		}
+@@ -1812,6 +1812,8 @@ static int zram_open(struct block_device
+ 
+ 	WARN_ON(!mutex_is_locked(&bdev->bd_mutex));
+ 
++  if (bdev->bd_openers > 1)
++    return -EBUSY;
+ 	zram = bdev->bd_disk->private_data;
+ 	/* zram was claimed to reset so open request fails */
+ 	if (zram->claim)
+Index: rpi-kernel/mm/zsmalloc.c
+===================================================================
+--- rpi-kernel.orig/mm/zsmalloc.c
++++ rpi-kernel/mm/zsmalloc.c
+@@ -1839,7 +1839,6 @@ static inline void zs_pool_dec_isolated(
+ 	 * for pool->isolated_pages above. Paired with the smp_mb() in
+ 	 * zs_unregister_migration().
+ 	 */
+-	smp_mb__after_atomic();
+ 	if (atomic_long_read(&pool->isolated_pages) == 0 && pool->destroying)
+ 		wake_up_all(&pool->migration_wait);
+ }
+Index: rpi-kernel/mm/zswap.c
+===================================================================
+--- rpi-kernel.orig/mm/zswap.c
++++ rpi-kernel/mm/zswap.c
+@@ -592,9 +592,8 @@ error:
+ 	return NULL;
+ }
+ 
+-static bool zswap_try_pool_create(void)
++static __init struct zswap_pool *__zswap_pool_create_fallback(void)
+ {
+-	struct zswap_pool *pool;
+ 	bool has_comp, has_zpool;
+ 
+ 	has_comp = crypto_has_comp(zswap_compressor, 0, 0);
+@@ -630,21 +629,9 @@ static bool zswap_try_pool_create(void)
+ 	}
+ 
+ 	if (!has_comp || !has_zpool)
+-		return false;
+-
+-	pool = zswap_pool_create(zswap_zpool_type, zswap_compressor);
++		return NULL;
+ 
+-	if (pool) {
+-		pr_info("loaded using pool %s/%s\n", pool->tfm_name,
+-			zpool_get_type(pool->zpool));
+-		list_add(&pool->list, &zswap_pools);
+-		zswap_has_pool = true;
+-	} else {
+-		pr_err("pool creation failed\n");
+-		zswap_enabled = false;
+-	}
+-
+-	return zswap_enabled;
++	return zswap_pool_create(zswap_zpool_type, zswap_compressor);
+ }
+ 
+ static void zswap_pool_destroy(struct zswap_pool *pool)
+@@ -817,19 +804,16 @@ static int zswap_zpool_param_set(const c
+ static int zswap_enabled_param_set(const char *val,
+ 				   const struct kernel_param *kp)
+ {
+-	int ret;
+-
+ 	if (zswap_init_failed) {
+ 		pr_err("can't enable, initialization failed\n");
+ 		return -ENODEV;
+ 	}
++	if (!zswap_has_pool && zswap_init_started) {
++		pr_err("can't enable, no pool configured\n");
++		return -ENODEV;
++	}
+ 
+-	ret = param_set_bool(val, kp);
+-	if (!ret && zswap_enabled && zswap_init_started && !zswap_has_pool)
+-		if (!zswap_try_pool_create())
+-			ret = -ENODEV;
+-
+-	return ret;
++	return param_set_bool(val, kp);
+ }
+ 
+ /*********************************
+@@ -1330,6 +1314,7 @@ static void __exit zswap_debugfs_exit(vo
+ **********************************/
+ static int __init init_zswap(void)
+ {
++	struct zswap_pool *pool;
+ 	int ret;
+ 
+ 	zswap_init_started = true;
+@@ -1353,19 +1338,29 @@ static int __init init_zswap(void)
+ 	if (ret)
+ 		goto hp_fail;
+ 
++	pool = __zswap_pool_create_fallback();
++	if (pool) {
++		pr_info("loaded using pool %s/%s\n", pool->tfm_name,
++			zpool_get_type(pool->zpool));
++		list_add(&pool->list, &zswap_pools);
++		zswap_has_pool = true;
++	} else {
++		pr_err("pool creation failed\n");
++		zswap_enabled = false;
++	}
++
+ 	shrink_wq = create_workqueue("zswap-shrink");
+ 	if (!shrink_wq)
+-		goto hp_fail;
++		goto fallback_fail;
+ 
+ 	frontswap_register_ops(&zswap_frontswap_ops);
+ 	if (zswap_debugfs_init())
+ 		pr_warn("debugfs initialization failed\n");
+-
+-	if (zswap_enabled)
+-		zswap_try_pool_create();
+-
+ 	return 0;
+ 
++fallback_fail:
++	if (pool)
++		zswap_pool_destroy(pool);
+ hp_fail:
+ 	cpuhp_remove_state(CPUHP_MM_ZSWP_MEM_PREPARE);
+ dstmem_fail:
+Index: rpi-kernel/mm/memblock.c
+===================================================================
+--- rpi-kernel.orig/mm/memblock.c
++++ rpi-kernel/mm/memblock.c
+@@ -182,8 +182,6 @@ bool __init_memblock memblock_overlaps_r
+ {
+ 	unsigned long i;
+ 
+-	memblock_cap_size(base, &size);
+-
+ 	for (i = 0; i < type->cnt; i++)
+ 		if (memblock_addrs_overlap(base, size, type->regions[i].base,
+ 					   type->regions[i].size))
+@@ -1794,6 +1792,7 @@ bool __init_memblock memblock_is_region_
+  */
+ bool __init_memblock memblock_is_region_reserved(phys_addr_t base, phys_addr_t size)
+ {
++	memblock_cap_size(base, &size);
+ 	return memblock_overlaps_region(&memblock.reserved, base, size);
+ }
+ 
+Index: rpi-kernel/mm/backing-dev.c
+===================================================================
+--- rpi-kernel.orig/mm/backing-dev.c
++++ rpi-kernel/mm/backing-dev.c
+@@ -872,13 +872,6 @@ void bdi_unregister(struct backing_dev_i
+ 	wb_shutdown(&bdi->wb);
+ 	cgwb_bdi_unregister(bdi);
+ 
+-	/*
+-	 * If this BDI's min ratio has been set, use bdi_set_min_ratio() to
+-	 * update the global bdi_min_ratio.
+-	 */
+-	if (bdi->min_ratio)
+-		bdi_set_min_ratio(bdi, 0);
+-
+ 	if (bdi->dev) {
+ 		bdi_debug_unregister(bdi);
+ 		device_unregister(bdi->dev);
+Index: rpi-kernel/mm/oom_kill.c
+===================================================================
+--- rpi-kernel.orig/mm/oom_kill.c
++++ rpi-kernel/mm/oom_kill.c
+@@ -957,7 +957,7 @@ static void oom_kill_process(struct oom_
+ 	struct task_struct *victim = oc->chosen;
+ 	struct mem_cgroup *oom_group;
+ 	static DEFINE_RATELIMIT_STATE(oom_rs, DEFAULT_RATELIMIT_INTERVAL,
+-					      DEFAULT_RATELIMIT_BURST);
++					      1);
+ 
+ 	/*
+ 	 * If the task is already exiting, don't alarm the sysadmin or kill
+@@ -1125,15 +1125,19 @@ bool out_of_memory(struct oom_control *o
+  */
+ void pagefault_out_of_memory(void)
+ {
+-	static DEFINE_RATELIMIT_STATE(pfoom_rs, DEFAULT_RATELIMIT_INTERVAL,
+-				      DEFAULT_RATELIMIT_BURST);
+-
+-	if (mem_cgroup_oom_synchronize(true))
+-		return;
+-
+-	if (fatal_signal_pending(current))
+-		return;
+-
+-	if (__ratelimit(&pfoom_rs))
+-		pr_warn("Huh VM_FAULT_OOM leaked out to the #PF handler. Retrying PF\n");
++  struct oom_control oc = {
++    .zonelist = NULL,
++    .nodemask = NULL,
++    .memcg = NULL,
++    .gfp_mask = 0,
++    .order = 0,
++  };
++
++  if (mem_cgroup_oom_synchronize(true))
++    return;
++
++  if (!mutex_trylock(&oom_lock))
++    return;
++  out_of_memory(&oc);
++  mutex_unlock(&oom_lock);
+ }

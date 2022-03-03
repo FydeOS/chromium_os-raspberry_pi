@@ -1,0 +1,11 @@
+diff --git a/init/upstart/boot-splash.conf b/init/upstart/boot-splash.conf
+index 3fdcc3312d..f7f5f02aca 100644
+--- a/init/upstart/boot-splash.conf
++++ b/init/upstart/boot-splash.conf
+@@ -52,5 +52,5 @@ script
+     ARGS="${ARGS} --dev-mode --enable-osc --enable-vts --pre-create-vts"
+   fi
+ 
+-  frecon --daemon --clear 0xfffefefe ${ARGS} ${BOOT_IMAGES}
++  frecon --daemon --clear 0xff000000 ${ARGS} ${BOOT_IMAGES}
+ end script

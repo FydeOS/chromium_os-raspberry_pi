@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "http://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+<use>
+	<flag name='cros_embedded'>Build for cros embedded devices.</flag>
+	<flag name='encrypted_stateful'>Encrypted /var and /home/chronos</flag>
+	<flag name='s3halt'>Halt to S3, reboot at wake; use if no power button</flag>
+	<flag name='vt'>Add upstart job for starting up VT2 terminal.</flag>
+</use>
+</pkgmetadata>

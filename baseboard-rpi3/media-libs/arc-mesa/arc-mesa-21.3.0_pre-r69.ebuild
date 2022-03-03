@@ -145,4 +145,5 @@ multilib_src_install_all() {
 	doins "${FILESDIR}/android.hardware.opengles.aep.xml"
 }
 
-PATCHES=( "${FILESDIR}/gles31/0001-limit-gles-version.patch" )
+PATCHES=( "${FILESDIR}/gles31/0001-limit-gles-version.patch" 
+          "${FILESDIR}/001-fix-rpi4-arc-draw.patch" )

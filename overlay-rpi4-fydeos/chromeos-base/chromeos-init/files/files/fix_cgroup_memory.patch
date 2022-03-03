@@ -1,0 +1,15 @@
+diff --git a/init/upstart/cgroups.conf b/init/upstart/cgroups.conf
+index d007d5e783..9f1b370963 100644
+--- a/init/upstart/cgroups.conf
++++ b/init/upstart/cgroups.conf
+@@ -48,6 +48,10 @@ script
+           -o "${subsys},${mount_opts}" || log "${subsys}"
+     fi
+
++    if [ "${subsys}" = "memory" ]; then
++      echo 1 > /sys/fs/cgroup/memory/memory.use_hierarchy
++    fi
++
+     if [ "${subsys}" != "net_cls" ]; then
+       mkdir -p /sys/fs/cgroup/${subsys}/session_manager_containers
+       if id -u android-root 2>/dev/null; then

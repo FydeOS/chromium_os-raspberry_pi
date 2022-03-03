@@ -1,0 +1,13 @@
+diff --git a/init/chromeos-boot-alert b/init/chromeos-boot-alert
+index 89eae651b..2fa608f94 100755
+--- a/init/chromeos-boot-alert
++++ b/init/chromeos-boot-alert
+@@ -61,7 +61,7 @@ show_assets_message() {
+     locale="${locale%[-_]*}"
+     locale_list="${locale_list} ${locale}"
+   done
+-  locale_list="${locale_list} en-US en"
++  locale_list="${locale_list} zh-CN en-US en"
+ 
+   if display_boot_message "${message}" "${locale_list}"; then
+     # Frecon may create the text terminal so we want to setup TTY again.
