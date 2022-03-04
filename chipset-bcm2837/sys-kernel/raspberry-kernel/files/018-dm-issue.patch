@@ -1,0 +1,1095 @@
+Index: rpi-kernel/drivers/md/Kconfig
+===================================================================
+--- rpi-kernel.orig/drivers/md/Kconfig
++++ rpi-kernel/drivers/md/Kconfig
+@@ -286,6 +286,19 @@ config DM_CRYPT
+ 
+ 	  If unsure, say N.
+ 
++config DM_VERITY_CHROMEOS
++	tristate "Support Chrome OS specific verity error behavior"
++	depends on DM_VERITY
++	help
++	  Enables Chrome OS platform-specific error behavior.  In particular,
++	  it will modify the partition preceding the verified block device
++	  when non-transient error occurs (followed by a panic).
++
++	  This module relies on linux/chromeos_platform.h and will behave
++	  reasonably if it only supplies the stubs.
++
++	  If unsure, say N.
++
+ config DM_SNAPSHOT
+        tristate "Snapshot target"
+        depends on BLK_DEV_DM
+@@ -537,6 +550,17 @@ config DM_VERITY_VERIFY_ROOTHASH_SIG
+ 
+ 	  If unsure, say N.
+ 
++config DM_VERITY_AVB
++	tristate "Support AVB specific verity error behavior"
++	depends on DM_VERITY
++	help
++	  Enables Android Verified Boot platform-specific error
++	  behavior. In particular, it will modify the vbmeta partition
++	  specified on the kernel command-line when non-transient error
++	  occurs (followed by a panic).
++
++	  If unsure, say N.
++
+ config DM_VERITY_FEC
+ 	bool "Verity forward error correction support"
+ 	depends on DM_VERITY
+@@ -619,4 +643,16 @@ config DM_ZONED
+ 
+ 	  If unsure, say N.
+ 
++config DM_BOW
++	tristate "Backup block device"
++	depends on BLK_DEV_DM
++	select DM_BUFIO
++	help
++	  This device-mapper target takes a device and keeps a log of all
++	  changes using free blocks identified by issuing a trim command.
++	  This can then be restored by running a command line utility,
++	  or committed by simply replacing the target.
++
++	  If unsure, say N.
++
+ endif # MD
+Index: rpi-kernel/drivers/md/Makefile
+===================================================================
+--- rpi-kernel.orig/drivers/md/Makefile
++++ rpi-kernel/drivers/md/Makefile
+@@ -77,6 +77,8 @@ obj-$(CONFIG_DM_LOG_WRITES)	+= dm-log-wr
+ obj-$(CONFIG_DM_INTEGRITY)	+= dm-integrity.o
+ obj-$(CONFIG_DM_ZONED)		+= dm-zoned.o
+ obj-$(CONFIG_DM_WRITECACHE)	+= dm-writecache.o
++obj-$(CONFIG_DM_BOW)		+= dm-bow.o
++obj-$(CONFIG_DM_VERITY_CHROMEOS)	+= dm-verity-chromeos.o
+ 
+ ifeq ($(CONFIG_DM_INIT),y)
+ dm-mod-objs			+= dm-init.o
+@@ -86,6 +88,10 @@ ifeq ($(CONFIG_DM_UEVENT),y)
+ dm-mod-objs			+= dm-uevent.o
+ endif
+ 
++ifeq ($(CONFIG_DM_VERITY_AVB),y)
++dm-verity-objs			+= dm-verity-avb.o
++endif
++
+ ifeq ($(CONFIG_DM_VERITY_FEC),y)
+ dm-verity-objs			+= dm-verity-fec.o
+ endif
+Index: rpi-kernel/drivers/md/dm-init.c
+===================================================================
+--- rpi-kernel.orig/drivers/md/dm-init.c
++++ rpi-kernel/drivers/md/dm-init.c
+@@ -301,3 +301,254 @@ late_initcall(dm_init_init);
+ 
+ module_param(create, charp, 0);
+ MODULE_PARM_DESC(create, "Create a mapped device in early boot");
++
++/* ---------------------------------------------------------------
++ * ChromeOS shim - convert dm= format to dm-mod.create= format
++ * ---------------------------------------------------------------
++ */
++
++struct dm_chrome_target {
++	char *field[4];
++};
++
++struct dm_chrome_dev {
++	char *name, *uuid, *mode;
++	unsigned int num_targets;
++	struct dm_chrome_target targets[DM_MAX_TARGETS];
++};
++
++static char __init *dm_chrome_parse_target(char *str, struct dm_chrome_target *tgt)
++{
++	unsigned int i;
++
++	tgt->field[0] = str;
++	/* Delimit first 3 fields that are separated by space */
++	for (i = 0; i < ARRAY_SIZE(tgt->field) - 1; i++) {
++		tgt->field[i + 1] = str_field_delimit(&tgt->field[i], ' ');
++		if (!tgt->field[i + 1])
++			return NULL;
++	}
++	/* Delimit last field that can be terminated by comma */
++	return str_field_delimit(&tgt->field[i], ',');
++}
++
++static char __init *dm_chrome_parse_dev(char *str, struct dm_chrome_dev *dev)
++{
++	char *target, *num;
++	unsigned int i;
++
++	if (!str)
++		return ERR_PTR(-EINVAL);
++
++	target = str_field_delimit(&str, ',');
++	if (!target)
++		return ERR_PTR(-EINVAL);
++
++	/* Delimit first 3 fields that are separated by space */
++	dev->name = str;
++	dev->uuid = str_field_delimit(&dev->name, ' ');
++	if (!dev->uuid)
++		return ERR_PTR(-EINVAL);
++
++	dev->mode = str_field_delimit(&dev->uuid, ' ');
++	if (!dev->mode)
++		return ERR_PTR(-EINVAL);
++
++	/* num is optional */
++	num = str_field_delimit(&dev->mode, ' ');
++	if (!num)
++		dev->num_targets = 1;
++	else {
++		/* Delimit num and check if it the last field */
++		if(str_field_delimit(&num, ' '))
++			return ERR_PTR(-EINVAL);
++		if (kstrtouint(num, 0, &dev->num_targets))
++			return ERR_PTR(-EINVAL);
++	}
++
++	if (dev->num_targets > DM_MAX_TARGETS) {
++		DMERR("too many targets %u > %d",
++		      dev->num_targets, DM_MAX_TARGETS);
++		return ERR_PTR(-EINVAL);
++	}
++
++	for (i = 0; i < dev->num_targets - 1; i++) {
++		target = dm_chrome_parse_target(target, &dev->targets[i]);
++		if (!target)
++			return ERR_PTR(-EINVAL);
++	}
++	/* The last one can return NULL if it reaches the end of str */
++	return dm_chrome_parse_target(target, &dev->targets[i]);
++}
++
++static char __init *dm_chrome_convert(struct dm_chrome_dev *devs, unsigned int num_devs)
++{
++	char *str = kmalloc(DM_MAX_STR_SIZE, GFP_KERNEL);
++	char *p = str;
++	unsigned int i, j;
++	int ret;
++
++	if (!str)
++		return ERR_PTR(-ENOMEM);
++
++	for (i = 0; i < num_devs; i++) {
++		if (!strcmp(devs[i].uuid, "none"))
++			devs[i].uuid = "";
++		ret = snprintf(p, DM_MAX_STR_SIZE - (p - str),
++			       "%s,%s,,%s",
++			       devs[i].name,
++			       devs[i].uuid,
++			       devs[i].mode);
++		if (ret < 0)
++			goto out;
++		p += ret;
++
++		for (j = 0; j < devs[i].num_targets; j++) {
++			ret = snprintf(p, DM_MAX_STR_SIZE - (p - str),
++				       ",%s %s %s %s",
++				       devs[i].targets[j].field[0],
++				       devs[i].targets[j].field[1],
++				       devs[i].targets[j].field[2],
++				       devs[i].targets[j].field[3]);
++			if (ret < 0)
++				goto out;
++			p += ret;
++		}
++		if (i < num_devs - 1) {
++			ret = snprintf(p, DM_MAX_STR_SIZE - (p - str), ";");
++			if (ret < 0)
++				goto out;
++			p += ret;
++		}
++	}
++
++	return str;
++
++out:
++	kfree(str);
++	return ERR_PTR(ret);
++}
++
++/**
++ * dm_chrome_shim - convert old dm= format used in chromeos to the new
++ * upstream format.
++ *
++ * ChromeOS old format
++ * -------------------
++ * <device>        ::= [<num>] <device-mapper>+
++ * <device-mapper> ::= <head> "," <target>+
++ * <head>          ::= <name> <uuid> <mode> [<num>]
++ * <target>        ::= <start> <length> <type> <options> ","
++ * <mode>          ::= "ro" | "rw"
++ * <uuid>          ::= xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx | "none"
++ * <type>          ::= "verity" | "bootcache" | ...
++ *
++ * Example:
++ * 2 vboot none ro 1,
++ *     0 1768000 bootcache
++ *       device=aa55b119-2a47-8c45-946a-5ac57765011f+1
++ *       signature=76e9be054b15884a9fa85973e9cb274c93afadb6
++ *       cache_start=1768000 max_blocks=100000 size_limit=23 max_trace=20000,
++ *   vroot none ro 1,
++ *     0 1740800 verity payload=254:0 hashtree=254:0 hashstart=1740800 alg=sha1
++ *       root_hexdigest=76e9be054b15884a9fa85973e9cb274c93afadb6
++ *       salt=5b3549d54d6c7a3837b9b81ed72e49463a64c03680c47835bef94d768e5646fe
++ *
++ * Notes:
++ *  1. uuid is a label for the device and we set it to "none".
++ *  2. The <num> field will be optional initially and assumed to be 1.
++ *     Once all the scripts that set these fields have been set, it will
++ *     be made mandatory.
++ */
++
++static char *chrome_create;
++
++static int __init dm_chrome_shim(char *arg) {
++	if (!arg || create)
++		return -EINVAL;
++	chrome_create = arg;
++	return 0;
++}
++
++static int __init dm_chrome_parse_devices(void)
++{
++	struct dm_chrome_dev *devs;
++	unsigned int num_devs, i;
++	char *next, *base_str;
++	int ret = 0;
++
++	/* Verify if dm-mod.create was not used */
++	if (!chrome_create || create)
++		return -EINVAL;
++
++	if (strlen(chrome_create) >= DM_MAX_STR_SIZE) {
++		DMERR("Argument is too big. Limit is %d\n", DM_MAX_STR_SIZE);
++		return -EINVAL;
++	}
++
++	base_str = kstrdup(chrome_create, GFP_KERNEL);
++	if (!base_str)
++		return -ENOMEM;
++
++	next = str_field_delimit(&base_str, ' ');
++	if (!next) {
++		ret = -EINVAL;
++		goto out_str;
++	}
++
++	/* if first field is not the optional <num> field */
++	if (kstrtouint(base_str, 0, &num_devs)) {
++		num_devs = 1;
++		/* rewind next pointer */
++		next = base_str;
++	}
++
++	if (num_devs > DM_MAX_DEVICES) {
++		DMERR("too many devices %u > %d", num_devs, DM_MAX_DEVICES);
++		ret = -EINVAL;
++		goto out_str;
++	}
++
++	devs = kcalloc(num_devs, sizeof(*devs), GFP_KERNEL);
++	if (!devs)
++		return -ENOMEM;
++
++	/* restore string */
++	strcpy(base_str, chrome_create);
++
++	/* parse devices */
++	for (i = 0; i < num_devs; i++) {
++		next = dm_chrome_parse_dev(next, &devs[i]);
++		if (IS_ERR(next)) {
++			DMERR("couldn't parse device");
++			ret = PTR_ERR(next);
++			goto out_devs;
++		}
++	}
++
++	create = dm_chrome_convert(devs, num_devs);
++	if (IS_ERR(create)) {
++		ret = PTR_ERR(create);
++		goto out_devs;
++	}
++
++	DMDEBUG("Converting:\n\tdm=\"%s\"\n\tdm-mod.create=\"%s\"\n",
++		chrome_create, create);
++
++	/* Call upstream code */
++	dm_init_init();
++
++	kfree(create);
++
++out_devs:
++	create = NULL;
++	kfree(devs);
++out_str:
++	kfree(base_str);
++
++	return ret;
++}
++
++late_initcall(dm_chrome_parse_devices);
++
++__setup("dm=", dm_chrome_shim);
+Index: rpi-kernel/drivers/md/dm-verity-target.c
+===================================================================
+--- rpi-kernel.orig/drivers/md/dm-verity-target.c
++++ rpi-kernel/drivers/md/dm-verity-target.c
+@@ -16,8 +16,10 @@
+ #include "dm-verity.h"
+ #include "dm-verity-fec.h"
+ #include "dm-verity-verify-sig.h"
++#include <linux/delay.h>
+ #include <linux/module.h>
+ #include <linux/reboot.h>
++#include <crypto/hash.h>
+ 
+ #define DM_MSG_PREFIX			"verity"
+ 
+@@ -33,7 +35,7 @@
+ #define DM_VERITY_OPT_PANIC		"panic_on_corruption"
+ #define DM_VERITY_OPT_IGN_ZEROES	"ignore_zero_blocks"
+ #define DM_VERITY_OPT_AT_MOST_ONCE	"check_at_most_once"
+-#define DM_VERITY_OPT_ERROR_BEHAVIOR  "error_behavior"
++#define DM_VERITY_OPT_ERROR_BEHAVIOR	"error_behavior"
+ 
+ #define DM_VERITY_OPTS_MAX		(4 + DM_VERITY_OPTS_FEC + \
+ 					 DM_VERITY_ROOT_HASH_VERIFICATION_OPTS)
+@@ -49,18 +51,101 @@ struct dm_verity_prefetch_work {
+ 	unsigned n_blocks;
+ };
+ 
++/* Provide a lightweight means of specifying the global default for
++ * error behavior: eio, reboot, or none
++ * Legacy support for 0 = eio, 1 = reboot/panic, 2 = none, 3 = notify.
++ * This is matched to the enum in dm-verity.h.
++ */
+ static char *error_behavior_istring[] = { "0", "1", "2", "3" };
+ static const char *allowed_error_behaviors[] = { "eio", "panic", "none",
+-             "notify", NULL };
++						 "notify", NULL };
+ static char *error_behavior = "eio";
+ module_param(error_behavior, charp, 0644);
+ MODULE_PARM_DESC(error_behavior, "Behavior on error "
+-         "(eio, panic, none, notify)");
++				 "(eio, panic, none, notify)");
++
++/* Controls whether verity_get_device will wait forever for a device. */
++static int dev_wait;
++module_param(dev_wait, int, 0444);
++MODULE_PARM_DESC(dev_wait, "Wait forever for a backing device");
++
++static BLOCKING_NOTIFIER_HEAD(verity_error_notifier);
++
++int dm_verity_register_error_notifier(struct notifier_block *nb)
++{
++	return blocking_notifier_chain_register(&verity_error_notifier, nb);
++}
++EXPORT_SYMBOL_GPL(dm_verity_register_error_notifier);
++
++int dm_verity_unregister_error_notifier(struct notifier_block *nb)
++{
++	return blocking_notifier_chain_unregister(&verity_error_notifier, nb);
++}
++EXPORT_SYMBOL_GPL(dm_verity_unregister_error_notifier);
++
++/* If the request is not successful, this handler takes action.
++ * TODO make this call a registered handler.
++ */
++static void verity_error(struct dm_verity *v, struct dm_verity_io *io,
++			 blk_status_t status)
++{
++	const char *message = v->hash_failed ? "integrity" : "block";
++	int error_behavior = DM_VERITY_ERROR_BEHAVIOR_PANIC;
++	dev_t devt = 0;
++	u64 block = ~0;
++	struct dm_verity_error_state error_state;
++	/* If the hash did not fail, then this is likely transient. */
++	int transient = !v->hash_failed;
++
++	devt = v->data_dev->bdev->bd_dev;
++	error_behavior = v->error_behavior;
++	if (io)
++		block = io->block;
++
++	DMERR_LIMIT("verification failure occurred: %s failure%s", message,
++		    transient ? " (transient)" : "");
++
++	if (error_behavior == DM_VERITY_ERROR_BEHAVIOR_NOTIFY) {
++		error_state.code = status;
++		error_state.transient = transient;
++		error_state.block = block;
++		error_state.message = message;
++		error_state.dev_start = v->data_start;
++		error_state.dev_len = v->data_blocks;
++		error_state.dev = v->data_dev->bdev;
++		error_state.hash_dev_start = v->hash_start;
++		error_state.hash_dev_len = v->hash_blocks;
++		error_state.hash_dev = v->hash_dev->bdev;
++
++		/* Set default fallthrough behavior. */
++		error_state.behavior = DM_VERITY_ERROR_BEHAVIOR_PANIC;
++		error_behavior = DM_VERITY_ERROR_BEHAVIOR_PANIC;
++
++		if (!blocking_notifier_call_chain(
++		    &verity_error_notifier, transient, &error_state)) {
++			error_behavior = error_state.behavior;
++		}
++	}
++
++	switch (error_behavior) {
++	case DM_VERITY_ERROR_BEHAVIOR_EIO:
++		break;
++	case DM_VERITY_ERROR_BEHAVIOR_NONE:
++		break;
++	default:
++		goto do_panic;
++	}
++	return;
+ 
++do_panic:
++	panic("dm-verity failure: "
++	      "device:%u:%u status:%d block:%llu message:%s",
++	      MAJOR(devt), MINOR(devt), status, (u64)block, message);
++}
+ 
+ /**
+  * verity_parse_error_behavior - parse a behavior charp to the enum
+- * @behavior: NUL-terminated char array
++ * @behavior:	NUL-terminated char array
+  *
+  * Checks if the behavior is valid either as text or as an index digit
+  * and returns the proper enum value in string form or ERR_PTR(-EINVAL)
+@@ -68,18 +153,18 @@ MODULE_PARM_DESC(error_behavior, "Behavi
+  */
+ static char *verity_parse_error_behavior(const char *behavior)
+ {
+-  const char **allowed = allowed_error_behaviors;
+-  int index;
++	const char **allowed = allowed_error_behaviors;
++	int index;
+ 
+-  for (index = 0; *allowed; allowed++, index++)
+-    if (!strcmp(*allowed, behavior) || behavior[0] == index + '0')
+-      break;
++	for (index = 0; *allowed; allowed++, index++)
++		if (!strcmp(*allowed, behavior) || behavior[0] == index + '0')
++			break;
+ 
+-  if (!*allowed)
+-    return ERR_PTR(-EINVAL);
++	if (!*allowed)
++		return ERR_PTR(-EINVAL);
+ 
+-  /* Convert to the integer index matching the enum. */
+-  return error_behavior_istring[index];
++	/* Convert to the integer index matching the enum. */
++	return error_behavior_istring[index];
+ }
+ 
+ /*
+@@ -286,8 +371,12 @@ out:
+ 	if (v->mode == DM_VERITY_MODE_LOGGING)
+ 		return 0;
+ 
+-	if (v->mode == DM_VERITY_MODE_RESTART)
++	if (v->mode == DM_VERITY_MODE_RESTART) {
++#ifdef CONFIG_DM_VERITY_AVB
++		dm_verity_avb_error_handler();
++#endif
+ 		kernel_restart("dm-verity device corrupted");
++	}
+ 
+ 	if (v->mode == DM_VERITY_MODE_PANIC)
+ 		panic("dm-verity device corrupted");
+@@ -588,6 +677,8 @@ static void verity_finish_io(struct dm_v
+ 	struct dm_verity *v = io->v;
+ 	struct bio *bio = dm_bio_from_per_bio_data(io, v->ti->per_io_data_size);
+ 
++	if (status && !verity_fec_is_enabled(io->v))
++		verity_error(v, io, status);
+ 	bio->bi_end_io = io->orig_bi_end_io;
+ 	bio->bi_status = status;
+ 
+@@ -976,21 +1067,22 @@ static int verity_parse_opt_args(struct
+ 				return r;
+ 			continue;
+ 
+-    } else if (!strcasecmp(arg_name, DM_VERITY_OPT_ERROR_BEHAVIOR)) {
+-      int behavior;
++		} else if (!strcasecmp(arg_name, DM_VERITY_OPT_ERROR_BEHAVIOR)) {
++			int behavior;
++
++			if (!argc) {
++				ti->error = "Missing error behavior parameter";
++				return -EINVAL;
++			}
++			if (kstrtoint(dm_shift_arg(as), 0, &behavior) ||
++			    behavior < 0) {
++				ti->error = "Bad error behavior parameter";
++				return -EINVAL;
++			}
++			v->error_behavior = behavior;
++			argc--;
++			continue;
+ 
+-      if (!argc) {
+-        ti->error = "Missing error behavior parameter";
+-        return -EINVAL;
+-      }
+-      if (kstrtoint(dm_shift_arg(as), 0, &behavior) ||
+-          behavior < 0) {
+-        ti->error = "Bad error behavior parameter";
+-        return -EINVAL;
+-      }
+-      v->error_behavior = behavior;
+-      argc--;
+-      continue;
+ 		} else if (verity_is_fec_opt_arg(arg_name)) {
+ 			r = verity_fec_parse_opt_args(as, v, &argc, arg_name);
+ 			if (r)
+@@ -1013,108 +1105,130 @@ static int verity_parse_opt_args(struct
+ 	return r;
+ }
+ 
++static int verity_get_device(struct dm_target *ti, const char *devname,
++			     struct dm_dev **dm_dev)
++{
++	do {
++		/* Try the normal path first since if everything is ready, it
++		 * will be the fastest.
++		 */
++		if (!dm_get_device(ti, devname,
++				   dm_table_get_mode(ti->table), dm_dev))
++			return 0;
++
++		if (!dev_wait)
++			break;
++
++		/* No need to be too aggressive since this is a slow path. */
++		msleep(500);
++	} while (dev_wait && (driver_probe_done() != 0 || *dm_dev == NULL));
++	return -1;
++}
++
+ static void splitarg(char *arg, char **key, char **val)
+ {
+-  *key = strsep(&arg, "=");
+-  *val = strsep(&arg, "");
++	*key = strsep(&arg, "=");
++	*val = strsep(&arg, "");
+ }
+ 
++/* Convert Chrome OS arguments into standard arguments */
++
+ static char *chromeos_args(unsigned *pargc, char ***pargv)
+ {
+-  char *hashstart = NULL;
+-  char **argv = *pargv;
+-  int argc = *pargc;
+-  char *key, *val;
+-  int nargc = 10;
+-  char **nargv;
+-  char *errstr;
+-  int i;
+-
+-  nargv = kcalloc(14, sizeof(char *), GFP_KERNEL);
+-  if (!nargv)
+-    return "Failed to allocate memory";
+-
+-  nargv[0] = "0";   /* version */
+-  nargv[3] = "4096";  /* hash block size */
+-  nargv[4] = "4096";  /* data block size */
+-  nargv[9] = "-";   /* salt (optional) */
+-
+-  for (i = 0; i < argc; ++i) {
+-    DMDEBUG("Argument %d: '%s'", i, argv[i]);
+-    splitarg(argv[i], &key, &val);
+-    if (!key) {
+-      DMWARN("Bad argument %d: missing key?", i);
+-      errstr = "Bad argument: missing key";
+-      goto err;
+-    }
+-    if (!val) {
+-      DMWARN("Bad argument %d='%s': missing value", i, key);
+-      errstr = "Bad argument: missing value";
+-      goto err;
+-    }
+-    if (!strcmp(key, "alg")) {
+-      nargv[7] = val;
+-    } else if (!strcmp(key, "payload")) {
+-      nargv[1] = val;
+-    } else if (!strcmp(key, "hashtree")) {
+-      nargv[2] = val;
+-    } else if (!strcmp(key, "root_hexdigest")) {
+-      nargv[8] = val;
+-    } else if (!strcmp(key, "hashstart")) {
+-      unsigned long num;
+-
+-      if (kstrtoul(val, 10, &num)) {
+-        errstr = "Invalid hashstart";
+-        goto err;
+-      }
+-      num >>= (12 - SECTOR_SHIFT);
+-      hashstart = kmalloc(24, GFP_KERNEL);
+-      if (!hashstart) {
+-        errstr = "Failed to allocate memory";
+-        goto err;
+-      }
+-      scnprintf(hashstart, sizeof(hashstart), "%lu", num);
+-      nargv[5] = hashstart;
+-      nargv[6] = hashstart;
+-    } else if (!strcmp(key, "salt")) {
+-      nargv[9] = val;
+-    } else if (!strcmp(key, DM_VERITY_OPT_ERROR_BEHAVIOR)) {
+-      char *behavior = verity_parse_error_behavior(val);
+-
+-      if (IS_ERR(behavior)) {
+-        errstr = "Invalid error behavior";
+-        goto err;
+-      }
+-      nargv[10] = "2";
+-      nargv[11] = key;
+-      nargv[12] = behavior;
+-      nargc = 13;
+-    }
+-  }
+-
+-  if (!nargv[1] || !nargv[2] || !nargv[5] || !nargv[7] || !nargv[8]) {
+-    errstr = "Missing argument";
+-    goto err;
+-  }
+-
+-  *pargc = nargc;
+-  *pargv = nargv;
+-  return NULL;
++	char *hashstart = NULL;
++	char **argv = *pargv;
++	int argc = *pargc;
++	char *key, *val;
++	int nargc = 10;
++	char **nargv;
++	char *errstr;
++	int i;
++
++	nargv = kcalloc(14, sizeof(char *), GFP_KERNEL);
++	if (!nargv)
++		return "Failed to allocate memory";
++
++	nargv[0] = "0";		/* version */
++	nargv[3] = "4096";	/* hash block size */
++	nargv[4] = "4096";	/* data block size */
++	nargv[9] = "-";		/* salt (optional) */
++
++	for (i = 0; i < argc; ++i) {
++		DMDEBUG("Argument %d: '%s'", i, argv[i]);
++		splitarg(argv[i], &key, &val);
++		if (!key) {
++			DMWARN("Bad argument %d: missing key?", i);
++			errstr = "Bad argument: missing key";
++			goto err;
++		}
++		if (!val) {
++			DMWARN("Bad argument %d='%s': missing value", i, key);
++			errstr = "Bad argument: missing value";
++			goto err;
++		}
++		if (!strcmp(key, "alg")) {
++			nargv[7] = val;
++		} else if (!strcmp(key, "payload")) {
++			nargv[1] = val;
++		} else if (!strcmp(key, "hashtree")) {
++			nargv[2] = val;
++		} else if (!strcmp(key, "root_hexdigest")) {
++			nargv[8] = val;
++		} else if (!strcmp(key, "hashstart")) {
++			unsigned long num;
++
++			if (kstrtoul(val, 10, &num)) {
++				errstr = "Invalid hashstart";
++				goto err;
++			}
++			num >>= (12 - SECTOR_SHIFT);
++			hashstart = kmalloc(24, GFP_KERNEL);
++			if (!hashstart) {
++				errstr = "Failed to allocate memory";
++				goto err;
++			}
++			scnprintf(hashstart, sizeof(hashstart), "%lu", num);
++			nargv[5] = hashstart;
++			nargv[6] = hashstart;
++		} else if (!strcmp(key, "salt")) {
++			nargv[9] = val;
++		} else if (!strcmp(key, DM_VERITY_OPT_ERROR_BEHAVIOR)) {
++			char *behavior = verity_parse_error_behavior(val);
++
++			if (IS_ERR(behavior)) {
++				errstr = "Invalid error behavior";
++				goto err;
++			}
++			nargv[10] = "2";
++			nargv[11] = key;
++			nargv[12] = behavior;
++			nargc = 13;
++		}
++	}
++
++	if (!nargv[1] || !nargv[2] || !nargv[5] || !nargv[7] || !nargv[8]) {
++		errstr = "Missing argument";
++		goto err;
++	}
++
++	*pargc = nargc;
++	*pargv = nargv;
++	return NULL;
+ 
+ err:
+-  kfree(nargv);
+-  kfree(hashstart);
+-  return errstr;
++	kfree(nargv);
++	kfree(hashstart);
++	return errstr;
+ }
+ 
+ /* Release memory allocated for Chrome OS parameter conversion */
+ 
+ static void free_chromeos_argv(char **argv)
+ {
+-  if (argv) {
+-    kfree(argv[5]);
+-    kfree(argv);
+-  }
++	if (argv) {
++		kfree(argv[5]);
++		kfree(argv);
++	}
+ }
+ 
+ /*
+@@ -1143,18 +1257,19 @@ static int verity_ctr(struct dm_target *
+ 	sector_t hash_position;
+ 	char dummy;
+ 	char *root_hash_digest_to_validate;
+-  char **chromeos_argv = NULL;
++	char **chromeos_argv = NULL;
+ 
+-  if (argc < 10) {
+-    ti->error = chromeos_args(&argc, &argv);
+-    if (ti->error)
+-      return -EINVAL;
+-    chromeos_argv = argv;
+-  }
++	if (argc < 10) {
++		ti->error = chromeos_args(&argc, &argv);
++		if (ti->error)
++			return -EINVAL;
++		chromeos_argv = argv;
++	}
+ 
+ 	v = kzalloc(sizeof(struct dm_verity), GFP_KERNEL);
+ 	if (!v) {
+ 		ti->error = "Cannot allocate verity structure";
++		free_chromeos_argv(chromeos_argv);
+ 		return -ENOMEM;
+ 	}
+ 	ti->private = v;
+@@ -1184,13 +1299,13 @@ static int verity_ctr(struct dm_target *
+ 	}
+ 	v->version = num;
+ 
+-	r = dm_get_device(ti, argv[1], FMODE_READ, &v->data_dev);
++	r = verity_get_device(ti, argv[1], &v->data_dev);
+ 	if (r) {
+ 		ti->error = "Data device lookup failed";
+ 		goto bad;
+ 	}
+ 
+-	r = dm_get_device(ti, argv[2], FMODE_READ, &v->hash_dev);
++	r = verity_get_device(ti, argv[2], &v->hash_dev);
+ 	if (r) {
+ 		ti->error = "Hash device lookup failed";
+ 		goto bad;
+@@ -1390,15 +1505,14 @@ static int verity_ctr(struct dm_target *
+ 				       __alignof__(struct dm_verity_io));
+ 
+ 	verity_verify_sig_opts_cleanup(&verify_args);
+-  free_chromeos_argv(chromeos_argv);
+-
++	free_chromeos_argv(chromeos_argv);
+ 	return 0;
+ 
+ bad:
+ 
+ 	verity_verify_sig_opts_cleanup(&verify_args);
+ 	verity_dtr(ti);
+-  free_chromeos_argv(chromeos_argv);
++	free_chromeos_argv(chromeos_argv);
+ 	return r;
+ }
+ 
+Index: rpi-kernel/drivers/md/dm-verity.h
+===================================================================
+--- rpi-kernel.orig/drivers/md/dm-verity.h
++++ rpi-kernel/drivers/md/dm-verity.h
+@@ -14,6 +14,7 @@
+ #include <linux/dm-bufio.h>
+ #include <linux/device-mapper.h>
+ #include <crypto/hash.h>
++#include <linux/notifier.h>
+ 
+ #define DM_VERITY_MAX_LEVELS		63
+ 
+@@ -56,7 +57,7 @@ struct dm_verity {
+ 	int hash_failed;	/* set to 1 if hash of any block failed */
+ 	enum verity_mode mode;	/* mode for handling verification errors */
+ 	unsigned corrupted_errs;/* Number of errors for corrupted blocks */
+-  int error_behavior; /* selects error behavior on io errors */
++	int error_behavior;	/* selects error behavior on io errors */
+ 
+ 	struct workqueue_struct *verify_wq;
+ 
+@@ -94,6 +95,40 @@ struct dm_verity_io {
+ 	 */
+ };
+ 
++struct verity_result {
++	struct completion completion;
++	int err;
++};
++
++struct dm_verity_error_state {
++	int code;
++	int transient;  /* Likely to not happen after a reboot */
++	u64 block;
++	const char *message;
++
++	sector_t dev_start;
++	sector_t dev_len;
++	struct block_device *dev;
++
++	sector_t hash_dev_start;
++	sector_t hash_dev_len;
++	struct block_device *hash_dev;
++
++	/* Final behavior after all notifications are completed. */
++	int behavior;
++};
++
++/* This enum must be matched to allowed_error_behaviors in dm-verity.c */
++enum dm_verity_error_behavior {
++	DM_VERITY_ERROR_BEHAVIOR_EIO = 0,
++	DM_VERITY_ERROR_BEHAVIOR_PANIC,
++	DM_VERITY_ERROR_BEHAVIOR_NONE,
++	DM_VERITY_ERROR_BEHAVIOR_NOTIFY
++};
++
++int dm_verity_register_error_notifier(struct notifier_block *nb);
++int dm_verity_unregister_error_notifier(struct notifier_block *nb);
++
+ static inline struct ahash_request *verity_io_hash_req(struct dm_verity *v,
+ 						     struct dm_verity_io *io)
+ {
+@@ -130,4 +165,6 @@ extern int verity_hash(struct dm_verity
+ extern int verity_hash_for_block(struct dm_verity *v, struct dm_verity_io *io,
+ 				 sector_t block, u8 *digest, bool *is_zero);
+ 
++extern void dm_verity_avb_error_handler(void);
++
+ #endif /* DM_VERITY_H */
+Index: rpi-kernel/drivers/md/md.c
+===================================================================
+--- rpi-kernel.orig/drivers/md/md.c
++++ rpi-kernel/drivers/md/md.c
+@@ -459,12 +459,34 @@ check_suspended:
+ }
+ EXPORT_SYMBOL(md_handle_request);
+ 
++struct md_io {
++	struct mddev *mddev;
++	bio_end_io_t *orig_bi_end_io;
++	void *orig_bi_private;
++	unsigned long start_time;
++	struct hd_struct *part;
++};
++
++static void md_end_io(struct bio *bio)
++{
++	struct md_io *md_io = bio->bi_private;
++	struct mddev *mddev = md_io->mddev;
++
++	part_end_io_acct(md_io->part, bio, md_io->start_time);
++
++	bio->bi_end_io = md_io->orig_bi_end_io;
++	bio->bi_private = md_io->orig_bi_private;
++
++	mempool_free(md_io, &mddev->md_io_pool);
++
++	if (bio->bi_end_io)
++		bio->bi_end_io(bio);
++}
++
+ static blk_qc_t md_submit_bio(struct bio *bio)
+ {
+ 	const int rw = bio_data_dir(bio);
+-	const int sgrp = op_stat_group(bio_op(bio));
+ 	struct mddev *mddev = bio->bi_disk->private_data;
+-	unsigned int sectors;
+ 
+ 	if (mddev == NULL || mddev->pers == NULL) {
+ 		bio_io_error(bio);
+@@ -485,21 +507,26 @@ static blk_qc_t md_submit_bio(struct bio
+ 		return BLK_QC_T_NONE;
+ 	}
+ 
+-	/*
+-	 * save the sectors now since our bio can
+-	 * go away inside make_request
+-	 */
+-	sectors = bio_sectors(bio);
++	if (bio->bi_end_io != md_end_io) {
++		struct md_io *md_io;
++
++		md_io = mempool_alloc(&mddev->md_io_pool, GFP_NOIO);
++		md_io->mddev = mddev;
++		md_io->orig_bi_end_io = bio->bi_end_io;
++		md_io->orig_bi_private = bio->bi_private;
++
++		bio->bi_end_io = md_end_io;
++		bio->bi_private = md_io;
++
++		md_io->start_time = part_start_io_acct(mddev->gendisk,
++						       &md_io->part, bio);
++	}
++
+ 	/* bio could be mergeable after passing to underlayer */
+ 	bio->bi_opf &= ~REQ_NOMERGE;
+ 
+ 	md_handle_request(mddev, bio);
+ 
+-	part_stat_lock();
+-	part_stat_inc(&mddev->gendisk->part0, ios[sgrp]);
+-	part_stat_add(&mddev->gendisk->part0, sectors[sgrp], sectors);
+-	part_stat_unlock();
+-
+ 	return BLK_QC_T_NONE;
+ }
+ 
+@@ -2225,7 +2252,6 @@ super_1_rdev_size_change(struct md_rdev
+ 
+ 		if (!num_sectors || num_sectors > max_sectors)
+ 			num_sectors = max_sectors;
+-		rdev->sb_start = sb_start;
+ 	}
+ 	sb = page_address(rdev->sb_page);
+ 	sb->data_size = cpu_to_le64(num_sectors);
+@@ -2998,11 +3024,7 @@ state_store(struct md_rdev *rdev, const
+ 	 *  -write_error - clears WriteErrorSeen
+ 	 *  {,-}failfast - set/clear FailFast
+ 	 */
+-
+-	struct mddev *mddev = rdev->mddev;
+ 	int err = -EINVAL;
+-	bool need_update_sb = false;
+-
+ 	if (cmd_match(buf, "faulty") && rdev->mddev->pers) {
+ 		md_error(rdev->mddev, rdev);
+ 		if (test_bit(Faulty, &rdev->flags))
+@@ -3017,6 +3039,7 @@ state_store(struct md_rdev *rdev, const
+ 		if (rdev->raid_disk >= 0)
+ 			err = -EBUSY;
+ 		else {
++			struct mddev *mddev = rdev->mddev;
+ 			err = 0;
+ 			if (mddev_is_clustered(mddev))
+ 				err = md_cluster_ops->remove_disk(mddev, rdev);
+@@ -3033,12 +3056,10 @@ state_store(struct md_rdev *rdev, const
+ 	} else if (cmd_match(buf, "writemostly")) {
+ 		set_bit(WriteMostly, &rdev->flags);
+ 		mddev_create_serial_pool(rdev->mddev, rdev, false);
+-		need_update_sb = true;
+ 		err = 0;
+ 	} else if (cmd_match(buf, "-writemostly")) {
+ 		mddev_destroy_serial_pool(rdev->mddev, rdev, false);
+ 		clear_bit(WriteMostly, &rdev->flags);
+-		need_update_sb = true;
+ 		err = 0;
+ 	} else if (cmd_match(buf, "blocked")) {
+ 		set_bit(Blocked, &rdev->flags);
+@@ -3064,11 +3085,9 @@ state_store(struct md_rdev *rdev, const
+ 		err = 0;
+ 	} else if (cmd_match(buf, "failfast")) {
+ 		set_bit(FailFast, &rdev->flags);
+-		need_update_sb = true;
+ 		err = 0;
+ 	} else if (cmd_match(buf, "-failfast")) {
+ 		clear_bit(FailFast, &rdev->flags);
+-		need_update_sb = true;
+ 		err = 0;
+ 	} else if (cmd_match(buf, "-insync") && rdev->raid_disk >= 0 &&
+ 		   !test_bit(Journal, &rdev->flags)) {
+@@ -3147,8 +3166,6 @@ state_store(struct md_rdev *rdev, const
+ 		clear_bit(ExternalBbl, &rdev->flags);
+ 		err = 0;
+ 	}
+-	if (need_update_sb)
+-		md_update_sb(mddev, 1);
+ 	if (!err)
+ 		sysfs_notify_dirent_safe(rdev->sysfs_state);
+ 	return err ? err : len;
+@@ -5609,6 +5626,7 @@ static void md_free(struct kobject *ko)
+ 
+ 	bioset_exit(&mddev->bio_set);
+ 	bioset_exit(&mddev->sync_set);
++	mempool_exit(&mddev->md_io_pool);
+ 	kfree(mddev);
+ }
+ 
+@@ -5704,6 +5722,11 @@ static int md_alloc(dev_t dev, char *nam
+ 		 */
+ 		mddev->hold_active = UNTIL_STOP;
+ 
++	error = mempool_init_kmalloc_pool(&mddev->md_io_pool, BIO_POOL_SIZE,
++					  sizeof(struct md_io));
++	if (error)
++		goto abort;
++
+ 	error = -ENOMEM;
+ 	mddev->queue = blk_alloc_queue(NUMA_NO_NODE);
+ 	if (!mddev->queue)
+Index: rpi-kernel/drivers/md/md.h
+===================================================================
+--- rpi-kernel.orig/drivers/md/md.h
++++ rpi-kernel/drivers/md/md.h
+@@ -487,6 +487,7 @@ struct mddev {
+ 	struct bio_set			sync_set; /* for sync operations like
+ 						   * metadata and bitmap writes
+ 						   */
++	mempool_t			md_io_pool;
+ 
+ 	/* Generic flush handling.
+ 	 * The last to finish preflush schedules a worker to submit
+Index: rpi-kernel/drivers/md/persistent-data/dm-btree-remove.c
+===================================================================
+--- rpi-kernel.orig/drivers/md/persistent-data/dm-btree-remove.c
++++ rpi-kernel/drivers/md/persistent-data/dm-btree-remove.c
+@@ -423,9 +423,9 @@ static int rebalance_children(struct sha
+ 
+ 		memcpy(n, dm_block_data(child),
+ 		       dm_bm_block_size(dm_tm_get_bm(info->tm)));
++		dm_tm_unlock(info->tm, child);
+ 
+ 		dm_tm_dec(info->tm, dm_block_location(child));
+-		dm_tm_unlock(info->tm, child);
+ 		return 0;
+ 	}
+ 
