@@ -1,31 +1,30 @@
 diff --git a/installer/chromeos-postinst b/installer/chromeos-postinst
-index bd8e095c4..71297e0b5 100755
+index d093f1fda8..4ef5ceb209 100755
 --- a/installer/chromeos-postinst
 +++ b/installer/chromeos-postinst
-@@ -20,7 +20,26 @@ cleanup() {
+@@ -26,6 +26,15 @@ cleanup() {
    done
  }
  
-+get_cur_dev() {
-+  mount |grep ${INSTALL_ROOT} |awk '{print $1}'
-+}
-+
 +get_disk_dev() {
-+  local disk_dev=$(get_cur_dev)
-+  disk_dev=${disk_dev%[0-9]}
-+  disk_dev=${disk_dev%[0-9]}
-+  echo ${disk_dev%p}
++  /usr/bin/rootdev -d
 +}
 +
 +get_part_num() {
-+  local disk_dev=$(get_cur_dev)
-+  echo ${disk_dev##*[a-z]}
++  local dev=$1
++  echo ${dev##*[a-z]}
 +}
 +
  main() {
-+  local target_disk=$(get_disk_dev)
-+  local target_part_num=$(get_part_num)
-+  /usr/sbin/switch_root.sh $target_part_num $target_disk
    cd "${INSTALL_ROOT}" || exit 1
  
-   trap cleanup EXIT
+@@ -38,6 +47,9 @@ main() {
+   done
+ 
+   local install_dev="$1"
++  local root_dev=$(get_disk_dev)
++  local target_part_num=$(get_part_num $install_dev)
++  chroot . /usr/sbin/switch_root.sh $target_part_num $root_dev
+   shift
+   chroot . /usr/bin/cros_installer --type="postinst" \
+          --install_dev="${install_dev}" --install_dir="/" "$@"
