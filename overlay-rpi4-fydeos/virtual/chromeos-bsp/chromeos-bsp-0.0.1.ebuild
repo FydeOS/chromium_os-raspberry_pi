@@ -14,6 +14,7 @@ IUSE=""
 RDEPEND="
   chromeos-base/fydeos-console-issue
   chromeos-base/fydeos-default-apps
+  chromeos-base/fydeos-utils
   chromeos-base/google-drive-fs
   net-misc/patch-tlsdate
   net-misc/fydeos-remote-help
