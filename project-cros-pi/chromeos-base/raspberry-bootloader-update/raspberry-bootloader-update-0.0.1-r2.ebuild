@@ -22,8 +22,9 @@ S=${WORKDIR}
 
 src_install() {
   insinto /usr/share/raspberry-boot
-  doins ${ROOT}/firmware/rpi/*.{dat,bin,elf}
+  doins ${ROOT}/firmware/rpi/*[!b].{dat,bin,elf}
   doins ${ROOT}/usr/src/linux/arch/arm64/boot/dts/broadcom/*.dtb
   insinto /usr/share/raspberry-boot/overlays
   doins ${ROOT}/usr/src/linux/arch/arm64/boot/dts/overlays/*.dtbo
+  
 }

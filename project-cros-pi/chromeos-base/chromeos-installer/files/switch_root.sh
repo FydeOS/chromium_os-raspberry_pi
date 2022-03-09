@@ -86,6 +86,8 @@ main() {
    root_dev=${disk_dev}p${part_num}
  fi
  mount $efi_dev $tmpdir || die "error mounting"
+# remove debug file for more room for new kernel
+ rm $tmpdir/*{4,_}db.* 2>/dev/null || true
  modify_root ${tmpdir}/${CMDFILE} $root_uuid || die "error when modified cmdline.txt"
  update_root_kernel $root_dev
  if [ -d $BOOTLOADER ]; then
