@@ -7,6 +7,8 @@ rootA=3
 rootB=5
 CMDFILE="cmdline.txt"
 BOOTLOADER="/usr/share/raspberry-boot"
+ARC_DIR=/mnt/stateful_partition/unencrypted/android
+CLEAN_OVERLAY="$ARC_DIR/.clean_overlay"
 
 . /usr/share/cros/update_kernel_lib.sh
 
@@ -95,6 +97,9 @@ main() {
  fi
  umount $tmpdir
  rmdir $tmpdir
+ if [ -d $ARC_DIR ]; then
+   touch $CLEAN_OVERLAY
+ fi 
 }
 
 main $@
