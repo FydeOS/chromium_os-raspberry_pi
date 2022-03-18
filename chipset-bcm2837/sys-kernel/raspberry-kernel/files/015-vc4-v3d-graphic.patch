@@ -30,16 +30,18 @@ Index: rpi-kernel/drivers/gpu/drm/v3d/v3d_bo.c
  
  	v3d_mmu_remove_ptes(bo);
  
-@@ -48,6 +50,8 @@ void v3d_free_object(struct drm_gem_obje
+@@ -47,6 +49,10 @@ void v3d_free_object(struct drm_gem_obje
+ 	/* GPU execution may have dirtied any pages in the BO. */
  	bo->base.pages_mark_dirty_on_put = true;
  
- 	drm_gem_shmem_free_object(obj);
-+  if (vc4_handle)
++  if (vc4_handle) {
++    DRM_DEBUG("free vc4_handle:%u\n", vc4_handle);
 +    free_bo_from_vc4(vc4_handle);
++  }
+ 	drm_gem_shmem_free_object(obj);
  }
  
- static const struct drm_gem_object_funcs v3d_gem_funcs = {
-@@ -170,13 +174,31 @@ int v3d_create_bo_ioctl(struct drm_devic
+@@ -170,13 +176,34 @@ int v3d_create_bo_ioctl(struct drm_devic
  			struct drm_file *file_priv)
  {
  	struct drm_v3d_create_bo *args = data;
@@ -49,8 +51,9 @@ Index: rpi-kernel/drivers/gpu/drm/v3d/v3d_bo.c
  	int ret;
  
 -	if (args->flags != 0) {
+-		DRM_INFO("unknown create_bo flags: %d\n", args->flags);
 +	if (args->flags != 0 && args->flags != ARC_CALLOC) {
- 		DRM_INFO("unknown create_bo flags: %d\n", args->flags);
++		DRM_DEBUG("unknown create_bo flags: %d\n", args->flags);
  		return -EINVAL;
  	}
 +  
@@ -59,12 +62,15 @@ Index: rpi-kernel/drivers/gpu/drm/v3d/v3d_bo.c
 +    if (!ret) {
 +      gem_obj = drm_gem_object_lookup(file_priv, args->handle);
 +      if (!gem_obj) {
-+        DRM_DEBUG("Failed to look up new imported GEM BO %d\n", args->handle);
++        DRM_ERROR("Failed to look up new imported GEM BO %d\n", args->handle);
 +        return -EINVAL;
 +      }
 +      bo = to_v3d_bo(gem_obj);
 +      bo->vc4_handle = vc4_handle;
-+      DRM_DEBUG("store vc4 handle:%u", bo->vc4_handle);
++      DRM_DEBUG("store vc4 handle:%u, dma_buf:%p, attachment_dma_buf:%p, size:%luKB", bo->vc4_handle,
++        gem_obj->dma_buf,
++        gem_obj->import_attach->dmabuf,
++        gem_obj->size/1024);
 +      drm_gem_object_put(gem_obj);
 +      return 0;
 +    }
@@ -72,6 +78,15 @@ Index: rpi-kernel/drivers/gpu/drm/v3d/v3d_bo.c
  
  	bo = v3d_bo_create(dev, file_priv, PAGE_ALIGN(args->size));
  	if (IS_ERR(bo))
+@@ -197,7 +224,7 @@ int v3d_mmap_bo_ioctl(struct drm_device
+ 	struct drm_gem_object *gem_obj;
+ 
+ 	if (args->flags != 0) {
+-		DRM_INFO("unknown mmap_bo flags: %d\n", args->flags);
++		DRM_DEBUG("unknown mmap_bo flags: %d\n", args->flags);
+ 		return -EINVAL;
+ 	}
+ 
 Index: rpi-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.h
 ===================================================================
 --- /dev/null
@@ -145,7 +160,8 @@ Index: rpi-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.c
 ===================================================================
 --- /dev/null
 +++ rpi-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.c
-@@ -0,0 +1,50 @@
+@@ -0,0 +1,49 @@
++#include <linux/syscalls.h>
 +#include <drm/drm_drv.h>
 +#include <drm/drm_prime.h>
 +#include "v3d_vc4_bind.h"
@@ -157,7 +173,7 @@ Index: rpi-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.c
 +    struct drm_file *file_priv, size_t unaligned_size, u32 *vc4_handle, u32 *handle)
 +{
 +  struct drm_vc4_create_bo args = {0};
-+  int ret, prime_fd;
++  int ret, prime_fd = 0;
 +
 +  if (!is_vc4_enable())
 +    return -ENODEV;
@@ -182,6 +198,8 @@ Index: rpi-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.c
 +release_vc4_bo:
 +  free_bo_from_vc4(args.handle);
 +out:
++  if(prime_fd)
++    ksys_close(prime_fd);
 +  if (ret)
 +  	DRM_ERROR("Borrow bo from vc4 size:%uk, vc4 handle:%u, fd:%d, v3d handle:%u, ret:%d\n",
 +      (u32) (unaligned_size / 1024), *vc4_handle, prime_fd, *handle, ret);
@@ -189,12 +207,8 @@ Index: rpi-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.c
 +}
 +
 +void free_bo_from_vc4(u32 handle) {
-+  int ret;
-+  /* need releasing handle twice? */
-+  ret = drm_gem_handle_delete(vc4_drm_file, handle);
++  vc4_move_to_purgeable_pool(vc4_drm_file, handle);
 +  DRM_DEBUG("release borrowed vc4 handle:%d\n", handle);
-+  if (ret)
-+    DRM_ERROR("Free handle:%u, from vc4, ret:%d\n", handle, ret);
 +}
 Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_bo.c
 ===================================================================
@@ -208,7 +222,41 @@ Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_bo.c
  };
  
  static bool is_user_label(int label)
-@@ -795,6 +796,7 @@ vc4_prime_import_sg_table(struct drm_dev
+@@ -527,6 +528,10 @@ void vc4_free_object(struct drm_gem_obje
+ 	struct vc4_bo *bo = to_vc4_bo(gem_bo);
+ 	struct list_head *cache_list;
+ 
++  if (bo->label == VC4_BO_TYPE_V3D_BIND) {
++    DRM_DEBUG("Free v3d bind bo usecnt:%u, refcnt:%u, size:%luKB, attach:%s", refcount_read(&bo->usecnt),
++      kref_read(&gem_bo->refcount), gem_bo->size/1024,gem_bo->import_attach? "yes":"no");
++  }
+ 	/* Remove the BO from the purgeable list. */
+ 	mutex_lock(&bo->madv_lock);
+ 	if (bo->madv == VC4_MADV_DONTNEED && !refcount_read(&bo->usecnt))
+@@ -543,6 +548,7 @@ void vc4_free_object(struct drm_gem_obje
+ 
+ 	/* Don't cache if it was publicly named. */
+ 	if (gem_bo->name) {
++    DRM_DEBUG("destory by name.");
+ 		vc4_bo_destroy(bo);
+ 		goto out;
+ 	}
+@@ -552,12 +558,14 @@ void vc4_free_object(struct drm_gem_obje
+ 	 * purged.
+ 	 */
+ 	if (!bo->base.vaddr) {
++    DRM_DEBUG("destory by no vaddr.");
+ 		vc4_bo_destroy(bo);
+ 		goto out;
+ 	}
+ 
+ 	cache_list = vc4_get_cache_list_for_size(dev, gem_bo->size);
+ 	if (!cache_list) {
++    DRM_DEBUG("destory by no cache_list.");
+ 		vc4_bo_destroy(bo);
+ 		goto out;
+ 	}
+@@ -795,6 +803,7 @@ vc4_prime_import_sg_table(struct drm_dev
  
  static int vc4_grab_bin_bo(struct vc4_dev *vc4, struct vc4_file *vc4file)
  {
@@ -216,7 +264,7 @@ Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_bo.c
  	int ret;
  
  	if (!vc4->v3d)
-@@ -806,7 +808,7 @@ static int vc4_grab_bin_bo(struct vc4_de
+@@ -806,7 +815,7 @@ static int vc4_grab_bin_bo(struct vc4_de
  	ret = vc4_v3d_bin_bo_get(vc4, &vc4file->bin_bo_used);
  	if (ret)
  		return ret;
@@ -225,7 +273,7 @@ Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_bo.c
  	return 0;
  }
  
-@@ -827,7 +829,8 @@ int vc4_create_bo_ioctl(struct drm_devic
+@@ -827,7 +836,8 @@ int vc4_create_bo_ioctl(struct drm_devic
  	 * We can't allocate from the BO cache, because the BOs don't
  	 * get zeroed, and that might leak data between users.
  	 */
@@ -235,21 +283,39 @@ Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_bo.c
  	if (IS_ERR(bo))
  		return PTR_ERR(bo);
  
-@@ -1096,3 +1099,15 @@ int vc4_label_bo_ioctl(struct drm_device
+@@ -875,12 +885,12 @@ vc4_create_shader_bo_ioctl(struct drm_de
+ 		return -EINVAL;
+ 
+ 	if (args->flags != 0) {
+-		DRM_INFO("Unknown flags set: 0x%08x\n", args->flags);
++		DRM_DEBUG("Unknown flags set: 0x%08x\n", args->flags);
+ 		return -EINVAL;
+ 	}
+ 
+ 	if (args->pad != 0) {
+-		DRM_INFO("Pad set: 0x%08x\n", args->pad);
++		DRM_DEBUG("Pad set: 0x%08x\n", args->pad);
+ 		return -EINVAL;
+ 	}
+ 
+@@ -1096,3 +1106,18 @@ int vc4_label_bo_ioctl(struct drm_device
  
  	return ret;
  }
 +
-+void vc4_bo_close(struct drm_gem_object *gem_obj, struct drm_file *file_priv)
-+{
-+  struct vc4_bo *bo = to_vc4_bo(gem_obj);
-+  if (bo->label == VC4_BO_TYPE_V3D_BIND && bo->base.vaddr != NULL) {
-+    mutex_lock(&bo->madv_lock);
-+    bo->madv = VC4_MADV_DONTNEED;
-+    mutex_unlock(&bo->madv_lock);
-+    vc4_bo_dec_usecnt(bo);
-+    DRM_DEBUG_DRIVER("vc4 exported gem closed, bo usercount:%u\n", refcount_read(&bo->usecnt));
++void vc4_move_to_purgeable_pool(struct drm_file *file_priv, u32 handle) {
++  struct drm_gem_object *gem_obj;
++  struct vc4_bo *bo;
++  gem_obj = drm_gem_object_lookup(file_priv, handle);
++  if (!gem_obj) {
++    DRM_ERROR("Failed to look up GEM BO %d to purgeable\n", handle);
++    return;
 +  }
++  bo = to_vc4_bo(gem_obj);
++  mutex_lock(&bo->madv_lock);
++  bo->madv = VC4_MADV_DONTNEED;
++  mutex_unlock(&bo->madv_lock);
++  vc4_bo_dec_usecnt(bo);
 +}
 Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_drv.c
 ===================================================================
@@ -291,15 +357,7 @@ Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_drv.c
  	vc4_perfmon_close_file(vc4file);
  	kfree(vc4file);
  }
-@@ -198,6 +204,7 @@ static struct drm_driver vc4_drm_driver
- 
- 	.gem_create_object = vc4_create_object,
- 	.gem_free_object_unlocked = vc4_free_object,
-+  .gem_close_object = vc4_bo_close,
- 	.gem_vm_ops = &vc4_vm_ops,
- 
- 	.prime_handle_to_fd = drm_gem_prime_handle_to_fd,
-@@ -290,12 +297,15 @@ static int vc4_drm_bind(struct device *d
+@@ -290,12 +296,15 @@ static int vc4_drm_bind(struct device *d
  	node = of_find_matching_node_and_match(NULL, vc4_dma_range_matches,
  					       NULL);
  	if (node) {
@@ -316,7 +374,7 @@ Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_drv.c
  
  	vc4 = devm_drm_dev_alloc(dev, &vc4_drm_driver, struct vc4_dev, base);
  	if (IS_ERR(vc4))
-@@ -362,19 +372,21 @@ static int vc4_drm_bind(struct device *d
+@@ -362,19 +371,21 @@ static int vc4_drm_bind(struct device *d
  		goto unbind_all;
  
  	drm_fbdev_generic_setup(drm, 16);
@@ -366,7 +424,7 @@ Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_drv.h
  void vc4_bo_dec_usecnt(struct vc4_bo *bo);
  void vc4_bo_add_to_purgeable_pool(struct vc4_bo *bo);
  void vc4_bo_remove_from_purgeable_pool(struct vc4_bo *bo);
-+void vc4_bo_close(struct drm_gem_object *, struct drm_file *file_priv);
++void vc4_move_to_purgeable_pool(struct drm_file *file_priv, u32 handle);
  
  /* vc4_crtc.c */
  extern struct platform_driver vc4_crtc_driver;
@@ -380,7 +438,28 @@ Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_kms.c
 ===================================================================
 --- rpi-kernel.orig/drivers/gpu/drm/vc4/vc4_kms.c
 +++ rpi-kernel/drivers/gpu/drm/vc4/vc4_kms.c
-@@ -444,6 +444,7 @@ static int vc4_atomic_commit(struct drm_
+@@ -353,7 +353,7 @@ vc4_atomic_complete_commit(struct drm_at
+ 						500000000,
+ 						hvs_state->core_clock_rate);
+ 
+-		drm_dbg(dev, "Raising the core clock at %lu Hz\n", core_rate);
++		/*drm_dbg(dev, "Raising the core clock at %lu Hz\n", core_rate);*/
+ 
+ 		/*
+ 		 * Do a temporary request on the core clock during the
+@@ -398,9 +398,10 @@ vc4_atomic_complete_commit(struct drm_at
+ 	drm_atomic_helper_commit_cleanup_done(state);
+ 
+ 	if (vc4->hvs && vc4->hvs->hvs5) {
++    /*
+ 		drm_dbg(dev, "Running the core clock at %lu Hz\n",
+ 			hvs_state->core_clock_rate);
+-
++    */
+ 		/*
+ 		 * Request a clock rate based on the current HVS
+ 		 * requirements.
+@@ -444,6 +445,7 @@ static int vc4_atomic_commit(struct drm_
  {
  	struct vc4_dev *vc4 = to_vc4_dev(dev);
  	int ret;
@@ -388,7 +467,7 @@ Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_kms.c
  
  	if (state->async_update) {
  		ret = down_interruptible(&vc4->async_modeset);
-@@ -489,8 +490,9 @@ static int vc4_atomic_commit(struct drm_
+@@ -489,8 +491,9 @@ static int vc4_atomic_commit(struct drm_
  	}
  
  	if (!nonblock) {
