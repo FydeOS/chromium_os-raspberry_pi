@@ -38,5 +38,7 @@ src_install() {
   doins ${FILESDIR}/power_policy/power.json
   insinto /etc
   doins ${FILESDIR}/etc/hardware_features.xml
+  insinto /etc/swap
+  doins ${FILESDIR}/swap/swap_size_mb
   dosym /lib/firmware /etc/firmware
 }

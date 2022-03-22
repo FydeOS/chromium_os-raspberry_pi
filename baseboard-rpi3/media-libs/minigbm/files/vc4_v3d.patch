@@ -328,7 +328,7 @@ Index: minigbm/v3d.c
 ===================================================================
 --- /dev/null
 +++ minigbm/v3d.c
-@@ -0,0 +1,161 @@
+@@ -0,0 +1,198 @@
 +/*
 + * Copyright 2019 The FydeOS Authors. All rights reserved.
 + * Use of this source code is governed by a BSD-style license that can be
@@ -380,26 +380,30 @@ Index: minigbm/v3d.c
 +      };
 +
 +static int v3d_init(struct driver *drv) {
++#if 0
 +  uint64_t render_use_flags = BO_USE_RENDER_MASK | BO_USE_SCANOUT;
 +  uint64_t texture_use_flags = BO_USE_TEXTURE_MASK;
-+  uint64_t sw_flags = (BO_USE_RENDERSCRIPT | BO_USE_SW_MASK | BO_USE_LINEAR | BO_USE_FRONT_RENDERING);
 +  struct format_metadata metadata;
++#endif
++  uint64_t sw_flags = BO_USE_SW_MASK | BO_USE_SCANOUT;
 +  drv_add_combinations(drv, render_target_formats, ARRAY_SIZE(render_target_formats),
-+           &LINEAR_METADATA, render_use_flags);
++           &LINEAR_METADATA, BO_USE_RENDER_MASK);
++  drv_modify_combination(drv, DRM_FORMAT_ABGR8888, &LINEAR_METADATA, BO_USE_SCANOUT);
++  drv_modify_combination(drv, DRM_FORMAT_XBGR8888, &LINEAR_METADATA, BO_USE_SCANOUT);
 +  drv_add_combinations(drv, texture_target_formats, ARRAY_SIZE(texture_target_formats),
 +           &LINEAR_METADATA, BO_USE_TEXTURE_MASK);
 +  drv_modify_combination(drv, DRM_FORMAT_YVU420, &LINEAR_METADATA,  
-+           BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
++           BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | 
 +           BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
 +  drv_modify_combination(drv, DRM_FORMAT_NV12, &LINEAR_METADATA,
-+           BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
++           BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | 
 +           BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
-+  drv_modify_combination(drv, DRM_FORMAT_R8, &LINEAR_METADATA, BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
-+  	   BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
++  drv_modify_combination(drv, DRM_FORMAT_R8, &LINEAR_METADATA, sw_flags);
 +  drv_modify_combination(drv, DRM_FORMAT_ARGB8888, &LINEAR_METADATA, BO_USE_CURSOR | BO_USE_SCANOUT);
-+
-+  metadata.tiling = V3D_TILING_UIF_NO_XOR;
-+  metadata.priority = 2;
++  drv_modify_combination(drv, DRM_FORMAT_XRGB8888, &LINEAR_METADATA, BO_USE_CURSOR | BO_USE_SCANOUT);
++#if 0
++  metadata.tiling = V3D_TILING_RASTER;
++  metadata.priority = 1;
 +  metadata.modifier = DRM_FORMAT_MOD_BROADCOM_UIF;
 +  render_use_flags &= ~sw_flags;
 +  texture_use_flags &= ~sw_flags;
@@ -407,10 +411,11 @@ Index: minigbm/v3d.c
 +    &metadata, render_use_flags);
 +  drv_add_combinations(drv, texture_target_formats, ARRAY_SIZE(texture_target_formats),
 +    &metadata, texture_use_flags);
++#endif
 +  drv_log("v3d driver init.\n");
 +  return 0;
 +}
-+
++#if 0
 +static int v3d_bo_create_for_modifiers(struct bo *bo, uint32_t width, uint32_t height,
 +               uint32_t format, uint64_t modifier) {
 +  int ret;
@@ -423,10 +428,10 @@ Index: minigbm/v3d.c
 +  algin_height = ALIGN(height * 12 / 10, 8);
 +  drv_bo_from_format(bo, stride, algin_height, format);
 +  bo->meta.total_size = ALIGN(bo->meta.total_size, 4096);
-+  if ( width * height == 1) // don't bother vc4 if only need 1 pixel.
-+    bo_create.flags = 0;
-+  else
++  #ifdef __ANDROID__
++  if ((width * height) >> 4 && modifier == DRM_FORMAT_MOD_LINEAR) // don't bother vc4 if only need 1 pixel.
 +    bo_create.flags = ARC_CALLOC;
++  #endif
 +  bo_create.size = bo->meta.total_size;
 +  bo->meta.format_modifier = modifier;
 +  bo->meta.tiling = (modifier == DRM_FORMAT_MOD_LINEAR ? V3D_TILING_RASTER: V3D_TILING_UIF_NO_XOR);
@@ -452,13 +457,43 @@ Index: minigbm/v3d.c
 +    DRM_FORMAT_MOD_LINEAR,
 +  };
 +  uint64_t modifier =
-+    drv_pick_modifier(modifiers, count, modifier_order, count);
++    drv_pick_modifier(modifiers, count, modifier_order, ARRAY_SIZE(modifier_order));
 +  return v3d_bo_create_for_modifiers(bo, width, height, format, modifier/*modifier*/);
 +}
-+
++#endif
 +static int v3d_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t format,
 +       uint64_t use_flags) {
-+  return v3d_bo_create_for_modifiers(bo, width, height, format, DRM_FORMAT_MOD_LINEAR/*modifier*/);
++  int ret;
++  size_t plane;
++  uint32_t stride, algin_height;
++  struct drm_v3d_create_bo bo_create;
++  memset(&bo_create, 0, sizeof(bo_create));
++  stride = drv_stride_from_format(format, width, 0);
++  stride = ALIGN(stride * 12 / 10, 64);
++  algin_height = ALIGN(height * 12 / 10, 8);
++  drv_bo_from_format(bo, stride, algin_height, format);
++  bo->meta.total_size = ALIGN(bo->meta.total_size, 4096);
++  bo->meta.format_modifier = DRM_FORMAT_MOD_LINEAR;
++  bo->meta.tiling = V3D_TILING_RASTER;
++  if (use_flags & (BO_USE_SW_MASK | BO_USE_SCANOUT)) {
++		 bo_create.flags = ARC_CALLOC;
++  } else {
++     bo_create.flags = 0;
++  }
++  bo_create.size = bo->meta.total_size;
++  ret = drmIoctl(bo->drv->fd, DRM_IOCTL_V3D_CREATE_BO, &bo_create);
++  if (ret) {
++    drv_log("DRM_IOCTL_V3D_CREATE_BO failed (size=%zu), ret=%d, format:%s\n", bo->meta.total_size, ret, getDrmFormatString(format));
++    return -errno;
++  }
++
++  for (plane = 0; plane < bo->meta.num_planes; plane++)
++    bo->handles[plane].u32 = bo_create.handle;
++#ifdef DEBUG
++ drv_log("create bo handler:0x%x, size:%zu, format:%s, width:%u, height:%u\n",
++   bo_create.handle, bo->meta.total_size, getDrmFormatString(format), width, height);
++#endif
++  return 0;
 +}
 +
 +static void *v3d_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags) {
@@ -481,7 +516,9 @@ Index: minigbm/v3d.c
 +  .name = "v3d",
 +  .init = v3d_init,
 +  .bo_create = v3d_bo_create,
++#if 0
 +  .bo_create_with_modifiers = v3d_bo_create_with_modifiers,
++#endif
 +  .bo_import = drv_prime_bo_import,
 +  .bo_destroy = drv_gem_bo_destroy,
 +  .bo_map = v3d_bo_map,
