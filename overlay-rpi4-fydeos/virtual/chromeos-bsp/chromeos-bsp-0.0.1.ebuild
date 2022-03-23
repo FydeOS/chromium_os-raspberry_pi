@@ -27,6 +27,7 @@ RDEPEND="
   virtual/fydemina
   app-i18n/rime-server
   app-i18n/chromeos-pinyin
+  app-i18n/google-ime-tools
   chromeos-base/chromeos-bsp-rpi4-fydeos"
 
 DEPEND="${RDEPEND}"
