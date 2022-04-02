@@ -1,0 +1,71 @@
+diff --git a/src/gallium/auxiliary/util/u_inlines.h b/src/gallium/auxiliary/util/u_inlines.h
+index 9a1315d01ec..94eb86a28e9 100644
+--- a/src/gallium/auxiliary/util/u_inlines.h
++++ b/src/gallium/auxiliary/util/u_inlines.h
+@@ -483,6 +483,7 @@ pipe_transfer_map(struct pipe_context *context,
+ {
+    struct pipe_box box;
+    u_box_2d_zslice(x, y, layer, w, h, &box);
++   _debug_printf("pipe map:width:%u, height:%u",w,h);
+    return context->transfer_map(context,
+                                 resource,
+                                 level,
+diff --git a/src/gallium/drivers/v3d/v3d_resource.c b/src/gallium/drivers/v3d/v3d_resource.c
+index 01bf803beef..d15c44e10b6 100644
+--- a/src/gallium/drivers/v3d/v3d_resource.c
++++ b/src/gallium/drivers/v3d/v3d_resource.c
+@@ -21,7 +21,6 @@
+  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+  * IN THE SOFTWARE.
+  */
+-
+ #include "pipe/p_defines.h"
+ #include "util/u_blit.h"
+ #include "util/u_memory.h"
+@@ -123,6 +122,8 @@ v3d_resource_transfer_unmap(struct pipe_context *pctx,
+                 struct v3d_resource *rsc = v3d_resource(ptrans->resource);
+                 struct v3d_resource_slice *slice = &rsc->slices[ptrans->level];
+ 
++                _debug_printf("transfer_unmap: tiling:%d,width:%u,height:%u", slice->tiling,
++                  ptrans->box.width, ptrans->box.height);
+                 if (ptrans->usage & PIPE_TRANSFER_WRITE) {
+                         for (int z = 0; z < ptrans->box.depth; z++) {
+                                 void *dst = rsc->bo->map +
+@@ -268,6 +269,8 @@ v3d_resource_transfer_map(struct pipe_context *pctx,
+                                           util_format_get_blockheight(format));
+ 
+         struct v3d_resource_slice *slice = &rsc->slices[level];
++        _debug_printf("transfer_map: tiled:%d, tiling:%d,width:%u,height:%u", rsc->tiled, slice->tiling,
++                          box->width, box->height);
+         if (rsc->tiled) {
+                 /* No direct mappings of tiled, since we need to manually
+                  * tile/untile.
+@@ -328,6 +331,8 @@ v3d_texture_subdata(struct pipe_context *pctx,
+         struct v3d_resource_slice *slice = &rsc->slices[level];
+ 
+         /* For a direct mapping, we can just take the u_transfer path. */
++	_debug_printf("texture subdata tile:%d, tiling:%d, :width:%u, height:%u", 
++		rsc->tiled, slice->tiling, box->width, box->height);
+         if (!rsc->tiled) {
+                 return u_default_texture_subdata(pctx, prsc, level, usage, box,
+                                                  data, stride, layer_stride);
+@@ -406,6 +411,7 @@ v3d_resource_get_handle(struct pipe_screen *pscreen,
+ 
+         switch (whandle->type) {
+         case WINSYS_HANDLE_TYPE_SHARED:
++		_debug_printf("resource: shared, tiled:%d, size:%uK", rsc->tiled, bo->size/1024);
+                 return v3d_bo_flink(bo, &whandle->handle);
+         case WINSYS_HANDLE_TYPE_KMS:
+                 if (screen->ro) {
+@@ -415,9 +421,11 @@ v3d_resource_get_handle(struct pipe_screen *pscreen,
+                         return ok;
+                 }
+                 whandle->handle = bo->handle;
++		_debug_printf("resource: kms, tiled:%d, size:%uK", rsc->tiled, bo->size/1024);
+                 return true;
+         case WINSYS_HANDLE_TYPE_FD:
+                 whandle->handle = v3d_bo_get_dmabuf(bo);
++		_debug_printf("resource: fd, tiled:%d, size:%uK", rsc->tiled, bo->size/1024);
+                 return whandle->handle != -1;
+         }
+ 

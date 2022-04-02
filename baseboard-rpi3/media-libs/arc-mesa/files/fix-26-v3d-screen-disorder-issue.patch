@@ -1,0 +1,252 @@
+diff --git a/src/gallium/auxiliary/util/u_inlines.h b/src/gallium/auxiliary/util/u_inlines.h
+index 9a1315d01ec..94eb86a28e9 100644
+--- a/src/gallium/auxiliary/util/u_inlines.h
++++ b/src/gallium/auxiliary/util/u_inlines.h
+@@ -483,6 +483,7 @@ pipe_transfer_map(struct pipe_context *context,
+ {
+    struct pipe_box box;
+    u_box_2d_zslice(x, y, layer, w, h, &box);
++   _debug_printf("pipe map:width:%u, height:%u",w,h);
+    return context->transfer_map(context,
+                                 resource,
+                                 level,
+diff --git a/src/gallium/drivers/v3d/v3d_resource.c b/src/gallium/drivers/v3d/v3d_resource.c
+index 01bf803beef..bb0823da430 100644
+--- a/src/gallium/drivers/v3d/v3d_resource.c
++++ b/src/gallium/drivers/v3d/v3d_resource.c
+@@ -21,7 +21,6 @@
+  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+  * IN THE SOFTWARE.
+  */
+-
+ #include "pipe/p_defines.h"
+ #include "util/u_blit.h"
+ #include "util/u_memory.h"
+@@ -122,6 +121,8 @@ v3d_resource_transfer_unmap(struct pipe_context *pctx,
+         if (trans->map) {
+                 struct v3d_resource *rsc = v3d_resource(ptrans->resource);
+                 struct v3d_resource_slice *slice = &rsc->slices[ptrans->level];
++                _debug_printf("%34s: (%u:%u), tiling:%d, handle:0x%x", __func__,
++                  ptrans->box.width, ptrans->box.height, slice->tiling, rsc->bo->handle);
+ 
+                 if (ptrans->usage & PIPE_TRANSFER_WRITE) {
+                         for (int z = 0; z < ptrans->box.depth; z++) {
+@@ -268,6 +269,8 @@ v3d_resource_transfer_map(struct pipe_context *pctx,
+                                           util_format_get_blockheight(format));
+ 
+         struct v3d_resource_slice *slice = &rsc->slices[level];
++        _debug_printf("%34s: (%u:%u), tiled:%d, tiling:%d, handle:0x%x", __func__, 
++                          box->width, box->height, rsc->tiled, slice->tiling, rsc->bo != NULL? rsc->bo->handle: 0);
+         if (rsc->tiled) {
+                 /* No direct mappings of tiled, since we need to manually
+                  * tile/untile.
+@@ -328,6 +331,8 @@ v3d_texture_subdata(struct pipe_context *pctx,
+         struct v3d_resource_slice *slice = &rsc->slices[level];
+ 
+         /* For a direct mapping, we can just take the u_transfer path. */
++	_debug_printf("%34s: tiled:%d, tiling:%d, box(%u:%u), prsc(%u:%u), handle:0x%x", __func__,
++		rsc->tiled, slice->tiling, box->width, box->height, prsc->width0, prsc->height0, rsc->bo != NULL ? rsc->bo->handle: 0);
+         if (!rsc->tiled) {
+                 return u_default_texture_subdata(pctx, prsc, level, usage, box,
+                                                  data, stride, layer_stride);
+@@ -368,7 +373,7 @@ v3d_resource_destroy(struct pipe_screen *pscreen,
+ 
+         if (rsc->scanout)
+                 renderonly_scanout_destroy(rsc->scanout, screen->ro);
+-
++        _debug_printf("%34s: (%u:%u), tiled:%d, handle:0x%x", __func__, prsc->width0, prsc->height0, rsc->tiled, rsc->bo->handle);
+         v3d_bo_unreference(&rsc->bo);
+         free(rsc);
+ }
+@@ -406,6 +411,7 @@ v3d_resource_get_handle(struct pipe_screen *pscreen,
+ 
+         switch (whandle->type) {
+         case WINSYS_HANDLE_TYPE_SHARED:
++		_debug_printf("resource: shared, tiled:%d, size:%uK, handle:0x%x", rsc->tiled, bo->size/1024, bo->handle);
+                 return v3d_bo_flink(bo, &whandle->handle);
+         case WINSYS_HANDLE_TYPE_KMS:
+                 if (screen->ro) {
+@@ -415,9 +421,11 @@ v3d_resource_get_handle(struct pipe_screen *pscreen,
+                         return ok;
+                 }
+                 whandle->handle = bo->handle;
++		_debug_printf("resource: kms, tiled:%d, size:%uK, handle:0x%x", rsc->tiled, bo->size/1024, bo->handle);
+                 return true;
+         case WINSYS_HANDLE_TYPE_FD:
+                 whandle->handle = v3d_bo_get_dmabuf(bo);
++		_debug_printf("resource: fd, tiled:%d, size:%uK, handle:0x%x", rsc->tiled, bo->size/1024, bo->handle);
+                 return whandle->handle != -1;
+         }
+ 
+@@ -505,7 +513,6 @@ v3d_setup_slices(struct v3d_resource *rsc, uint32_t winsys_stride,
+          */
+         assert(prsc->array_size != 0);
+         assert(prsc->depth0 != 0);
+-
+         for (int i = prsc->last_level; i >= 0; i--) {
+                 struct v3d_resource_slice *slice = &rsc->slices[i];
+ 
+@@ -741,6 +748,8 @@ v3d_resource_create_with_modifiers(struct pipe_screen *pscreen,
+         /* No user-specified modifier; determine our own. */
+         if (count == 1 && modifiers[0] == DRM_FORMAT_MOD_INVALID) {
+                 linear_ok = true;
++                _debug_printf("%34s: (%u:%u), determine tiled:%d, bind:0x%x, target:0x%x", 
++                  __func__, prsc->width0, prsc->height0, should_tile, tmpl->bind, tmpl->target);
+                 rsc->tiled = should_tile;
+         } else if (should_tile &&
+                    drm_find_modifier(DRM_FORMAT_MOD_BROADCOM_UIF,
+@@ -801,6 +810,8 @@ v3d_resource_create_with_modifiers(struct pipe_screen *pscreen,
+                         goto fail;
+         }
+ 
++        _debug_printf("v3d_resource_create_with_modifiers: (%u:%u), msaa:%d, uif_top:%d, tiled:%d, tiling:%d, bind:0x%x, handle:0x%x", 
++          prsc->width0, prsc->height0, prsc->nr_samples > 1, tmpl->bind & PIPE_BIND_SHARED, rsc->tiled, rsc->slices[0].tiling, tmpl->bind, rsc->bo->handle);
+         return prsc;
+ fail:
+         v3d_resource_destroy(pscreen, prsc);
+@@ -812,6 +823,7 @@ v3d_resource_create(struct pipe_screen *pscreen,
+                     const struct pipe_resource *tmpl)
+ {
+         const uint64_t mod = DRM_FORMAT_MOD_INVALID;
++        _debug_printf("%34s: mode:invalid ",__func__);
+         return v3d_resource_create_with_modifiers(pscreen, tmpl, &mod, 1);
+ }
+ 
+@@ -837,11 +849,12 @@ v3d_resource_from_handle(struct pipe_screen *pscreen,
+                 rsc->tiled = true;
+                 break;
+         case DRM_FORMAT_MOD_INVALID:
++                _debug_printf("%34s: guess tiled:1", __func__);
+                 rsc->tiled = screen->ro == NULL;
+                 break;
+         default:
+-                fprintf(stderr,
+-                        "Attempt to import unsupported modifier 0x%llx\n",
++                _debug_printf(
++                        "Attempt to import unsupported modifier 0x%llx",
+                         (long long)whandle->modifier);
+                 goto fail;
+         }
+@@ -854,8 +867,8 @@ v3d_resource_from_handle(struct pipe_screen *pscreen,
+                 rsc->bo = v3d_bo_open_dmabuf(screen, whandle->handle);
+                 break;
+         default:
+-                fprintf(stderr,
+-                        "Attempt to import unsupported handle type %d\n",
++                _debug_printf(
++                        "Attempt to import unsupported handle type %d",
+                         whandle->type);
+                 goto fail;
+         }
+@@ -870,8 +883,8 @@ v3d_resource_from_handle(struct pipe_screen *pscreen,
+ 
+         if (whandle->offset != 0) {
+                 if (rsc->tiled) {
+-                        fprintf(stderr,
+-                                "Attempt to import unsupported winsys offset %u\n",
++                        _debug_printf(
++                                "Attempt to import unsupported winsys offset %u",
+                                 whandle->offset);
+                         goto fail;
+                 }
+@@ -879,8 +892,7 @@ v3d_resource_from_handle(struct pipe_screen *pscreen,
+ 
+                 if (rsc->slices[0].offset + rsc->slices[0].size >
+                     rsc->bo->size) {
+-                        fprintf(stderr, "Attempt to import "
+-                                "with overflowing offset (%d + %d > %d)\n",
++                        _debug_printf( "Attempt to import with overflowing offset (%d + %d > %d)",
+                                 whandle->offset,
+                                 rsc->slices[0].size,
+                                 rsc->bo->size);
+@@ -893,6 +905,7 @@ v3d_resource_from_handle(struct pipe_screen *pscreen,
+                  * display's fd, so that a later renderonly_get_handle()
+                  * returns correct handles or GEM names.
+                  */
++                _debug_printf("import from screen ro");
+                 rsc->scanout =
+                         renderonly_create_gpu_import_for_resource(prsc,
+                                                                   screen->ro,
+@@ -907,9 +920,8 @@ v3d_resource_from_handle(struct pipe_screen *pscreen,
+                 static bool warned = false;
+                 if (!warned) {
+                         warned = true;
+-                        fprintf(stderr,
+-                                "Attempting to import %dx%d %s with "
+-                                "unsupported stride %d instead of %d\n",
++                        _debug_printf(
++                                "Attempting to import %dx%d %s with unsupported stride %d instead of %d",
+                                 prsc->width0, prsc->height0,
+                                 util_format_short_name(prsc->format),
+                                 whandle->stride,
+@@ -919,7 +931,8 @@ v3d_resource_from_handle(struct pipe_screen *pscreen,
+         } else if (!rsc->tiled) {
+                 slice->stride = whandle->stride;
+         }
+-
++        _debug_printf("%34s: (%u:%u), msaa:%d, uif_top:%d, tiled:%d, tiling:%d, usage:0x%x, bind:0x%x, handle:0x%x", __func__,
++           prsc->width0, prsc->height0, prsc->nr_samples > 1, true, rsc->tiled, rsc->slices[0].tiling, usage, tmpl->bind, rsc->bo != NULL ? rsc->bo->handle: 0);
+         return prsc;
+ 
+ fail:
+@@ -941,9 +954,9 @@ v3d_update_shadow_texture(struct pipe_context *pctx,
+         if (shadow->writes == orig->writes && orig->bo->private)
+                 return;
+ 
+-        perf_debug("Updating %dx%d@%d shadow for linear texture\n",
++        _debug_printf("Updating %dx%d@%d shadow for linear texture, orig_handle:0x%x, shadow_handle:0x%x",
+                    orig->base.width0, orig->base.height0,
+-                   pview->u.tex.first_level);
++                   pview->u.tex.first_level, orig->bo->handle, shadow->bo->handle);
+ 
+         for (int i = 0; i <= shadow->base.last_level; i++) {
+                 unsigned width = u_minify(shadow->base.width0, i);
+@@ -1056,6 +1069,9 @@ v3d_create_surface(struct pipe_context *pctx,
+                         v3d_create_surface(pctx, &rsc->separate_stencil->base,
+                                            surf_tmpl);
+         }
++        _debug_printf("%34s: (%u:%u), format:%s, tiling:%d, handle:0x%x", __func__, 
++          psurf->width, psurf->height, util_format_short_name(psurf->format), surface->tiling, 
++          rsc->bo != NULL ? rsc->bo->handle: 0);
+ 
+         return &surface->base;
+ }
+@@ -1064,10 +1080,15 @@ static void
+ v3d_surface_destroy(struct pipe_context *pctx, struct pipe_surface *psurf)
+ {
+         struct v3d_surface *surf = v3d_surface(psurf);
++        struct v3d_resource *rsc = v3d_resource(psurf->texture);
+ 
+         if (surf->separate_stencil)
+                 pipe_surface_reference(&surf->separate_stencil, NULL);
+ 
++        _debug_printf("%34s: (%u:%u), format:%s, tiling:%d, handle:0x%x", __func__,
++          psurf->width, psurf->height, util_format_short_name(psurf->format), surf->tiling,
++          rsc->bo != NULL ? rsc->bo->handle : 0);
++
+         pipe_resource_reference(&psurf->texture, NULL);
+         FREE(psurf);
+ }
+@@ -1078,6 +1099,9 @@ v3d_flush_resource(struct pipe_context *pctx, struct pipe_resource *resource)
+         /* All calls to flush_resource are followed by a flush of the context,
+          * so there's nothing to do.
+          */
++         struct v3d_resource *rsc = v3d_resource(resource);
++        _debug_printf("%34s: (%u:%u), tiled:%d, tiling:%d, handle:0x%x", __func__,
++          resource->width0, resource->height0, rsc->tiled, rsc->slices[0].tiling, rsc->bo != NULL? rsc->bo->handle: 0);
+ }
+ 
+ static enum pipe_format
+diff --git a/src/gallium/drivers/v3d/v3dx_state.c b/src/gallium/drivers/v3d/v3dx_state.c
+index ee41b9fa75e..c9cb07b8fb5 100644
+--- a/src/gallium/drivers/v3d/v3dx_state.c
++++ b/src/gallium/drivers/v3d/v3dx_state.c
+@@ -1061,7 +1061,7 @@ v3d_create_sampler_view(struct pipe_context *pctx, struct pipe_resource *prsc,
+                 /* Flag it as needing update of the contents from the parent. */
+                 rsc->writes = shadow_parent->writes - 1;
+                 assert(rsc->tiled);
+-
++                _debug_printf("%s: sampling from raster textures and create shadow texture. handle:0x%x", __func__, rsc->bo->handle);
+                 so->texture = prsc;
+         } else {
+                 pipe_resource_reference(&so->texture, prsc);

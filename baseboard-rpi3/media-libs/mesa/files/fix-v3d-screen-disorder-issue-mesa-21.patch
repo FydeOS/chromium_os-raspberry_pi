@@ -1,0 +1,14 @@
+diff --git a/src/gallium/drivers/v3d/v3d_resource.c b/src/gallium/drivers/v3d/v3d_resource.c
+index 0885a2cb80f..5d545e20aee 100644
+--- a/src/gallium/drivers/v3d/v3d_resource.c
++++ b/src/gallium/drivers/v3d/v3d_resource.c
+@@ -881,7 +881,8 @@ v3d_resource_from_handle(struct pipe_screen *pscreen,
+ 
+         if (!rsc)
+                 return NULL;
+-
++	if (usage == PIPE_HANDLE_USAGE_FRAMEBUFFER_WRITE)
++		whandle->modifier = DRM_FORMAT_MOD_INVALID;
+         switch (whandle->modifier) {
+         case DRM_FORMAT_MOD_LINEAR:
+                 rsc->tiled = false;

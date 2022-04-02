@@ -4,7 +4,7 @@
 
 EAPI="6"
 
-CROS_WORKON_COMMIT="663d464366675bf6d44c5d4d00e04cbdfa3f6057"
+CROS_WORKON_COMMIT="7b866d516a7dc0a36dc8ea7ce7733414294e26d9"
 CROS_WORKON_TREE="cde5431fb6fb5b6843049a5df677de47050df448"
 CROS_WORKON_PROJECT="chromiumos/third_party/mesa"
 #CROS_WORKON_LOCALNAME="arc-mesa-virgl"
@@ -147,6 +147,7 @@ src_prepare() {
 	#epatch "${FILESDIR}"/UPSTREAM-mapi-Return-NULL-function-pointers-for-GL_EXT_debug_.patch
 
 	#epatch "${FILESDIR}"/FROMLIST-util-ralloc-fix-ralloc-alignment.patch
+  epatch ${FILESDIR}/fix-26-v3d-screen-disorder-issue.patch
 
 	default
 }
