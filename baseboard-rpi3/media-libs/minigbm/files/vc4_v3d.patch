@@ -328,7 +328,7 @@ Index: minigbm/v3d.c
 ===================================================================
 --- /dev/null
 +++ minigbm/v3d.c
-@@ -0,0 +1,198 @@
+@@ -0,0 +1,200 @@
 +/*
 + * Copyright 2019 The FydeOS Authors. All rights reserved.
 + * Use of this source code is governed by a BSD-style license that can be
@@ -347,7 +347,7 @@ Index: minigbm/v3d.c
 +#include "util.h"
 +#include "external/v3d_drm.h"
 +#define ARC_CALLOC (1<<7)
-+
++#define DEBUG
 +enum v3d_tiling_mode {
 +        /* Untiled resources.  Not valid as texture inputs. */
 +        V3D_TILING_RASTER,
@@ -392,11 +392,11 @@ Index: minigbm/v3d.c
 +  drv_modify_combination(drv, DRM_FORMAT_XBGR8888, &LINEAR_METADATA, BO_USE_SCANOUT);
 +  drv_add_combinations(drv, texture_target_formats, ARRAY_SIZE(texture_target_formats),
 +           &LINEAR_METADATA, BO_USE_TEXTURE_MASK);
-+  drv_modify_combination(drv, DRM_FORMAT_YVU420, &LINEAR_METADATA,  
-+           BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | 
++  drv_modify_combination(drv, DRM_FORMAT_YVU420, &LINEAR_METADATA,
++           BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE |
 +           BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
 +  drv_modify_combination(drv, DRM_FORMAT_NV12, &LINEAR_METADATA,
-+           BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | 
++           BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE |
 +           BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
 +  drv_modify_combination(drv, DRM_FORMAT_R8, &LINEAR_METADATA, sw_flags);
 +  drv_modify_combination(drv, DRM_FORMAT_ARGB8888, &LINEAR_METADATA, BO_USE_CURSOR | BO_USE_SCANOUT);
@@ -473,12 +473,14 @@ Index: minigbm/v3d.c
 +  algin_height = ALIGN(height * 12 / 10, 8);
 +  drv_bo_from_format(bo, stride, algin_height, format);
 +  bo->meta.total_size = ALIGN(bo->meta.total_size, 4096);
-+  bo->meta.format_modifier = DRM_FORMAT_MOD_LINEAR;
-+  bo->meta.tiling = V3D_TILING_RASTER;
-+  if (use_flags & (BO_USE_SW_MASK | BO_USE_SCANOUT)) {
++  if (use_flags & BO_USE_SCANOUT) {
 +		 bo_create.flags = ARC_CALLOC;
++     bo->meta.format_modifier = DRM_FORMAT_MOD_LINEAR;
++     bo->meta.tiling = V3D_TILING_RASTER;
 +  } else {
 +     bo_create.flags = 0;
++     bo->meta.format_modifier = DRM_FORMAT_MOD_BROADCOM_UIF;
++//     bo->meta.tiling = V3D_TILING_UIF_NO_XOR;
 +  }
 +  bo_create.size = bo->meta.total_size;
 +  ret = drmIoctl(bo->drv->fd, DRM_IOCTL_V3D_CREATE_BO, &bo_create);
@@ -490,8 +492,8 @@ Index: minigbm/v3d.c
 +  for (plane = 0; plane < bo->meta.num_planes; plane++)
 +    bo->handles[plane].u32 = bo_create.handle;
 +#ifdef DEBUG
-+ drv_log("create bo handler:0x%x, size:%zu, format:%s, width:%u, height:%u\n",
-+   bo_create.handle, bo->meta.total_size, getDrmFormatString(format), width, height);
++ drv_log("create bo handler:0x%x, size:%zu, format:%s, width:%u, height:%u, use_flags:0x%llx\n",
++   bo_create.handle, bo->meta.total_size, getDrmFormatString(format), width, height, use_flags & (BO_USE_SW_MASK | BO_USE_SCANOUT));
 +#endif
 +  return 0;
 +}
@@ -564,7 +566,7 @@ Index: minigbm/vc4.c
 +          &metadata, BO_USE_RENDER_MASK);
 +  drv_add_combinations(drv, texture_target_formats, ARRAY_SIZE(texture_target_formats),
 +          &metadata, BO_USE_TEXTURE_MASK);
-+  drv_modify_combination(drv, DRM_FORMAT_YVU420, &metadata,  BO_USE_CAMERA_READ | 
++  drv_modify_combination(drv, DRM_FORMAT_YVU420, &metadata,  BO_USE_CAMERA_READ |
 +                              BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
 +                              BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
 +  drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata,
@@ -586,7 +588,7 @@ Index: minigbm/vc4.c
 -
 -	return drv_modify_linear_combinations(drv);
 +  drv_log("vc4 driver inited.\n");
-+  return drv_modify_linear_combinations(drv); 
++  return drv_modify_linear_combinations(drv);
  }
  
  static int vc4_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t height,

@@ -41,3 +41,14 @@ dtoverlay=vc4-kms-v3d-pi4
 # Uncomment the following lines to enable overclocking 
 #over_voltage=8
 #arm_freq=2147
+
+# Supported MIPI Cameras
+# 1. Raspberry Pi Camera V2:
+#dtoverlay=imx219
+# 2. Others:
+#dtoverlay=imx290
+#dtoverlay=imx378
+#dtoverlay=imx477
+#dtoverlay=imx519
+#dtoverlay=ov5647
+#dtoverlay=ov9281

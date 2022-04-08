@@ -1,0 +1,19 @@
+cameras:
+  "/base/soc/i2c0mux/i2c@1/imx219@10":
+    location: front
+    rotation: 0
+  "/base/soc/i2c0mux/i2c@1/imx290@1a":
+    location: front
+    rotation: 0
+  "/base/soc/i2c0mux/i2c@1/imx477@1a":
+    location: front
+    rotation: 0
+  "/base/soc/i2c0mux/i2c@1/imx519@1a":
+    location: front
+    rotation: 0
+  "/base/soc/i2c0mux/i2c@1/ov5647@36":
+    location: front
+    rotation: 0
+  "/base/soc/i2c0mux/i2c@1/ov9281@60":
+    location: front
+    rotation: 0

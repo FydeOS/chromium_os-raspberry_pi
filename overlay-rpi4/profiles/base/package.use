@@ -4,3 +4,4 @@ chromeos-base/chromeos-base -cros_embedded
 sys-apps/gptfdisk -ncurses
 chromeos-base/shill -wireguard
 chromeos-base/crosvm -crosvm-video-decoder -crosvm-video-encoder
+dev-libs/libevent threads

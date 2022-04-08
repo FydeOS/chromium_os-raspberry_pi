@@ -1,0 +1,1 @@
+SUBSYSTEM=="video4linux|media|drm|dma_heap", MODE="0666"

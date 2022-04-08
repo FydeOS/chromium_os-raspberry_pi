@@ -4,7 +4,7 @@
 EAPI=7
 
 CROS_WORKON_PROJECT="chromiumos/third_party/libcamera"
-CROS_WORKON_INCREMENTAL_BUILD="1"
+#CROS_WORKON_INCREMENTAL_BUILD="1"
 
 inherit cros-camera cros-workon meson
 
@@ -23,6 +23,7 @@ RDEPEND="
 	media-libs/libcamera-configs
 	media-libs/libjpeg-turbo
 	media-libs/libexif
+  dev-libs/boost
 	>=net-libs/gnutls-3.3:=
 	media-libs/libyuv
 	udev? ( virtual/libudev )
@@ -37,6 +38,7 @@ DEPEND="
 src_configure() {
 	local pipelines=(
 		"uvcvideo"
+    "raspberrypi"
 		$(usev ipu3)
 		$(usev rkisp1)
 	)
@@ -54,9 +56,11 @@ src_configure() {
 		-Dandroid="enabled"
 		-Dandroid_platform="cros"
 		-Dpipelines="$(pipeline_list "${pipelines[@]}")"
+    -Dipas="raspberrypi"
 		--buildtype "$(usex debug debug plain)"
 		--sysconfdir /etc/camera
 	)
+  filter-flags "-fno-exceptions"
 	meson_src_configure
 }
 

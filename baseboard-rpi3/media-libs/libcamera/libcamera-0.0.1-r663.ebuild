@@ -3,7 +3,7 @@
 
 EAPI=7
 
-CROS_WORKON_COMMIT="962df634bd0afe12e6f38464f5e602cf1460c430"
+CROS_WORKON_COMMIT="72b6c710d448d5a1ff9407f9f7c7780660ee556a"
 CROS_WORKON_TREE="c66f4eadb3ce21b120447bb910bc9606c3fc499b"
 CROS_WORKON_PROJECT="chromiumos/third_party/libcamera"
 #CROS_WORKON_INCREMENTAL_BUILD="1"
@@ -63,6 +63,7 @@ src_configure() {
 		--sysconfdir /etc/camera
 	)
  # append-flags '-Wno-error=shadow' '-std=c99'
+  filter-flags "-fno-exceptions"
 	meson_src_configure
 }
 
@@ -76,4 +77,10 @@ src_install() {
 	cros-camera_dohal "${D}/usr/$(get_libdir)/libcamera-hal.so" libcamera-hal.so
 
 	dostrip -x "/usr/$(get_libdir)/libcamera/"
+  insinto /etc/camera/libcamera
+  doins ${FILESDIR}/camera_hal.yaml
+  insinto /lib/udev/rules.d
+  doins ${FILESDIR}/99-rpi-camera.rules
 }
+
+PATCHES=( "${FILESDIR}"/fix-rpi-build.patch )

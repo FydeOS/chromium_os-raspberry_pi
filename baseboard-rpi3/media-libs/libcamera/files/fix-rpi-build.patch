@@ -1,0 +1,41 @@
+diff --git a/src/android/camera_device.cpp b/src/android/camera_device.cpp
+index 00d48471..2412ce91 100644
+--- a/src/android/camera_device.cpp
++++ b/src/android/camera_device.cpp
+@@ -354,7 +354,9 @@ int CameraDevice::initialize(const CameraConfigData *cameraConfigData)
+ 	 * value for clockwise direction as required by the Android orientation
+ 	 * metadata.
+ 	 */
+-	if (properties.contains(properties::Rotation)) {
++  if (cameraConfigData && cameraConfigData->rotation != -1) {
++    orientation_ = cameraConfigData->rotation;
++  } else if (properties.contains(properties::Rotation)) {
+ 		int rotation = properties.get(properties::Rotation);
+ 		orientation_ = (360 - rotation) % 360;
+ 		if (cameraConfigData && cameraConfigData->rotation != -1 &&
+@@ -697,7 +699,7 @@ int CameraDevice::configureStreams(camera3_stream_configuration_t *stream_list)
+ 		for (const StreamConfiguration &cfg : *config)
+ 			LOG(HAL, Info) << " - " << cfg.toString();
+ 
+-		return -EINVAL;
++		break;
+ 	case CameraConfiguration::Invalid:
+ 		LOG(HAL, Info) << "Camera configuration invalid";
+ 		return -EINVAL;
+diff --git a/src/ipa/raspberrypi/meson.build b/src/ipa/raspberrypi/meson.build
+index 176055f4..3b2d6a96 100644
+--- a/src/ipa/raspberrypi/meson.build
++++ b/src/ipa/raspberrypi/meson.build
+@@ -1,10 +1,10 @@
+ # SPDX-License-Identifier: CC0-1.0
+ 
+ ipa_name = 'ipa_rpi'
+-
++libboost=cc.find_library('boost', required :false)
+ rpi_ipa_deps = [
+     libcamera_private,
+-    dependency('boost'),
++    libboost,
+     libatomic,
+ ]
+ 
