@@ -1,5 +1,5 @@
-chromeos-base/auto-expand-partition::fydeos
-virtual/chromeos-bsp::fydeos
+chromeos-base/auto-expand-partition::openfyde
+virtual/chromeos-bsp::openfyde
 sys-kernel/linux-firmware::patches
 sys-kernel/linux-firmware::openfyde-patches
 media-libs/minigbm::patches
