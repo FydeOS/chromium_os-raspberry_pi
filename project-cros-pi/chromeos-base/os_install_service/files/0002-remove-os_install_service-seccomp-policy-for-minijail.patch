@@ -1,0 +1,22 @@
+From 96588565abd19c6a76285b91c8a4c4728be4c04f Mon Sep 17 00:00:00 2001
+From: Chen Fangzhou <fangzhou@fydeos.io>
+Date: Wed, 20 Apr 2022 07:26:57 +0000
+Subject: [PATCH 2/2] remove os_install_service-seccomp.policy arg for minijail
+
+---
+ os_install_service/conf/os_install_service.conf | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/os_install_service/conf/os_install_service.conf b/os_install_service/conf/os_install_service.conf
+index a10e96b848..22da74140b 100644
+--- a/os_install_service/conf/os_install_service.conf
++++ b/os_install_service/conf/os_install_service.conf
+@@ -26,5 +26,4 @@ end script
+ # docs/security/selinux.md.
+ exec minijail0 -T static -- \
+   /sbin/minijail0 -n \
+-    -S /usr/share/policy/os_install_service-seccomp.policy \
+     /usr/sbin/os_install_service
+-- 
+2.25.1
+

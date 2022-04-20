@@ -1,0 +1,27 @@
+From 238cd74a2f8062ecd21d16636e3e813c8e6d3a8a Mon Sep 17 00:00:00 2001
+From: Chen Fangzhou <fangzhou@fydeos.io>
+Date: Wed, 20 Apr 2022 07:19:50 +0000
+Subject: [PATCH 1/2] add args for chromeos-install to make it work on pi
+
+---
+ os_install_service/src/bin/os_install_service/install.rs | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/os_install_service/src/bin/os_install_service/install.rs b/os_install_service/src/bin/os_install_service/install.rs
+index ee69f52c6d..dca3d7a554 100644
+--- a/os_install_service/src/bin/os_install_service/install.rs
++++ b/os_install_service/src/bin/os_install_service/install.rs
+@@ -126,6 +126,10 @@ fn run_chromeos_install(dest: &Path, boot_mode: BootMode) -> Result {
+     cmd.arg("--dst").arg(dest);
+     // Don't ask questions.
+     cmd.arg("--yes");
++    // For arm devices, like the Raspberry Pi
++    cmd.arg("--skip_postinstall");
++    cmd.arg("--skip_dst_removable");
++    cmd.arg("--skip_src_removable");
+ 
+     if boot_mode == BootMode::Uefi {
+         cmd.args(&["--target_bios", "efi"]);
+-- 
+2.25.1
+
