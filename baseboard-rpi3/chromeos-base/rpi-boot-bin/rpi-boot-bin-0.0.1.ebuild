@@ -2,7 +2,7 @@
 # Distributed under the license specified in the root directory of this project.
 
 EAPI="5"
-EGIT_REPO_URI="https://github.com/FydeOS/rpi-boot-bin.git"
+EGIT_REPO_URI="https://gitee.com/openFyde/rpi-boot-bin.git"
 
 inherit git-r3
 DESCRIPTION="Raspberry Pi boot binary files"
