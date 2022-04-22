@@ -1,3 +1,6 @@
+# Copyright (c) 2022 Fyde Innovations Limited and the openFyde Authors.
+# Distributed under the license specified in the root directory of this project.
+
 # Copyright 1999-2010 Gentoo Foundation
 # Distributed under the terms of the GNU General Public License v2
 # $Header: /var/cvsroot/gentoo-x86/media-libs/mesa/mesa-7.9.ebuild,v 1.3 2010/12/05 17:19:14 arfrever Exp $
