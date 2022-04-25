@@ -22,7 +22,7 @@ else
 	SRC_URI="https://gitee.com/openFyde/raspberrypi-userland/repository/archive/${GIT_COMMIT}.tar.gz -> ${P}.tar.gz"
 	KEYWORDS="arm arm64"
   RESTRICT="mirror"
-	S="${WORKDIR}/userland-${GIT_COMMIT}"
+	S="${WORKDIR}/raspberrypi-userland-${GIT_COMMIT}"
 fi
 
 DESCRIPTION="Raspberry Pi userspace tools and libraries"
