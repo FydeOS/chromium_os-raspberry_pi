@@ -1,1 +1,0 @@
-chromeos-chrome-92.0.4515.138_rc-r1.ebuild
