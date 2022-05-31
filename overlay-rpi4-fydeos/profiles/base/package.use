@@ -1,5 +1,0 @@
-media-libs/arc-mesa -video_cards_vc4 -llvm -vulkan
-media-libs/mesa vulkan
-chromeos-base/vkbench vulkan
-virtual/target-chromium-os-test vulkan
-chromeos-base/tast-use-flags vulkan

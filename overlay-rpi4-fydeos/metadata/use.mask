@@ -1,2 +1,0 @@
--abi_arm_32
--abi_arm_64
