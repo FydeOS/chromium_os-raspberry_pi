@@ -119,7 +119,7 @@ The code and document in this repository are the results of works by the people 
  - **branches**
 
     - `main` - the default branch of this project. It has been tested against our current release version. You are welcome to test it with future releases and send feedback and/or PRs.
-    - `r<revision> - branches for specific Chromium OS revision, it could be served for archiving purposes or used as a development branch for future (non-stable) code.
+    - `r<revision>` - branches for specific Chromium OS revision, it could be served for archiving purposes or used as a development branch for future (non-stable) code.
 
 
  - **tags**
@@ -658,7 +658,7 @@ After the disk image is successfully written to the SD card, plug it into the Ra
 
 # More information
 
-[Chromium OS Developer Guide](http://www.chromium.org/chromium-os/developer-guide). This is the official source of how to build Chromium OS
+[Chromium OS Developer Guide](http://www.chromium.org/chromium-os/developer-guide). This is the official source of how to build Chromium OS.
 
 [openFyde](https://openfyde.io), the open-sourced version of FydeOS.
 
