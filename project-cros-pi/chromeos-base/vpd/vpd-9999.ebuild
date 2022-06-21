@@ -1,6 +1,3 @@
-# Copyright (c) 2022 Fyde Innovations Limited and the openFyde Authors.
-# Distributed under the license specified in the root directory of this project.
-
 # Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
 # Distributed under the terms of the GNU General Public License v2
 
@@ -48,6 +45,7 @@ src_install() {
 	else
 		insinto /etc/init
 		doins init/check-rw-vpd.conf
+		doins init/vpd-icc.conf
 		doins init/vpd-log.conf
 	fi
 }

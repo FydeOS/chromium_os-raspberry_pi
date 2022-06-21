@@ -5,8 +5,8 @@
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=7
-CROS_WORKON_COMMIT="0ccc467d8a29eaab9e7d84de0a673a3e93fddb47"
-CROS_WORKON_TREE="d29b8b1ff2b87fdb3142e8d6eedff5059831728e"
+CROS_WORKON_COMMIT="21ac829a3c671e9728ef6b68a049ad180aa9a898"
+CROS_WORKON_TREE="401c010e3f553367b3f7e55ce0e05452559ffda6"
 CROS_WORKON_PROJECT="chromiumos/platform/vpd"
 CROS_WORKON_LOCALNAME="platform/vpd"
 
@@ -29,13 +29,12 @@ RDEPEND="
 	dev-util/shflags
 	virtual/chromeos-activate-date
 	"
-
 VPD_TEMPLATE="oem_licence.tmp"
 src_compile() {
 	tc-export CC
 	use static && append-ldflags -static
 	emake all
-	cat ${VPD_TEMPLATE} | gzip > "vpd.gz"
+  cat ${FILESDIR}/${VPD_TEMPLATE} | gzip > "vpd.gz"
 }
 
 src_install() {
@@ -52,12 +51,13 @@ src_install() {
 	else
 		insinto /etc/init
 		doins init/check-rw-vpd.conf
+		doins init/vpd-icc.conf
 		doins init/vpd-log.conf
-		doins ${FILESDIR}/check_serial_number.conf
+    doins ${FILESDIR}/check_serial_number.conf
 	fi
-	insinto /usr/share/cros/init
-	doins vpd.gz
-	doins ${FILESDIR}/check_serial_number.sh
+  insinto /usr/share/cros/init
+  doins vpd.gz
+  doins ${FILESDIR}/check_serial_number.sh
 }
 
 src_test() {
@@ -71,5 +71,4 @@ src_test() {
 src_prepare() {
   default
   eapply ${FILESDIR}/*.patch
-  cp ${FILESDIR}/${VPD_TEMPLATE} ${S}
 }
