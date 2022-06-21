@@ -2,7 +2,5 @@ chromeos-base/vpd::chromiumos
 chromeos-base/chromeos-chrome::chromiumos
 chromeos-base/chromeos-chrome::openfyde-patches
 chromeos-base/libwidevine::chromiumos
-chromeos-base/chromeos-installer::chromiumos
-chromeos-base/chromeos-installer::openfyde-patches
 chromeos-base/vpd::patches
 chromeos-base/vpd::openfyde-patches
