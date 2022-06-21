@@ -9,13 +9,12 @@ HOMEPAGE="https://fydeos.io"
 LICENSE="BSD"
 SLOT="0"
 KEYWORDS="*"
-IUSE="kiosk_demo widevine fyde_extension"
+IUSE="kiosk_demo fyde_extension"
 
 RDEPEND="
   chromeos-base/auto-expand-partition
   chromeos-base/power_wash_command
   chromeos-base/fyde-chromedev-flags
-  widevine? ( chromeos-base/libwidevine )
   kiosk_demo? ( chromeos-base/fyde-kiosk-demo )
   fyde_extension? ( chromeos-base/fyde-shell-daemon-bin )
   chromeos-base/edit-pi-config
