@@ -1,6 +1,3 @@
-# Copyright (c) 2022 Fyde Innovations Limited and the openFyde Authors.
-# Distributed under the license specified in the root directory of this project.
-
 # Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -38,6 +35,7 @@ RDEPEND="
 	media-sound/alsa-utils
 	media-plugins/alsa-plugins
 	chromeos-base/chromeos-config-tools
+	chromeos-base/featured
 "
 
 DEPEND="
@@ -70,6 +68,7 @@ src_configure() {
 	else
 		econf $(use_enable selinux) \
 			$(use_enable cras-apm webrtc-apm) \
+			--enable-hats \
 			--enable-metrics \
 			--with-system-cras-rust \
 			$(use_enable amd64 fuzzer) \
@@ -124,9 +123,9 @@ src_install() {
 		insinto /etc/cras
 		doins cras-config/dsp.ini.sample
 		# Install fuzzer binary
-		fuzzer_install "${S}/OWNERS.fuzz" cras/src/cras_rclient_message_fuzzer
+		fuzzer_install "${S}/OWNERS" cras/src/cras_rclient_message_fuzzer
 		local fuzzer_component_id="777118"
-		fuzzer_install "${S}/OWNERS.fuzz" cras/src/cras_hfp_slc_fuzzer \
+		fuzzer_install "${S}/OWNERS" cras/src/cras_hfp_slc_fuzzer \
 			--dict "${S}/cras/src/fuzz/cras_hfp_slc.dict" \
 			--comp "${fuzzer_component_id}"
 	fi

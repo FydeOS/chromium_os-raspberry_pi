@@ -6,8 +6,8 @@
 # found in the LICENSE file.
 
 EAPI=7
-CROS_WORKON_COMMIT="7c8d531e8831323235c8354b9bcc610323f6df2c"
-CROS_WORKON_TREE="79406158f15ff3b7751105a548e12f53d488dff1"
+CROS_WORKON_COMMIT="cf46341faafb78c8b6d3b405215042f757fad0b0"
+CROS_WORKON_TREE="c49124bfc111eb4ae54eab9b08f43e0b7fe85592"
 CROS_WORKON_PROJECT="chromiumos/third_party/adhd"
 CROS_WORKON_LOCALNAME="adhd"
 CROS_WORKON_USE_VCSID=1
@@ -40,6 +40,7 @@ RDEPEND="
 	media-sound/alsa-utils
 	media-plugins/alsa-plugins
 	chromeos-base/chromeos-config-tools
+	chromeos-base/featured
 "
 
 DEPEND="
@@ -73,6 +74,7 @@ src_configure() {
 	else
 		econf $(use_enable selinux) \
 			$(use_enable cras-apm webrtc-apm) \
+			--enable-hats \
 			--enable-metrics \
 			--with-system-cras-rust \
 			$(use_enable amd64 fuzzer) \
@@ -127,9 +129,9 @@ src_install() {
 		insinto /etc/cras
 		doins cras-config/dsp.ini.sample
 		# Install fuzzer binary
-		fuzzer_install "${S}/OWNERS.fuzz" cras/src/cras_rclient_message_fuzzer
+		fuzzer_install "${S}/OWNERS" cras/src/cras_rclient_message_fuzzer
 		local fuzzer_component_id="777118"
-		fuzzer_install "${S}/OWNERS.fuzz" cras/src/cras_hfp_slc_fuzzer \
+		fuzzer_install "${S}/OWNERS" cras/src/cras_hfp_slc_fuzzer \
 			--dict "${S}/cras/src/fuzz/cras_hfp_slc.dict" \
 			--comp "${fuzzer_component_id}"
 	fi
