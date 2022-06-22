@@ -1,0 +1,457 @@
+From: Yang Taso <yang@fydeos.io>
+Date: Fri, 13 May 2022 02:18:00 +0000
+Subject: add rpi hardware decoder
+Signed-off-by: Fangzhou Chen <fangzhou@fydeos.io>
+
+--- /dev/null
++++ b/fydeos/media/filters/rpi_video_decoder.cc
+@@ -0,0 +1,194 @@
++// Copyright 2021 The FydeOS Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++// Author: Yang Tsao<yang@fydeos.io>
++
++#include "fydeos/media/filters/rpi_video_decoder.h"
++#include "media/ffmpeg/ffmpeg_common.h"
++#include "media/base/video_frame.h"
++#include "media/ffmpeg/ffmpeg_decoding_loop.h"
++#include "media/base/bind_to_current_loop.h"
++#include "media/base/media_log.h"
++
++namespace media {
++namespace {
++  const char kMMAL_H264[] = "h264_mmal";
++  const char kMMAL_MPEG2[] = "mpeg2_mmal";
++  const char kMMAL_MPEG4[] = "mpeg4_mmal";
++  const char kMMAL_VC1[] = "vc1_mmal";
++  const char kMMAL_vp8[] = "vp8_mmal";
++  
++const char * getDecoderName(AVCodecID id) {
++    switch (id) {
++			case AV_CODEC_ID_H264:
++				return kMMAL_H264;
++      case AV_CODEC_ID_MPEG2VIDEO:
++        return kMMAL_MPEG2;
++      case AV_CODEC_ID_MPEG4:
++        return kMMAL_MPEG4;
++      case AV_CODEC_ID_VC1:
++        return kMMAL_VC1;
++      case AV_CODEC_ID_VP8:
++        return kMMAL_vp8;
++      default:
++        return kMMAL_H264;
++    } 
++}
++
++static int GetVideoBufferImpl(struct AVCodecContext* s,
++                              AVFrame* frame,
++                              int flags) {
++  RpiVideoDecoder* decoder = static_cast<RpiVideoDecoder*>(s->opaque);
++  return decoder->GetVideoBuffer(s, frame, flags);
++}
++
++} // no spacename
++
++SupportedVideoDecoderConfigs RpiVideoDecoder::SupportedConfigsForWebRTC() {
++  SupportedVideoDecoderConfigs supported_configs;
++  //H264
++  supported_configs.emplace_back(/*profile_min=*/H264PROFILE_BASELINE,
++                                   /*profile_max=*/H264PROFILE_MAX,
++                                   /*coded_size_min=*/kDefaultSwDecodeSizeMin,
++                                   /*coded_size_max=*/kDefaultSwDecodeSizeMax,
++                                   /*allow_encrypted=*/false,
++                                   /*require_encrypted=*/false);
++  //VP8
++  supported_configs.emplace_back(/*profile_min=*/VP8PROFILE_ANY,
++                                   /*profile_max=*/VP8PROFILE_ANY,
++                                   /*coded_size_min=*/kDefaultSwDecodeSizeMin,
++                                   /*coded_size_max=*/kDefaultSwDecodeSizeMax,
++                                   /*allow_encrypted=*/false,
++                                   /*require_encrypted=*/false);
++  //MPEG2
++  supported_configs.emplace_back(/*profile_min=*/VP8PROFILE_ANY,
++                                   /*profile_max=*/VP8PROFILE_ANY,
++                                   /*coded_size_min=*/kDefaultSwDecodeSizeMin,
++                                   /*coded_size_max=*/kDefaultSwDecodeSizeMax,
++                                   /*allow_encrypted=*/false,
++                                   /*require_encrypted=*/false);
++  //OTHERS
++  supported_configs.emplace_back(/*profile_min=*/VIDEO_CODEC_PROFILE_UNKNOWN,
++                                   /*profile_max=*/VIDEO_CODEC_PROFILE_UNKNOWN,
++                                   /*coded_size_min=*/kDefaultSwDecodeSizeMin,
++                                   /*coded_size_max=*/kDefaultSwDecodeSizeMax,
++                                   /*allow_encrypted=*/false,
++                                   /*require_encrypted=*/false);
++  return supported_configs;
++}
++
++bool RpiVideoDecoder::IsCodecSupported(VideoCodec codec) {
++  switch (codec) {
++    case VideoCodec::kH264:
++    case VideoCodec::kVP8:
++    case VideoCodec::kVC1:
++    case VideoCodec::kMPEG2:
++    case VideoCodec::kMPEG4:
++      return true;
++    default:
++      return false;
++  }
++}
++
++bool RpiVideoDecoder::OnNewFrame(AVFrame* frame) {
++  // TODO(fbarchard): Work around for FFmpeg http://crbug.com/27675
++  // The decoder is in a bad state and not decoding correctly.
++  // Checking for NULL avoids a crash in CopyPlane().
++  if (!frame->data[VideoFrame::kYPlane] || !frame->data[VideoFrame::kUPlane] ||
++      !frame->data[VideoFrame::kVPlane]) {
++    DLOG(ERROR) << "Video frame was produced yet has invalid frame data.";
++    return false;
++  }
++
++  scoped_refptr<VideoFrame> video_frame =
++      reinterpret_cast<VideoFrame*>(av_buffer_get_opaque(frame->buf[0]));
++  video_frame->set_timestamp(
++      base::Microseconds(frame->pts));
++  video_frame->metadata().power_efficient = true;
++  video_frame->metadata().allow_overlay = true;
++  output_cb_.Run(video_frame);
++  return true;
++}
++
++bool RpiVideoDecoder::FFmpegDecode(const DecoderBuffer& buffer) {
++  // Create a packet for input data.
++  // Due to FFmpeg API changes we no longer have const read-only pointers.
++  VLOG(3) << __func__;
++  AVPacket packet;
++  av_init_packet(&packet);
++  if (buffer.end_of_stream()) {
++    packet.data = NULL;
++    packet.size = 0;
++  } else {
++    packet.data = const_cast<uint8_t*>(buffer.data());
++    packet.size = buffer.data_size();
++    packet.pts = buffer.timestamp().InMicroseconds();
++
++    DCHECK(packet.data);
++    DCHECK_GT(packet.size, 0);
++
++    // Let FFmpeg handle presentation timestamp reordering.
++    codec_context_->reordered_opaque = buffer.timestamp().InMicroseconds();
++  }
++
++  switch (decoding_loop_->DecodePacket(
++      &packet, base::BindRepeating(&RpiVideoDecoder::OnNewFrame,
++                                   base::Unretained(this)))) {
++    case FFmpegDecodingLoop::DecodeStatus::kSendPacketFailed:
++      MEDIA_LOG(ERROR, media_log_)
++          << "Failed to send video packet for decoding: "
++          << buffer.AsHumanReadableString();
++      return false;
++    case FFmpegDecodingLoop::DecodeStatus::kFrameProcessingFailed:
++      // OnNewFrame() should have already issued a MEDIA_LOG for this.
++      return false;
++    case FFmpegDecodingLoop::DecodeStatus::kDecodeFrameFailed:
++      MEDIA_LOG(DEBUG, media_log_)
++          << GetDecoderType() << " failed to decode a video frame: "
++          << AVErrorToString(decoding_loop_->last_averror_code()) << ", at "
++          << buffer.AsHumanReadableString();
++      return false;
++    case FFmpegDecodingLoop::DecodeStatus::kOkay:
++      break;
++  }
++
++  return true;
++}
++
++bool RpiVideoDecoder::ConfigureDecoder(const VideoDecoderConfig& config,
++                                       bool low_delay) {
++  DCHECK(config.IsValidConfig());
++  DCHECK(!config.is_encrypted());
++  VLOG(2) << __func__;
++  // Release existing decoder resources if necessary.
++  if (codec_context_ && 
++      codec_context_->codec_id == VideoCodecToCodecID(config.codec())) {
++     avcodec_flush_buffers(codec_context_.get());
++     return true;
++  }
++
++  ReleaseFFmpegResources();
++
++  // Initialize AVCodecContext structure.
++  codec_context_.reset(avcodec_alloc_context3(NULL));
++  VideoDecoderConfigToAVCodecContext(config, codec_context_.get());
++
++  codec_context_->thread_count = 1;
++  codec_context_->thread_type = 0;
++  codec_context_->opaque = this;
++  codec_context_->get_buffer2 = GetVideoBufferImpl;
++
++  if (decode_nalus_)
++    codec_context_->flags2 |= AV_CODEC_FLAG2_CHUNKS;
++
++  const AVCodec* codec = avcodec_find_decoder_by_name(
++            getDecoderName(codec_context_->codec_id));
++  if (!codec || avcodec_open2(codec_context_.get(), codec, NULL) < 0) {
++    ReleaseFFmpegResources();
++    return false;
++  }
++
++  decoding_loop_ = std::make_unique<FFmpegDecodingLoop>(codec_context_.get());
++  return true;
++}
++} //media
+--- /dev/null
++++ b/fydeos/media/filters/rpi_video_decoder.h
+@@ -0,0 +1,42 @@
++// Copyright 2021 The FydeOS Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++// Author: Yang Tsao<yang@fydeos.io>
++
++#ifndef MEDIA_FILTERS_RPI_VIDEO_DECODER_H_
++#define MEDIA_FILTERS_RPI_VIDEO_DECODER_H_
++
++#include "media/base/video_codecs.h"
++#include "media/base/supported_video_decoder_config.h"
++#include "media/filters/ffmpeg_video_decoder.h"
++
++struct AVFrame;
++namespace media {
++
++class MEDIA_EXPORT RpiVideoDecoder : public FFmpegVideoDecoder {
++public:
++  static bool IsCodecSupported(VideoCodec codec);
++  explicit RpiVideoDecoder(MediaLog* media_log)
++    :FFmpegVideoDecoder(media_log) 
++  {}
++
++  bool IsPlatformDecoder() const override {  
++    return true;
++  }
++
++  static SupportedVideoDecoderConfigs SupportedConfigsForWebRTC();
++
++  VideoDecoderType GetDecoderType() const override {
++    return VideoDecoderType::kRpi; 
++  }
++  
++private:
++  bool OnNewFrame(AVFrame* frame) override;
++  bool FFmpegDecode(const DecoderBuffer& buffer) override;
++  bool ConfigureDecoder(const VideoDecoderConfig& config, bool low_delay) override;
++
++}; // RpiVideoDecoder
++
++} // media
++
++#endif //MEDIA_FILTERS_RPI_VIDEO_DECODER_H_
+--- a/media/base/decoder.cc
++++ b/media/base/decoder.cc
+@@ -52,6 +52,10 @@
+       return "VDAVideoDecoder";
+     case VideoDecoderType::kV4L2:
+       return "V4L2VideoDecoder";
++      //---***FYDEOS BEGIN***---
++    case VideoDecoderType::kRpi:
++      return "RpiVideoDecoder";
++      //---***FYDEOS END***---
+     case VideoDecoderType::kTesting:
+       return "Testing or Mock Video decoder";
+   }
+--- a/media/base/decoder.h
++++ b/media/base/decoder.h
+@@ -50,7 +50,10 @@
+   // kChromeOs = 15,  // DEPRECATED, should be kVaapi or kV4L2 instead.
+   kV4L2 = 16,       // V4L2VideoDecoder
+ 
+-  kTesting = 17,  // Never send this to UKM, for tests only.
++//---***FYDEOS BEGIN***---
++  kRpi = 17,
++//---***FYDEOS END***---
++  kTesting = 18,  // Never send this to UKM, for tests only.
+ 
+   // Keep this at the end and equal to the last entry.
+   kMaxValue = kTesting
+--- a/media/filters/BUILD.gn
++++ b/media/filters/BUILD.gn
+@@ -174,6 +174,8 @@
+       sources += [
+         "ffmpeg_video_decoder.cc",
+         "ffmpeg_video_decoder.h",
++        "//fydeos/media/filters/rpi_video_decoder.cc",
++        "//fydeos/media/filters/rpi_video_decoder.h",
+       ]
+     }
+ 
+--- a/media/filters/ffmpeg_video_decoder.h
++++ b/media/filters/ffmpeg_video_decoder.h
+@@ -63,16 +63,21 @@
+   void force_allocation_error_for_testing() { force_allocation_error_ = true; }
+ 
+  private:
++  friend class RpiVideoDecoder;
+   enum class DecoderState { kUninitialized, kNormal, kDecodeFinished, kError };
+ 
+   // Handles decoding of an unencrypted encoded buffer. A return value of false
+   // indicates that an error has occurred.
+-  bool FFmpegDecode(const DecoderBuffer& buffer);
+-  bool OnNewFrame(AVFrame* frame);
++  //---***FYDEOS BEGIN***---
++  virtual bool FFmpegDecode(const DecoderBuffer& buffer);
++  virtual bool OnNewFrame(AVFrame* frame);
++  //---***FYDEOS END***---
+ 
+   // Handles (re-)initializing the decoder with a (new) config.
+   // Returns true if initialization was successful.
+-  bool ConfigureDecoder(const VideoDecoderConfig& config, bool low_delay);
++  //---***FYDEOS BEGIN***---
++  virtual bool ConfigureDecoder(const VideoDecoderConfig& config, bool low_delay);
++  //---***FYDEOS END***---
+ 
+   // Releases resources associated with |codec_context_|.
+   void ReleaseFFmpegResources();
+--- a/media/renderers/default_decoder_factory.cc
++++ b/media/renderers/default_decoder_factory.cc
+@@ -36,6 +36,10 @@
+ 
+ #if BUILDFLAG(ENABLE_FFMPEG_VIDEO_DECODERS)
+ #include "media/filters/ffmpeg_video_decoder.h"
++//---***FYDEOS BEGIN***---
++#include "fydeos/switches/display/display_switches.h"
++#include "fydeos/media/filters/rpi_video_decoder.h"
++//---***FYDEOS END***---
+ #endif
+ 
+ #if BUILDFLAG(ENABLE_LIBVPX)
+@@ -125,6 +129,14 @@
+ #if BUILDFLAG(ENABLE_FFMPEG_VIDEO_DECODERS)
+   // When the FFmpegVideoDecoder has been updated for RTC add
+   // `FFmpegVideoDecoder::SupportedConfigsForWebRTC()` to `supported_configs`.
++  //---***FYDEOS BEGIN***---
++  if (fydeos::switches::UseRpiVideoDecoder()) {
++    SupportedVideoDecoderConfigs rpi_configs =
++      RpiVideoDecoder::SupportedConfigsForWebRTC();
++    supported_configs.insert(supported_configs.end(), rpi_configs.begin(),
++                             rpi_configs.end());
++  }
++  //---***FYDEOS END***---
+ #endif
+ 
+   return supported_configs;
+@@ -199,6 +211,10 @@
+   }
+ 
+ #if BUILDFLAG(ENABLE_FFMPEG_VIDEO_DECODERS)
++//---***FYDEOS BEGIN***---
++  if (fydeos::switches::UseRpiVideoDecoder())
++    video_decoders->push_back(std::make_unique<RpiVideoDecoder>(media_log));
++//---***FYDEOS END***---
+   video_decoders->push_back(std::make_unique<FFmpegVideoDecoder>(media_log));
+ #endif
+ }
+--- a/fydeos/switches/display/display_switches.cc
++++ b/fydeos/switches/display/display_switches.cc
+@@ -20,11 +20,16 @@
+ 
+ const char kForceLegacyPlaneManager[] = "use-legacy-plane-manager";
+ const char kForceShowCursor[] = "fydeos-force-show-cursor";
++const char kUseRpiVideoDecoder[] = "enable-rpi-video-decoder";
+ 
+ bool ForceLegacyPlaneManager() {
+   return base::CommandLine::ForCurrentProcess()->HasSwitch(kForceLegacyPlaneManager);  
+ }
+ 
++bool UseRpiVideoDecoder() {
++  return base::CommandLine::ForCurrentProcess()->HasSwitch(kUseRpiVideoDecoder);
++}
++
+ float GetDefaultDSF(float default_value) {
+   std::string factorStr = base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(kDefaultDSF);
+   if (factorStr.empty())
+--- a/fydeos/switches/display/display_switches.h
++++ b/fydeos/switches/display/display_switches.h
+@@ -12,8 +12,10 @@
+ namespace switches {
+ EXPORT_ALL extern const char kForceLegacyPlaneManager[];
+ EXPORT_ALL extern const char kForceShowCursor[];
++EXPORT_ALL extern const char kUseRpiVideoDecoder[];
+ EXPORT_ALL bool ForceLegacyPlaneManager();
+ EXPORT_ALL bool ForceShowCursor();
++CHROMEOS_EXPORT bool UseRpiVideoDecoder();
+ 
+ CHROMEOS_EXPORT float GetDefaultDSF(float default_value);
+ CHROMEOS_EXPORT float GetDefaultScreenDpi(float default_value);
+--- a/chrome/browser/ui/startup/infobar_utils.cc
++++ b/chrome/browser/ui/startup/infobar_utils.cc
+@@ -26,6 +26,9 @@
+ #include "content/public/common/content_switches.h"
+ #include "google_apis/google_api_keys.h"
+ 
++//---***FYDEOS BEGIN***---
++#include "fydeos/switches/display/display_switches.h"
++//---***FYDEOS END***---
+ namespace {
+ bool ShouldShowBadFlagsSecurityWarnings() {
+ #if !BUILDFLAG(IS_CHROMEOS_ASH)
+@@ -41,6 +44,11 @@
+   if (pref->IsManaged())
+     return pref->GetValue()->GetBool();
+ #endif
++  //---***FYDEOS BEGIN***---
++  // TODO add rpi mmal decoder related files to sandbox to remove no-sandbox
++  if (fydeos::switches::UseRpiVideoDecoder())
++    return false;
++  //---***FYDEOS END***---
+   return true;
+ }
+ 
+--- a/gpu/BUILD.gn
++++ b/gpu/BUILD.gn
+@@ -214,6 +214,7 @@
+     "//ui/gfx:test_support",
+     "//ui/gl:gl_unittest_utils",
+     "//ui/gl:test_support",
++    "//fydeos/switches",
+   ]
+ 
+   if (use_static_angle) {
+--- a/media/gpu/test/BUILD.gn
++++ b/media/gpu/test/BUILD.gn
+@@ -133,6 +133,7 @@
+     "//media:test_support",
+     "//media/gpu",
+     "//mojo/core/embedder:embedder",
++    "//fydeos/switches",
+   ]
+ 
+   public_deps = [
+--- a/ui/ozone/gl/BUILD.gn
++++ b/ui/ozone/gl/BUILD.gn
+@@ -14,6 +14,7 @@
+     "//ui/gl:run_all_unittests",
+     "//ui/gl:test_support",
+     "//ui/ozone",
++    "//fydeos/switches",
+   ]
+ 
+   data_deps = [ "//third_party/mesa_headers" ]
+--- a/chrome/browser/chrome_content_browser_client.cc
++++ b/chrome/browser/chrome_content_browser_client.cc
+@@ -2252,6 +2252,7 @@
+       //---***FYDEOS BEGIN***---
+       fydeos::switches::kForceLegacyPlaneManager,
+       fydeos::switches::kForceShowCursor,
++      fydeos::switches::kUseRpiVideoDecoder,
+       //---***FYDEOS END***---
+   };
+   command_line->CopySwitchesFrom(browser_command_line, kCommonSwitchNames,
+--- a/media/mojo/mojom/stable/stable_video_decoder_types_mojom_traits.h
++++ b/media/mojo/mojom/stable/stable_video_decoder_types_mojom_traits.h
+@@ -1016,6 +1016,7 @@
+       case ::media::VideoDecoderType::kGav1:
+       case ::media::VideoDecoderType::kD3D11:
+       case ::media::VideoDecoderType::kBroker:
++      case ::media::VideoDecoderType::kRpi:
+         return media::stable::mojom::VideoDecoderType::kUnknown;
+     }
+ 

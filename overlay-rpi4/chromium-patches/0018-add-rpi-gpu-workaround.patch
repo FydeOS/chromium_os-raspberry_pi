@@ -1,0 +1,24 @@
+From: Yang Taso <yang@fydeos.io>
+Date: Fri, 13 May 2022 02:17:20 +0000
+Subject: add rpi gpu workaround
+Signed-off-by: Fangzhou Chen <fangzhou@fydeos.io>
+
+Index: src/gpu/config/gpu_driver_bug_list.json
+===================================================================
+--- src.orig/gpu/config/gpu_driver_bug_list.json
++++ src/gpu/config/gpu_driver_bug_list.json
+@@ -167,11 +167,11 @@
+       "cr_bugs": [179815],
+       "description": "Share groups are not working on (older?) Broadcom drivers",
+       "os": {
+-        "type": "android"
++        "type": "chromeos"
+       },
+-      "gl_vendor": "Broadcom.*",
++      "gl_vendor": "Broadcom",
+       "features": [
+-        "use_virtualized_gl_contexts"
++        "force_gl_flush_on_swap_buffers"
+       ]
+     },
+     {
