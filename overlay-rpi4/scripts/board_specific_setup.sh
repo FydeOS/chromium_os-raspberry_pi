@@ -70,7 +70,7 @@ board_setup() {
 }
 
 . $(dirname ${BASH_SOURCE[0]})/fydeos_version.sh
-CHROMEOS_PATCH=14
+CHROMEOS_PATCH=15
 if [ -n "${CHROMEOS_BUILD}" ]; then
   CHROMEOS_VERSION_STRING="${CHROMEOS_BUILD}.${CHROMEOS_BRANCH}.${CHROMEOS_PATCH}.$(get_build_number ${CHROMEOS_PATCH})"
 fi
