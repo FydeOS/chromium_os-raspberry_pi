@@ -14,8 +14,7 @@
 
 EAPI=7
 
-# TODO(crbug.com/984182): We force Python 2 because depot_tools doesn't support Python 3.
-PYTHON_COMPAT=( python2_7 )
+PYTHON_COMPAT=( python3_{6..9} )
 inherit autotest-deponly binutils-funcs chromium-source cros-credentials cros-constants cros-sanitizers eutils flag-o-matic git-2 multilib toolchain-funcs user python-any-r1 multiprocessing
 
 DESCRIPTION="Open-source version of Google Chrome web browser"
@@ -30,6 +29,7 @@ IUSE="
 	afdo_verify
 	+accessibility
 	app_shell
+	arc_hw_oemcrypto
 	asan
 	+authpolicy
 	+build_tests
@@ -48,6 +48,8 @@ IUSE="
 	debug_fission
 	+dwarf5
 	+fonts
+	hibernate
+	hw_details
 	goma
 	goma_thinlto
 	+highdpi
@@ -66,10 +68,13 @@ IUSE="
 	orderfile_generate
 	+orderfile_use
 	orderfile_verify
+	remoteexec
 	+runhooks
 	strict_toolchain_checks
+	subpixel_rendering
 	+thinlto
 	touchview
+	tpm_dynamic
 	ubsan
 	v4l2_codec
 	v4lplugin
@@ -82,14 +87,15 @@ REQUIRED_USE="
 	cfi? ( thinlto )
 	afdo_verify? ( !afdo_use )
 	orderfile_generate? ( !orderfile_use )
+	?? ( goma remoteexec )
 	"
 
 OZONE_PLATFORM_PREFIX=ozone_platform_
 OZONE_PLATFORMS=(gbm cast headless egltest caca)
-IUSE_OZONE_PLATFORMS="${OZONE_PLATFORMS[@]/#/${OZONE_PLATFORM_PREFIX}}"
+IUSE_OZONE_PLATFORMS="${OZONE_PLATFORMS[*]/#/${OZONE_PLATFORM_PREFIX}}"
 IUSE+=" ${IUSE_OZONE_PLATFORMS}"
 OZONE_PLATFORM_DEFAULT_PREFIX=ozone_platform_default_
-IUSE_OZONE_PLATFORM_DEFAULTS="${OZONE_PLATFORMS[@]/#/${OZONE_PLATFORM_DEFAULT_PREFIX}}"
+IUSE_OZONE_PLATFORM_DEFAULTS="${OZONE_PLATFORMS[*]/#/${OZONE_PLATFORM_DEFAULT_PREFIX}}"
 IUSE+=" ${IUSE_OZONE_PLATFORM_DEFAULTS}"
 REQUIRED_USE+=" ^^ ( ${IUSE_OZONE_PLATFORM_DEFAULTS} )"
 
@@ -137,6 +143,7 @@ add_orderfiles
 
 RDEPEND="${RDEPEND}
 	app-arch/bzip2
+	app-arch/sharutils
 	app-crypt/mit-krb5
 	app-misc/edid-decode
 	authpolicy? ( chromeos-base/authpolicy )
@@ -179,6 +186,7 @@ RDEPEND="${RDEPEND}
 	)
 	oobe_config? ( chromeos-base/oobe_config )
 	iioservice? ( chromeos-base/iioservice )
+	hibernate? ( chromeos-base/hiberman )
 	"
 
 DEPEND="${DEPEND}
@@ -216,12 +224,18 @@ echox() {
 	# Like the `usex` helper.
 	[[ ${1:-$?} -eq 0 ]] && echo "${2:-yes}" || echo "${3:-no}"
 }
-echotf() { echox ${1:-$?} true false ; }
-usetf()  { usex $1 true false ; }
+# shellcheck disable=SC2120 # for suppressing a warning of never passed argument.
+echotf() { echox "${1:-$?}" true false ; }
+usetf()  { usex "$1" true false ; }
+
+use_remoteexec() {
+	[[ "${USE_REMOTEEXEC:-$(usetf remoteexec)}" == "true" ]]
+}
 
 use_goma() {
 	[[ "${USE_GOMA:-$(usetf goma)}" == "true" ]]
 }
+
 should_upload_build_logs() {
 	[[ -n "${GOMA_TMP_DIR}" && -n "${GLOG_log_dir}" && \
 		"${GLOG_log_dir}" == "${GOMA_TMP_DIR}"* ]]
@@ -231,6 +245,9 @@ set_build_args() {
 	# use goma_thinlto says that if we are using Goma and ThinLTO, use
 	# Goma for distributed code generation. So only set the corresponding
 	# gn arg to true if all three conditions are met.
+
+	# shellcheck disable=SC2119
+	# suppressing the false warning not to specify the optional argument of 'echotf".
 	use_goma_thin_lto=$(use goma_thinlto && use_goma && use thinlto; echotf)
 	BUILD_ARGS=(
 		"is_chromeos_device=true"
@@ -244,6 +261,7 @@ set_build_args() {
 		"is_debug=false"
 		"${EXTRA_GN_ARGS}"
 		"enable_pseudolocales=$(usetf cros-debug)"
+		"use_arc_protected_media=$(usetf arc_hw_oemcrypto)"
 		"use_chromeos_protected_av1=$(usetf intel_oemcrypto)"
 		"use_chromeos_protected_media=$(usetf cdm_factory_daemon)"
 		"use_iioservice=$(usetf iioservice)"
@@ -252,7 +270,10 @@ set_build_args() {
 		"use_vaapi=$(usetf vaapi)"
 		"use_xkbcommon=$(usetf xkbcommon)"
 		"enable_remoting=$(usetf chrome_remoting)"
+		# shellcheck disable=SC2119
+		# suppressing the false warning not to specify the optional argument of 'echotf".
 		"enable_nacl=$(use_nacl; echotf)"
+		"enable_hibernate=$(usetf hibernate)"
 		# use_system_minigbm is set below.
 
 		"is_cfm=$(usetf cfm)"
@@ -277,6 +298,12 @@ set_build_args() {
 
 		# Add libinput to handle touchpad.
 		"use_libinput=$(usetf libinput)"
+
+		# Enable NSS slots software fallback when we are using runtime TPM selection.
+		"nss_slots_software_fallback=$(usetf tpm_dynamic)"
+
+		# Add hardware information to feedback logs and chrome://system.
+		"is_chromeos_with_hw_details=$(usetf hw_details)"
 	)
 
 	# BUILD_STRING_ARGS needs appropriate quoting. So, we keep them separate and
@@ -293,7 +320,7 @@ set_build_args() {
 
 	# Ozone platforms.
 	local platform
-	for platform in ${OZONE_PLATFORMS[@]}; do
+	for platform in "${OZONE_PLATFORMS[@]}"; do
 		local flag="${OZONE_PLATFORM_DEFAULT_PREFIX}${platform}"
 		if use "${flag}"; then
 			BUILD_STRING_ARGS+=( "ozone_platform=${platform}" )
@@ -311,7 +338,7 @@ set_build_args() {
 		BUILD_ARGS+=( "use_system_minigbm=true" )
 		BUILD_ARGS+=( "use_system_libdrm=true" )
 	fi
-	if use "touchview"; then
+	if ! use "subpixel_rendering" || use "touchview"; then
 		BUILD_ARGS+=( "subpixel_font_rendering_disabled=true" )
 	fi
 
@@ -350,6 +377,7 @@ set_build_args() {
 	mips)
 		local mips_arch target_arch
 
+		# shellcheck disable=SC2086 # suppressing the false warning of expanding vars.
 		mips_arch="$($(tc-getCPP) ${CFLAGS} ${CPPFLAGS} -E -P - <<<_MIPS_ARCH)"
 		# Strip away any enclosing quotes.
 		mips_arch="${mips_arch//\"}"
@@ -410,6 +438,16 @@ set_build_args() {
 		if [[ -z "${GOMA_TMP_DIR}" ]]; then
 			export GOMA_TMP_DIR="/tmp/goma_${WHOAMI}"
 		fi
+	fi
+
+	if use_remoteexec; then
+		BUILD_ARGS+=(
+			"use_remoteexec=true"
+			"use_rbe=true"
+		)
+		BUILD_STRING_ARGS+=(
+			"rbe_cc_cfg_file=${CHROME_ROOT}/src/buildtools/reclient_cfgs/rewrapper_chroot_compile.cfg"
+		)
 	fi
 
 	if use chrome_debug; then
@@ -494,7 +532,13 @@ src_unpack() {
 	echo
 	ewarn "If you want to develop or hack on the browser itself, you should follow the"
 	ewarn "simple chrome workflow instead of using emerge:"
-	ewarn "https://chromium.googlesource.com/chromiumos/docs/+/master/simple_chrome_workflow.md"
+	ewarn "https://chromium.googlesource.com/chromiumos/docs/+/HEAD/simple_chrome_workflow.md"
+	ewarn ""
+	ewarn "Otherwise, if you have a Chrome checkout already present on your machine, you can"
+	ewarn "re-enter the cros_sdk with the --chrome-root arg and set CHROME_ORIGIN to"
+	ewarn "LOCAL_SOURCE. This will bypass the lengthy sync_chrome phase here."
+	ewarn "Note: when using --chrome-root, the ebuild won't update or modify the Chrome checkout."
+	ewarn "So make sure it's at a compatible Chrome version before proceeding."
 	echo
 
 	tc-export CC CXX
@@ -527,7 +571,7 @@ src_unpack() {
 
 	case "${CHROME_ORIGIN}" in
 	LOCAL_SOURCE|SERVER_SOURCE|LOCAL_BINARY)
-		elog "CHROME_ORIGIN VALUE is ${CHROME_ORIGIN}"
+		einfo "CHROME_ORIGIN VALUE is ${CHROME_ORIGIN}"
 		;;
 	*)
 		die "CHROME_ORIGIN not one of LOCAL_SOURCE, SERVER_SOURCE, LOCAL_BINARY"
@@ -558,7 +602,7 @@ src_unpack() {
 		CHROME_ROOT=${CHROME_DISTDIR}
 		;;
 	(LOCAL_SOURCE)
-		: ${CHROME_ROOT:=/home/${WHOAMI}/chrome_root}
+		: "${CHROME_ROOT:=/home/${WHOAMI}/chrome_root}"
 		if [[ ! -d "${CHROME_ROOT}/src" ]]; then
 			die "${CHROME_ROOT} does not contain a valid chromium checkout!"
 		fi
@@ -655,7 +699,7 @@ src_prepare() {
 
 	# We do symlink creation here if appropriate.
 	mkdir -p "${CHROME_CACHE_DIR}/src/${BUILD_OUT}"
-	if [[ ! -z "${BUILD_OUT_SYM}" ]]; then
+	if [[ -n "${BUILD_OUT_SYM}" ]]; then
 		rm -rf "${BUILD_OUT_SYM}" || die "Could not remove symlink"
 		ln -sfT "${CHROME_CACHE_DIR}/src/${BUILD_OUT}" "${BUILD_OUT_SYM}" ||
 			die "Could not create symlink for output directory"
@@ -693,6 +737,7 @@ setup_test_lists() {
 		jpeg_decode_accelerator_unittest
 		ozone_gl_unittests
 		sandbox_linux_unittests
+		wayland_client_integration_tests
 		wayland_client_perftests
 	)
 
@@ -713,6 +758,12 @@ setup_test_lists() {
 		TEST_FILES+=(
 			decode_test
 			vaapi_unittest
+		)
+	fi
+
+	if use v4l2_codec; then
+		TEST_FILES+=(
+			v4l2_stateless_decoder
 		)
 	fi
 
@@ -850,10 +901,6 @@ src_configure() {
 	export PATH=${PATH}:${DEPOT_TOOLS}
 
 	export DEPOT_TOOLS_GSUTIL_BIN_DIR="${CHROME_CACHE_DIR}/gsutil_bin"
-	# The venv logic seems to misbehave when cross-compiling.  Since our SDK
-	# should include all the necessary modules, just disable it (for now).
-	# https://crbug.com/808434
-	export VPYTHON_BYPASS="manually managed python not supported by chrome operations"
 
 	# TODO(rcui): crosbug.com/20435. Investigate removal of runhooks
 	# useflag when chrome build switches to Ninja inside the chroot.
@@ -932,17 +979,18 @@ chrome_make() {
 	# between multiple links done by this build (e.g. tests).
 	use thinlto && rm -rf "${build_dir}/thinlto-cache"
 
-	# If goma is enabled, increase the number of parallel run to
-	# 10 * {number of processors}. Though, if it is too large the
+	local parallelism="$(makeopts_jobs)"
+	# If goma or remoteexec is enabled, increase the number of parallel
+	# run to 10 * {number of processors}. Though, if it is too large the
 	# performance gets slow down, so limit by 200 heuristically.
-	if use_goma; then
+	if use_goma || use_remoteexec; then
 		local num_parallel=$(($(nproc) * 10))
 		local j_limit=200
-		set -- -j $((num_parallel < j_limit ? num_parallel : j_limit)) "$@"
+		parallelism=$((num_parallel < j_limit ? num_parallel : j_limit))
 	fi
 	local command=(
 		"${ENINJA}"
-		-j"$(makeopts_jobs)"
+		-j "${parallelism}"
 		-C "${build_dir}"
 		$(usex verbose -v "")
 		-d "keeprsp"
@@ -966,6 +1014,7 @@ chrome_make() {
 	# Still use a script to check if the orderfile is used properly, i.e.
 	# Builtin_ functions are placed between the markers, etc.
 	if use strict_toolchain_checks && (use orderfile_use || use orderfile_verify); then
+		einfo "Verifying orderfile..."
 		"${FILESDIR}/check_orderfile.py" "${build_dir}/chrome" || die
 	fi
 }
@@ -1021,6 +1070,7 @@ src_compile() {
 		autotest-deponly_src_prepare
 
 		# Remove .git dirs
+		# shellcheck disable=SC2154 # this is a bug in the linter.
 		find "${AUTOTEST_WORKDIR}" -type d -name .git -prune -exec rm -rf {} +
 
 		autotest_src_compile
@@ -1064,7 +1114,7 @@ test_strip_install() {
 	local f
 	for f in "$@"; do
 		$(tc-getSTRIP) --strip-debug \
-			"${from}"/${f} -o "${dest}/$(basename ${f})"
+			"${from}/${f}" -o "${dest}/$(basename "${f}")"
 	done
 }
 
@@ -1085,7 +1135,7 @@ install_chrome_test_resources() {
 		"${TEST_FILES[@]}"
 		"libppapi_tests.so" )
 
-	einfo "Installing test targets: ${TEST_INSTALL_TARGETS[@]}"
+	einfo "Installing test targets: ${TEST_INSTALL_TARGETS[*]}"
 	test_strip_install "${from}" "${dest}" "${TEST_INSTALL_TARGETS[@]}"
 
 	# Copy Chrome test data.
@@ -1145,8 +1195,8 @@ install_telemetry_dep_resources() {
 		CROS_DEPS=${CHROME_ROOT}/src/tools/cros/bootstrap_deps
 		# sed removes the leading path including src/ converting it to relative.
 		# To avoid silent failures assert the success.
-		DEPS_LIST=$(python ${FIND_DEPS} ${PERF_DEPS} ${CROS_DEPS} | \
-			sed -e 's|^'${CHROME_ROOT}/src/'||'; assert)
+		DEPS_LIST=$(${FIND_DEPS} "${PERF_DEPS}" "${CROS_DEPS}" | \
+			sed -e "s|^${CHROME_ROOT}/src/||"; assert)
 		install_test_resources "${test_dir}" "${DEPS_LIST}"
 		# For crosperf, which uses some tests only available on internal builds.
 		if use chrome_internal; then
@@ -1158,12 +1208,20 @@ install_telemetry_dep_resources() {
 
 	local from="${CHROME_CACHE_DIR}/src/${BUILD_OUT}/${BUILDTYPE}"
 	local dest="${test_dir}/src/out/${BUILDTYPE}"
-	einfo "Installing telemetry binaries: ${TOOLS_TELEMETRY_BIN[@]}"
+	einfo "Installing telemetry binaries: ${TOOLS_TELEMETRY_BIN[*]}"
 	test_strip_install "${from}" "${dest}" "${TOOLS_TELEMETRY_BIN[@]}"
 
 	# When copying only a portion of the Chrome source that telemetry needs,
 	# some symlinks can end up broken. Thus clean these up before packaging.
+	einfo "Cleaning up broken symlinks in telemetry"
 	find -L "${test_dir}" -type l -delete
+
+	# Unfortunately we are sometimes provided with unrelated upstream directories
+	# and binaries taking a lot of space. Clean these up manually. Notice
+	# that Android and Linux directories might be needed so keep those.
+	einfo "Cleaning up non-Chrome OS directories in telemetry"
+	find -L "${test_dir}" -type d -regex ".*/\(mac\|mips\|mips64\|win\)" -exec rm -rfv {} \;
+	einfo "Finished installing telemetry dep resources"
 }
 
 # Add any new artifacts generated by the Chrome build targets to deploy_chrome.py.
@@ -1174,7 +1232,7 @@ src_install() {
 	# Override default strip flags and lose the '-R .comment'
 	# in order to play nice with the crash server.
 	if [[ -z "${KEEP_CHROME_DEBUG_SYMBOLS}" ]]; then
-		if [[ "${STRIP}" == "llvm-strip" ]]; then
+		if [[ "$(tc-getSTRIP)" == "llvm-strip" ]]; then
 			export PORTAGE_STRIP_FLAGS="--strip-all-gnu"
 		else
 			export PORTAGE_STRIP_FLAGS=""
@@ -1183,7 +1241,7 @@ src_install() {
 		export PORTAGE_STRIP_FLAGS="--strip-debug"
 	fi
 	einfo "PORTAGE_STRIP_FLAGS=${PORTAGE_STRIP_FLAGS}"
-	LS=$(ls -alhS ${FROM})
+	LS=$(ls -alhS "${FROM}")
 	einfo "CHROME_DIR after build\n${LS}"
 
 	# Copy a D-Bus config file that includes other configs that are installed to
@@ -1315,17 +1373,17 @@ src_install() {
 	)
 	einfo "${cmd[*]}"
 	"${cmd[@]}" || die
-	LS=$(ls -alhS ${D}/${CHROME_DIR})
+	LS=$(ls -alhS "${D}/${CHROME_DIR}")
 	einfo "CHROME_DIR after deploy_chrome\n${LS}"
 
 	# Keep the .dwp files with debug fission.
 	if use chrome_debug && use debug_fission; then
 		mkdir -p "${D}/usr/lib/debug/${CHROME_DIR}"
 		DWP="${CHOST}"-dwp
-		cd "${D}/${CHROME_DIR}"
+		cd "${D}/${CHROME_DIR}" || die
 		# Iterate over all ELF files in current directory
-		while read i; do
-			cd "${FROM}"
+		while read -r i; do
+			cd "${FROM}" || die
 			# These files do not build with -gsplit-dwarf,
 			# so we do not need to get a .dwp file from them.
 			if [[ "${i}" == "./libassistant.so"		|| \
@@ -1364,19 +1422,20 @@ src_install() {
 	# chromeos-base/chrome-icu is responsible for installing the icu
 	# data, so we remove it from ${D} here.
 	rm "${D_CHROME_DIR}/icudtl.dat" || die
+	rm "${D_CHROME_DIR}/icudtl.dat.hash" || die
 }
 
 pkg_preinst() {
 	enewuser "wayland"
 	enewgroup "wayland"
-	LS=$(ls -alhS ${ED}/${CHROME_DIR})
+	LS=$(ls -alhS "${ED}/${CHROME_DIR}")
 	einfo "CHROME_DIR after installation\n${LS}"
-	CHROME_SIZE=$(stat --printf="%s" ${ED}/${CHROME_DIR}/chrome)
+	CHROME_SIZE=$(stat --printf="%s" "${ED}/${CHROME_DIR}/chrome")
 	einfo "CHROME_SIZE = ${CHROME_SIZE}"
 
 	# Non-internal builds come with >10MB of unwinding info built-in. Size
 	# checks on those are less profitable.
-	if [[ ${CHROME_SIZE} -ge 250000000 && -z "${KEEP_CHROME_DEBUG_SYMBOLS}" ]] && use chrome_internal && ! use chrome_dcheck; then
+	if [[ ${CHROME_SIZE} -ge 300000000 && -z "${KEEP_CHROME_DEBUG_SYMBOLS}" ]] && use chrome_internal && ! use chrome_dcheck; then
 		die "Installed chrome binary got suspiciously large (size=${CHROME_SIZE})."
 	fi
 	if use arm; then
