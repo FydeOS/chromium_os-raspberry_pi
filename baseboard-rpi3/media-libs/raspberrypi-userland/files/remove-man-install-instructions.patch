@@ -1,0 +1,85 @@
+Index: userland-54fd97ae4066a10b6b02089bc769ceed328737e0/host_applications/linux/apps/dtmerge/CMakeLists.txt
+===================================================================
+--- userland-54fd97ae4066a10b6b02089bc769ceed328737e0.orig/host_applications/linux/apps/dtmerge/CMakeLists.txt
++++ userland-54fd97ae4066a10b6b02089bc769ceed328737e0/host_applications/linux/apps/dtmerge/CMakeLists.txt
+@@ -18,4 +18,3 @@ add_executable(dtmerge dtmerge.c)
+ target_link_libraries(dtmerge dtovl)
+ 
+ install(TARGETS dtmerge RUNTIME DESTINATION bin)
+-install(FILES dtmerge.1 DESTINATION man/man1)
+Index: userland-54fd97ae4066a10b6b02089bc769ceed328737e0/host_applications/linux/apps/dtoverlay/CMakeLists.txt
+===================================================================
+--- userland-54fd97ae4066a10b6b02089bc769ceed328737e0.orig/host_applications/linux/apps/dtoverlay/CMakeLists.txt
++++ userland-54fd97ae4066a10b6b02089bc769ceed328737e0/host_applications/linux/apps/dtoverlay/CMakeLists.txt
+@@ -17,11 +17,9 @@ include_directories (
+ add_executable(dtoverlay dtoverlay_main.c utils.c)
+ target_link_libraries(dtoverlay dtovl)
+ install(TARGETS dtoverlay RUNTIME DESTINATION bin)
+-install(FILES dtoverlay.1 DESTINATION man/man1)
+ 
+ add_custom_command(TARGET dtoverlay POST_BUILD COMMAND ln;-sf;dtoverlay;dtparam)
+ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/dtparam DESTINATION bin)
+-install(FILES dtparam.1 DESTINATION man/man1)
+ 
+ set(DTOVERLAY_SCRIPTS dtoverlay-pre dtoverlay-post)
+ install(PROGRAMS ${DTOVERLAY_SCRIPTS} DESTINATION bin)
+Index: userland-54fd97ae4066a10b6b02089bc769ceed328737e0/host_applications/linux/apps/gencmd/CMakeLists.txt
+===================================================================
+--- userland-54fd97ae4066a10b6b02089bc769ceed328737e0.orig/host_applications/linux/apps/gencmd/CMakeLists.txt
++++ userland-54fd97ae4066a10b6b02089bc769ceed328737e0/host_applications/linux/apps/gencmd/CMakeLists.txt
+@@ -7,7 +7,7 @@ else ()
+    add_definitions(-Wall -Werror)
+ endif ()
+ 
+-include_directories( ../../../.. 
++include_directories( ../../../..
+                      ../../../../interface/vcos
+                      ../../../../interface/vcos/${VCOS_PLATFORM} )
+ 
+@@ -17,4 +17,3 @@ include_directories( ../../../..
+ add_executable(vcgencmd gencmd.c)
+ target_link_libraries(vcgencmd vcos vchiq_arm vchostif)
+ install(TARGETS vcgencmd RUNTIME DESTINATION bin)
+-install(FILES vcgencmd.1 DESTINATION man/man1)
+Index: userland-54fd97ae4066a10b6b02089bc769ceed328737e0/host_applications/linux/apps/raspicam/CMakeLists.txt
+===================================================================
+--- userland-54fd97ae4066a10b6b02089bc769ceed328737e0.orig/host_applications/linux/apps/raspicam/CMakeLists.txt
++++ userland-54fd97ae4066a10b6b02089bc769ceed328737e0/host_applications/linux/apps/raspicam/CMakeLists.txt
+@@ -67,5 +67,3 @@ target_link_libraries(raspivid   ${MMAL_
+ target_link_libraries(raspividyuv   ${MMAL_LIBS} vcos bcm_host m)
+ 
+ install(TARGETS raspistill raspiyuv raspivid raspividyuv RUNTIME DESTINATION bin)
+-install(FILES raspistill.1 raspiyuv.1 raspivid.1 raspividyuv.1 DESTINATION man/man1)
+-install(FILES raspicam.7 DESTINATION man/man7)
+Index: userland-54fd97ae4066a10b6b02089bc769ceed328737e0/host_applications/linux/apps/tvservice/CMakeLists.txt
+===================================================================
+--- userland-54fd97ae4066a10b6b02089bc769ceed328737e0.orig/host_applications/linux/apps/tvservice/CMakeLists.txt
++++ userland-54fd97ae4066a10b6b02089bc769ceed328737e0/host_applications/linux/apps/tvservice/CMakeLists.txt
+@@ -4,4 +4,3 @@ target_link_libraries(tvservice vchostif
+ 
+ install(TARGETS tvservice
+         RUNTIME DESTINATION bin)
+-install(FILES tvservice.1 DESTINATION man/man1)
+Index: userland-54fd97ae4066a10b6b02089bc769ceed328737e0/host_applications/linux/apps/vcmailbox/CMakeLists.txt
+===================================================================
+--- userland-54fd97ae4066a10b6b02089bc769ceed328737e0.orig/host_applications/linux/apps/vcmailbox/CMakeLists.txt
++++ userland-54fd97ae4066a10b6b02089bc769ceed328737e0/host_applications/linux/apps/vcmailbox/CMakeLists.txt
+@@ -3,5 +3,3 @@ target_link_libraries(vcmailbox vchostif
+ 
+ install(TARGETS vcmailbox
+         RUNTIME DESTINATION bin)
+-install(FILES vcmailbox.1 DESTINATION man/man1)
+-install(FILES vcmailbox.7 raspiotp.7 raspirev.7 DESTINATION man/man7)
+Index: userland-54fd97ae4066a10b6b02089bc769ceed328737e0/interface/mmal/vc/CMakeLists.txt
+===================================================================
+--- userland-54fd97ae4066a10b6b02089bc769ceed328737e0.orig/interface/mmal/vc/CMakeLists.txt
++++ userland-54fd97ae4066a10b6b02089bc769ceed328737e0/interface/mmal/vc/CMakeLists.txt
+@@ -3,7 +3,7 @@ add_definitions(-DENABLE_MMAL_VCSM)
+ add_library(mmal_vc_client ${LIBRARY_TYPE} mmal_vc_client.c mmal_vc_shm.c mmal_vc_api.c mmal_vc_opaque_alloc.c mmal_vc_msgnames.c mmal_vc_api_drm.c)
+ #target_link_libraries(mmal_vc_client vchiq_arm vcos)
+ 
+-target_link_libraries(mmal_vc_client vchiq_arm vcos vcsm)
++target_link_libraries(mmal_vc_client vchiq_arm vcos vcsm mmal_util)
+ 
+ if(BUILD_MMAL_APPS)
+ add_executable(mmal_vc_diag mmal_vc_diag.c)

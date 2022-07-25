@@ -18,15 +18,16 @@ else
 	# * libraspberrypi-bin-dbgsym_2+git20201022~151804+e432bc3-1_arm64.deb
 	# * "e432bc3" is the first 7 hex digits of the commit hash.
 	# * Go to https://github.com/raspberrypi/userland/commits/master and find the full hash
-	GIT_COMMIT="e432bc3400401064e2d8affa5d1454aac2cf4a00"
+	GIT_COMMIT="54fd97ae4066a10b6b02089bc769ceed328737e0"
 	SRC_URI="https://github.com/raspberrypi/userland/archive/${GIT_COMMIT}.tar.gz -> ${P}.tar.gz"
-	KEYWORDS="arm arm64"
   RESTRICT="mirror"
 	S="${WORKDIR}/userland-${GIT_COMMIT}"
 fi
+KEYWORDS="~arm ~arm64"
 
 DESCRIPTION="Raspberry Pi userspace tools and libraries"
 HOMEPAGE="https://github.com/raspberrypi/userland"
+FEATURES="noman"
 
 LICENSE="BSD"
 SLOT="0"
@@ -45,7 +46,7 @@ PATCHES=(
 	"${FILESDIR}/${PN}-libfdt-static.patch"
 	# See https://github.com/raspberrypi/userland/pull/659
 	"${FILESDIR}/${PN}-pkgconf-arm64.patch"
-  "${FILESDIR}/fix-link-error.patch"
+  "${FILESDIR}/remove-man-install-instructions.patch"
 )
 
 src_prepare() {

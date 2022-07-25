@@ -18,7 +18,7 @@ Index: src/gpu/config/gpu_driver_bug_list.json
 +      "gl_vendor": "Broadcom",
        "features": [
 -        "use_virtualized_gl_contexts"
-+        "force_gl_flush_on_swap_buffers"
++        "flush_on_framebuffer_change"
        ]
      },
      {
