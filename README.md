@@ -124,8 +124,8 @@ The code and document in this repository are the results of works by the people 
 
  - **tags**
 
-     - When we do release a prebuilt image, the commit would be tagged with a release number corresponding to the repo manifest. For example, if the repo manifest release is `release-R96-14268.B`, then our release tag would be `r96`.
-     - Often we will be doing more than one release for each repo manifest release number, so we will append a meaningful string to the tag name to identify such. For example: `r96-hardware_acceleration`
+     - When we do release a prebuilt image, the commit would be tagged with a release number corresponding to the repo manifest. For example, if the repo manifest release is `rrelease-R102-14695.B`, then our release tag would be `r102`.
+     - Often we will be doing more than one release for each repo manifest release number, so we will append a meaningful string to the tag name to identify such. For example: `r102-hardware_acceleration`
 
 
 ### Typography Conventions
@@ -245,7 +245,7 @@ If you are building a different release, make sure you use the actual directory 
 
 First, you need to find out the reference name of the release you would like to build, by visiting this page [https://chromium.googlesource.com/chromiumos/manifest.git](https://chromium.googlesource.com/chromiumos/manifest.git):
 
-You will see a list of Git commit IDs and its name in the form of `refs/heads/release-Rxx-xxxx.B`. That `release-Rxx-XXXX.B` link is what you need for fetching the code of that specific Chromium OS release. For example, [release-R96-14268.B](https://chromium.googlesource.com/chromiumos/manifest.git/+/refs/heads/release-R96-14268.B) for release r96.
+You will see a list of Git commit IDs and its name in the form of `refs/heads/release-Rxx-xxxx.B`. That `release-Rxx-XXXX.B` link is what you need for fetching the code of that specific Chromium OS release. For example, [release-R102-14695.B](https://chromium.googlesource.com/chromiumos/manifest.git/+/refs/heads/release-R102-14695.B) for release r102.
 
 Now run these commands to fetch the source code. Find and use a different release name if you would like to build a different release.
 
@@ -254,7 +254,7 @@ Now run these commands to fetch the source code. Find and use a different releas
 #Assuming you understand what /path/to means. If not, replace it with '~'
 $ cd /path/to/cros-pi
 
-$ repo init -u https://chromium.googlesource.com/chromiumos/manifest.git --repo-url https://chromium.googlesource.com/external/repo.git -b release-R96-14268.B
+$ repo init -u https://chromium.googlesource.com/chromiumos/manifest.git --repo-url https://chromium.googlesource.com/external/repo.git -b release-R102-14695.B
 
 # Raise this number if you have a fast internet connection
 $ repo sync -j8
@@ -311,9 +311,9 @@ It's recommended to build Chromium browser on your local setup so that your Chro
 
 As far as this project is concerned, the chromium source that we use to build our releases can be found in the [chromium-raspberry_pi](https://github.com/FydeOS/chromium-raspberry_pi) project. You may also choose to use Google's vanilla chromium repository which can be found [here](https://chromium.googlesource.com/chromium/src.git/).
 
-Note that we use a much simpler way to manage releases, with our [chromium-raspberry_pi](https://github.com/FydeOS/chromium-raspberry_pi) project you need to select the correct branch corresponding to the [repo manifest](#fetch-chromium-os-source-code) you used in the previous step to sync your Chromium OS code. For example, if you are building r96, you will then need to look out for "`chromium-m96`" branch under [chromium-raspberry_pi](https://github.com/FydeOS/chromium-raspberry_pi). The letter "m" stands for "milestone" and it correlates to the release number for Chromium OS(r96 in this case). Choosing an unmatched chromium milestone branch and Chromium OS repo will probably result in endless build errors.
+Note that we use a much simpler way to manage releases, with our [chromium-raspberry_pi](https://github.com/FydeOS/chromium-raspberry_pi) project you need to select the correct branch corresponding to the [repo manifest](#fetch-chromium-os-source-code) you used in the previous step to sync your Chromium OS code. For example, if you are building r102, you will then need to look out for "`chromium-m102`" branch under [chromium-raspberry_pi](https://github.com/FydeOS/chromium-raspberry_pi). The letter "m" stands for "milestone" and it correlates to the release number for Chromium OS(r102 in this case). Choosing an unmatched chromium milestone branch and Chromium OS repo will probably result in endless build errors.
 
-With Google's repository, you need to choose a correct release tag rather than a branch. For example, if you are building r96, you can browse all existing chromium release tags on [this page](https://chromium.googlesource.com/chromium/src.git/) and deduce that the latest tag on your desired milestone version. At the point where this was written, this would be [96.0.4664.209](https://chromium.googlesource.com/chromium/src.git/+/refs/tags/96.0.4664.209).
+With Google's repository, you need to choose a correct release tag rather than a branch. For example, if you are building r102, you can browse all existing chromium release tags on [this page](https://chromium.googlesource.com/chromium/src.git/) and deduce that the latest tag on your desired milestone version. At the point where this was written, this would be [102.0.5005.90](https://chromium.googlesource.com/chromium/src.git/+/refs/tags/102.0.5005.90).
 
 Having understood the above, now create a directory parallel to your Chromium OS repo to house the chromium source:
 
@@ -343,10 +343,10 @@ Then choose the correct branch/tag
 ```bash
 (outside)
 #with our chromium repo
-$ git checkout chromium-m96
+$ git checkout chromium-m102
 
-#with Google's repo and you wish to build for r96
-$ git checkout 96.0.4664.209
+#with Google's repo and you wish to build for r102
+$ git checkout 102.0.5005.90
 ```
 
 Now you need to create a config file known to gclient for syncing the chromium dependencies:
@@ -358,7 +358,7 @@ $ cd ..
 $ touch .gclient
 ```
 
-The .gclient file should have the following content, note that you should replace the correct branch name with the `url` field (in this example we use `chromium-m96`) you may also replace the `url` value to Google's per your setup.
+The .gclient file should have the following content, note that you should replace the correct branch name with the `url` field (in this example we use `chromium-m102`) you may also replace the `url` value to Google's per your setup.
 
 ```
 solutions = [{'custom_deps': {},
@@ -366,7 +366,7 @@ solutions = [{'custom_deps': {},
   'deps_file': '.DEPS.git',
   'managed': False,
   'name': 'src',
-  'url': 'git@github.com:FydeOS/chromium-raspberry_pi.git@refs/remotes/origin/chromium-m96'}]
+  'url': 'git@github.com:FydeOS/chromium-raspberry_pi.git@refs/remotes/origin/chromium-m102'}]
 target_os = ['chromeos']
 ```
 
@@ -425,7 +425,7 @@ It may take 10 to over 30 minutes depending on your internet connection speed an
 
 ```
 (inside)
-(release-R96-14268.B/(xxxxxx...)) <user>@<host> ~/trunk/src/scripts $
+(release-R102-14695.B/(xxxxxx...)) <user>@<host> ~/trunk/src/scripts $
 ```
 
 The chroot environment is located under the `/path/to/cros-pi/chroot` directory.
@@ -598,7 +598,7 @@ It may take 10 to 30 minutes, mainly depending on the speed of your disk. It wil
 
 After the command finished successfully, you will have disk images generated, saved under `/mnt/host/source/src/build/images/rpi4/` directory in the chroot, or `/path/to/cros-pi/src/build/images/rpi4` in the host OS. These two are the same directory, just bind mounted in the chroot.
 
-Each invocation of the build_image command will create a directory named similar to `R96-XXXX.XXX.<date time>-a1` under above directory. There is a symlink named `latest` under the above directory, that always points to the image directory of the last successful build.
+Each invocation of the build_image command will create a directory named similar to `R102-XXXX.XXX.<date time>-a1` under above directory. There is a symlink named `latest` under the above directory, that always points to the image directory of the last successful build.
 
 The disk image is usually named `chromiumos_image.bin`, under the abovementioned directory. So full path to the latest image is
 
