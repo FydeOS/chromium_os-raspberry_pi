@@ -1,6 +1,3 @@
-# Copyright (c) 2022 Fyde Innovations Limited and the openFyde Authors.
-# Distributed under the license specified in the root directory of this project.
-
 # Copyright 2016 The Chromium OS Authors. All rights reserved.
 # Distributed under the terms of the GNU General Public License v2
 
@@ -105,11 +102,20 @@ arc-build-select-clang() {
 		ARC_GCC_TUPLE=x86_64-linux-android
 		ARC_GCC_BASE="${ARC_BASE}/arc-gcc/x86_64/${ARC_GCC_TUPLE}-4.9"
 
-		# The clang version used by ARC is too old to recognize certain
-		# recent microarchitectures like tremont. Filter it out for now.
-		# TODO(b/161353194,b/181375275) If clang is uprevved, please
-		# remove this filter and see if the build succeeds.
-		filter-flags -march=tremont -march=alderlake
+		# Old versions of clang cannot recognize new CPU flags. Replace
+		# them with the latest Atom available on each version.
+		case ${ARC_VERSION_MAJOR} in
+		9)
+		# ARC P uses llvm 6.0
+			replace-flags -march=goldmont-plus -march=goldmont
+			replace-flags -march=tremont -march=goldmont
+			replace-flags -march=alderlake -march=goldmont
+			;;
+		11)
+		# ARC R uses llvm 11.0.2
+			replace-flags -march=alderlake -march=tremont
+			;;
+		esac
 
 		# multilib.eclass does not use CFLAGS_${DEFAULT_ABI}, but
 		# we need to add some flags valid only for amd64, so we trick
@@ -148,6 +154,9 @@ arc-build-select-clang() {
 	# correctly with this flag, filter it out.
 	filter-flags -Wl,--icf=all
 
+	# Ignore unwindlib flag for ARC++.
+	filter-flags --unwindlib=libunwind
+
 	# Set up flags for the android sysroot.
 	append-flags --sysroot="${ARC_SYSROOT}"
 	append-cppflags --sysroot="${ARC_SYSROOT}"
@@ -181,64 +190,28 @@ arc-build-select-clang() {
 	fi
 }
 
-# Copied from the upstream meson.eclass. The upstream cross-file does not
-# set needs_exe_wrapper, and I don't see how to automatically detect that
-# for upstream.
+# This is composed after the cross file generated in meson.eclass, and
+# values here override values there.
 arc-build-create-cross-file() {
 	# Reference: http://mesonbuild.com/Cross-compilation.html
 
-	# system roughly corresponds to uname -s (lowercase)
-	local system=unknown
-	case ${CHOST} in
-		*-aix*)          system=aix ;;
-		*-cygwin*)       system=cygwin ;;
-		*-darwin*)       system=darwin ;;
-		*-freebsd*)      system=freebsd ;;
-		*-linux*)        system=linux ;;
-		mingw*|*-mingw*) system=windows ;;
-		*-solaris*)      system=sunos ;;
-	esac
-
-	local cpu_family=$(tc-arch)
-	case ${cpu_family} in
-		amd64) cpu_family=x86_64 ;;
-		arm64) cpu_family=aarch64 ;;
-	esac
-
-	# This may require adjustment based on CFLAGS
-	local cpu=${CHOST%%-*}
-
 	ARC_CROSS_FILE="${T}/arc-meson.${CHOST}.${ABI}"
+
+	# Explicitly prohibit meson from running cross-built binaries.
+	#
+	# This is done by setting `needs_exe_wrapper` to true and
+	# `exe_wrapper` to the empty string.
+	#
+	# If at some point a wrapper is written that can run ARC
+	# binaries this should be updated.
+
 	cat > "${ARC_CROSS_FILE}" <<-EOF
 	[binaries]
-	ar = $(_meson_env_array "$(tc-getAR)")
-	c = $(_meson_env_array "$(tc-getCC)")
-	cpp = $(_meson_env_array "$(tc-getCXX)")
-	fortran = $(_meson_env_array "$(tc-getFC)")
-	llvm-config = '$(tc-getPROG LLVM_CONFIG llvm-config)'
-	objc = $(_meson_env_array "$(tc-getPROG OBJC cc)")
-	objcpp = $(_meson_env_array "$(tc-getPROG OBJCXX c++)")
-	pkgconfig = '$(tc-getPKG_CONFIG)'
-	strip = $(_meson_env_array "$(tc-getSTRIP)")
+	exe_wrapper = ''
 
 	[properties]
-	c_args = $(_meson_env_array "${CFLAGS} ${CPPFLAGS}")
-	c_link_args = $(_meson_env_array "${CFLAGS} ${LDFLAGS}")
-	cpp_args = $(_meson_env_array "${CXXFLAGS} ${CPPFLAGS}")
-	cpp_link_args = $(_meson_env_array "${CXXFLAGS} ${LDFLAGS}")
-	fortran_args = $(_meson_env_array "${FCFLAGS}")
-	fortran_link_args = $(_meson_env_array "${FCFLAGS} ${LDFLAGS}")
-	objc_args = $(_meson_env_array "${OBJCFLAGS} ${CPPFLAGS}")
-	objc_link_args = $(_meson_env_array "${OBJCFLAGS} ${LDFLAGS}")
-	objcpp_args = $(_meson_env_array "${OBJCXXFLAGS} ${CPPFLAGS}")
-	objcpp_link_args = $(_meson_env_array "${OBJCXXFLAGS} ${LDFLAGS}")
 	needs_exe_wrapper = true
 
-	[host_machine]
-	system = '${system}'
-	cpu_family = '${cpu_family}'
-	cpu = '${cpu}'
-	endian = '$(tc-endian)'
 	EOF
 }
 

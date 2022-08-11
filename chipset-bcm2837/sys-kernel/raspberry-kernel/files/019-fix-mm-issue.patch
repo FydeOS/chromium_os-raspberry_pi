@@ -1,7 +1,7 @@
-Index: rpi-kernel/include/linux/memcontrol.h
+Index: kernel-rpi/include/linux/memcontrol.h
 ===================================================================
---- rpi-kernel.orig/include/linux/memcontrol.h
-+++ rpi-kernel/include/linux/memcontrol.h
+--- kernel-rpi.orig/include/linux/memcontrol.h
++++ kernel-rpi/include/linux/memcontrol.h
 @@ -169,6 +169,8 @@ struct memcg_padding {
  #define MEMCG_PADDING(name)
  #endif
@@ -11,7 +11,7 @@ Index: rpi-kernel/include/linux/memcontrol.h
  /*
   * Remember four most recent foreign writebacks with dirty pages in this
   * cgroup.  Inode sharing is expected to be uncommon and, even if we miss
-@@ -331,6 +333,10 @@ struct mem_cgroup {
+@@ -332,6 +334,10 @@ struct mem_cgroup {
  	struct deferred_split deferred_split_queue;
  #endif
  
@@ -22,7 +22,7 @@ Index: rpi-kernel/include/linux/memcontrol.h
  	struct mem_cgroup_per_node *nodeinfo[0];
  	/* WARNING: nodeinfo must be the last member here */
  };
-@@ -647,18 +653,6 @@ void mem_cgroup_print_oom_context(struct
+@@ -648,18 +654,6 @@ void mem_cgroup_print_oom_context(struct
  
  void mem_cgroup_print_oom_meminfo(struct mem_cgroup *memcg);
  
@@ -41,7 +41,7 @@ Index: rpi-kernel/include/linux/memcontrol.h
  static inline bool task_in_memcg_oom(struct task_struct *p)
  {
  	return p->memcg_in_oom;
-@@ -1134,14 +1128,6 @@ static inline void mem_cgroup_handle_ove
+@@ -1135,14 +1129,6 @@ static inline void mem_cgroup_handle_ove
  {
  }
  
@@ -56,41 +56,27 @@ Index: rpi-kernel/include/linux/memcontrol.h
  static inline bool task_in_memcg_oom(struct task_struct *p)
  {
  	return false;
-Index: rpi-kernel/arch/arm64/include/asm/cpucaps.h
+Index: kernel-rpi/arch/arm64/include/asm/cpufeature.h
 ===================================================================
---- rpi-kernel.orig/arch/arm64/include/asm/cpucaps.h
-+++ rpi-kernel/arch/arm64/include/asm/cpucaps.h
-@@ -66,7 +66,8 @@
- #define ARM64_HAS_TLB_RANGE			56
- #define ARM64_MTE				57
- #define ARM64_WORKAROUND_1508412		58
-+#define ARM64_HW_AF       59
- 
--#define ARM64_NCAPS				59
-+#define ARM64_NCAPS				60
- 
- #endif /* __ASM_CPUCAPS_H */
-Index: rpi-kernel/arch/arm64/include/asm/cpufeature.h
-===================================================================
---- rpi-kernel.orig/arch/arm64/include/asm/cpufeature.h
-+++ rpi-kernel/arch/arm64/include/asm/cpufeature.h
-@@ -728,6 +728,12 @@ static inline bool system_supports_tlb_r
+--- kernel-rpi.orig/arch/arm64/include/asm/cpufeature.h
++++ kernel-rpi/arch/arm64/include/asm/cpufeature.h
+@@ -756,6 +756,12 @@ static inline bool system_supports_tlb_r
  		cpus_have_const_cap(ARM64_HAS_TLB_RANGE);
  }
  
 +static inline bool system_has_hw_af(void)
 +{
 +  return IS_ENABLED(CONFIG_ARM64_HW_AFDBM) &&
-+         cpus_have_const_cap(ARM64_HW_AF);
++         cpus_have_const_cap(ARM64_SPECTRE_BHB);
 +}
 +
  extern int do_emulate_mrs(struct pt_regs *regs, u32 sys_reg, u32 rt);
  
  static inline u32 id_aa64mmfr0_parange_to_phys_shift(int parange)
-Index: rpi-kernel/arch/arm64/include/asm/pgtable.h
+Index: kernel-rpi/arch/arm64/include/asm/pgtable.h
 ===================================================================
---- rpi-kernel.orig/arch/arm64/include/asm/pgtable.h
-+++ rpi-kernel/arch/arm64/include/asm/pgtable.h
+--- kernel-rpi.orig/arch/arm64/include/asm/pgtable.h
++++ kernel-rpi/arch/arm64/include/asm/pgtable.h
 @@ -986,6 +986,12 @@ static inline bool arch_faults_on_old_pt
  }
  #define arch_faults_on_old_pte arch_faults_on_old_pte
@@ -104,10 +90,10 @@ Index: rpi-kernel/arch/arm64/include/asm/pgtable.h
  #endif /* !__ASSEMBLY__ */
  
  #endif /* __ASM_PGTABLE_H */
-Index: rpi-kernel/include/linux/nodemask.h
+Index: kernel-rpi/include/linux/nodemask.h
 ===================================================================
---- rpi-kernel.orig/include/linux/nodemask.h
-+++ rpi-kernel/include/linux/nodemask.h
+--- kernel-rpi.orig/include/linux/nodemask.h
++++ kernel-rpi/include/linux/nodemask.h
 @@ -486,6 +486,7 @@ static inline int num_node_state(enum no
  #define first_online_node	0
  #define first_memory_node	0

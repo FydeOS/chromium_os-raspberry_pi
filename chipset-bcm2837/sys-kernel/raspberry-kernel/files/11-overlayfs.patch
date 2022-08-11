@@ -1,7 +1,7 @@
-Index: rpi-kernel/security/selinux/hooks.c
+Index: kernel-rpi/security/selinux/hooks.c
 ===================================================================
---- rpi-kernel.orig/security/selinux/hooks.c
-+++ rpi-kernel/security/selinux/hooks.c
+--- kernel-rpi.orig/security/selinux/hooks.c
++++ kernel-rpi/security/selinux/hooks.c
 @@ -103,6 +103,9 @@
  #include "netlabel.h"
  #include "audit.h"
@@ -46,7 +46,7 @@ Index: rpi-kernel/security/selinux/hooks.c
  	/*
  	 * IMPORTANT: Double-check logic in this function when adding a new
  	 * SECURITY_FS_USE_* definition!
-@@ -3364,7 +3389,15 @@ static int selinux_inode_getsecurity(str
+@@ -3371,7 +3396,15 @@ static int selinux_inode_getsecurity(str
  	 * and lack of permission just means that we fall back to the
  	 * in-core context value, not a denial.
  	 */
@@ -63,7 +63,7 @@ Index: rpi-kernel/security/selinux/hooks.c
  	if (has_cap_mac_admin(false))
  		error = security_sid_to_context_force(&selinux_state,
  						      isec->sid, &context,
-@@ -3387,11 +3420,26 @@ out_nofree:
+@@ -3394,11 +3427,26 @@ out_nofree:
  static int selinux_inode_setsecurity(struct inode *inode, const char *name,
  				     const void *value, size_t size, int flags)
  {
@@ -93,10 +93,10 @@ Index: rpi-kernel/security/selinux/hooks.c
  	if (strcmp(name, XATTR_SELINUX_SUFFIX))
  		return -EOPNOTSUPP;
  
-Index: rpi-kernel/drivers/misc/Kconfig
+Index: kernel-rpi/drivers/misc/Kconfig
 ===================================================================
---- rpi-kernel.orig/drivers/misc/Kconfig
-+++ rpi-kernel/drivers/misc/Kconfig
+--- kernel-rpi.orig/drivers/misc/Kconfig
++++ kernel-rpi/drivers/misc/Kconfig
 @@ -456,6 +456,21 @@ config MISC_RTSX
  	tristate
  	default MISC_RTSX_PCI || MISC_RTSX_USB
@@ -119,19 +119,19 @@ Index: rpi-kernel/drivers/misc/Kconfig
  config PVPANIC
  	tristate "pvpanic device support"
  	depends on HAS_IOMEM && (ACPI || OF)
-Index: rpi-kernel/drivers/misc/Makefile
+Index: kernel-rpi/drivers/misc/Makefile
 ===================================================================
---- rpi-kernel.orig/drivers/misc/Makefile
-+++ rpi-kernel/drivers/misc/Makefile
+--- kernel-rpi.orig/drivers/misc/Makefile
++++ kernel-rpi/drivers/misc/Makefile
 @@ -58,3 +58,4 @@ obj-$(CONFIG_HABANA_AI)		+= habanalabs/
  obj-$(CONFIG_UACCE)		+= uacce/
  obj-$(CONFIG_XILINX_SDFEC)	+= xilinx_sdfec.o
  obj-$(CONFIG_HISI_HIKEY_USB)	+= hisi_hikey_usb.o
 +obj-$(CONFIG_UID_SYS_STATS) += uid_sys_stats.o
-Index: rpi-kernel/drivers/misc/uid_sys_stats.c
+Index: kernel-rpi/drivers/misc/uid_sys_stats.c
 ===================================================================
 --- /dev/null
-+++ rpi-kernel/drivers/misc/uid_sys_stats.c
++++ kernel-rpi/drivers/misc/uid_sys_stats.c
 @@ -0,0 +1,706 @@
 +/* drivers/misc/uid_sys_stats.c
 + *
@@ -839,10 +839,10 @@ Index: rpi-kernel/drivers/misc/uid_sys_stats.c
 +}
 +
 +early_initcall(proc_uid_sys_stats_init);
-Index: rpi-kernel/fs/sync.c
+Index: kernel-rpi/fs/sync.c
 ===================================================================
---- rpi-kernel.orig/fs/sync.c
-+++ rpi-kernel/fs/sync.c
+--- kernel-rpi.orig/fs/sync.c
++++ kernel-rpi/fs/sync.c
 @@ -10,6 +10,7 @@
  #include <linux/export.h>
  #include <linux/namei.h>
@@ -859,10 +859,10 @@ Index: rpi-kernel/fs/sync.c
  	}
  	return ret;
  }
-Index: rpi-kernel/include/linux/sched/xacct.h
+Index: kernel-rpi/include/linux/sched/xacct.h
 ===================================================================
---- rpi-kernel.orig/include/linux/sched/xacct.h
-+++ rpi-kernel/include/linux/sched/xacct.h
+--- kernel-rpi.orig/include/linux/sched/xacct.h
++++ kernel-rpi/include/linux/sched/xacct.h
 @@ -28,6 +28,11 @@ static inline void inc_syscw(struct task
  {
  	tsk->ioac.syscw++;
@@ -885,10 +885,10 @@ Index: rpi-kernel/include/linux/sched/xacct.h
  #endif
  
  #endif /* _LINUX_SCHED_XACCT_H */
-Index: rpi-kernel/include/linux/task_io_accounting.h
+Index: kernel-rpi/include/linux/task_io_accounting.h
 ===================================================================
---- rpi-kernel.orig/include/linux/task_io_accounting.h
-+++ rpi-kernel/include/linux/task_io_accounting.h
+--- kernel-rpi.orig/include/linux/task_io_accounting.h
++++ kernel-rpi/include/linux/task_io_accounting.h
 @@ -19,6 +19,8 @@ struct task_io_accounting {
  	u64 syscr;
  	/* # of write syscalls */
@@ -898,10 +898,10 @@ Index: rpi-kernel/include/linux/task_io_accounting.h
  #endif /* CONFIG_TASK_XACCT */
  
  #ifdef CONFIG_TASK_IO_ACCOUNTING
-Index: rpi-kernel/include/linux/task_io_accounting_ops.h
+Index: kernel-rpi/include/linux/task_io_accounting_ops.h
 ===================================================================
---- rpi-kernel.orig/include/linux/task_io_accounting_ops.h
-+++ rpi-kernel/include/linux/task_io_accounting_ops.h
+--- kernel-rpi.orig/include/linux/task_io_accounting_ops.h
++++ kernel-rpi/include/linux/task_io_accounting_ops.h
 @@ -97,6 +97,7 @@ static inline void task_chr_io_accountin
  	dst->wchar += src->wchar;
  	dst->syscr += src->syscr;

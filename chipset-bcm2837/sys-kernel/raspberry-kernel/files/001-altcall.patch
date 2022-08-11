@@ -1,7 +1,7 @@
-Index: rpi-linux-kernel/arch/arm64/Kconfig
+Index: kernel-rpi/arch/arm64/Kconfig
 ===================================================================
---- rpi-linux-kernel.orig/arch/arm64/Kconfig
-+++ rpi-linux-kernel/arch/arm64/Kconfig
+--- kernel-rpi.orig/arch/arm64/Kconfig
++++ kernel-rpi/arch/arm64/Kconfig
 @@ -16,6 +16,7 @@ config ARM64
  	select ARCH_HAS_DEVMEM_IS_ALLOWED
  	select ARCH_HAS_DMA_PREP_COHERENT
@@ -10,10 +10,10 @@ Index: rpi-linux-kernel/arch/arm64/Kconfig
  	select ARCH_HAS_FAST_MULTIPLIER
  	select ARCH_HAS_FORTIFY_SOURCE
  	select ARCH_HAS_GCOV_PROFILE_ALL
-Index: rpi-linux-kernel/arch/arm64/include/asm/thread_info.h
+Index: kernel-rpi/arch/arm64/include/asm/thread_info.h
 ===================================================================
---- rpi-linux-kernel.orig/arch/arm64/include/asm/thread_info.h
-+++ rpi-linux-kernel/arch/arm64/include/asm/thread_info.h
+--- kernel-rpi.orig/arch/arm64/include/asm/thread_info.h
++++ kernel-rpi/arch/arm64/include/asm/thread_info.h
 @@ -17,6 +17,7 @@ struct task_struct;
  #include <asm/memory.h>
  #include <asm/stack_pointer.h>
@@ -63,10 +63,10 @@ Index: rpi-linux-kernel/arch/arm64/include/asm/thread_info.h
  }
  
  #endif /* __ASM_THREAD_INFO_H */
-Index: rpi-linux-kernel/arch/arm64/include/asm/unistd.h
+Index: kernel-rpi/arch/arm64/include/asm/unistd.h
 ===================================================================
---- rpi-linux-kernel.orig/arch/arm64/include/asm/unistd.h
-+++ rpi-linux-kernel/arch/arm64/include/asm/unistd.h
+--- kernel-rpi.orig/arch/arm64/include/asm/unistd.h
++++ kernel-rpi/arch/arm64/include/asm/unistd.h
 @@ -20,13 +20,349 @@
   */
  #define __NR_compat_restart_syscall	0
@@ -417,10 +417,10 @@ Index: rpi-linux-kernel/arch/arm64/include/asm/unistd.h
  #define __NR_compat_clock_gettime64	403
  #define __NR_compat_clock_getres_time64	406
  
-Index: rpi-linux-kernel/arch/arm64/kernel/syscall.c
+Index: kernel-rpi/arch/arm64/kernel/syscall.c
 ===================================================================
---- rpi-linux-kernel.orig/arch/arm64/kernel/syscall.c
-+++ rpi-linux-kernel/arch/arm64/kernel/syscall.c
+--- kernel-rpi.orig/arch/arm64/kernel/syscall.c
++++ kernel-rpi/arch/arm64/kernel/syscall.c
 @@ -190,14 +190,28 @@ static inline void sve_user_discard(void
  
  void do_el0_svc(struct pt_regs *regs)
@@ -450,10 +450,10 @@ Index: rpi-linux-kernel/arch/arm64/kernel/syscall.c
 +#endif
  }
  #endif
-Index: rpi-linux-kernel/include/linux/alt-syscall.h
+Index: kernel-rpi/include/linux/alt-syscall.h
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/include/linux/alt-syscall.h
++++ kernel-rpi/include/linux/alt-syscall.h
 @@ -0,0 +1,60 @@
 +#ifndef _ALT_SYSCALL_H
 +#define _ALT_SYSCALL_H
@@ -515,10 +515,10 @@ Index: rpi-linux-kernel/include/linux/alt-syscall.h
 +#endif
 +
 +#endif /* _ALT_SYSCALL_H */
-Index: rpi-linux-kernel/include/linux/android_aid.h
+Index: kernel-rpi/include/linux/android_aid.h
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/include/linux/android_aid.h
++++ kernel-rpi/include/linux/android_aid.h
 @@ -0,0 +1,28 @@
 +/* include/linux/android_aid.h
 + *
@@ -548,10 +548,10 @@ Index: rpi-linux-kernel/include/linux/android_aid.h
 +#define AID_NET_BW_ACCT  (3007)  /* change bandwidth statistics accounting */
 +
 +#endif
-Index: rpi-linux-kernel/include/net/netns/core.h
+Index: kernel-rpi/include/net/netns/core.h
 ===================================================================
---- rpi-linux-kernel.orig/include/net/netns/core.h
-+++ rpi-linux-kernel/include/net/netns/core.h
+--- kernel-rpi.orig/include/net/netns/core.h
++++ kernel-rpi/include/net/netns/core.h
 @@ -10,6 +10,7 @@ struct netns_core {
  	struct ctl_table_header	*sysctl_hdr;
  
@@ -560,10 +560,10 @@ Index: rpi-linux-kernel/include/net/netns/core.h
  
  #ifdef CONFIG_PROC_FS
  	int __percpu *sock_inuse;
-Index: rpi-linux-kernel/include/net/sock.h
+Index: kernel-rpi/include/net/sock.h
 ===================================================================
---- rpi-linux-kernel.orig/include/net/sock.h
-+++ rpi-linux-kernel/include/net/sock.h
+--- kernel-rpi.orig/include/net/sock.h
++++ kernel-rpi/include/net/sock.h
 @@ -2648,6 +2648,8 @@ bool sk_ns_capable(const struct sock *sk
  		   struct user_namespace *user_ns, int cap);
  bool sk_capable(const struct sock *sk, int cap);
@@ -573,10 +573,10 @@ Index: rpi-linux-kernel/include/net/sock.h
  
  void sk_get_meminfo(const struct sock *sk, u32 *meminfo);
  
-Index: rpi-linux-kernel/net/core/sock.c
+Index: kernel-rpi/net/core/sock.c
 ===================================================================
---- rpi-linux-kernel.orig/net/core/sock.c
-+++ rpi-linux-kernel/net/core/sock.c
+--- kernel-rpi.orig/net/core/sock.c
++++ kernel-rpi/net/core/sock.c
 @@ -114,6 +114,9 @@
  #include <linux/memcontrol.h>
  #include <linux/prefetch.h>
@@ -637,10 +637,10 @@ Index: rpi-linux-kernel/net/core/sock.c
  		goto out;
  
  	ret = -EINVAL;
-Index: rpi-linux-kernel/net/ipv4/af_inet.c
+Index: kernel-rpi/net/ipv4/af_inet.c
 ===================================================================
---- rpi-linux-kernel.orig/net/ipv4/af_inet.c
-+++ rpi-linux-kernel/net/ipv4/af_inet.c
+--- kernel-rpi.orig/net/ipv4/af_inet.c
++++ kernel-rpi/net/ipv4/af_inet.c
 @@ -85,6 +85,8 @@
  #include <linux/netfilter_ipv4.h>
  #include <linux/random.h>
@@ -669,10 +669,10 @@ Index: rpi-linux-kernel/net/ipv4/af_inet.c
  		goto out_rcu_unlock;
  
  	sock->ops = answer->ops;
-Index: rpi-linux-kernel/net/socket.c
+Index: kernel-rpi/net/socket.c
 ===================================================================
---- rpi-linux-kernel.orig/net/socket.c
-+++ rpi-linux-kernel/net/socket.c
+--- kernel-rpi.orig/net/socket.c
++++ kernel-rpi/net/socket.c
 @@ -314,7 +314,7 @@ static const struct dentry_operations so
  
  static int sockfs_xattr_get(const struct xattr_handler *handler,
@@ -682,10 +682,10 @@ Index: rpi-linux-kernel/net/socket.c
  {
  	if (value) {
  		if (dentry->d_name.len + 1 > size)
-Index: rpi-linux-kernel/security/Kconfig
+Index: kernel-rpi/security/Kconfig
 ===================================================================
---- rpi-linux-kernel.orig/security/Kconfig
-+++ rpi-linux-kernel/security/Kconfig
+--- kernel-rpi.orig/security/Kconfig
++++ kernel-rpi/security/Kconfig
 @@ -241,6 +241,7 @@ source "security/loadpin/Kconfig"
  source "security/yama/Kconfig"
  source "security/safesetid/Kconfig"
@@ -709,10 +709,10 @@ Index: rpi-linux-kernel/security/Kconfig
 +
  endmenu
  
-Index: rpi-linux-kernel/security/Makefile
+Index: kernel-rpi/security/Makefile
 ===================================================================
---- rpi-linux-kernel.orig/security/Makefile
-+++ rpi-linux-kernel/security/Makefile
+--- kernel-rpi.orig/security/Makefile
++++ kernel-rpi/security/Makefile
 @@ -13,6 +13,7 @@ subdir-$(CONFIG_SECURITY_LOADPIN)	+= loa
  subdir-$(CONFIG_SECURITY_SAFESETID)    += safesetid
  subdir-$(CONFIG_SECURITY_LOCKDOWN_LSM)	+= lockdown
@@ -729,10 +729,10 @@ Index: rpi-linux-kernel/security/Makefile
  obj-$(CONFIG_SECURITY_SELINUX)		+= selinux/
  obj-$(CONFIG_SECURITY_SMACK)		+= smack/
  obj-$(CONFIG_SECURITY)			+= lsm_audit.o
-Index: rpi-linux-kernel/fs/ecryptfs/inode.c
+Index: kernel-rpi/fs/ecryptfs/inode.c
 ===================================================================
---- rpi-linux-kernel.orig/fs/ecryptfs/inode.c
-+++ rpi-linux-kernel/fs/ecryptfs/inode.c
+--- kernel-rpi.orig/fs/ecryptfs/inode.c
++++ kernel-rpi/fs/ecryptfs/inode.c
 @@ -1040,7 +1040,7 @@ ecryptfs_getxattr_lower(struct dentry *l
  		goto out;
  	}
@@ -751,10 +751,10 @@ Index: rpi-linux-kernel/fs/ecryptfs/inode.c
  {
  	return ecryptfs_getxattr(dentry, inode, name, buffer, size);
  }
-Index: rpi-linux-kernel/fs/ecryptfs/mmap.c
+Index: kernel-rpi/fs/ecryptfs/mmap.c
 ===================================================================
---- rpi-linux-kernel.orig/fs/ecryptfs/mmap.c
-+++ rpi-linux-kernel/fs/ecryptfs/mmap.c
+--- kernel-rpi.orig/fs/ecryptfs/mmap.c
++++ kernel-rpi/fs/ecryptfs/mmap.c
 @@ -422,7 +422,7 @@ static int ecryptfs_write_inode_size_to_
  	}
  	inode_lock(lower_inode);
@@ -764,10 +764,10 @@ Index: rpi-linux-kernel/fs/ecryptfs/mmap.c
  	if (size < 0)
  		size = 8;
  	put_unaligned_be64(i_size_read(ecryptfs_inode), xattr_virt);
-Index: rpi-linux-kernel/fs/xattr.c
+Index: kernel-rpi/fs/xattr.c
 ===================================================================
---- rpi-linux-kernel.orig/fs/xattr.c
-+++ rpi-linux-kernel/fs/xattr.c
+--- kernel-rpi.orig/fs/xattr.c
++++ kernel-rpi/fs/xattr.c
 @@ -345,7 +345,7 @@ vfs_getxattr_alloc(struct dentry *dentry
  		return PTR_ERR(handler);
  	if (!handler->get)
@@ -855,10 +855,10 @@ Index: rpi-linux-kernel/fs/xattr.c
  	return __vfs_getxattr(dentry, inode, name, value, size);
  }
  EXPORT_SYMBOL_GPL(vfs_getxattr);
-Index: rpi-linux-kernel/include/uapi/linux/xattr.h
+Index: kernel-rpi/include/uapi/linux/xattr.h
 ===================================================================
---- rpi-linux-kernel.orig/include/uapi/linux/xattr.h
-+++ rpi-linux-kernel/include/uapi/linux/xattr.h
+--- kernel-rpi.orig/include/uapi/linux/xattr.h
++++ kernel-rpi/include/uapi/linux/xattr.h
 @@ -20,6 +20,9 @@
  
  #define XATTR_CREATE	0x1	/* set value, fail if attr already exists */
@@ -869,10 +869,10 @@ Index: rpi-linux-kernel/include/uapi/linux/xattr.h
  #endif
  
  /* Namespaces */
-Index: rpi-linux-kernel/net/ipv6/af_inet6.c
+Index: kernel-rpi/net/ipv6/af_inet6.c
 ===================================================================
---- rpi-linux-kernel.orig/net/ipv6/af_inet6.c
-+++ rpi-linux-kernel/net/ipv6/af_inet6.c
+--- kernel-rpi.orig/net/ipv6/af_inet6.c
++++ kernel-rpi/net/ipv6/af_inet6.c
 @@ -34,6 +34,7 @@
  #include <linux/stat.h>
  #include <linux/init.h>
@@ -890,10 +890,10 @@ Index: rpi-linux-kernel/net/ipv6/af_inet6.c
  		goto out_rcu_unlock;
  
  	sock->ops = answer->ops;
-Index: rpi-linux-kernel/security/commoncap.c
+Index: kernel-rpi/security/commoncap.c
 ===================================================================
---- rpi-linux-kernel.orig/security/commoncap.c
-+++ rpi-linux-kernel/security/commoncap.c
+--- kernel-rpi.orig/security/commoncap.c
++++ kernel-rpi/security/commoncap.c
 @@ -297,7 +297,8 @@ int cap_inode_need_killpriv(struct dentr
  	struct inode *inode = d_backing_inode(dentry);
  	int error;
@@ -914,10 +914,10 @@ Index: rpi-linux-kernel/security/commoncap.c
  	if (size == -ENODATA || size == -EOPNOTSUPP)
  		/* no data, that's ok */
  		return -ENODATA;
-Index: rpi-linux-kernel/security/integrity/evm/evm_main.c
+Index: kernel-rpi/security/integrity/evm/evm_main.c
 ===================================================================
---- rpi-linux-kernel.orig/security/integrity/evm/evm_main.c
-+++ rpi-linux-kernel/security/integrity/evm/evm_main.c
+--- kernel-rpi.orig/security/integrity/evm/evm_main.c
++++ kernel-rpi/security/integrity/evm/evm_main.c
 @@ -101,7 +101,7 @@ static int evm_find_protected_xattrs(str
  		return -EOPNOTSUPP;
  
@@ -927,10 +927,10 @@ Index: rpi-linux-kernel/security/integrity/evm/evm_main.c
  		if (error < 0) {
  			if (error == -ENODATA)
  				continue;
-Index: rpi-linux-kernel/security/selinux/Kconfig
+Index: kernel-rpi/security/selinux/Kconfig
 ===================================================================
---- rpi-linux-kernel.orig/security/selinux/Kconfig
-+++ rpi-linux-kernel/security/selinux/Kconfig
+--- kernel-rpi.orig/security/selinux/Kconfig
++++ kernel-rpi/security/selinux/Kconfig
 @@ -93,6 +93,16 @@ config SECURITY_SELINUX_CHECKREQPROT_VAL
  
  	  If you are unsure how to answer this question, answer 0.
@@ -948,10 +948,10 @@ Index: rpi-linux-kernel/security/selinux/Kconfig
  config SECURITY_SELINUX_SIDTAB_HASH_BITS
  	int "NSA SELinux sidtab hashtable size"
  	depends on SECURITY_SELINUX
-Index: rpi-linux-kernel/security/selinux/avc.c
+Index: kernel-rpi/security/selinux/avc.c
 ===================================================================
---- rpi-linux-kernel.orig/security/selinux/avc.c
-+++ rpi-linux-kernel/security/selinux/avc.c
+--- kernel-rpi.orig/security/selinux/avc.c
++++ kernel-rpi/security/selinux/avc.c
 @@ -768,6 +768,11 @@ noinline int slow_avc_audit(struct selin
  	struct common_audit_data stack_data;
  	struct selinux_audit_data sad;
@@ -964,10 +964,10 @@ Index: rpi-linux-kernel/security/selinux/avc.c
  	if (WARN_ON(!tclass || tclass >= ARRAY_SIZE(secclass_map)))
  		return -EINVAL;
  
-Index: rpi-linux-kernel/security/selinux/hooks.c
+Index: kernel-rpi/security/selinux/hooks.c
 ===================================================================
---- rpi-linux-kernel.orig/security/selinux/hooks.c
-+++ rpi-linux-kernel/security/selinux/hooks.c
+--- kernel-rpi.orig/security/selinux/hooks.c
++++ kernel-rpi/security/selinux/hooks.c
 @@ -504,7 +504,8 @@ static int sb_finish_set_opts(struct sup
  			goto out;
  		}
@@ -978,7 +978,7 @@ Index: rpi-linux-kernel/security/selinux/hooks.c
  		if (rc < 0 && rc != -ENODATA) {
  			if (rc == -EOPNOTSUPP)
  				pr_warn("SELinux: (dev %s, type "
-@@ -1332,12 +1333,14 @@ static int inode_doinit_use_xattr(struct
+@@ -1340,12 +1341,14 @@ static int inode_doinit_use_xattr(struct
  		return -ENOMEM;
  
  	context[len] = '\0';
@@ -995,7 +995,7 @@ Index: rpi-linux-kernel/security/selinux/hooks.c
  		if (rc < 0)
  			return rc;
  
-@@ -1348,7 +1351,7 @@ static int inode_doinit_use_xattr(struct
+@@ -1356,7 +1359,7 @@ static int inode_doinit_use_xattr(struct
  
  		context[len] = '\0';
  		rc = __vfs_getxattr(dentry, inode, XATTR_NAME_SELINUX,
@@ -1004,7 +1004,7 @@ Index: rpi-linux-kernel/security/selinux/hooks.c
  	}
  	if (rc < 0) {
  		kfree(context);
-@@ -2004,19 +2007,22 @@ static inline u32 open_file_to_av(struct
+@@ -2012,19 +2015,22 @@ static inline u32 open_file_to_av(struct
  
  /* Hook functions begin here. */
  
@@ -1033,7 +1033,7 @@ Index: rpi-linux-kernel/security/selinux/hooks.c
  	int rc;
  
  	if (mysid != fromsid) {
-@@ -2027,24 +2033,27 @@ static int selinux_binder_transaction(co
+@@ -2035,24 +2041,27 @@ static int selinux_binder_transaction(co
  			return rc;
  	}
  
@@ -1070,7 +1070,7 @@ Index: rpi-linux-kernel/security/selinux/hooks.c
  	struct file_security_struct *fsec = selinux_file(file);
  	struct dentry *dentry = file->f_path.dentry;
  	struct inode_security_struct *isec;
-@@ -5665,7 +5674,7 @@ static unsigned int selinux_ip_postroute
+@@ -5678,7 +5687,7 @@ static unsigned int selinux_ip_postroute
  	struct common_audit_data ad;
  	struct lsm_network_audit net = {0,};
  	char *addrp;
@@ -1079,10 +1079,10 @@ Index: rpi-linux-kernel/security/selinux/hooks.c
  
  	if (sk == NULL)
  		return NF_ACCEPT;
-Index: rpi-linux-kernel/security/selinux/include/classmap.h
+Index: kernel-rpi/security/selinux/include/classmap.h
 ===================================================================
---- rpi-linux-kernel.orig/security/selinux/include/classmap.h
-+++ rpi-linux-kernel/security/selinux/include/classmap.h
+--- kernel-rpi.orig/security/selinux/include/classmap.h
++++ kernel-rpi/security/selinux/include/classmap.h
 @@ -117,7 +117,7 @@ struct security_class_mapping secclass_m
  	  { COMMON_IPC_PERMS, NULL } },
  	{ "netlink_route_socket",
@@ -1092,10 +1092,10 @@ Index: rpi-linux-kernel/security/selinux/include/classmap.h
  	{ "netlink_tcpdiag_socket",
  	  { COMMON_SOCK_PERMS,
  	    "nlmsg_read", "nlmsg_write", NULL } },
-Index: rpi-linux-kernel/security/selinux/include/security.h
+Index: kernel-rpi/security/selinux/include/security.h
 ===================================================================
---- rpi-linux-kernel.orig/security/selinux/include/security.h
-+++ rpi-linux-kernel/security/selinux/include/security.h
+--- kernel-rpi.orig/security/selinux/include/security.h
++++ kernel-rpi/security/selinux/include/security.h
 @@ -97,6 +97,7 @@ struct selinux_state {
  	bool checkreqprot;
  	bool initialized;
@@ -1104,8 +1104,8 @@ Index: rpi-linux-kernel/security/selinux/include/security.h
  
  	struct page *status_page;
  	struct mutex status_lock;
-@@ -219,6 +220,13 @@ static inline bool selinux_policycap_gen
- 	return READ_ONCE(state->policycap[POLICYDB_CAPABILITY_GENFS_SECLABEL_SYMLINKS]);
+@@ -226,6 +227,13 @@ static inline bool selinux_policycap_ioc
+ 	return READ_ONCE(state->policycap[POLICYDB_CAPABILITY_IOCTL_SKIP_CLOEXEC]);
  }
  
 +static inline bool selinux_android_nlroute_getlink(void)
@@ -1118,17 +1118,17 @@ Index: rpi-linux-kernel/security/selinux/include/security.h
  struct selinux_policy_convert_data;
  
  struct selinux_load_state {
-@@ -452,5 +460,6 @@ extern void avtab_cache_init(void);
+@@ -459,5 +467,6 @@ extern void avtab_cache_init(void);
  extern void ebitmap_cache_init(void);
  extern void hashtab_cache_init(void);
  extern int security_sidtab_hash_stats(struct selinux_state *state, char *page);
 +extern void selinux_nlmsg_init(void);
  
  #endif /* _SELINUX_SECURITY_H_ */
-Index: rpi-linux-kernel/security/selinux/nlmsgtab.c
+Index: kernel-rpi/security/selinux/nlmsgtab.c
 ===================================================================
---- rpi-linux-kernel.orig/security/selinux/nlmsgtab.c
-+++ rpi-linux-kernel/security/selinux/nlmsgtab.c
+--- kernel-rpi.orig/security/selinux/nlmsgtab.c
++++ kernel-rpi/security/selinux/nlmsgtab.c
 @@ -25,7 +25,7 @@ struct nlmsg_perm {
  	u32	perm;
  };
@@ -1166,10 +1166,10 @@ Index: rpi-linux-kernel/security/selinux/nlmsgtab.c
 +  else
 +    nlmsg_set_getlink_perm(NETLINK_ROUTE_SOCKET__NLMSG_READ);
 +}
-Index: rpi-linux-kernel/security/selinux/ss/policydb.c
+Index: kernel-rpi/security/selinux/ss/policydb.c
 ===================================================================
---- rpi-linux-kernel.orig/security/selinux/ss/policydb.c
-+++ rpi-linux-kernel/security/selinux/ss/policydb.c
+--- kernel-rpi.orig/security/selinux/ss/policydb.c
++++ kernel-rpi/security/selinux/ss/policydb.c
 @@ -2491,6 +2491,10 @@ int policydb_read(struct policydb *p, vo
  	p->reject_unknown = !!(le32_to_cpu(buf[1]) & REJECT_UNKNOWN);
  	p->allow_unknown = !!(le32_to_cpu(buf[1]) & ALLOW_UNKNOWN);
@@ -1181,10 +1181,10 @@ Index: rpi-linux-kernel/security/selinux/ss/policydb.c
  	if (p->policyvers >= POLICYDB_VERSION_POLCAP) {
  		rc = ebitmap_read(&p->policycaps, fp);
  		if (rc)
-Index: rpi-linux-kernel/security/selinux/ss/policydb.h
+Index: kernel-rpi/security/selinux/ss/policydb.h
 ===================================================================
---- rpi-linux-kernel.orig/security/selinux/ss/policydb.h
-+++ rpi-linux-kernel/security/selinux/ss/policydb.h
+--- kernel-rpi.orig/security/selinux/ss/policydb.h
++++ kernel-rpi/security/selinux/ss/policydb.h
 @@ -238,6 +238,7 @@ struct genfs {
  /* The policy database */
  struct policydb {
@@ -1201,10 +1201,10 @@ Index: rpi-linux-kernel/security/selinux/ss/policydb.h
  
  /* the config flags related to unknown classes/perms are bits 2 and 3 */
  #define REJECT_UNKNOWN	0x00000002
-Index: rpi-linux-kernel/security/selinux/ss/services.c
+Index: kernel-rpi/security/selinux/ss/services.c
 ===================================================================
---- rpi-linux-kernel.orig/security/selinux/ss/services.c
-+++ rpi-linux-kernel/security/selinux/ss/services.c
+--- kernel-rpi.orig/security/selinux/ss/services.c
++++ kernel-rpi/security/selinux/ss/services.c
 @@ -2158,6 +2158,9 @@ static void security_load_policycaps(str
  			pr_info("SELinux:  unknown policy capability %u\n",
  				i);
@@ -1215,10 +1215,10 @@ Index: rpi-linux-kernel/security/selinux/ss/services.c
  }
  
  static int security_preserve_bools(struct selinux_policy *oldpolicy,
-Index: rpi-linux-kernel/security/smack/smack_lsm.c
+Index: kernel-rpi/security/smack/smack_lsm.c
 ===================================================================
---- rpi-linux-kernel.orig/security/smack/smack_lsm.c
-+++ rpi-linux-kernel/security/smack/smack_lsm.c
+--- kernel-rpi.orig/security/smack/smack_lsm.c
++++ kernel-rpi/security/smack/smack_lsm.c
 @@ -289,7 +289,7 @@ static struct smack_known *smk_fetch(con
  	if (buffer == NULL)
  		return ERR_PTR(-ENOMEM);
@@ -1237,10 +1237,10 @@ Index: rpi-linux-kernel/security/smack/smack_lsm.c
  				if (rc >= 0 && strncmp(trattr, TRANS_TRUE,
  						       TRANS_TRUE_SIZE) != 0)
  					rc = -EINVAL;
-Index: rpi-linux-kernel/drivers/net/tun.c
+Index: kernel-rpi/drivers/net/tun.c
 ===================================================================
---- rpi-linux-kernel.orig/drivers/net/tun.c
-+++ rpi-linux-kernel/drivers/net/tun.c
+--- kernel-rpi.orig/drivers/net/tun.c
++++ kernel-rpi/drivers/net/tun.c
 @@ -3047,6 +3047,12 @@ static long __tun_chr_ioctl(struct file
  	int ret;
  	bool do_notify = false;
@@ -1254,10 +1254,10 @@ Index: rpi-linux-kernel/drivers/net/tun.c
  	if (cmd == TUNSETIFF || cmd == TUNSETQUEUE ||
  	    (_IOC_TYPE(cmd) == SOCK_IOC_TYPE && cmd != SIOCGSKNS)) {
  		if (copy_from_user(&ifr, argp, ifreq_len))
-Index: rpi-linux-kernel/fs/ext4/xattr_security.c
+Index: kernel-rpi/fs/ext4/xattr_security.c
 ===================================================================
---- rpi-linux-kernel.orig/fs/ext4/xattr_security.c
-+++ rpi-linux-kernel/fs/ext4/xattr_security.c
+--- kernel-rpi.orig/fs/ext4/xattr_security.c
++++ kernel-rpi/fs/ext4/xattr_security.c
 @@ -15,7 +15,7 @@
  static int
  ext4_xattr_security_get(const struct xattr_handler *handler,
@@ -1267,10 +1267,10 @@ Index: rpi-linux-kernel/fs/ext4/xattr_security.c
  {
  	return ext4_xattr_get(inode, EXT4_XATTR_INDEX_SECURITY,
  			      name, buffer, size);
-Index: rpi-linux-kernel/fs/fuse/xattr.c
+Index: kernel-rpi/fs/fuse/xattr.c
 ===================================================================
---- rpi-linux-kernel.orig/fs/fuse/xattr.c
-+++ rpi-linux-kernel/fs/fuse/xattr.c
+--- kernel-rpi.orig/fs/fuse/xattr.c
++++ kernel-rpi/fs/fuse/xattr.c
 @@ -179,7 +179,7 @@ int fuse_removexattr(struct inode *inode
  
  static int fuse_xattr_get(const struct xattr_handler *handler,
@@ -1289,10 +1289,10 @@ Index: rpi-linux-kernel/fs/fuse/xattr.c
  {
  	return -EOPNOTSUPP;
  }
-Index: rpi-linux-kernel/fs/overlayfs/inode.c
+Index: kernel-rpi/fs/overlayfs/inode.c
 ===================================================================
---- rpi-linux-kernel.orig/fs/overlayfs/inode.c
-+++ rpi-linux-kernel/fs/overlayfs/inode.c
+--- kernel-rpi.orig/fs/overlayfs/inode.c
++++ kernel-rpi/fs/overlayfs/inode.c
 @@ -380,7 +380,7 @@ out:
  }
  
@@ -1312,10 +1312,10 @@ Index: rpi-linux-kernel/fs/overlayfs/inode.c
  	revert_creds(old_cred);
  	return res;
  }
-Index: rpi-linux-kernel/fs/overlayfs/util.c
+Index: kernel-rpi/fs/overlayfs/util.c
 ===================================================================
---- rpi-linux-kernel.orig/fs/overlayfs/util.c
-+++ rpi-linux-kernel/fs/overlayfs/util.c
+--- kernel-rpi.orig/fs/overlayfs/util.c
++++ kernel-rpi/fs/overlayfs/util.c
 @@ -37,9 +37,17 @@ const struct cred *ovl_override_creds(st
  {
  	struct ovl_fs *ofs = sb->s_fs_info;
@@ -1388,10 +1388,10 @@ Index: rpi-linux-kernel/fs/overlayfs/util.c
  	return res;
  }
  
-Index: rpi-linux-kernel/fs/posix_acl.c
+Index: kernel-rpi/fs/posix_acl.c
 ===================================================================
---- rpi-linux-kernel.orig/fs/posix_acl.c
-+++ rpi-linux-kernel/fs/posix_acl.c
+--- kernel-rpi.orig/fs/posix_acl.c
++++ kernel-rpi/fs/posix_acl.c
 @@ -835,7 +835,7 @@ EXPORT_SYMBOL (posix_acl_to_xattr);
  static int
  posix_acl_xattr_get(const struct xattr_handler *handler,
@@ -1401,10 +1401,10 @@ Index: rpi-linux-kernel/fs/posix_acl.c
  {
  	struct posix_acl *acl;
  	int error;
-Index: rpi-linux-kernel/fs/squashfs/xattr.c
+Index: kernel-rpi/fs/squashfs/xattr.c
 ===================================================================
---- rpi-linux-kernel.orig/fs/squashfs/xattr.c
-+++ rpi-linux-kernel/fs/squashfs/xattr.c
+--- kernel-rpi.orig/fs/squashfs/xattr.c
++++ kernel-rpi/fs/squashfs/xattr.c
 @@ -204,7 +204,7 @@ static int squashfs_xattr_handler_get(co
  				      struct dentry *unused,
  				      struct inode *inode,
@@ -1414,10 +1414,10 @@ Index: rpi-linux-kernel/fs/squashfs/xattr.c
  {
  	return squashfs_xattr_get(inode, handler->flags, name,
  		buffer, size);
-Index: rpi-linux-kernel/net/ipv4/devinet.c
+Index: kernel-rpi/net/ipv4/devinet.c
 ===================================================================
---- rpi-linux-kernel.orig/net/ipv4/devinet.c
-+++ rpi-linux-kernel/net/ipv4/devinet.c
+--- kernel-rpi.orig/net/ipv4/devinet.c
++++ kernel-rpi/net/ipv4/devinet.c
 @@ -61,6 +61,7 @@
  #include <net/rtnetlink.h>
  #include <net/net_namespace.h>
@@ -1444,10 +1444,10 @@ Index: rpi-linux-kernel/net/ipv4/devinet.c
  			goto out;
  		ret = -EINVAL;
  		if (sin->sin_family != AF_INET)
-Index: rpi-linux-kernel/security/chromiumos/Kconfig
+Index: kernel-rpi/security/chromiumos/Kconfig
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/security/chromiumos/Kconfig
++++ kernel-rpi/security/chromiumos/Kconfig
 @@ -0,0 +1,45 @@
 +config SECURITY_CHROMIUMOS
 +	bool "Chromium OS Security Module"
@@ -1494,20 +1494,20 @@ Index: rpi-linux-kernel/security/chromiumos/Kconfig
 +	  When enabled, attempts to open /proc/self/mem for write access
 +	  will always fail.  Write access to this file allows bypassing
 +	  of memory map permissions (such as modifying read-only code).
-Index: rpi-linux-kernel/security/chromiumos/Makefile
+Index: kernel-rpi/security/chromiumos/Makefile
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/security/chromiumos/Makefile
++++ kernel-rpi/security/chromiumos/Makefile
 @@ -0,0 +1,5 @@
 +obj-$(CONFIG_SECURITY_CHROMIUMOS) := chromiumos_lsm.o
 +
 +chromiumos_lsm-y := inode_mark.o lsm.o securityfs.o utils.o
 +
 +obj-$(CONFIG_ALT_SYSCALL_CHROMIUMOS) += alt-syscall.o
-Index: rpi-linux-kernel/security/chromiumos/alt-syscall.c
+Index: kernel-rpi/security/chromiumos/alt-syscall.c
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/security/chromiumos/alt-syscall.c
++++ kernel-rpi/security/chromiumos/alt-syscall.c
 @@ -0,0 +1,538 @@
 +/*
 + * Chromium OS alt-syscall tables
@@ -2047,10 +2047,10 @@ Index: rpi-linux-kernel/security/chromiumos/alt-syscall.c
 +	return 0;
 +}
 +module_init(chromiumos_alt_syscall_init);
-Index: rpi-linux-kernel/security/chromiumos/alt-syscall.h
+Index: kernel-rpi/security/chromiumos/alt-syscall.h
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/security/chromiumos/alt-syscall.h
++++ kernel-rpi/security/chromiumos/alt-syscall.h
 @@ -0,0 +1,385 @@
 +/*
 + * Linux Security Module for Chromium OS
@@ -2437,10 +2437,10 @@ Index: rpi-linux-kernel/security/chromiumos/alt-syscall.h
 +#endif
 +
 +#endif /* ALT_SYSCALL_H */
-Index: rpi-linux-kernel/security/chromiumos/android_whitelists.h
+Index: kernel-rpi/security/chromiumos/android_whitelists.h
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/security/chromiumos/android_whitelists.h
++++ kernel-rpi/security/chromiumos/android_whitelists.h
 @@ -0,0 +1,639 @@
 +/*
 + * Linux Security Module for Chromium OS
@@ -3081,10 +3081,10 @@ Index: rpi-linux-kernel/security/chromiumos/android_whitelists.h
 +#endif /* CONFIG_COMPAT */
 +
 +#endif /* ANDROID_WHITELISTS_H */
-Index: rpi-linux-kernel/security/chromiumos/complete_whitelists.h
+Index: kernel-rpi/security/chromiumos/complete_whitelists.h
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/security/chromiumos/complete_whitelists.h
++++ kernel-rpi/security/chromiumos/complete_whitelists.h
 @@ -0,0 +1,373 @@
 +/*
 + * Linux Security Module for Chromium OS
@@ -3459,10 +3459,10 @@ Index: rpi-linux-kernel/security/chromiumos/complete_whitelists.h
 +#endif /* CONFIG_COMPAT */
 +
 +#endif /* COMPLETE_WHITELISTS_H */
-Index: rpi-linux-kernel/security/chromiumos/inode_mark.c
+Index: kernel-rpi/security/chromiumos/inode_mark.c
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/security/chromiumos/inode_mark.c
++++ kernel-rpi/security/chromiumos/inode_mark.c
 @@ -0,0 +1,353 @@
 +/*
 + * Linux Security Module for Chromium OS
@@ -3817,10 +3817,10 @@ Index: rpi-linux-kernel/security/chromiumos/inode_mark.c
 +
 +	return policy;
 +}
-Index: rpi-linux-kernel/security/chromiumos/inode_mark.h
+Index: kernel-rpi/security/chromiumos/inode_mark.h
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/security/chromiumos/inode_mark.h
++++ kernel-rpi/security/chromiumos/inode_mark.h
 @@ -0,0 +1,47 @@
 +/*
 + * Linux Security Module for Chromium OS
@@ -3869,10 +3869,10 @@ Index: rpi-linux-kernel/security/chromiumos/inode_mark.h
 +chromiumos_get_inode_security_policy(
 +	struct dentry *dentry, struct inode *inode,
 +	enum chromiumos_inode_security_policy_type type);
-Index: rpi-linux-kernel/security/chromiumos/lsm.c
+Index: kernel-rpi/security/chromiumos/lsm.c
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/security/chromiumos/lsm.c
++++ kernel-rpi/security/chromiumos/lsm.c
 @@ -0,0 +1,274 @@
 +/*
 + * Linux Security Module for Chromium OS
@@ -4148,10 +4148,10 @@ Index: rpi-linux-kernel/security/chromiumos/lsm.c
 +	.name = "chromiumos",
 +	.init = chromiumos_security_init
 +};
-Index: rpi-linux-kernel/security/chromiumos/read_write_test_whitelists.h
+Index: kernel-rpi/security/chromiumos/read_write_test_whitelists.h
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/security/chromiumos/read_write_test_whitelists.h
++++ kernel-rpi/security/chromiumos/read_write_test_whitelists.h
 @@ -0,0 +1,56 @@
 +/*
 + * Linux Security Module for Chromium OS
@@ -4209,10 +4209,10 @@ Index: rpi-linux-kernel/security/chromiumos/read_write_test_whitelists.h
 +#endif /* CONFIG_COMPAT */
 +
 +#endif /* READ_WRITE_TESTS_WHITELISTS_H */
-Index: rpi-linux-kernel/security/chromiumos/securityfs.c
+Index: kernel-rpi/security/chromiumos/securityfs.c
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/security/chromiumos/securityfs.c
++++ kernel-rpi/security/chromiumos/securityfs.c
 @@ -0,0 +1,241 @@
 +/*
 + * Linux Security Module for Chromium OS
@@ -4455,10 +4455,10 @@ Index: rpi-linux-kernel/security/chromiumos/securityfs.c
 +	return ret;
 +}
 +fs_initcall(chromiumos_init_securityfs);
-Index: rpi-linux-kernel/security/chromiumos/third_party_whitelists.h
+Index: kernel-rpi/security/chromiumos/third_party_whitelists.h
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/security/chromiumos/third_party_whitelists.h
++++ kernel-rpi/security/chromiumos/third_party_whitelists.h
 @@ -0,0 +1,252 @@
 +/*
 + * Linux Security Module for Chromium OS
@@ -4712,10 +4712,10 @@ Index: rpi-linux-kernel/security/chromiumos/third_party_whitelists.h
 +#endif /* CONFIG_COMPAT */
 +
 +#endif /* THIRD_PARTY_WHITELISTS_H */
-Index: rpi-linux-kernel/security/chromiumos/utils.c
+Index: kernel-rpi/security/chromiumos/utils.c
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/security/chromiumos/utils.c
++++ kernel-rpi/security/chromiumos/utils.c
 @@ -0,0 +1,157 @@
 +/*
 + * Utilities for the Linux Security Module for Chromium OS
@@ -4874,10 +4874,10 @@ Index: rpi-linux-kernel/security/chromiumos/utils.c
 +out:
 +	return buffer;
 +}
-Index: rpi-linux-kernel/security/chromiumos/utils.h
+Index: kernel-rpi/security/chromiumos/utils.h
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/security/chromiumos/utils.h
++++ kernel-rpi/security/chromiumos/utils.h
 @@ -0,0 +1,30 @@
 +/*
 + * Utilities for the Linux Security Module for Chromium OS
@@ -4909,10 +4909,10 @@ Index: rpi-linux-kernel/security/chromiumos/utils.h
 +char *printable_cmdline(struct task_struct *task);
 +
 +#endif /* _SECURITY_CHROMIUMOS_UTILS_H */
-Index: rpi-linux-kernel/net/core/sysctl_net_core.c
+Index: kernel-rpi/net/core/sysctl_net_core.c
 ===================================================================
---- rpi-linux-kernel.orig/net/core/sysctl_net_core.c
-+++ rpi-linux-kernel/net/core/sysctl_net_core.c
+--- kernel-rpi.orig/net/core/sysctl_net_core.c
++++ kernel-rpi/net/core/sysctl_net_core.c
 @@ -576,6 +576,15 @@ static struct ctl_table net_core_table[]
  };
  
@@ -4944,10 +4944,10 @@ Index: rpi-linux-kernel/net/core/sysctl_net_core.c
  		}
  	}
  
-Index: rpi-linux-kernel/arch/arm64/include/asm/syscall.h
+Index: kernel-rpi/arch/arm64/include/asm/syscall.h
 ===================================================================
---- rpi-linux-kernel.orig/arch/arm64/include/asm/syscall.h
-+++ rpi-linux-kernel/arch/arm64/include/asm/syscall.h
+--- kernel-rpi.orig/arch/arm64/include/asm/syscall.h
++++ kernel-rpi/arch/arm64/include/asm/syscall.h
 @@ -17,6 +17,8 @@ extern const syscall_fn_t sys_call_table
  extern const syscall_fn_t compat_sys_call_table[];
  #endif
@@ -4957,10 +4957,10 @@ Index: rpi-linux-kernel/arch/arm64/include/asm/syscall.h
  static inline int syscall_get_nr(struct task_struct *task,
  				 struct pt_regs *regs)
  {
-Index: rpi-linux-kernel/arch/arm64/kernel/Makefile
+Index: kernel-rpi/arch/arm64/kernel/Makefile
 ===================================================================
---- rpi-linux-kernel.orig/arch/arm64/kernel/Makefile
-+++ rpi-linux-kernel/arch/arm64/kernel/Makefile
+--- kernel-rpi.orig/arch/arm64/kernel/Makefile
++++ kernel-rpi/arch/arm64/kernel/Makefile
 @@ -63,6 +63,9 @@ obj-$(CONFIG_ARM64_MTE)			+= mte.o
  
  obj-y					+= vdso/ probes/
@@ -4971,10 +4971,10 @@ Index: rpi-linux-kernel/arch/arm64/kernel/Makefile
  head-y					:= head.o
  extra-y					+= $(head-y) vmlinux.lds
  
-Index: rpi-linux-kernel/arch/arm64/kernel/alt-syscall.c
+Index: kernel-rpi/arch/arm64/kernel/alt-syscall.c
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/arch/arm64/kernel/alt-syscall.c
++++ kernel-rpi/arch/arm64/kernel/alt-syscall.c
 @@ -0,0 +1,78 @@
 +/*
 + * AArch64 alt-syscall implementation
@@ -5054,10 +5054,10 @@ Index: rpi-linux-kernel/arch/arm64/kernel/alt-syscall.c
 +
 +	return 0;
 +}
-Index: rpi-linux-kernel/arch/arm64/kernel/vdso32/Makefile
+Index: kernel-rpi/arch/arm64/kernel/vdso32/Makefile
 ===================================================================
---- rpi-linux-kernel.orig/arch/arm64/kernel/vdso32/Makefile
-+++ rpi-linux-kernel/arch/arm64/kernel/vdso32/Makefile
+--- kernel-rpi.orig/arch/arm64/kernel/vdso32/Makefile
++++ kernel-rpi/arch/arm64/kernel/vdso32/Makefile
 @@ -10,17 +10,20 @@ include $(srctree)/lib/vdso/Makefile
  
  # Same as cc-*option, but using CC_COMPAT instead of CC
@@ -5103,10 +5103,10 @@ Index: rpi-linux-kernel/arch/arm64/kernel/vdso32/Makefile
  VDSO_CAFLAGS += $(call cc32-option,-fno-PIE)
  ifdef CONFIG_DEBUG_INFO
  VDSO_CAFLAGS += -g
-Index: rpi-linux-kernel/include/linux/syscalls.h
+Index: kernel-rpi/include/linux/syscalls.h
 ===================================================================
---- rpi-linux-kernel.orig/include/linux/syscalls.h
-+++ rpi-linux-kernel/include/linux/syscalls.h
+--- kernel-rpi.orig/include/linux/syscalls.h
++++ kernel-rpi/include/linux/syscalls.h
 @@ -1371,4 +1371,25 @@ int __sys_getsockopt(int fd, int level,
  		int __user *optlen);
  int __sys_setsockopt(int fd, int level, int optname, char __user *optval,
@@ -5133,10 +5133,10 @@ Index: rpi-linux-kernel/include/linux/syscalls.h
 +#endif /* CONFIG_ALT_SYSCALL */
 +
  #endif
-Index: rpi-linux-kernel/include/uapi/linux/prctl.h
+Index: kernel-rpi/include/uapi/linux/prctl.h
 ===================================================================
---- rpi-linux-kernel.orig/include/uapi/linux/prctl.h
-+++ rpi-linux-kernel/include/uapi/linux/prctl.h
+--- kernel-rpi.orig/include/uapi/linux/prctl.h
++++ kernel-rpi/include/uapi/linux/prctl.h
 @@ -155,6 +155,9 @@ struct prctl_mm_map {
  #define PR_SET_PTRACER 0x59616d61
  # define PR_SET_PTRACER_ANY ((unsigned long)-1)
@@ -5155,10 +5155,10 @@ Index: rpi-linux-kernel/include/uapi/linux/prctl.h
 +# define PR_SET_VMA_ANON_NAME   0
 +
  #endif /* _LINUX_PRCTL_H */
-Index: rpi-linux-kernel/kernel/Makefile
+Index: kernel-rpi/kernel/Makefile
 ===================================================================
---- rpi-linux-kernel.orig/kernel/Makefile
-+++ rpi-linux-kernel/kernel/Makefile
+--- kernel-rpi.orig/kernel/Makefile
++++ kernel-rpi/kernel/Makefile
 @@ -48,6 +48,8 @@ obj-y += livepatch/
  obj-y += dma/
  obj-y += entry/
@@ -5168,10 +5168,10 @@ Index: rpi-linux-kernel/kernel/Makefile
  obj-$(CONFIG_KCMP) += kcmp.o
  obj-$(CONFIG_FREEZER) += freezer.o
  obj-$(CONFIG_PROFILING) += profile.o
-Index: rpi-linux-kernel/kernel/alt-syscall.c
+Index: kernel-rpi/kernel/alt-syscall.c
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/kernel/alt-syscall.c
++++ kernel-rpi/kernel/alt-syscall.c
 @@ -0,0 +1,66 @@
 +/*
 + * Alternate Syscall Table Infrastructure
@@ -5239,10 +5239,10 @@ Index: rpi-linux-kernel/kernel/alt-syscall.c
 +
 +	return -ENOENT;
 +}
-Index: rpi-linux-kernel/kernel/sys.c
+Index: kernel-rpi/kernel/sys.c
 ===================================================================
---- rpi-linux-kernel.orig/kernel/sys.c
-+++ rpi-linux-kernel/kernel/sys.c
+--- kernel-rpi.orig/kernel/sys.c
++++ kernel-rpi/kernel/sys.c
 @@ -42,9 +42,12 @@
  #include <linux/syscore_ops.h>
  #include <linux/version.h>
@@ -5510,10 +5510,10 @@ Index: rpi-linux-kernel/kernel/sys.c
  /**
   * do_sysinfo - fill in sysinfo struct
   * @info: pointer to buffer to fill
-Index: rpi-linux-kernel/include/linux/lsm_hook_defs.h
+Index: kernel-rpi/include/linux/lsm_hook_defs.h
 ===================================================================
---- rpi-linux-kernel.orig/include/linux/lsm_hook_defs.h
-+++ rpi-linux-kernel/include/linux/lsm_hook_defs.h
+--- kernel-rpi.orig/include/linux/lsm_hook_defs.h
++++ kernel-rpi/include/linux/lsm_hook_defs.h
 @@ -26,13 +26,13 @@
   *   #undef LSM_HOOK
   * };
@@ -5535,10 +5535,10 @@ Index: rpi-linux-kernel/include/linux/lsm_hook_defs.h
  LSM_HOOK(int, 0, ptrace_access_check, struct task_struct *child,
  	 unsigned int mode)
  LSM_HOOK(int, 0, ptrace_traceme, struct task_struct *parent)
-Index: rpi-linux-kernel/security/security.c
+Index: kernel-rpi/security/security.c
 ===================================================================
---- rpi-linux-kernel.orig/security/security.c
-+++ rpi-linux-kernel/security/security.c
+--- kernel-rpi.orig/security/security.c
++++ kernel-rpi/security/security.c
 @@ -723,25 +723,25 @@ static void __init lsm_early_task(struct
  
  /* Security operations */
@@ -5572,7 +5572,7 @@ Index: rpi-linux-kernel/security/security.c
  {
  	return call_int_hook(binder_transfer_file, 0, from, to, file);
  }
-@@ -1159,6 +1159,7 @@ int security_path_chown(const struct pat
+@@ -1172,6 +1172,7 @@ int security_path_chown(const struct pat
  		return 0;
  	return call_int_hook(path_chown, 0, path, uid, gid);
  }
@@ -5580,10 +5580,10 @@ Index: rpi-linux-kernel/security/security.c
  
  int security_path_chroot(const struct path *path)
  {
-Index: rpi-linux-kernel/include/linux/security.h
+Index: kernel-rpi/include/linux/security.h
 ===================================================================
---- rpi-linux-kernel.orig/include/linux/security.h
-+++ rpi-linux-kernel/include/linux/security.h
+--- kernel-rpi.orig/include/linux/security.h
++++ kernel-rpi/include/linux/security.h
 @@ -254,13 +254,13 @@ extern int security_init(void);
  extern int early_security_init(void);
  
@@ -5650,10 +5650,10 @@ Index: rpi-linux-kernel/include/linux/security.h
  static inline int security_kernel_act_as(struct cred *cred, u32 secid)
  {
  	return 0;
-Index: rpi-linux-kernel/drivers/android/binder.c
+Index: kernel-rpi/drivers/android/binder.c
 ===================================================================
---- rpi-linux-kernel.orig/drivers/android/binder.c
-+++ rpi-linux-kernel/drivers/android/binder.c
+--- kernel-rpi.orig/drivers/android/binder.c
++++ kernel-rpi/drivers/android/binder.c
 @@ -420,9 +420,6 @@ enum binder_deferred_state {
   *                        (invariant after initialized)
   * @tsk                   task_struct for group_leader of process
@@ -5841,11 +5841,11 @@ Index: rpi-linux-kernel/drivers/android/binder.c
  	INIT_LIST_HEAD(&proc->todo);
  	proc->default_priority = task_nice(current);
  	/* binderfs stashes devices in i_private */
-Index: rpi-linux-kernel/kernel/events/core.c
+Index: kernel-rpi/kernel/events/core.c
 ===================================================================
---- rpi-linux-kernel.orig/kernel/events/core.c
-+++ rpi-linux-kernel/kernel/events/core.c
-@@ -2209,6 +2209,26 @@ out:
+--- kernel-rpi.orig/kernel/events/core.c
++++ kernel-rpi/kernel/events/core.c
+@@ -2276,6 +2276,26 @@ out:
  	perf_event__header_size(leader);
  }
  
@@ -5872,7 +5872,7 @@ Index: rpi-linux-kernel/kernel/events/core.c
  static bool is_orphaned_event(struct perf_event *event)
  {
  	return event->state == PERF_EVENT_STATE_DEAD;
-@@ -2316,6 +2336,7 @@ group_sched_out(struct perf_event *group
+@@ -2383,6 +2403,7 @@ group_sched_out(struct perf_event *group
  }
  
  #define DETACH_GROUP	0x01UL
@@ -5880,7 +5880,7 @@ Index: rpi-linux-kernel/kernel/events/core.c
  
  /*
   * Cross CPU call to remove a performance event
-@@ -2339,6 +2360,8 @@ __perf_remove_from_context(struct perf_e
+@@ -2406,6 +2427,8 @@ __perf_remove_from_context(struct perf_e
  	event_sched_out(event, cpuctx, ctx);
  	if (flags & DETACH_GROUP)
  		perf_group_detach(event);
@@ -5889,7 +5889,7 @@ Index: rpi-linux-kernel/kernel/events/core.c
  	list_del_event(event, ctx);
  
  	if (!ctx->nr_events && ctx->is_active) {
-@@ -2367,25 +2390,21 @@ static void perf_remove_from_context(str
+@@ -2437,25 +2460,21 @@ static void perf_remove_from_context(str
  
  	lockdep_assert_held(&ctx->mutex);
  
@@ -5927,37 +5927,7 @@ Index: rpi-linux-kernel/kernel/events/core.c
  }
  
  /*
-@@ -3676,29 +3695,6 @@ static noinline int visit_groups_merge(s
- 	return 0;
- }
- 
--static inline bool event_update_userpage(struct perf_event *event)
--{
--	if (likely(!atomic_read(&event->mmap_count)))
--		return false;
--
--	perf_event_update_time(event);
--	perf_set_shadow_time(event, event->ctx);
--	perf_event_update_userpage(event);
--
--	return true;
--}
--
--static inline void group_update_userpage(struct perf_event *group_event)
--{
--	struct perf_event *event;
--
--	if (!event_update_userpage(group_event))
--		return;
--
--	for_each_sibling_event(event, group_event)
--		event_update_userpage(event);
--}
--
- static int merge_sched_in(struct perf_event *event, void *data)
- {
- 	struct perf_event_context *ctx = event->ctx;
-@@ -3717,15 +3713,14 @@ static int merge_sched_in(struct perf_ev
+@@ -3762,15 +3781,14 @@ static int merge_sched_in(struct perf_ev
  	}
  
  	if (event->state == PERF_EVENT_STATE_INACTIVE) {
@@ -5977,16 +5947,7 @@ Index: rpi-linux-kernel/kernel/events/core.c
  	}
  
  	return 0;
-@@ -6244,8 +6239,6 @@ accounting:
- 
- 		ring_buffer_attach(event, rb);
- 
--		perf_event_update_time(event);
--		perf_set_shadow_time(event, event->ctx);
- 		perf_event_init_userpage(event);
- 		perf_event_update_userpage(event);
- 	} else {
-@@ -7017,6 +7010,7 @@ void perf_output_sample(struct perf_outp
+@@ -7078,6 +7096,7 @@ void perf_output_sample(struct perf_outp
  static u64 perf_virt_to_phys(u64 virt)
  {
  	u64 phys_addr = 0;
@@ -5994,7 +5955,7 @@ Index: rpi-linux-kernel/kernel/events/core.c
  
  	if (!virt)
  		return 0;
-@@ -7035,15 +7029,14 @@ static u64 perf_virt_to_phys(u64 virt)
+@@ -7096,15 +7115,14 @@ static u64 perf_virt_to_phys(u64 virt)
  		 * If failed, leave phys_addr as 0.
  		 */
  		if (current->mm != NULL) {
@@ -6014,7 +5975,7 @@ Index: rpi-linux-kernel/kernel/events/core.c
  	}
  
  	return phys_addr;
-@@ -11676,9 +11669,8 @@ again:
+@@ -11740,9 +11758,8 @@ again:
   * @cpu:		target cpu
   * @group_fd:		group leader event fd
   */
@@ -6026,7 +5987,7 @@ Index: rpi-linux-kernel/kernel/events/core.c
  {
  	struct perf_event *group_leader = NULL, *output_event = NULL;
  	struct perf_event *event, *sibling;
-@@ -12125,6 +12117,13 @@ err_fd:
+@@ -12189,6 +12206,13 @@ err_fd:
  	return err;
  }
  
@@ -6040,7 +6001,7 @@ Index: rpi-linux-kernel/kernel/events/core.c
  /**
   * perf_event_create_kernel_counter
   *
-@@ -12277,14 +12276,17 @@ void perf_pmu_migrate_context(struct pmu
+@@ -12341,14 +12365,17 @@ void perf_pmu_migrate_context(struct pmu
  }
  EXPORT_SYMBOL_GPL(perf_pmu_migrate_context);
  
@@ -6062,7 +6023,7 @@ Index: rpi-linux-kernel/kernel/events/core.c
  
  	child_val = perf_event_count(child_event);
  
-@@ -12299,60 +12301,53 @@ static void sync_child_event(struct perf
+@@ -12363,60 +12390,53 @@ static void sync_child_event(struct perf
  }
  
  static void
@@ -6159,7 +6120,7 @@ Index: rpi-linux-kernel/kernel/events/core.c
  }
  
  static void perf_event_exit_task_context(struct task_struct *child, int ctxn)
-@@ -12409,7 +12404,7 @@ static void perf_event_exit_task_context
+@@ -12473,7 +12493,7 @@ static void perf_event_exit_task_context
  	perf_event_task(child, child_ctx, 0);
  
  	list_for_each_entry_safe(child_event, next, &child_ctx->event_list, event_entry)
@@ -6168,7 +6129,7 @@ Index: rpi-linux-kernel/kernel/events/core.c
  
  	mutex_unlock(&child_ctx->mutex);
  
-@@ -12669,6 +12664,7 @@ inherit_event(struct perf_event *parent_
+@@ -12733,6 +12753,7 @@ inherit_event(struct perf_event *parent_
  	 */
  	raw_spin_lock_irqsave(&child_ctx->lock, flags);
  	add_event_to_ctx(child_event, child_ctx);
@@ -6176,10 +6137,10 @@ Index: rpi-linux-kernel/kernel/events/core.c
  	raw_spin_unlock_irqrestore(&child_ctx->lock, flags);
  
  	/*
-Index: rpi-linux-kernel/kernel/time/time.c
+Index: kernel-rpi/kernel/time/time.c
 ===================================================================
---- rpi-linux-kernel.orig/kernel/time/time.c
-+++ rpi-linux-kernel/kernel/time/time.c
+--- kernel-rpi.orig/kernel/time/time.c
++++ kernel-rpi/kernel/time/time.c
 @@ -266,7 +266,7 @@ COMPAT_SYSCALL_DEFINE2(settimeofday, str
  #endif
  
@@ -6223,10 +6184,10 @@ Index: rpi-linux-kernel/kernel/time/time.c
  #endif
  
  /*
-Index: rpi-linux-kernel/include/linux/perf_event.h
+Index: kernel-rpi/include/linux/perf_event.h
 ===================================================================
---- rpi-linux-kernel.orig/include/linux/perf_event.h
-+++ rpi-linux-kernel/include/linux/perf_event.h
+--- kernel-rpi.orig/include/linux/perf_event.h
++++ kernel-rpi/include/linux/perf_event.h
 @@ -607,6 +607,7 @@ struct swevent_hlist {
  #define PERF_ATTACH_TASK_DATA	0x08
  #define PERF_ATTACH_ITRACE	0x10
@@ -6235,10 +6196,10 @@ Index: rpi-linux-kernel/include/linux/perf_event.h
  
  struct perf_cgroup;
  struct perf_buffer;
-Index: rpi-linux-kernel/kernel/time/posix-timers.c
+Index: kernel-rpi/kernel/time/posix-timers.c
 ===================================================================
---- rpi-linux-kernel.orig/kernel/time/posix-timers.c
-+++ rpi-linux-kernel/kernel/time/posix-timers.c
+--- kernel-rpi.orig/kernel/time/posix-timers.c
++++ kernel-rpi/kernel/time/posix-timers.c
 @@ -1109,8 +1109,8 @@ int do_clock_adjtime(const clockid_t whi
  	return kc->clock_adj(which_clock, ktx);
  }

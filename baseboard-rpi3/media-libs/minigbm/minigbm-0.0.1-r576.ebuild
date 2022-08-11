@@ -1,13 +1,10 @@
-# Copyright (c) 2022 Fyde Innovations Limited and the openFyde Authors.
-# Distributed under the license specified in the root directory of this project.
-
 # Copyright 2014 The Chromium OS Authors. All rights reserved.
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI="6"
 
-CROS_WORKON_COMMIT="bba5d53609ab980bac95a70b378dd6fb29d375a8"
-CROS_WORKON_TREE="d716f9085d4bdb2f9277eff0a623787e89fed228"
+CROS_WORKON_COMMIT="a5ac45890d256866bac77140da7981e6a8a41c42"
+CROS_WORKON_TREE="7a7f01716f76660e5547da42fe22f360242dc4cc"
 CROS_WORKON_PROJECT="chromiumos/platform/minigbm"
 CROS_WORKON_LOCALNAME="../platform/minigbm"
 CROS_WORKON_OUTOFTREE_BUILD=1
@@ -24,10 +21,13 @@ VIDEO_CARDS="
 	amdgpu exynos intel marvell mediatek msm
 	radeon radeonsi rockchip tegra vc4 virgl v3d
 "
-IUSE="-asan kernel-3_8 kernel-3_14 kernel-3_18"
+IUSE="-asan linear_align_256"
 for card in ${VIDEO_CARDS}; do
 	IUSE+=" video_cards_${card}"
 done
+
+MINI_GBM_PLATFORMS_USE=( mt8183 mt8186 mt8192 mt8195 sc7280)
+IUSE+=" ${MINI_GBM_PLATFORMS_USE[*]/#/minigbm_platform_}"
 
 RDEPEND="
 	x11-libs/libdrm
@@ -41,7 +41,7 @@ DEPEND="${RDEPEND}
 	)"
 
 src_prepare() {
-  epatch ${FILESDIR}/vc4_v3d.patch
+  eapply "${FILESDIR}/vc4_v3d.patch"
 	default
 	sanitizers-setup-env
 	cros-common.mk_src_prepare
@@ -54,14 +54,14 @@ src_configure() {
 	use video_cards_exynos && append-cppflags -DDRV_EXYNOS && export DRV_EXYNOS=1
 	use video_cards_intel && append-cppflags -DDRV_I915 && export DRV_I915=1
 	if use video_cards_intel ; then
-		if ! (use kernel-3_8 || use kernel-3_14 || use kernel-3_18); then
-			append-cppflags -DI915_SCANOUT_Y_TILED
-		fi
+		append-cppflags -DI915_SCANOUT_Y_TILED
 	fi
 	use video_cards_marvell && append-cppflags -DDRV_MARVELL && export DRV_MARVELL=1
-	if [[ ${MTK_MINIGBM_PLATFORM} == "MT8183" ]] ; then
-		append-cppflags -DMTK_MT8183 && export MTK_MT8183=1
-	fi
+	use minigbm_platform_mt8183 && append-cppflags -DMTK_MT8183
+	use minigbm_platform_mt8186 && append-cppflags -DMTK_MT8186
+	use minigbm_platform_mt8192 && append-cppflags -DMTK_MT8192
+	use minigbm_platform_mt8195 && append-cppflags -DMTK_MT8195
+	use minigbm_platform_sc7280 && append-cppflags -DSC_7280
 	use video_cards_mediatek && append-cppflags -DDRV_MEDIATEK && export DRV_MEDIATEK=1
 	use video_cards_msm && append-cppflags -DDRV_MSM && export DRV_MSM=1
 	use video_cards_radeon && append-cppflags -DDRV_RADEON && export DRV_RADEON=1
@@ -70,6 +70,7 @@ src_configure() {
 	use video_cards_tegra && append-cppflags -DDRV_TEGRA && export DRV_TEGRA=1
 	use video_cards_vc4 && append-cppflags -DDRV_VC4 && export DRV_VC4=1
 	use video_cards_virgl && append-cppflags -DDRV_VIRGL && export DRV_VIRGL=1
+	use linear_align_256 && append-cppflags -DLINEAR_ALIGN_256
   use video_cards_v3d && append-cppflags -DDRV_V3D && export DRV_V3D=1
 	cros-common.mk_src_configure
 }
@@ -81,10 +82,6 @@ src_compile() {
 src_install() {
 	insinto "${EPREFIX}/etc/udev/rules.d"
 	doins "${FILESDIR}/50-vgem.rules"
-
-	# Install cros_gralloc header files for arc-mali-* packages
-	insinto "${EPREFIX}/usr/include/cros_gralloc"
-	doins "${S}/cros_gralloc/cros_gralloc_handle.h"
 
 	default
 }

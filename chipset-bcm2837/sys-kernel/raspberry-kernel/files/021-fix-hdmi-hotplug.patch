@@ -1,7 +1,7 @@
-Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_hdmi.h
+Index: kernel-rpi/drivers/gpu/drm/vc4/vc4_hdmi.h
 ===================================================================
---- rpi-kernel.orig/drivers/gpu/drm/vc4/vc4_hdmi.h
-+++ rpi-kernel/drivers/gpu/drm/vc4/vc4_hdmi.h
+--- kernel-rpi.orig/drivers/gpu/drm/vc4/vc4_hdmi.h
++++ kernel-rpi/drivers/gpu/drm/vc4/vc4_hdmi.h
 @@ -5,6 +5,8 @@
  #include <media/cec.h>
  #include <sound/dmaengine_pcm.h>
@@ -11,10 +11,10 @@ Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_hdmi.h
  
  #include "vc4_drv.h"
  
-@@ -254,6 +256,11 @@ struct vc4_hdmi {
+@@ -262,6 +264,11 @@ struct vc4_hdmi {
  	 * for use outside of KMS hooks. Protected by @mutex.
  	 */
- 	enum vc4_hdmi_output_format output_format;
+ 	int broadcast_rgb;
 +
 +  struct snd_soc_jack hdmi_jack;
 +  hdmi_codec_plugged_cb plugged_cb;
@@ -23,11 +23,11 @@ Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_hdmi.h
  };
  
  static inline struct vc4_hdmi *
-Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_hdmi.c
+Index: kernel-rpi/drivers/gpu/drm/vc4/vc4_hdmi.c
 ===================================================================
---- rpi-kernel.orig/drivers/gpu/drm/vc4/vc4_hdmi.c
-+++ rpi-kernel/drivers/gpu/drm/vc4/vc4_hdmi.c
-@@ -110,6 +110,12 @@ static const char * const output_format_
+--- kernel-rpi.orig/drivers/gpu/drm/vc4/vc4_hdmi.c
++++ kernel-rpi/drivers/gpu/drm/vc4/vc4_hdmi.c
+@@ -124,6 +124,12 @@ static const char * const output_format_
  	[VC4_HDMI_OUTPUT_YUV444]	= "YUV 4:4:4",
  };
  
@@ -40,7 +40,7 @@ Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_hdmi.c
  static const char *vc4_hdmi_output_fmt_str(enum vc4_hdmi_output_format fmt)
  {
  	if (fmt >= ARRAY_SIZE(output_format_str))
-@@ -269,6 +275,11 @@ vc4_hdmi_connector_detect(struct drm_con
+@@ -292,6 +298,11 @@ vc4_hdmi_connector_detect(struct drm_con
  	cec_phys_addr_invalidate(vc4_hdmi->cec_adap);
  
  out:
@@ -52,7 +52,7 @@ Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_hdmi.c
  	pm_runtime_put(&vc4_hdmi->pdev->dev);
  	mutex_unlock(&vc4_hdmi->mutex);
  	return ret;
-@@ -2072,11 +2083,26 @@ static int vc4_hdmi_audio_get_eld(struct
+@@ -2292,11 +2303,26 @@ static int vc4_hdmi_audio_get_eld(struct
  	return 0;
  }
  
@@ -79,7 +79,7 @@ Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_hdmi.c
  };
  
  struct hdmi_codec_pdata vc4_hdmi_codec_pdata = {
-@@ -2085,6 +2111,20 @@ struct hdmi_codec_pdata vc4_hdmi_codec_p
+@@ -2305,6 +2331,20 @@ struct hdmi_codec_pdata vc4_hdmi_codec_p
  	.i2s = 1,
  };
  
@@ -100,7 +100,7 @@ Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_hdmi.c
  static int vc4_hdmi_audio_init(struct vc4_hdmi *vc4_hdmi)
  {
  	const struct vc4_hdmi_register *mai_data =
-@@ -2153,6 +2193,7 @@ static int vc4_hdmi_audio_init(struct vc
+@@ -2373,6 +2413,7 @@ static int vc4_hdmi_audio_init(struct vc
  	dai_link->cpus		= &vc4_hdmi->audio.cpu;
  	dai_link->codecs	= &vc4_hdmi->audio.codec;
  	dai_link->platforms	= &vc4_hdmi->audio.platform;

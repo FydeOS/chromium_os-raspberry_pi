@@ -1,19 +1,7 @@
-Index: minigbm/Android.mk
-===================================================================
---- minigbm.orig/Android.mk
-+++ minigbm/Android.mk
-@@ -22,6 +22,7 @@ MINIGBM_SRC := \
- 	radeon.c \
- 	rockchip.c \
- 	vc4.c \
-+	v3d.c \
- 	virtio_gpu.c
- 
- MINIGBM_CPPFLAGS := -std=c++14
-Index: minigbm/drv.c
-===================================================================
---- minigbm.orig/drv.c
-+++ minigbm/drv.c
+diff --git a/drv.c b/drv.c
+index ada02ba..7747cab 100644
+--- a/drv.c
++++ b/drv.c
 @@ -14,7 +14,6 @@
  #include <sys/types.h>
  #include <unistd.h>
@@ -22,7 +10,7 @@ Index: minigbm/drv.c
  #ifdef __ANDROID__
  #include <cutils/log.h>
  #include <libgen.h>
-@@ -45,6 +44,9 @@ extern const struct backend backend_rock
+@@ -42,6 +41,9 @@ extern const struct backend backend_rockchip;
  #ifdef DRV_VC4
  extern const struct backend backend_vc4;
  #endif
@@ -32,17 +20,17 @@ Index: minigbm/drv.c
  
  // Dumb / generic drivers
  extern const struct backend backend_evdi;
-@@ -90,6 +92,9 @@ static const struct backend *drv_get_bac
+@@ -83,6 +85,9 @@ static const struct backend *drv_get_backend(int fd)
+ #endif
  #ifdef DRV_VC4
  		&backend_vc4,
- #endif
++#endif
 +#ifdef DRV_V3D
 +    &backend_v3d,
-+#endif
+ #endif
  		&backend_evdi,	   &backend_marvell, &backend_meson,	 &backend_nouveau,
  		&backend_komeda,   &backend_radeon,  &backend_synaptics, &backend_virtgpu,
- 		&backend_udl,	   &backend_virtgpu, &backend_vkms
-@@ -99,6 +104,9 @@ static const struct backend *drv_get_bac
+@@ -93,6 +98,9 @@ static const struct backend *drv_get_backend(int fd)
  		const struct backend *b = backend_list[i];
  		if (!strcmp(drm_version->name, b->name)) {
  			drmFreeVersion(drm_version);
@@ -52,10 +40,140 @@ Index: minigbm/drv.c
  			return b;
  		}
  	}
-Index: minigbm/external/v3d_drm.h
-===================================================================
+diff --git a/drv_helpers.c b/drv_helpers.c
+index 6ea4b8e..2565dd8 100644
+--- a/drv_helpers.c
++++ b/drv_helpers.c
+@@ -601,3 +601,113 @@ void drv_resolve_format_and_use_flags_helper(struct driver *drv, uint32_t format
+ 		break;
+ 	}
+ }
++
++char * getDrmFormatString(uint32_t drmFormat) {
++    switch (drmFormat) {
++        case DRM_FORMAT_ABGR1555:
++            return "DRM_FORMAT_ABGR1555";
++        case DRM_FORMAT_ABGR2101010:
++            return "DRM_FORMAT_ABGR2101010";
++        case DRM_FORMAT_ABGR4444:
++            return "DRM_FORMAT_ABGR4444";
++        case DRM_FORMAT_ABGR8888:
++            return "DRM_FORMAT_ABGR8888";
++        case DRM_FORMAT_ARGB1555:
++            return "DRM_FORMAT_ARGB1555";
++        case DRM_FORMAT_ARGB2101010:
++            return "DRM_FORMAT_ARGB2101010";
++        case DRM_FORMAT_ARGB4444:
++            return "DRM_FORMAT_ARGB4444";
++        case DRM_FORMAT_ARGB8888:
++            return "DRM_FORMAT_ARGB8888";
++        case DRM_FORMAT_AYUV:
++            return "DRM_FORMAT_AYUV";
++        case DRM_FORMAT_BGR233:
++            return "DRM_FORMAT_BGR233";
++        case DRM_FORMAT_BGR565:
++            return "DRM_FORMAT_BGR565";
++        case DRM_FORMAT_BGR888:
++            return "DRM_FORMAT_BGR888";
++        case DRM_FORMAT_BGRA1010102:
++            return "DRM_FORMAT_BGRA1010102";
++        case DRM_FORMAT_BGRA4444:
++            return "DRM_FORMAT_BGRA4444";
++        case DRM_FORMAT_BGRA5551:
++            return "DRM_FORMAT_BGRA5551";
++        case DRM_FORMAT_BGRA8888:
++            return "DRM_FORMAT_BGRA8888";
++        case DRM_FORMAT_BGRX1010102:
++            return "DRM_FORMAT_BGRX1010102";
++        case DRM_FORMAT_BGRX4444:
++            return "DRM_FORMAT_BGRX4444";
++        case DRM_FORMAT_BGRX5551:
++            return "DRM_FORMAT_BGRX5551";
++        case DRM_FORMAT_BGRX8888:
++            return "DRM_FORMAT_BGRX8888";
++        case DRM_FORMAT_C8:
++            return "DRM_FORMAT_C8";
++        case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED:
++            return "DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED";
++        case DRM_FORMAT_GR88:
++            return "DRM_FORMAT_GR88";
++        case DRM_FORMAT_NV12:
++            return "DRM_FORMAT_NV12";
++        case DRM_FORMAT_NV21:
++            return "DRM_FORMAT_NV21";
++        case DRM_FORMAT_R8:
++            return "DRM_FORMAT_R8";
++        case DRM_FORMAT_RG88:
++            return "DRM_FORMAT_RG88";
++        case DRM_FORMAT_RGB332:
++            return "DRM_FORMAT_RGB332";
++        case DRM_FORMAT_RGB565:
++            return "DRM_FORMAT_RGB565";
++        case DRM_FORMAT_RGB888:
++            return "DRM_FORMAT_RGB888";
++        case DRM_FORMAT_RGBA1010102:
++            return "DRM_FORMAT_RGBA1010102";
++        case DRM_FORMAT_RGBA4444:
++            return "DRM_FORMAT_RGBA4444";
++        case DRM_FORMAT_RGBA5551:
++            return "DRM_FORMAT_RGBA5551";
++        case DRM_FORMAT_RGBA8888:
++            return "DRM_FORMAT_RGBA8888";
++        case DRM_FORMAT_RGBX1010102:
++            return "DRM_FORMAT_RGBX1010102";
++        case DRM_FORMAT_RGBX4444:
++            return "DRM_FORMAT_RGBX4444";
++        case DRM_FORMAT_RGBX5551:
++            return "DRM_FORMAT_RGBX5551";
++        case DRM_FORMAT_RGBX8888:
++            return "DRM_FORMAT_RGBX8888";
++        case DRM_FORMAT_UYVY:
++            return "DRM_FORMAT_UYVY";
++        case DRM_FORMAT_VYUY:
++            return "DRM_FORMAT_VYUY";
++        case DRM_FORMAT_XBGR1555:
++            return "DRM_FORMAT_XBGR1555";
++        case DRM_FORMAT_XBGR2101010:
++            return "DRM_FORMAT_XBGR2101010";
++        case DRM_FORMAT_XBGR4444:
++            return "DRM_FORMAT_XBGR4444";
++        case DRM_FORMAT_XBGR8888:
++            return "DRM_FORMAT_XBGR8888";
++        case DRM_FORMAT_XRGB1555:
++            return "DRM_FORMAT_XRGB1555";
++        case DRM_FORMAT_XRGB2101010:
++            return "DRM_FORMAT_XRGB2101010";
++        case DRM_FORMAT_XRGB4444:
++            return "DRM_FORMAT_XRGB4444";
++        case DRM_FORMAT_XRGB8888:
++            return "DRM_FORMAT_XRGB8888";
++        case DRM_FORMAT_YUYV:
++            return "DRM_FORMAT_YUYV";
++        case DRM_FORMAT_YVU420:
++            return "DRM_FORMAT_YVU420";
++        case DRM_FORMAT_YVU420_ANDROID:
++            return "DRM_FORMAT_YVU420";
++        case DRM_FORMAT_YVYU:
++            return "DRM_FORMAT_YVYU";
++    }
++    return "Unknown format";
++}
+diff --git a/drv_helpers.h b/drv_helpers.h
+index edb69bf..599d452 100644
+--- a/drv_helpers.h
++++ b/drv_helpers.h
+@@ -47,5 +47,5 @@ bool drv_has_modifier(const uint64_t *list, uint32_t count, uint64_t modifier);
+ void drv_resolve_format_and_use_flags_helper(struct driver *drv, uint32_t format,
+ 					     uint64_t use_flags, uint32_t *out_format,
+ 					     uint64_t *out_use_flags);
+-
++char *getDrmFormatString(uint32_t drmFormat);
+ #endif
+diff --git a/external/v3d_drm.h b/external/v3d_drm.h
+new file mode 100644
+index 0000000..b8c6f9d
 --- /dev/null
-+++ minigbm/external/v3d_drm.h
++++ b/external/v3d_drm.h
 @@ -0,0 +1,267 @@
 +/*
 + * Copyright © 2014-2018 Broadcom
@@ -324,11 +442,12 @@ Index: minigbm/external/v3d_drm.h
 +#endif
 +
 +#endif /* _V3D_DRM_H_ */
-Index: minigbm/v3d.c
-===================================================================
+diff --git a/v3d.c b/v3d.c
+new file mode 100644
+index 0000000..e5dedd6
 --- /dev/null
-+++ minigbm/v3d.c
-@@ -0,0 +1,200 @@
++++ b/v3d.c
+@@ -0,0 +1,201 @@
 +/*
 + * Copyright 2019 The FydeOS Authors. All rights reserved.
 + * Use of this source code is governed by a BSD-style license that can be
@@ -347,7 +466,6 @@ Index: minigbm/v3d.c
 +#include "util.h"
 +#include "external/v3d_drm.h"
 +#define ARC_CALLOC (1<<7)
-+#define DEBUG
 +enum v3d_tiling_mode {
 +        /* Untiled resources.  Not valid as texture inputs. */
 +        V3D_TILING_RASTER,
@@ -470,7 +588,10 @@ Index: minigbm/v3d.c
 +  memset(&bo_create, 0, sizeof(bo_create));
 +  stride = drv_stride_from_format(format, width, 0);
 +  stride = ALIGN(stride * 12 / 10, 64);
-+  algin_height = ALIGN(height * 12 / 10, 8);
++  if (format == DRM_FORMAT_YVU420_ANDROID)
++    algin_height = bo->meta.height;
++  else
++    algin_height = ALIGN(height * 12 / 10, 8);
 +  drv_bo_from_format(bo, stride, algin_height, format);
 +  bo->meta.total_size = ALIGN(bo->meta.total_size, 4096);
 +  if (use_flags & BO_USE_SCANOUT) {
@@ -480,7 +601,6 @@ Index: minigbm/v3d.c
 +  } else {
 +     bo_create.flags = 0;
 +     bo->meta.format_modifier = DRM_FORMAT_MOD_BROADCOM_UIF;
-+//     bo->meta.tiling = V3D_TILING_UIF_NO_XOR;
 +  }
 +  bo_create.size = bo->meta.total_size;
 +  ret = drmIoctl(bo->drv->fd, DRM_IOCTL_V3D_CREATE_BO, &bo_create);
@@ -529,10 +649,10 @@ Index: minigbm/v3d.c
 +};
 +
 +#endif // DEV_V3D
-Index: minigbm/vc4.c
-===================================================================
---- minigbm.orig/vc4.c
-+++ minigbm/vc4.c
+diff --git a/vc4.c b/vc4.c
+index 820e4fe..fa8f45d 100644
+--- a/vc4.c
++++ b/vc4.c
 @@ -3,9 +3,7 @@
   * Use of this source code is governed by a BSD-style license that can be
   * found in the LICENSE file.
@@ -561,6 +681,18 @@ Index: minigbm/vc4.c
  {
 -	drv_add_combinations(drv, render_target_formats, ARRAY_SIZE(render_target_formats),
 -			     &LINEAR_METADATA, BO_USE_RENDER_MASK);
+-
+-	drv_add_combinations(drv, texture_only_formats, ARRAY_SIZE(texture_only_formats),
+-			     &LINEAR_METADATA, BO_USE_TEXTURE_MASK);
+-	/*
+-	 * Chrome uses DMA-buf mmap to write to YV12 buffers, which are then accessed by the
+-	 * Video Encoder Accelerator (VEA). It could also support NV12 potentially in the future.
+-	 */
+-	drv_modify_combination(drv, DRM_FORMAT_YVU420, &LINEAR_METADATA, BO_USE_HW_VIDEO_ENCODER);
+-	drv_modify_combination(drv, DRM_FORMAT_NV12, &LINEAR_METADATA,
+-			       BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT | BO_USE_HW_VIDEO_ENCODER);
+-
+-	return drv_modify_linear_combinations(drv);
 +  struct format_metadata metadata = {1, VC4_TILING_NONE,DRM_FORMAT_MOD_LINEAR};
 +  drv_add_combinations(drv, render_target_formats, ARRAY_SIZE(render_target_formats),
 +          &metadata, BO_USE_RENDER_MASK);
@@ -575,24 +707,13 @@ Index: minigbm/vc4.c
 +  drv_modify_combination(drv, DRM_FORMAT_R8, &metadata, BO_USE_CAMERA_READ |
 +                              BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
 +			      BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
- 
--	drv_add_combinations(drv, texture_only_formats, ARRAY_SIZE(texture_only_formats),
--			     &LINEAR_METADATA, BO_USE_TEXTURE_MASK);
--	/*
--	 * Chrome uses DMA-buf mmap to write to YV12 buffers, which are then accessed by the
--	 * Video Encoder Accelerator (VEA). It could also support NV12 potentially in the future.
--	 */
--	drv_modify_combination(drv, DRM_FORMAT_YVU420, &LINEAR_METADATA, BO_USE_HW_VIDEO_ENCODER);
--	drv_modify_combination(drv, DRM_FORMAT_NV12, &LINEAR_METADATA,
--			       BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT | BO_USE_HW_VIDEO_ENCODER);
--
--	return drv_modify_linear_combinations(drv);
++
 +  drv_log("vc4 driver inited.\n");
 +  return drv_modify_linear_combinations(drv);
  }
  
  static int vc4_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t height,
-@@ -48,36 +53,24 @@ static int vc4_bo_create_for_modifier(st
+@@ -48,36 +53,24 @@ static int vc4_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t he
  	uint32_t stride;
  	struct drm_vc4_create_bo bo_create = { 0 };
  
@@ -605,7 +726,10 @@ Index: minigbm/vc4.c
 -	default:
 -		return -EINVAL;
 -	}
--
++  stride = drv_stride_from_format(format, width, 0);
++  stride = ALIGN(stride, 64);
++  drv_bo_from_format(bo, stride, height, format);
+ 
 -	/*
 -	 * Since the ARM L1 cache line size is 64 bytes, align to that as a
 -	 * performance optimization.
@@ -613,9 +737,15 @@ Index: minigbm/vc4.c
 -	stride = drv_stride_from_format(format, width, 0);
 -	stride = ALIGN(stride, 64);
 -	drv_bo_from_format(bo, stride, height, format);
--
++  bo_create.size = bo->meta.total_size;
+ 
 -	bo_create.size = bo->meta.total_size;
--
++  ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VC4_CREATE_BO, &bo_create);
++  if (ret) {
++    drv_log("DRM_IOCTL_VC4_CREATE_BO failed (size=%zu)\n", bo->meta.total_size);
++    return -errno;
++  }
+ 
 -	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VC4_CREATE_BO, &bo_create);
 -	if (ret) {
 -		drv_log("DRM_IOCTL_VC4_CREATE_BO failed (size=%zu)\n", bo->meta.total_size);
@@ -626,18 +756,6 @@ Index: minigbm/vc4.c
 -		bo->handles[plane].u32 = bo_create.handle;
 -
 -	return 0;
-+  stride = drv_stride_from_format(format, width, 0);
-+  stride = ALIGN(stride, 64);
-+  drv_bo_from_format(bo, stride, height, format);
-+
-+  bo_create.size = bo->meta.total_size;
-+
-+  ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VC4_CREATE_BO, &bo_create);
-+  if (ret) {
-+    drv_log("DRM_IOCTL_VC4_CREATE_BO failed (size=%zu)\n", bo->meta.total_size);
-+    return -errno;
-+  }
-+
 +  for (plane = 0; plane < bo->meta.num_planes; plane++)
 +    bo->handles[plane].u32 = bo_create.handle;
 +#ifdef DEBUG
@@ -647,132 +765,3 @@ Index: minigbm/vc4.c
  }
  
  static int vc4_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t format,
-Index: minigbm/drv_helpers.c
-===================================================================
---- minigbm.orig/drv_helpers.c
-+++ minigbm/drv_helpers.c
-@@ -601,3 +601,113 @@ void drv_resolve_format_and_use_flags_he
- 		break;
- 	}
- }
-+
-+char * getDrmFormatString(uint32_t drmFormat) {
-+    switch (drmFormat) {
-+        case DRM_FORMAT_ABGR1555:
-+            return "DRM_FORMAT_ABGR1555";
-+        case DRM_FORMAT_ABGR2101010:
-+            return "DRM_FORMAT_ABGR2101010";
-+        case DRM_FORMAT_ABGR4444:
-+            return "DRM_FORMAT_ABGR4444";
-+        case DRM_FORMAT_ABGR8888:
-+            return "DRM_FORMAT_ABGR8888";
-+        case DRM_FORMAT_ARGB1555:
-+            return "DRM_FORMAT_ARGB1555";
-+        case DRM_FORMAT_ARGB2101010:
-+            return "DRM_FORMAT_ARGB2101010";
-+        case DRM_FORMAT_ARGB4444:
-+            return "DRM_FORMAT_ARGB4444";
-+        case DRM_FORMAT_ARGB8888:
-+            return "DRM_FORMAT_ARGB8888";
-+        case DRM_FORMAT_AYUV:
-+            return "DRM_FORMAT_AYUV";
-+        case DRM_FORMAT_BGR233:
-+            return "DRM_FORMAT_BGR233";
-+        case DRM_FORMAT_BGR565:
-+            return "DRM_FORMAT_BGR565";
-+        case DRM_FORMAT_BGR888:
-+            return "DRM_FORMAT_BGR888";
-+        case DRM_FORMAT_BGRA1010102:
-+            return "DRM_FORMAT_BGRA1010102";
-+        case DRM_FORMAT_BGRA4444:
-+            return "DRM_FORMAT_BGRA4444";
-+        case DRM_FORMAT_BGRA5551:
-+            return "DRM_FORMAT_BGRA5551";
-+        case DRM_FORMAT_BGRA8888:
-+            return "DRM_FORMAT_BGRA8888";
-+        case DRM_FORMAT_BGRX1010102:
-+            return "DRM_FORMAT_BGRX1010102";
-+        case DRM_FORMAT_BGRX4444:
-+            return "DRM_FORMAT_BGRX4444";
-+        case DRM_FORMAT_BGRX5551:
-+            return "DRM_FORMAT_BGRX5551";
-+        case DRM_FORMAT_BGRX8888:
-+            return "DRM_FORMAT_BGRX8888";
-+        case DRM_FORMAT_C8:
-+            return "DRM_FORMAT_C8";
-+        case DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED:
-+            return "DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED";
-+        case DRM_FORMAT_GR88:
-+            return "DRM_FORMAT_GR88";
-+        case DRM_FORMAT_NV12:
-+            return "DRM_FORMAT_NV12";
-+        case DRM_FORMAT_NV21:
-+            return "DRM_FORMAT_NV21";
-+        case DRM_FORMAT_R8:
-+            return "DRM_FORMAT_R8";
-+        case DRM_FORMAT_RG88:
-+            return "DRM_FORMAT_RG88";
-+        case DRM_FORMAT_RGB332:
-+            return "DRM_FORMAT_RGB332";
-+        case DRM_FORMAT_RGB565:
-+            return "DRM_FORMAT_RGB565";
-+        case DRM_FORMAT_RGB888:
-+            return "DRM_FORMAT_RGB888";
-+        case DRM_FORMAT_RGBA1010102:
-+            return "DRM_FORMAT_RGBA1010102";
-+        case DRM_FORMAT_RGBA4444:
-+            return "DRM_FORMAT_RGBA4444";
-+        case DRM_FORMAT_RGBA5551:
-+            return "DRM_FORMAT_RGBA5551";
-+        case DRM_FORMAT_RGBA8888:
-+            return "DRM_FORMAT_RGBA8888";
-+        case DRM_FORMAT_RGBX1010102:
-+            return "DRM_FORMAT_RGBX1010102";
-+        case DRM_FORMAT_RGBX4444:
-+            return "DRM_FORMAT_RGBX4444";
-+        case DRM_FORMAT_RGBX5551:
-+            return "DRM_FORMAT_RGBX5551";
-+        case DRM_FORMAT_RGBX8888:
-+            return "DRM_FORMAT_RGBX8888";
-+        case DRM_FORMAT_UYVY:
-+            return "DRM_FORMAT_UYVY";
-+        case DRM_FORMAT_VYUY:
-+            return "DRM_FORMAT_VYUY";
-+        case DRM_FORMAT_XBGR1555:
-+            return "DRM_FORMAT_XBGR1555";
-+        case DRM_FORMAT_XBGR2101010:
-+            return "DRM_FORMAT_XBGR2101010";
-+        case DRM_FORMAT_XBGR4444:
-+            return "DRM_FORMAT_XBGR4444";
-+        case DRM_FORMAT_XBGR8888:
-+            return "DRM_FORMAT_XBGR8888";
-+        case DRM_FORMAT_XRGB1555:
-+            return "DRM_FORMAT_XRGB1555";
-+        case DRM_FORMAT_XRGB2101010:
-+            return "DRM_FORMAT_XRGB2101010";
-+        case DRM_FORMAT_XRGB4444:
-+            return "DRM_FORMAT_XRGB4444";
-+        case DRM_FORMAT_XRGB8888:
-+            return "DRM_FORMAT_XRGB8888";
-+        case DRM_FORMAT_YUYV:
-+            return "DRM_FORMAT_YUYV";
-+        case DRM_FORMAT_YVU420:
-+            return "DRM_FORMAT_YVU420";
-+        case DRM_FORMAT_YVU420_ANDROID:
-+            return "DRM_FORMAT_YVU420";
-+        case DRM_FORMAT_YVYU:
-+            return "DRM_FORMAT_YVYU";
-+    }
-+    return "Unknown format";
-+}
-Index: minigbm/drv_helpers.h
-===================================================================
---- minigbm.orig/drv_helpers.h
-+++ minigbm/drv_helpers.h
-@@ -47,5 +47,5 @@ bool drv_has_modifier(const uint64_t *li
- void drv_resolve_format_and_use_flags_helper(struct driver *drv, uint32_t format,
- 					     uint64_t use_flags, uint32_t *out_format,
- 					     uint64_t *out_use_flags);
--
-+char *getDrmFormatString(uint32_t drmFormat);
- #endif

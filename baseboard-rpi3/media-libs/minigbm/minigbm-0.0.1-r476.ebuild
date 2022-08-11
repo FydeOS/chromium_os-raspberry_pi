@@ -1,1 +1,0 @@
-minigbm-0.0.1-r475.ebuild

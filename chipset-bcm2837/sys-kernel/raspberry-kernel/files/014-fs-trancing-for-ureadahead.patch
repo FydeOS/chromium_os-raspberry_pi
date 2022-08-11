@@ -1,7 +1,7 @@
-Index: rpi-linux-kernel/fs/exec.c
+Index: kernel-rpi/fs/exec.c
 ===================================================================
---- rpi-linux-kernel.orig/fs/exec.c
-+++ rpi-linux-kernel/fs/exec.c
+--- kernel-rpi.orig/fs/exec.c
++++ kernel-rpi/fs/exec.c
 @@ -69,6 +69,7 @@
  #include <asm/mmu_context.h>
  #include <asm/tlb.h>
@@ -10,7 +10,7 @@ Index: rpi-linux-kernel/fs/exec.c
  #include <trace/events/task.h>
  #include "internal.h"
  
-@@ -927,8 +928,10 @@ static struct file *do_open_execat(int f
+@@ -933,8 +934,10 @@ static struct file *do_open_execat(int f
  	if (err)
  		goto exit;
  
@@ -22,10 +22,10 @@ Index: rpi-linux-kernel/fs/exec.c
  
  out:
  	return file;
-Index: rpi-linux-kernel/fs/open.c
+Index: kernel-rpi/fs/open.c
 ===================================================================
---- rpi-linux-kernel.orig/fs/open.c
-+++ rpi-linux-kernel/fs/open.c
+--- kernel-rpi.orig/fs/open.c
++++ kernel-rpi/fs/open.c
 @@ -32,6 +32,8 @@
  #include <linux/ima.h>
  #include <linux/dnotify.h>
@@ -43,10 +43,10 @@ Index: rpi-linux-kernel/fs/open.c
  		}
  	}
  	putname(tmp);
-Index: rpi-linux-kernel/include/trace/events/fs.h
+Index: kernel-rpi/include/trace/events/fs.h
 ===================================================================
 --- /dev/null
-+++ rpi-linux-kernel/include/trace/events/fs.h
++++ kernel-rpi/include/trace/events/fs.h
 @@ -0,0 +1,53 @@
 +#undef TRACE_SYSTEM
 +#define TRACE_SYSTEM fs

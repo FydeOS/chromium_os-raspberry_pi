@@ -1,8 +1,8 @@
-Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_hdmi.c
+Index: kernel-rpi/drivers/gpu/drm/vc4/vc4_hdmi.c
 ===================================================================
---- rpi-kernel.orig/drivers/gpu/drm/vc4/vc4_hdmi.c
-+++ rpi-kernel/drivers/gpu/drm/vc4/vc4_hdmi.c
-@@ -261,6 +261,9 @@ vc4_hdmi_connector_detect(struct drm_con
+--- kernel-rpi.orig/drivers/gpu/drm/vc4/vc4_hdmi.c
++++ kernel-rpi/drivers/gpu/drm/vc4/vc4_hdmi.c
+@@ -281,6 +281,9 @@ vc4_hdmi_connector_detect(struct drm_con
  		vc4_hdmi_enable_scrambling(&vc4_hdmi->encoder.base.base);
  
  		ret = connector_status_connected;
@@ -12,7 +12,7 @@ Index: rpi-kernel/drivers/gpu/drm/vc4/vc4_hdmi.c
  		goto out;
  	}
  
-@@ -1960,6 +1963,7 @@ static int vc4_hdmi_audio_prepare(struct
+@@ -2176,6 +2179,7 @@ static int vc4_hdmi_audio_prepare(struct
  		mai_audio_format = VC4_HDMI_MAI_FORMAT_HBR;
  	else
  		mai_audio_format = VC4_HDMI_MAI_FORMAT_PCM;

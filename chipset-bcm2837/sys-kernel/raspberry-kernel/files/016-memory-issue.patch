@@ -1,7 +1,7 @@
-Index: rpi-kernel/drivers/android/binder_alloc.c
+Index: kernel-rpi/drivers/android/binder_alloc.c
 ===================================================================
---- rpi-kernel.orig/drivers/android/binder_alloc.c
-+++ rpi-kernel/drivers/android/binder_alloc.c
+--- kernel-rpi.orig/drivers/android/binder_alloc.c
++++ kernel-rpi/drivers/android/binder_alloc.c
 @@ -662,7 +662,7 @@ static void binder_free_buf_locked(struc
  	BUG_ON(buffer->user_data > alloc->buffer + alloc->buffer_size);
  
@@ -11,10 +11,10 @@ Index: rpi-kernel/drivers/android/binder_alloc.c
  
  		binder_alloc_debug(BINDER_DEBUG_BUFFER_ALLOC_ASYNC,
  			     "%d: binder_free_buf size %zd async free %zd\n",
-Index: rpi-kernel/drivers/block/zram/zram_drv.c
+Index: kernel-rpi/drivers/block/zram/zram_drv.c
 ===================================================================
---- rpi-kernel.orig/drivers/block/zram/zram_drv.c
-+++ rpi-kernel/drivers/block/zram/zram_drv.c
+--- kernel-rpi.orig/drivers/block/zram/zram_drv.c
++++ kernel-rpi/drivers/block/zram/zram_drv.c
 @@ -907,7 +907,7 @@ static ssize_t read_block_state(struct f
  			zram_test_flag(zram, index, ZRAM_HUGE) ? 'h' : '.',
  			zram_test_flag(zram, index, ZRAM_IDLE) ? 'i' : '.');
@@ -41,10 +41,10 @@ Index: rpi-kernel/drivers/block/zram/zram_drv.c
  	zram = bdev->bd_disk->private_data;
  	/* zram was claimed to reset so open request fails */
  	if (zram->claim)
-Index: rpi-kernel/mm/Kconfig
+Index: kernel-rpi/mm/Kconfig
 ===================================================================
---- rpi-kernel.orig/mm/Kconfig
-+++ rpi-kernel/mm/Kconfig
+--- kernel-rpi.orig/mm/Kconfig
++++ kernel-rpi/mm/Kconfig
 @@ -253,6 +253,17 @@ config PAGE_REPORTING
  	  those pages to another entity, such as a hypervisor, so that the
  	  memory can be freed within the host for other uses.
@@ -185,10 +185,10 @@ Index: rpi-kernel/mm/Kconfig
 +# }
  
  endmenu
-Index: rpi-kernel/mm/backing-dev.c
+Index: kernel-rpi/mm/backing-dev.c
 ===================================================================
---- rpi-kernel.orig/mm/backing-dev.c
-+++ rpi-kernel/mm/backing-dev.c
+--- kernel-rpi.orig/mm/backing-dev.c
++++ kernel-rpi/mm/backing-dev.c
 @@ -872,13 +872,6 @@ void bdi_unregister(struct backing_dev_i
  	wb_shutdown(&bdi->wb);
  	cgwb_bdi_unregister(bdi);
@@ -203,10 +203,10 @@ Index: rpi-kernel/mm/backing-dev.c
  	if (bdi->dev) {
  		bdi_debug_unregister(bdi);
  		device_unregister(bdi->dev);
-Index: rpi-kernel/mm/compaction.c
+Index: kernel-rpi/mm/compaction.c
 ===================================================================
---- rpi-kernel.orig/mm/compaction.c
-+++ rpi-kernel/mm/compaction.c
+--- kernel-rpi.orig/mm/compaction.c
++++ kernel-rpi/mm/compaction.c
 @@ -1009,7 +1009,7 @@ isolate_migratepages_block(struct compac
  			low_pfn += compound_nr(page) - 1;
  
@@ -216,10 +216,10 @@ Index: rpi-kernel/mm/compaction.c
  		mod_node_page_state(page_pgdat(page),
  				NR_ISOLATED_ANON + page_is_file_lru(page),
  				thp_nr_pages(page));
-Index: rpi-kernel/mm/highmem.c
+Index: kernel-rpi/mm/highmem.c
 ===================================================================
---- rpi-kernel.orig/mm/highmem.c
-+++ rpi-kernel/mm/highmem.c
+--- kernel-rpi.orig/mm/highmem.c
++++ kernel-rpi/mm/highmem.c
 @@ -31,10 +31,6 @@
  #include <asm/tlbflush.h>
  #include <linux/vmalloc.h>
@@ -456,10 +456,10 @@ Index: rpi-kernel/mm/highmem.c
  
  #if defined(HASHED_PAGE_VIRTUAL)
  
-Index: rpi-kernel/mm/huge_memory.c
+Index: kernel-rpi/mm/huge_memory.c
 ===================================================================
---- rpi-kernel.orig/mm/huge_memory.c
-+++ rpi-kernel/mm/huge_memory.c
+--- kernel-rpi.orig/mm/huge_memory.c
++++ kernel-rpi/mm/huge_memory.c
 @@ -1089,9 +1089,7 @@ int copy_huge_pmd(struct mm_struct *dst_
  	 * best effort that the pinned pages won't be replaced by another
  	 * random page during the coming copy-on-write.
@@ -492,10 +492,10 @@ Index: rpi-kernel/mm/huge_memory.c
  
  	/* ->mapping in first tail page is compound_mapcount */
  	VM_BUG_ON_PAGE(tail > 2 && page_tail->mapping != TAIL_MAPPING,
-Index: rpi-kernel/mm/hugetlb.c
+Index: kernel-rpi/mm/hugetlb.c
 ===================================================================
---- rpi-kernel.orig/mm/hugetlb.c
-+++ rpi-kernel/mm/hugetlb.c
+--- kernel-rpi.orig/mm/hugetlb.c
++++ kernel-rpi/mm/hugetlb.c
 @@ -79,21 +79,6 @@ DEFINE_SPINLOCK(hugetlb_lock);
  static int num_fault_mutexes;
  struct mutex *hugetlb_fault_mutex_table ____cacheline_aligned_in_smp;
@@ -1120,10 +1120,10 @@ Index: rpi-kernel/mm/hugetlb.c
  
  		spin_lock(&hugetlb_lock);
  		if (h->surplus_huge_pages_node[old_nid]) {
-Index: rpi-kernel/mm/internal.h
+Index: kernel-rpi/mm/internal.h
 ===================================================================
---- rpi-kernel.orig/mm/internal.h
-+++ rpi-kernel/mm/internal.h
+--- kernel-rpi.orig/mm/internal.h
++++ kernel-rpi/mm/internal.h
 @@ -291,11 +291,6 @@ static inline unsigned int buddy_order(s
   */
  #define buddy_order_unsafe(page)	READ_ONCE(page_private(page))
@@ -1136,10 +1136,10 @@ Index: rpi-kernel/mm/internal.h
  /*
   * These three helpers classifies VMAs for virtual memory accounting.
   */
-Index: rpi-kernel/mm/khugepaged.c
+Index: kernel-rpi/mm/khugepaged.c
 ===================================================================
---- rpi-kernel.orig/mm/khugepaged.c
-+++ rpi-kernel/mm/khugepaged.c
+--- kernel-rpi.orig/mm/khugepaged.c
++++ kernel-rpi/mm/khugepaged.c
 @@ -443,24 +443,21 @@ static bool hugepage_vma_check(struct vm
  	if (!transhuge_vma_enabled(vma, vm_flags))
  		return false;
@@ -1193,10 +1193,10 @@ Index: rpi-kernel/mm/khugepaged.c
  			/*
  			 * khugepaged only works on read-only fd, so this
  			 * page is dirty because it hasn't been flushed
-Index: rpi-kernel/mm/mapping_dirty_helpers.c
+Index: kernel-rpi/mm/mapping_dirty_helpers.c
 ===================================================================
---- rpi-kernel.orig/mm/mapping_dirty_helpers.c
-+++ rpi-kernel/mm/mapping_dirty_helpers.c
+--- kernel-rpi.orig/mm/mapping_dirty_helpers.c
++++ kernel-rpi/mm/mapping_dirty_helpers.c
 @@ -163,10 +163,12 @@ static int wp_clean_pud_entry(pud_t *pud
  		return 0;
  	}
@@ -1210,10 +1210,10 @@ Index: rpi-kernel/mm/mapping_dirty_helpers.c
  
  	return 0;
  }
-Index: rpi-kernel/mm/memblock.c
+Index: kernel-rpi/mm/memblock.c
 ===================================================================
---- rpi-kernel.orig/mm/memblock.c
-+++ rpi-kernel/mm/memblock.c
+--- kernel-rpi.orig/mm/memblock.c
++++ kernel-rpi/mm/memblock.c
 @@ -182,8 +182,6 @@ bool __init_memblock memblock_overlaps_r
  {
  	unsigned long i;
@@ -1223,7 +1223,7 @@ Index: rpi-kernel/mm/memblock.c
  	for (i = 0; i < type->cnt; i++)
  		if (memblock_addrs_overlap(base, size, type->regions[i].base,
  					   type->regions[i].size))
-@@ -1794,6 +1792,7 @@ bool __init_memblock memblock_is_region_
+@@ -1800,6 +1798,7 @@ bool __init_memblock memblock_is_region_
   */
  bool __init_memblock memblock_is_region_reserved(phys_addr_t base, phys_addr_t size)
  {
@@ -1231,10 +1231,10 @@ Index: rpi-kernel/mm/memblock.c
  	return memblock_overlaps_region(&memblock.reserved, base, size);
  }
  
-Index: rpi-kernel/mm/memcontrol.c
+Index: kernel-rpi/mm/memcontrol.c
 ===================================================================
---- rpi-kernel.orig/mm/memcontrol.c
-+++ rpi-kernel/mm/memcontrol.c
+--- kernel-rpi.orig/mm/memcontrol.c
++++ kernel-rpi/mm/memcontrol.c
 @@ -230,7 +230,7 @@ enum res_type {
  	     iter != NULL;				\
  	     iter = mem_cgroup_iter(NULL, iter, NULL))
@@ -1371,10 +1371,10 @@ Index: rpi-kernel/mm/memcontrol.c
  	.cancel_attach = mem_cgroup_cancel_attach,
  	.post_attach = mem_cgroup_move_task,
  	.bind = mem_cgroup_bind,
-Index: rpi-kernel/mm/memory-failure.c
+Index: kernel-rpi/mm/memory-failure.c
 ===================================================================
---- rpi-kernel.orig/mm/memory-failure.c
-+++ rpi-kernel/mm/memory-failure.c
+--- kernel-rpi.orig/mm/memory-failure.c
++++ kernel-rpi/mm/memory-failure.c
 @@ -1938,7 +1938,6 @@ retry:
  	else if (ret == 0)
  		if (soft_offline_free_page(page) && try_again) {
@@ -1383,10 +1383,10 @@ Index: rpi-kernel/mm/memory-failure.c
  			goto retry;
  		}
  
-Index: rpi-kernel/mm/memory.c
+Index: kernel-rpi/mm/memory.c
 ===================================================================
---- rpi-kernel.orig/mm/memory.c
-+++ rpi-kernel/mm/memory.c
+--- kernel-rpi.orig/mm/memory.c
++++ kernel-rpi/mm/memory.c
 @@ -799,12 +799,8 @@ copy_present_page(struct vm_area_struct
  		  pte_t *dst_pte, pte_t *src_pte, unsigned long addr, int *rss,
  		  struct page **prealloc, pte_t pte, struct page *page)
@@ -1411,7 +1411,7 @@ Index: rpi-kernel/mm/memory.c
  		return 1;
  
  	new_page = *prealloc;
-@@ -4660,7 +4654,7 @@ vm_fault_t handle_mm_fault(struct vm_are
+@@ -4669,7 +4663,7 @@ vm_fault_t handle_mm_fault(struct vm_are
  	 * space.  Kernel faults are handled more gracefully.
  	 */
  	if (flags & FAULT_FLAG_USER)
@@ -1420,7 +1420,7 @@ Index: rpi-kernel/mm/memory.c
  
  	if (unlikely(is_vm_hugetlb_page(vma)))
  		ret = hugetlb_fault(vma->vm_mm, vma, address, flags);
-@@ -4668,7 +4662,7 @@ vm_fault_t handle_mm_fault(struct vm_are
+@@ -4677,7 +4671,7 @@ vm_fault_t handle_mm_fault(struct vm_are
  		ret = __handle_mm_fault(vma, address, flags);
  
  	if (flags & FAULT_FLAG_USER) {
@@ -1429,10 +1429,10 @@ Index: rpi-kernel/mm/memory.c
  		/*
  		 * The task may have entered a memcg OOM situation but
  		 * if the allocation error was handled gracefully (no
-Index: rpi-kernel/mm/memory_hotplug.c
+Index: kernel-rpi/mm/memory_hotplug.c
 ===================================================================
---- rpi-kernel.orig/mm/memory_hotplug.c
-+++ rpi-kernel/mm/memory_hotplug.c
+--- kernel-rpi.orig/mm/memory_hotplug.c
++++ kernel-rpi/mm/memory_hotplug.c
 @@ -1261,7 +1261,14 @@ static int scan_movable_pages(unsigned l
  		if (!PageHuge(page))
  			continue;
@@ -1449,11 +1449,11 @@ Index: rpi-kernel/mm/memory_hotplug.c
  			goto found;
  		skip = compound_nr(head) - (page - head);
  		pfn += skip - 1;
-Index: rpi-kernel/mm/mempolicy.c
+Index: kernel-rpi/mm/mempolicy.c
 ===================================================================
---- rpi-kernel.orig/mm/mempolicy.c
-+++ rpi-kernel/mm/mempolicy.c
-@@ -830,7 +830,7 @@ static int mbind_range(struct mm_struct
+--- kernel-rpi.orig/mm/mempolicy.c
++++ kernel-rpi/mm/mempolicy.c
+@@ -828,7 +828,7 @@ static int mbind_range(struct mm_struct
  		prev = vma_merge(mm, prev, vmstart, vmend, vma->vm_flags,
  				 vma->anon_vma, vma->vm_file, pgoff,
  				 new_pol, vma->vm_userfaultfd_ctx,
@@ -1461,8 +1461,8 @@ Index: rpi-kernel/mm/mempolicy.c
 +				 vma_get_anon_name(vma));
  		if (prev) {
  			vma = prev;
- 			next = vma->vm_next;
-@@ -2223,8 +2223,8 @@ alloc_pages_vma(gfp_t gfp, int order, st
+ 			goto replace;
+@@ -2217,8 +2217,8 @@ alloc_pages_vma(gfp_t gfp, int order, st
  			 * memory with both reclaim and compact as well.
  			 */
  			if (!page && (gfp & __GFP_DIRECT_RECLAIM))
@@ -1473,10 +1473,10 @@ Index: rpi-kernel/mm/mempolicy.c
  
  			goto out;
  		}
-Index: rpi-kernel/mm/mlock.c
+Index: kernel-rpi/mm/mlock.c
 ===================================================================
---- rpi-kernel.orig/mm/mlock.c
-+++ rpi-kernel/mm/mlock.c
+--- kernel-rpi.orig/mm/mlock.c
++++ kernel-rpi/mm/mlock.c
 @@ -118,7 +118,7 @@ static bool __munlock_isolate_lru_page(s
  		if (getpage)
  			get_page(page);
@@ -1486,10 +1486,10 @@ Index: rpi-kernel/mm/mlock.c
  		return true;
  	}
  
-Index: rpi-kernel/mm/mm_init.c
+Index: kernel-rpi/mm/mm_init.c
 ===================================================================
---- rpi-kernel.orig/mm/mm_init.c
-+++ rpi-kernel/mm/mm_init.c
+--- kernel-rpi.orig/mm/mm_init.c
++++ kernel-rpi/mm/mm_init.c
 @@ -69,14 +69,16 @@ void __init mminit_verify_pageflags_layo
  
  	shift = 8 * sizeof(unsigned long);
@@ -1509,10 +1509,10 @@ Index: rpi-kernel/mm/mm_init.c
  		NR_PAGEFLAGS);
  	mminit_dprintk(MMINIT_TRACE, "pageflags_layout_shifts",
  		"Section %d Node %d Zone %d Lastcpupid %d Kasantag %d\n",
-Index: rpi-kernel/mm/mmap.c
+Index: kernel-rpi/mm/mmap.c
 ===================================================================
---- rpi-kernel.orig/mm/mmap.c
-+++ rpi-kernel/mm/mmap.c
+--- kernel-rpi.orig/mm/mmap.c
++++ kernel-rpi/mm/mmap.c
 @@ -1029,7 +1029,7 @@ again:
  static inline int is_mergeable_vma(struct vm_area_struct *vma,
  				struct file *file, unsigned long vm_flags,
@@ -1630,10 +1630,10 @@ Index: rpi-kernel/mm/mmap.c
  
  	/* Undo any partial mapping done by a device driver. */
  	unmap_region(mm, vma, prev, vma->vm_start, vma->vm_end);
-Index: rpi-kernel/mm/mmu_notifier.c
+Index: kernel-rpi/mm/mmu_notifier.c
 ===================================================================
---- rpi-kernel.orig/mm/mmu_notifier.c
-+++ rpi-kernel/mm/mmu_notifier.c
+--- kernel-rpi.orig/mm/mmu_notifier.c
++++ kernel-rpi/mm/mmu_notifier.c
 @@ -402,6 +402,22 @@ int __mmu_notifier_clear_young(struct mm
  	return young;
  }
@@ -1657,10 +1657,10 @@ Index: rpi-kernel/mm/mmu_notifier.c
  int __mmu_notifier_test_young(struct mm_struct *mm,
  			      unsigned long address)
  {
-Index: rpi-kernel/mm/mmzone.c
+Index: kernel-rpi/mm/mmzone.c
 ===================================================================
---- rpi-kernel.orig/mm/mmzone.c
-+++ rpi-kernel/mm/mmzone.c
+--- kernel-rpi.orig/mm/mmzone.c
++++ kernel-rpi/mm/mmzone.c
 @@ -94,6 +94,8 @@ void lruvec_init(struct lruvec *lruvec)
  
  	for_each_lru(lru)
@@ -1670,10 +1670,10 @@ Index: rpi-kernel/mm/mmzone.c
  }
  
  #if defined(CONFIG_NUMA_BALANCING) && !defined(LAST_CPUPID_NOT_IN_PAGE_FLAGS)
-Index: rpi-kernel/mm/oom_kill.c
+Index: kernel-rpi/mm/oom_kill.c
 ===================================================================
---- rpi-kernel.orig/mm/oom_kill.c
-+++ rpi-kernel/mm/oom_kill.c
+--- kernel-rpi.orig/mm/oom_kill.c
++++ kernel-rpi/mm/oom_kill.c
 @@ -957,7 +957,7 @@ static void oom_kill_process(struct oom_
  	struct task_struct *victim = oc->chosen;
  	struct mem_cgroup *oom_group;
@@ -1719,10 +1719,10 @@ Index: rpi-kernel/mm/oom_kill.c
 +	out_of_memory(&oc);
 +	mutex_unlock(&oom_lock);
  }
-Index: rpi-kernel/mm/page_alloc.c
+Index: kernel-rpi/mm/page_alloc.c
 ===================================================================
---- rpi-kernel.orig/mm/page_alloc.c
-+++ rpi-kernel/mm/page_alloc.c
+--- kernel-rpi.orig/mm/page_alloc.c
++++ kernel-rpi/mm/page_alloc.c
 @@ -70,6 +70,7 @@
  #include <linux/psi.h>
  #include <linux/padata.h>
@@ -1757,7 +1757,7 @@ Index: rpi-kernel/mm/page_alloc.c
  static unsigned long nr_kernel_pages __initdata;
  static unsigned long nr_all_pages __initdata;
  static unsigned long dma_reserve __initdata;
-@@ -4509,6 +4522,7 @@ should_reclaim_retry(gfp_t gfp_mask, uns
+@@ -4511,6 +4524,7 @@ should_reclaim_retry(gfp_t gfp_mask, uns
  	 * several times in the row.
  	 */
  	if (*no_progress_loops > MAX_RECLAIM_RETRIES) {
@@ -1765,7 +1765,7 @@ Index: rpi-kernel/mm/page_alloc.c
  		/* Before OOM, exhaust highatomic_reserve */
  		return unreserve_highatomic_pageblock(ac, true);
  	}
-@@ -4941,6 +4955,8 @@ __alloc_pages_nodemask(gfp_t gfp_mask, u
+@@ -4943,6 +4957,8 @@ __alloc_pages_nodemask(gfp_t gfp_mask, u
  	if (!prepare_alloc_pages(gfp_mask, order, preferred_nid, nodemask, &ac, &alloc_mask, &alloc_flags))
  		return NULL;
  
@@ -1774,7 +1774,7 @@ Index: rpi-kernel/mm/page_alloc.c
  	/*
  	 * Forbid the first pass from falling back to types that fragment
  	 * memory until all local zones are considered.
-@@ -7845,6 +7861,7 @@ static void setup_per_zone_lowmem_reserv
+@@ -7854,6 +7870,7 @@ static void setup_per_zone_lowmem_reserv
  static void __setup_per_zone_wmarks(void)
  {
  	unsigned long pages_min = min_free_kbytes >> (PAGE_SHIFT - 10);
@@ -1782,7 +1782,7 @@ Index: rpi-kernel/mm/page_alloc.c
  	unsigned long lowmem_pages = 0;
  	struct zone *zone;
  	unsigned long flags;
-@@ -7856,11 +7873,13 @@ static void __setup_per_zone_wmarks(void
+@@ -7865,11 +7882,13 @@ static void __setup_per_zone_wmarks(void
  	}
  
  	for_each_zone(zone) {
@@ -1797,7 +1797,7 @@ Index: rpi-kernel/mm/page_alloc.c
  		if (is_highmem(zone)) {
  			/*
  			 * __GFP_HIGH and PF_MEMALLOC allocations usually don't
-@@ -7894,8 +7913,8 @@ static void __setup_per_zone_wmarks(void
+@@ -7903,8 +7922,8 @@ static void __setup_per_zone_wmarks(void
  				      watermark_scale_factor, 10000));
  
  		zone->watermark_boost = 0;
@@ -1808,7 +1808,7 @@ Index: rpi-kernel/mm/page_alloc.c
  
  		spin_unlock_irqrestore(&zone->lock, flags);
  	}
-@@ -7980,7 +7999,7 @@ postcore_initcall(init_per_zone_wmark_mi
+@@ -7989,7 +8008,7 @@ postcore_initcall(init_per_zone_wmark_mi
  /*
   * min_free_kbytes_sysctl_handler - just a wrapper around proc_dointvec() so
   *	that we can call two helper functions whenever min_free_kbytes
@@ -1817,7 +1817,7 @@ Index: rpi-kernel/mm/page_alloc.c
   */
  int min_free_kbytes_sysctl_handler(struct ctl_table *table, int write,
  		void *buffer, size_t *length, loff_t *ppos)
-@@ -8594,6 +8613,8 @@ int alloc_contig_range(unsigned long sta
+@@ -8603,6 +8622,8 @@ int alloc_contig_range(unsigned long sta
  
  	/* Make sure the range is really isolated. */
  	if (test_pages_isolated(outer_start, end, 0)) {
@@ -1826,10 +1826,10 @@ Index: rpi-kernel/mm/page_alloc.c
  		ret = -EBUSY;
  		goto done;
  	}
-Index: rpi-kernel/mm/rmap.c
+Index: kernel-rpi/mm/rmap.c
 ===================================================================
---- rpi-kernel.orig/mm/rmap.c
-+++ rpi-kernel/mm/rmap.c
+--- kernel-rpi.orig/mm/rmap.c
++++ kernel-rpi/mm/rmap.c
 @@ -72,6 +72,7 @@
  #include <linux/page_idle.h>
  #include <linux/memremap.h>
@@ -1850,11 +1850,11 @@ Index: rpi-kernel/mm/rmap.c
  			if (ptep_clear_flush_young_notify(vma, address,
  						pvmw.pte)) {
  				/*
-Index: rpi-kernel/mm/shmem.c
+Index: kernel-rpi/mm/shmem.c
 ===================================================================
---- rpi-kernel.orig/mm/shmem.c
-+++ rpi-kernel/mm/shmem.c
-@@ -3266,7 +3266,7 @@ static int shmem_initxattrs(struct inode
+--- kernel-rpi.orig/mm/shmem.c
++++ kernel-rpi/mm/shmem.c
+@@ -3271,7 +3271,7 @@ static int shmem_initxattrs(struct inode
  static int shmem_xattr_handler_get(const struct xattr_handler *handler,
  				   struct dentry *unused, struct inode *inode,
  				   const char *name, void *buffer, size_t size,
@@ -1863,10 +1863,10 @@ Index: rpi-kernel/mm/shmem.c
  {
  	struct shmem_inode_info *info = SHMEM_I(inode);
  
-Index: rpi-kernel/mm/slab.h
+Index: kernel-rpi/mm/slab.h
 ===================================================================
---- rpi-kernel.orig/mm/slab.h
-+++ rpi-kernel/mm/slab.h
+--- kernel-rpi.orig/mm/slab.h
++++ kernel-rpi/mm/slab.h
 @@ -147,7 +147,7 @@ static inline slab_flags_t kmem_cache_fl
  #define SLAB_CACHE_FLAGS (SLAB_NOLEAKTRACE | SLAB_RECLAIM_ACCOUNT | \
  			  SLAB_TEMPORARY | SLAB_ACCOUNT)
@@ -1888,10 +1888,10 @@ Index: rpi-kernel/mm/slab.h
  
  	if (should_failslab(s, flags))
  		return NULL;
-Index: rpi-kernel/mm/slob.c
+Index: kernel-rpi/mm/slob.c
 ===================================================================
---- rpi-kernel.orig/mm/slob.c
-+++ rpi-kernel/mm/slob.c
+--- kernel-rpi.orig/mm/slob.c
++++ kernel-rpi/mm/slob.c
 @@ -474,8 +474,7 @@ __do_kmalloc_node(size_t size, gfp_t gfp
  
  	gfp &= gfp_allowed_mask;
@@ -1912,10 +1912,10 @@ Index: rpi-kernel/mm/slob.c
  
  	if (c->size < PAGE_SIZE) {
  		b = slob_alloc(c->size, flags, c->align, node, 0);
-Index: rpi-kernel/mm/slub.c
+Index: kernel-rpi/mm/slub.c
 ===================================================================
---- rpi-kernel.orig/mm/slub.c
-+++ rpi-kernel/mm/slub.c
+--- kernel-rpi.orig/mm/slub.c
++++ kernel-rpi/mm/slub.c
 @@ -1543,8 +1543,7 @@ static __always_inline bool slab_free_ho
  }
  
@@ -1969,10 +1969,10 @@ Index: rpi-kernel/mm/slub.c
  	return -EINVAL;
  }
  
-Index: rpi-kernel/mm/swap.c
+Index: kernel-rpi/mm/swap.c
 ===================================================================
---- rpi-kernel.orig/mm/swap.c
-+++ rpi-kernel/mm/swap.c
+--- kernel-rpi.orig/mm/swap.c
++++ kernel-rpi/mm/swap.c
 @@ -85,9 +85,8 @@ static void __page_cache_release(struct
  
  		spin_lock_irqsave(&pgdat->lru_lock, flags);
@@ -2174,10 +2174,10 @@ Index: rpi-kernel/mm/swap.c
  }
  
  /*
-Index: rpi-kernel/mm/swap_state.c
+Index: kernel-rpi/mm/swap_state.c
 ===================================================================
---- rpi-kernel.orig/mm/swap_state.c
-+++ rpi-kernel/mm/swap_state.c
+--- kernel-rpi.orig/mm/swap_state.c
++++ kernel-rpi/mm/swap_state.c
 @@ -537,7 +537,6 @@ struct page *__read_swap_cache_async(swp
  		workingset_refault(page, shadow);
  
@@ -2186,10 +2186,10 @@ Index: rpi-kernel/mm/swap_state.c
  	lru_cache_add(page);
  	*new_page_allocated = true;
  	return page;
-Index: rpi-kernel/mm/swapfile.c
+Index: kernel-rpi/mm/swapfile.c
 ===================================================================
---- rpi-kernel.orig/mm/swapfile.c
-+++ rpi-kernel/mm/swapfile.c
+--- kernel-rpi.orig/mm/swapfile.c
++++ kernel-rpi/mm/swapfile.c
 @@ -2573,6 +2573,8 @@ SYSCALL_DEFINE1(swapoff, const char __us
  	struct filename *pathname;
  	int err, found = 0;
@@ -2285,10 +2285,10 @@ Index: rpi-kernel/mm/swapfile.c
  
  	error = 0;
  	goto out;
-Index: rpi-kernel/mm/userfaultfd.c
+Index: kernel-rpi/mm/userfaultfd.c
 ===================================================================
---- rpi-kernel.orig/mm/userfaultfd.c
-+++ rpi-kernel/mm/userfaultfd.c
+--- kernel-rpi.orig/mm/userfaultfd.c
++++ kernel-rpi/mm/userfaultfd.c
 @@ -362,38 +362,38 @@ out:
  		 * If a reservation for the page existed in the reservation
  		 * map of a private mapping, the map was modified to indicate
@@ -2342,10 +2342,10 @@ Index: rpi-kernel/mm/userfaultfd.c
  		put_page(page);
  	}
  	BUG_ON(copied < 0);
-Index: rpi-kernel/mm/util.c
+Index: kernel-rpi/mm/util.c
 ===================================================================
---- rpi-kernel.orig/mm/util.c
-+++ rpi-kernel/mm/util.c
+--- kernel-rpi.orig/mm/util.c
++++ kernel-rpi/mm/util.c
 @@ -311,6 +311,18 @@ int vma_is_stack_for_current(struct vm_a
  	return (vma->vm_start <= KSTK_ESP(t) && vma->vm_end >= KSTK_ESP(t));
  }
@@ -2365,10 +2365,10 @@ Index: rpi-kernel/mm/util.c
  #ifndef STACK_RND_MASK
  #define STACK_RND_MASK (0x7ff >> (PAGE_SHIFT - 12))     /* 8MB of VA */
  #endif
-Index: rpi-kernel/mm/vmscan.c
+Index: kernel-rpi/mm/vmscan.c
 ===================================================================
---- rpi-kernel.orig/mm/vmscan.c
-+++ rpi-kernel/mm/vmscan.c
+--- kernel-rpi.orig/mm/vmscan.c
++++ kernel-rpi/mm/vmscan.c
 @@ -51,6 +51,12 @@
  #include <linux/printk.h>
  #include <linux/dax.h>
@@ -5363,10 +5363,10 @@ Index: rpi-kernel/mm/vmscan.c
  			pgrescued += nr_pages;
  		}
  	}
-Index: rpi-kernel/mm/workingset.c
+Index: kernel-rpi/mm/workingset.c
 ===================================================================
---- rpi-kernel.orig/mm/workingset.c
-+++ rpi-kernel/mm/workingset.c
+--- kernel-rpi.orig/mm/workingset.c
++++ kernel-rpi/mm/workingset.c
 @@ -168,9 +168,9 @@
   * refault distance will immediately activate the refaulting page.
   */
@@ -5603,10 +5603,10 @@ Index: rpi-kernel/mm/workingset.c
  	max_order = fls_long(totalram_pages() - 1);
  	if (max_order > timestamp_bits)
  		bucket_order = max_order - timestamp_bits;
-Index: rpi-kernel/mm/zsmalloc.c
+Index: kernel-rpi/mm/zsmalloc.c
 ===================================================================
---- rpi-kernel.orig/mm/zsmalloc.c
-+++ rpi-kernel/mm/zsmalloc.c
+--- kernel-rpi.orig/mm/zsmalloc.c
++++ kernel-rpi/mm/zsmalloc.c
 @@ -1835,11 +1835,10 @@ static inline void zs_pool_dec_isolated(
  	VM_BUG_ON(atomic_long_read(&pool->isolated_pages) <= 0);
  	atomic_long_dec(&pool->isolated_pages);
@@ -5622,10 +5622,10 @@ Index: rpi-kernel/mm/zsmalloc.c
  	if (atomic_long_read(&pool->isolated_pages) == 0 && pool->destroying)
  		wake_up_all(&pool->migration_wait);
  }
-Index: rpi-kernel/mm/zswap.c
+Index: kernel-rpi/mm/zswap.c
 ===================================================================
---- rpi-kernel.orig/mm/zswap.c
-+++ rpi-kernel/mm/zswap.c
+--- kernel-rpi.orig/mm/zswap.c
++++ kernel-rpi/mm/zswap.c
 @@ -592,9 +592,8 @@ error:
  	return NULL;
  }
@@ -5729,10 +5729,10 @@ Index: rpi-kernel/mm/zswap.c
  hp_fail:
  	cpuhp_remove_state(CPUHP_MM_ZSWP_MEM_PREPARE);
  dstmem_fail:
-Index: rpi-kernel/include/linux/sched/mm.h
+Index: kernel-rpi/include/linux/sched/mm.h
 ===================================================================
---- rpi-kernel.orig/include/linux/sched/mm.h
-+++ rpi-kernel/include/linux/sched/mm.h
+--- kernel-rpi.orig/include/linux/sched/mm.h
++++ kernel-rpi/include/linux/sched/mm.h
 @@ -182,6 +182,22 @@ static inline void fs_reclaim_release(gf
  #endif
  
@@ -5756,10 +5756,10 @@ Index: rpi-kernel/include/linux/sched/mm.h
   * memalloc_noio_save - Marks implicit GFP_NOIO allocation scope.
   *
   * This functions marks the beginning of the GFP_NOIO allocation scope.
-Index: rpi-kernel/include/linux/sched/smt.h
+Index: kernel-rpi/include/linux/sched/smt.h
 ===================================================================
---- rpi-kernel.orig/include/linux/sched/smt.h
-+++ rpi-kernel/include/linux/sched/smt.h
+--- kernel-rpi.orig/include/linux/sched/smt.h
++++ kernel-rpi/include/linux/sched/smt.h
 @@ -17,4 +17,8 @@ static inline bool sched_smt_active(void
  
  void arch_smt_update(void);
@@ -5769,10 +5769,10 @@ Index: rpi-kernel/include/linux/sched/smt.h
 +#endif
 +
  #endif
-Index: rpi-kernel/include/linux/sched/sysctl.h
+Index: kernel-rpi/include/linux/sched/sysctl.h
 ===================================================================
---- rpi-kernel.orig/include/linux/sched/sysctl.h
-+++ rpi-kernel/include/linux/sched/sysctl.h
+--- kernel-rpi.orig/include/linux/sched/sysctl.h
++++ kernel-rpi/include/linux/sched/sysctl.h
 @@ -52,6 +52,9 @@ int sched_proc_update_handler(struct ctl
  		void *buffer, size_t *length, loff_t *ppos);
  #endif
@@ -5783,10 +5783,10 @@ Index: rpi-kernel/include/linux/sched/sysctl.h
  /*
   *  control realtime throttling:
   *
-Index: rpi-kernel/include/linux/sched/task.h
+Index: kernel-rpi/include/linux/sched/task.h
 ===================================================================
---- rpi-kernel.orig/include/linux/sched/task.h
-+++ rpi-kernel/include/linux/sched/task.h
+--- kernel-rpi.orig/include/linux/sched/task.h
++++ kernel-rpi/include/linux/sched/task.h
 @@ -55,8 +55,7 @@ extern asmlinkage void schedule_tail(str
  extern void init_idle(struct task_struct *idle, int cpu);
  
@@ -5806,10 +5806,10 @@ Index: rpi-kernel/include/linux/sched/task.h
   *
   * Nests both inside and outside of read_lock(&tasklist_lock).
   * It must not be nested with write_lock_irq(&tasklist_lock),
-Index: rpi-kernel/include/linux/sched/task_stack.h
+Index: kernel-rpi/include/linux/sched/task_stack.h
 ===================================================================
---- rpi-kernel.orig/include/linux/sched/task_stack.h
-+++ rpi-kernel/include/linux/sched/task_stack.h
+--- kernel-rpi.orig/include/linux/sched/task_stack.h
++++ kernel-rpi/include/linux/sched/task_stack.h
 @@ -25,11 +25,7 @@ static inline void *task_stack_page(cons
  
  static inline unsigned long *end_of_stack(const struct task_struct *task)
@@ -5822,10 +5822,10 @@ Index: rpi-kernel/include/linux/sched/task_stack.h
  }
  
  #elif !defined(__HAVE_THREAD_FUNCTIONS)
-Index: rpi-kernel/kernel/Kconfig.preempt
+Index: kernel-rpi/kernel/Kconfig.preempt
 ===================================================================
---- rpi-kernel.orig/kernel/Kconfig.preempt
-+++ rpi-kernel/kernel/Kconfig.preempt
+--- kernel-rpi.orig/kernel/Kconfig.preempt
++++ kernel-rpi/kernel/Kconfig.preempt
 @@ -80,3 +80,9 @@ config PREEMPT_COUNT
  config PREEMPTION
         bool
@@ -5836,10 +5836,10 @@ Index: rpi-kernel/kernel/Kconfig.preempt
 +	default y
 +	depends on SCHED_SMT
 +
-Index: rpi-kernel/kernel/Makefile
+Index: kernel-rpi/kernel/Makefile
 ===================================================================
---- rpi-kernel.orig/kernel/Makefile
-+++ rpi-kernel/kernel/Makefile
+--- kernel-rpi.orig/kernel/Makefile
++++ kernel-rpi/kernel/Makefile
 @@ -50,7 +50,7 @@ obj-y += entry/
  
  obj-$(CONFIG_ALT_SYSCALL) += alt-syscall.o
@@ -5857,20 +5857,11 @@ Index: rpi-kernel/kernel/Makefile
  obj-$(CONFIG_HARDLOCKUP_DETECTOR_PERF) += watchdog_hld.o
  obj-$(CONFIG_SECCOMP) += seccomp.o
  obj-$(CONFIG_RELAY) += relay.o
-Index: rpi-kernel/kernel/audit.c
+Index: kernel-rpi/kernel/audit.c
 ===================================================================
---- rpi-kernel.orig/kernel/audit.c
-+++ rpi-kernel/kernel/audit.c
-@@ -718,7 +718,7 @@ static int kauditd_send_queue(struct soc
- {
- 	int rc = 0;
- 	struct sk_buff *skb;
--	unsigned int failed = 0;
-+	static unsigned int failed = 0;
- 
- 	/* NOTE: kauditd_thread takes care of all our locking, we just use
- 	 *       the netlink info passed to us (e.g. sk and portid) */
-@@ -735,30 +735,32 @@ static int kauditd_send_queue(struct soc
+--- kernel-rpi.orig/kernel/audit.c
++++ kernel-rpi/kernel/audit.c
+@@ -759,7 +759,6 @@ static int kauditd_send_queue(struct soc
  			continue;
  		}
  
@@ -5878,39 +5869,31 @@ Index: rpi-kernel/kernel/audit.c
  		/* grab an extra skb reference in case of error */
  		skb_get(skb);
  		rc = netlink_unicast(sk, skb, portid, 0);
- 		if (rc < 0) {
--			/* send failed - try a few times unless fatal error */
-+			/* fatal failure for our queue flush attempt? */
- 			if (++failed >= retry_limit ||
- 			    rc == -ECONNREFUSED || rc == -EPERM) {
-+				/* yes - error processing for the queue */
+@@ -770,19 +769,18 @@ retry:
  				sk = NULL;
  				if (err_hook)
- 					(*err_hook)(skb);
+ 					(*err_hook)(skb, rc);
 -				if (rc == -EAGAIN)
 -					rc = 0;
 -				/* continue to drain the queue */
-+				if (!skb_hook)
-+					goto out;
-+				/* keep processing with the skb_hook */
++        if (!skb_hook)
++          goto out;
  				continue;
  			} else
 -				goto retry;
-+				/* no - requeue to preserve ordering */
-+				skb_queue_head(queue, skb);
++        skb_queue_head(queue, skb);
  		} else {
--			/* skb sent - drop the extra reference and continue */
-+			/* it worked - drop the extra reference and continue */
+ 			/* skb sent - drop the extra reference and continue */
  			consume_skb(skb);
  			failed = 0;
  		}
  	}
- 
+-
 +out:
  	return (rc >= 0 ? 0 : rc);
  }
  
-@@ -1607,8 +1609,7 @@ static int __net_init audit_net_init(str
+@@ -1645,8 +1643,7 @@ static int __net_init audit_net_init(str
  		audit_panic("cannot initialize netlink socket in namespace");
  		return -ENOMEM;
  	}
@@ -5920,7 +5903,7 @@ Index: rpi-kernel/kernel/audit.c
  
  	return 0;
  }
-@@ -2089,6 +2090,12 @@ void audit_log_d_path(struct audit_buffe
+@@ -2129,6 +2126,12 @@ void audit_log_d_path(struct audit_buffe
  	if (prefix)
  		audit_log_format(ab, "%s", prefix);
  
@@ -5933,10 +5916,10 @@ Index: rpi-kernel/kernel/audit.c
  	/* We will allow 11 spaces for ' (deleted)' to be appended */
  	pathname = kmalloc(PATH_MAX+11, ab->gfp_mask);
  	if (!pathname) {
-Index: rpi-kernel/kernel/auditsc.c
+Index: kernel-rpi/kernel/auditsc.c
 ===================================================================
---- rpi-kernel.orig/kernel/auditsc.c
-+++ rpi-kernel/kernel/auditsc.c
+--- kernel-rpi.orig/kernel/auditsc.c
++++ kernel-rpi/kernel/auditsc.c
 @@ -653,7 +653,7 @@ static int audit_filter_rules(struct tas
  			result = audit_comparator(audit_loginuid_set(tsk), f->op, f->val);
  			break;
@@ -5946,10 +5929,10 @@ Index: rpi-kernel/kernel/auditsc.c
  				result = audit_comparator(ctx->sockaddr->ss_family,
  							  f->op, f->val);
  			break;
-Index: rpi-kernel/kernel/bounds.c
+Index: kernel-rpi/kernel/bounds.c
 ===================================================================
---- rpi-kernel.orig/kernel/bounds.c
-+++ rpi-kernel/kernel/bounds.c
+--- kernel-rpi.orig/kernel/bounds.c
++++ kernel-rpi/kernel/bounds.c
 @@ -22,6 +22,12 @@ int main(void)
  	DEFINE(NR_CPUS_BITS, ilog2(CONFIG_NR_CPUS));
  #endif
@@ -5963,10 +5946,10 @@ Index: rpi-kernel/kernel/bounds.c
  	/* End of constants */
  
  	return 0;
-Index: rpi-kernel/kernel/bpf/arraymap.c
+Index: kernel-rpi/kernel/bpf/arraymap.c
 ===================================================================
---- rpi-kernel.orig/kernel/bpf/arraymap.c
-+++ rpi-kernel/kernel/bpf/arraymap.c
+--- kernel-rpi.orig/kernel/bpf/arraymap.c
++++ kernel-rpi/kernel/bpf/arraymap.c
 @@ -1025,7 +1025,6 @@ static struct bpf_map *prog_array_map_al
  	INIT_WORK(&aux->work, prog_array_map_clear_deferred);
  	INIT_LIST_HEAD(&aux->poke_progs);
@@ -5975,10 +5958,10 @@ Index: rpi-kernel/kernel/bpf/arraymap.c
  
  	map = array_map_alloc(attr);
  	if (IS_ERR(map)) {
-Index: rpi-kernel/kernel/bpf/core.c
+Index: kernel-rpi/kernel/bpf/core.c
 ===================================================================
---- rpi-kernel.orig/kernel/bpf/core.c
-+++ rpi-kernel/kernel/bpf/core.c
+--- kernel-rpi.orig/kernel/bpf/core.c
++++ kernel-rpi/kernel/bpf/core.c
 @@ -822,7 +822,7 @@ u64 __weak bpf_jit_alloc_exec_limit(void
  static int __init bpf_jit_charge_init(void)
  {
@@ -6022,10 +6005,10 @@ Index: rpi-kernel/kernel/bpf/core.c
  }
  
  static int bpf_check_tail_call(const struct bpf_prog *fp)
-Index: rpi-kernel/kernel/bpf/devmap.c
+Index: kernel-rpi/kernel/bpf/devmap.c
 ===================================================================
---- rpi-kernel.orig/kernel/bpf/devmap.c
-+++ rpi-kernel/kernel/bpf/devmap.c
+--- kernel-rpi.orig/kernel/bpf/devmap.c
++++ kernel-rpi/kernel/bpf/devmap.c
 @@ -92,7 +92,7 @@ static struct hlist_head *dev_map_create
  	int i;
  	struct hlist_head *hash;
@@ -6044,10 +6027,10 @@ Index: rpi-kernel/kernel/bpf/devmap.c
  						      sizeof(struct bpf_dtab_netdev *),
  						      dtab->map.numa_node);
  		if (!dtab->netdev_map)
-Index: rpi-kernel/kernel/bpf/stackmap.c
+Index: kernel-rpi/kernel/bpf/stackmap.c
 ===================================================================
---- rpi-kernel.orig/kernel/bpf/stackmap.c
-+++ rpi-kernel/kernel/bpf/stackmap.c
+--- kernel-rpi.orig/kernel/bpf/stackmap.c
++++ kernel-rpi/kernel/bpf/stackmap.c
 @@ -7,10 +7,9 @@
  #include <linux/kernel.h>
  #include <linux/stacktrace.h>
@@ -6233,10 +6216,10 @@ Index: rpi-kernel/kernel/bpf/stackmap.c
  			continue;
  		}
  		id_offs[i].offset = (vma->vm_pgoff << PAGE_SHIFT) + ips[i]
-Index: rpi-kernel/kernel/bpf/syscall.c
+Index: kernel-rpi/kernel/bpf/syscall.c
 ===================================================================
---- rpi-kernel.orig/kernel/bpf/syscall.c
-+++ rpi-kernel/kernel/bpf/syscall.c
+--- kernel-rpi.orig/kernel/bpf/syscall.c
++++ kernel-rpi/kernel/bpf/syscall.c
 @@ -50,8 +50,7 @@ static DEFINE_SPINLOCK(map_idr_lock);
  static DEFINE_IDR(link_idr);
  static DEFINE_SPINLOCK(link_idr_lock);
@@ -6351,7 +6334,7 @@ Index: rpi-kernel/kernel/bpf/syscall.c
  	fdput(f);
  	return err;
  }
-@@ -1323,11 +1307,12 @@ int generic_map_update_batch(struct bpf_
+@@ -1324,11 +1308,12 @@ int generic_map_update_batch(struct bpf_
  	void __user *values = u64_to_user_ptr(attr->batch.values);
  	void __user *keys = u64_to_user_ptr(attr->batch.keys);
  	u32 value_size, cp, max_count;
@@ -6365,7 +6348,7 @@ Index: rpi-kernel/kernel/bpf/syscall.c
  	if (attr->batch.elem_flags & ~BPF_F_LOCK)
  		return -EINVAL;
  
-@@ -1352,7 +1337,6 @@ int generic_map_update_batch(struct bpf_
+@@ -1353,7 +1338,6 @@ int generic_map_update_batch(struct bpf_
  		return -ENOMEM;
  	}
  
@@ -6373,7 +6356,7 @@ Index: rpi-kernel/kernel/bpf/syscall.c
  	for (cp = 0; cp < max_count; cp++) {
  		err = -EFAULT;
  		if (copy_from_user(key, keys + cp * map->key_size,
-@@ -1372,7 +1356,6 @@ int generic_map_update_batch(struct bpf_
+@@ -1374,7 +1358,6 @@ int generic_map_update_batch(struct bpf_
  
  	kfree(value);
  	kfree(key);
@@ -6381,7 +6364,7 @@ Index: rpi-kernel/kernel/bpf/syscall.c
  	return err;
  }
  
-@@ -1497,7 +1480,6 @@ static int map_lookup_and_delete_elem(un
+@@ -1500,7 +1483,6 @@ static int map_lookup_and_delete_elem(un
  	map = __bpf_map_get(f);
  	if (IS_ERR(map))
  		return PTR_ERR(map);
@@ -6389,7 +6372,7 @@ Index: rpi-kernel/kernel/bpf/syscall.c
  	if (!(map_get_sys_perms(map, f) & FMODE_CAN_READ) ||
  	    !(map_get_sys_perms(map, f) & FMODE_CAN_WRITE)) {
  		err = -EPERM;
-@@ -1539,7 +1521,6 @@ free_value:
+@@ -1542,7 +1524,6 @@ free_value:
  free_key:
  	kfree(key);
  err_put:
@@ -6397,7 +6380,7 @@ Index: rpi-kernel/kernel/bpf/syscall.c
  	fdput(f);
  	return err;
  }
-@@ -1566,7 +1547,8 @@ static int map_freeze(const union bpf_at
+@@ -1569,7 +1550,8 @@ static int map_freeze(const union bpf_at
  	}
  
  	mutex_lock(&map->freeze_mutex);
@@ -6407,7 +6390,7 @@ Index: rpi-kernel/kernel/bpf/syscall.c
  		err = -EBUSY;
  		goto err_put;
  	}
-@@ -3991,9 +3973,6 @@ static int bpf_map_do_batch(const union
+@@ -3994,9 +3976,6 @@ static int bpf_map_do_batch(const union
  			    union bpf_attr __user *uattr,
  			    int cmd)
  {
@@ -6417,7 +6400,7 @@ Index: rpi-kernel/kernel/bpf/syscall.c
  	struct bpf_map *map;
  	int err, ufd;
  	struct fd f;
-@@ -4006,13 +3985,16 @@ static int bpf_map_do_batch(const union
+@@ -4009,13 +3988,16 @@ static int bpf_map_do_batch(const union
  	map = __bpf_map_get(f);
  	if (IS_ERR(map))
  		return PTR_ERR(map);
@@ -6438,7 +6421,7 @@ Index: rpi-kernel/kernel/bpf/syscall.c
  		err = -EPERM;
  		goto err_put;
  	}
-@@ -4025,9 +4007,8 @@ static int bpf_map_do_batch(const union
+@@ -4028,9 +4010,8 @@ static int bpf_map_do_batch(const union
  		BPF_DO_BATCH(map->ops->map_update_batch);
  	else
  		BPF_DO_BATCH(map->ops->map_delete_batch);
@@ -6449,10 +6432,10 @@ Index: rpi-kernel/kernel/bpf/syscall.c
  	fdput(f);
  	return err;
  }
-Index: rpi-kernel/kernel/bpf/verifier.c
+Index: kernel-rpi/kernel/bpf/verifier.c
 ===================================================================
---- rpi-kernel.orig/kernel/bpf/verifier.c
-+++ rpi-kernel/kernel/bpf/verifier.c
+--- kernel-rpi.orig/kernel/bpf/verifier.c
++++ kernel-rpi/kernel/bpf/verifier.c
 @@ -1249,28 +1249,22 @@ static void __reg_bound_offset(struct bp
  	reg->var_off = tnum_or(tnum_clear_subreg(var64_off), var32_off);
  }
@@ -6570,10 +6553,10 @@ Index: rpi-kernel/kernel/bpf/verifier.c
  
  	/* Examples for register markings:
  	 *
-Index: rpi-kernel/kernel/cpu.c
+Index: kernel-rpi/kernel/cpu.c
 ===================================================================
---- rpi-kernel.orig/kernel/cpu.c
-+++ rpi-kernel/kernel/cpu.c
+--- kernel-rpi.orig/kernel/cpu.c
++++ kernel-rpi/kernel/cpu.c
 @@ -31,8 +31,8 @@
  #include <linux/smpboot.h>
  #include <linux/relay.h>
@@ -6722,10 +6705,10 @@ Index: rpi-kernel/kernel/cpu.c
 +}
 +EXPORT_SYMBOL_GPL(coresched_cmd_secure);
 +#endif
-Index: rpi-kernel/kernel/crash_core.c
+Index: kernel-rpi/kernel/crash_core.c
 ===================================================================
---- rpi-kernel.orig/kernel/crash_core.c
-+++ rpi-kernel/kernel/crash_core.c
+--- kernel-rpi.orig/kernel/crash_core.c
++++ kernel-rpi/kernel/crash_core.c
 @@ -4,6 +4,7 @@
   * Copyright (C) 2002-2004 Eric Biederman  <ebiederm@xmission.com>
   */
@@ -6797,10 +6780,10 @@ Index: rpi-kernel/kernel/crash_core.c
  	VMCOREINFO_PAGESIZE(PAGE_SIZE);
  
  	VMCOREINFO_SYMBOL(init_uts_ns);
-Index: rpi-kernel/kernel/dma/debug.c
+Index: kernel-rpi/kernel/dma/debug.c
 ===================================================================
---- rpi-kernel.orig/kernel/dma/debug.c
-+++ rpi-kernel/kernel/dma/debug.c
+--- kernel-rpi.orig/kernel/dma/debug.c
++++ kernel-rpi/kernel/dma/debug.c
 @@ -1300,12 +1300,6 @@ void debug_dma_map_sg(struct device *dev
  	if (unlikely(dma_debug_disabled()))
  		return;
@@ -6827,10 +6810,10 @@ Index: rpi-kernel/kernel/dma/debug.c
  		check_sg_segment(dev, s);
  
  		add_dma_entry(entry);
-Index: rpi-kernel/kernel/dma/mapping.c
+Index: kernel-rpi/kernel/dma/mapping.c
 ===================================================================
---- rpi-kernel.orig/kernel/dma/mapping.c
-+++ rpi-kernel/kernel/dma/mapping.c
+--- kernel-rpi.orig/kernel/dma/mapping.c
++++ kernel-rpi/kernel/dma/mapping.c
 @@ -471,11 +471,10 @@ void dma_free_attrs(struct device *dev,
  }
  EXPORT_SYMBOL(dma_free_attrs);
@@ -7040,10 +7023,10 @@ Index: rpi-kernel/kernel/dma/mapping.c
  
  int dma_supported(struct device *dev, u64 mask)
  {
-Index: rpi-kernel/kernel/exit.c
+Index: kernel-rpi/kernel/exit.c
 ===================================================================
---- rpi-kernel.orig/kernel/exit.c
-+++ rpi-kernel/kernel/exit.c
+--- kernel-rpi.orig/kernel/exit.c
++++ kernel-rpi/kernel/exit.c
 @@ -422,6 +422,7 @@ assign_new_owner:
  		goto retry;
  	}
@@ -7052,10 +7035,10 @@ Index: rpi-kernel/kernel/exit.c
  	task_unlock(c);
  	put_task_struct(c);
  }
-Index: rpi-kernel/kernel/fork.c
+Index: kernel-rpi/kernel/fork.c
 ===================================================================
---- rpi-kernel.orig/kernel/fork.c
-+++ rpi-kernel/kernel/fork.c
+--- kernel-rpi.orig/kernel/fork.c
++++ kernel-rpi/kernel/fork.c
 @@ -96,6 +96,7 @@
  #include <linux/kasan.h>
  #include <linux/scs.h>
@@ -7130,8 +7113,8 @@ Index: rpi-kernel/kernel/fork.c
  	spin_lock(&current->sighand->siglock);
  
  	/*
-@@ -2311,7 +2320,7 @@ static __latent_entropy struct task_stru
- 	write_unlock_irq(&tasklist_lock);
+@@ -2310,7 +2319,7 @@ static __latent_entropy struct task_stru
+ 		fd_install(pidfd, pidfile);
  
  	proc_fork_connector(p);
 -	sched_post_fork(p, args);
@@ -7139,7 +7122,7 @@ Index: rpi-kernel/kernel/fork.c
  	cgroup_post_fork(p, args);
  	perf_event_fork(p);
  
-@@ -2323,6 +2332,7 @@ static __latent_entropy struct task_stru
+@@ -2322,6 +2331,7 @@ static __latent_entropy struct task_stru
  	return p;
  
  bad_fork_cancel_cgroup:
@@ -7147,7 +7130,7 @@ Index: rpi-kernel/kernel/fork.c
  	spin_unlock(&current->sighand->siglock);
  	write_unlock_irq(&tasklist_lock);
  	cgroup_cancel_fork(p, args);
-@@ -2470,6 +2480,8 @@ pid_t kernel_clone(struct kernel_clone_a
+@@ -2469,6 +2479,8 @@ pid_t kernel_clone(struct kernel_clone_a
  	if (IS_ERR(p))
  		return PTR_ERR(p);
  
@@ -7156,7 +7139,7 @@ Index: rpi-kernel/kernel/fork.c
  	/*
  	 * Do this prior waking up the new thread - the thread pointer
  	 * might get invalid after that point, if the thread exits quickly.
-@@ -2488,6 +2500,13 @@ pid_t kernel_clone(struct kernel_clone_a
+@@ -2487,6 +2499,13 @@ pid_t kernel_clone(struct kernel_clone_a
  		get_task_struct(p);
  	}
  
@@ -7170,10 +7153,10 @@ Index: rpi-kernel/kernel/fork.c
  	wake_up_new_task(p);
  
  	/* forking complete and child started to run, tell ptracer */
-Index: rpi-kernel/kernel/futex.c
+Index: kernel-rpi/kernel/futex.c
 ===================================================================
---- rpi-kernel.orig/kernel/futex.c
-+++ rpi-kernel/kernel/futex.c
+--- kernel-rpi.orig/kernel/futex.c
++++ kernel-rpi/kernel/futex.c
 @@ -1181,7 +1181,7 @@ static int handle_exit_race(u32 __user *
  	 *  tsk->futex_state =               } else {
  	 *	FUTEX_STATE_DEAD;              if (tsk->futex_state !=
@@ -7389,10 +7372,10 @@ Index: rpi-kernel/kernel/futex.c
  			t = ktime_add_safe(ktime_get(), t);
  		else if (cmd != FUTEX_LOCK_PI && !(op & FUTEX_CLOCK_REALTIME))
  			t = timens_ktime_to_host(CLOCK_MONOTONIC, t);
-Index: rpi-kernel/kernel/hung_task.c
+Index: kernel-rpi/kernel/hung_task.c
 ===================================================================
---- rpi-kernel.orig/kernel/hung_task.c
-+++ rpi-kernel/kernel/hung_task.c
+--- kernel-rpi.orig/kernel/hung_task.c
++++ kernel-rpi/kernel/hung_task.c
 @@ -209,8 +209,10 @@ static void check_hung_uninterruptible_t
  		trigger_all_cpu_backtrace();
  	}
@@ -7405,10 +7388,10 @@ Index: rpi-kernel/kernel/hung_task.c
  }
  
  static long hung_timeout_jiffies(unsigned long last_checked,
-Index: rpi-kernel/kernel/irq/chip.c
+Index: kernel-rpi/kernel/irq/chip.c
 ===================================================================
---- rpi-kernel.orig/kernel/irq/chip.c
-+++ rpi-kernel/kernel/irq/chip.c
+--- kernel-rpi.orig/kernel/irq/chip.c
++++ kernel-rpi/kernel/irq/chip.c
 @@ -14,6 +14,7 @@
  #include <linux/interrupt.h>
  #include <linux/kernel_stat.h>
@@ -7441,10 +7424,10 @@ Index: rpi-kernel/kernel/irq/chip.c
  
  	/*
  	 * If the interrupt is an armed wakeup source, mark it pending
-Index: rpi-kernel/kernel/irq/manage.c
+Index: kernel-rpi/kernel/irq/manage.c
 ===================================================================
---- rpi-kernel.orig/kernel/irq/manage.c
-+++ rpi-kernel/kernel/irq/manage.c
+--- kernel-rpi.orig/kernel/irq/manage.c
++++ kernel-rpi/kernel/irq/manage.c
 @@ -1627,7 +1627,8 @@ __setup_irq(unsigned int irq, struct irq
  			irqd_set(&desc->irq_data, IRQD_NO_BALANCING);
  		}
@@ -7481,10 +7464,10 @@ Index: rpi-kernel/kernel/irq/manage.c
  	    !irq_settings_can_request(desc) ||
  	    WARN_ON(irq_settings_is_per_cpu_devid(desc)) ||
  	    !irq_supports_nmi(desc))
-Index: rpi-kernel/kernel/kallsyms.c
+Index: kernel-rpi/kernel/kallsyms.c
 ===================================================================
---- rpi-kernel.orig/kernel/kallsyms.c
-+++ rpi-kernel/kernel/kallsyms.c
+--- kernel-rpi.orig/kernel/kallsyms.c
++++ kernel-rpi/kernel/kallsyms.c
 @@ -25,7 +25,10 @@
  #include <linux/filter.h>
  #include <linux/ftrace.h>
@@ -7765,10 +7748,10 @@ Index: rpi-kernel/kernel/kallsyms.c
  }
  
  /* To avoid using get_symbol_offset for every symbol, we carry prefix along. */
-Index: rpi-kernel/kernel/kprobes.c
+Index: kernel-rpi/kernel/kprobes.c
 ===================================================================
---- rpi-kernel.orig/kernel/kprobes.c
-+++ rpi-kernel/kernel/kprobes.c
+--- kernel-rpi.orig/kernel/kprobes.c
++++ kernel-rpi/kernel/kprobes.c
 @@ -2137,9 +2137,6 @@ int register_kretprobe(struct kretprobe
  		}
  	}
@@ -7794,10 +7777,10 @@ Index: rpi-kernel/kernel/kprobes.c
  
  	debugfs_create_file("blacklist", 0400, dir, NULL,
  			    &kprobe_blacklist_fops);
-Index: rpi-kernel/kernel/kthread.c
+Index: kernel-rpi/kernel/kthread.c
 ===================================================================
---- rpi-kernel.orig/kernel/kthread.c
-+++ rpi-kernel/kernel/kthread.c
+--- kernel-rpi.orig/kernel/kthread.c
++++ kernel-rpi/kernel/kthread.c
 @@ -1326,6 +1326,7 @@ void kthread_use_mm(struct mm_struct *mm
  	}
  	tsk->mm = mm;
@@ -7806,11 +7789,11 @@ Index: rpi-kernel/kernel/kthread.c
  	local_irq_enable();
  	task_unlock(tsk);
  #ifdef finish_arch_post_lock_switch
-Index: rpi-kernel/kernel/locking/lockdep.c
+Index: kernel-rpi/kernel/locking/lockdep.c
 ===================================================================
---- rpi-kernel.orig/kernel/locking/lockdep.c
-+++ rpi-kernel/kernel/locking/lockdep.c
-@@ -887,7 +887,7 @@ look_up_lock_class(const struct lockdep_
+--- kernel-rpi.orig/kernel/locking/lockdep.c
++++ kernel-rpi/kernel/locking/lockdep.c
+@@ -885,7 +885,7 @@ look_up_lock_class(const struct lockdep_
  	if (DEBUG_LOCKS_WARN_ON(!irqs_disabled()))
  		return NULL;
  
@@ -7819,7 +7802,7 @@ Index: rpi-kernel/kernel/locking/lockdep.c
  		if (class->key == key) {
  			/*
  			 * Huh! same key, different name? Did someone trample
-@@ -5303,7 +5303,7 @@ int __lock_is_held(const struct lockdep_
+@@ -5305,7 +5305,7 @@ int __lock_is_held(const struct lockdep_
  		struct held_lock *hlock = curr->held_locks + i;
  
  		if (match_held_lock(hlock, lock)) {
@@ -7828,10 +7811,10 @@ Index: rpi-kernel/kernel/locking/lockdep.c
  				return 1;
  
  			return 0;
-Index: rpi-kernel/kernel/module.c
+Index: kernel-rpi/kernel/module.c
 ===================================================================
---- rpi-kernel.orig/kernel/module.c
-+++ rpi-kernel/kernel/module.c
+--- kernel-rpi.orig/kernel/module.c
++++ kernel-rpi/kernel/module.c
 @@ -14,6 +14,7 @@
  #include <linux/trace_events.h>
  #include <linux/init.h>
@@ -7893,7 +7876,7 @@ Index: rpi-kernel/kernel/module.c
  static void dynamic_debug_setup(struct module *mod, struct _ddebug *debug, unsigned int num)
  {
  	if (!debug)
-@@ -4065,6 +4088,7 @@ static int load_module(struct load_info
+@@ -4050,6 +4073,7 @@ static int load_module(struct load_info
  		goto free_arch_cleanup;
  	}
  
@@ -7901,7 +7884,7 @@ Index: rpi-kernel/kernel/module.c
  	dynamic_debug_setup(mod, info->debug, info->num_debug);
  
  	/* Ftrace init must be called in the MODULE_STATE_UNFORMED state */
-@@ -4291,6 +4315,7 @@ const char *module_address_lookup(unsign
+@@ -4276,6 +4300,7 @@ const char *module_address_lookup(unsign
  			    unsigned long *size,
  			    unsigned long *offset,
  			    char **modname,
@@ -7909,7 +7892,7 @@ Index: rpi-kernel/kernel/module.c
  			    char *namebuf)
  {
  	const char *ret = NULL;
-@@ -4301,6 +4326,13 @@ const char *module_address_lookup(unsign
+@@ -4286,6 +4311,13 @@ const char *module_address_lookup(unsign
  	if (mod) {
  		if (modname)
  			*modname = mod->name;
@@ -7923,20 +7906,20 @@ Index: rpi-kernel/kernel/module.c
  
  		ret = find_kallsyms_symbol(mod, addr, size, offset);
  	}
-Index: rpi-kernel/kernel/power/Makefile
+Index: kernel-rpi/kernel/power/Makefile
 ===================================================================
---- rpi-kernel.orig/kernel/power/Makefile
-+++ rpi-kernel/kernel/power/Makefile
+--- kernel-rpi.orig/kernel/power/Makefile
++++ kernel-rpi/kernel/power/Makefile
 @@ -17,4 +17,5 @@ obj-$(CONFIG_PM_WAKELOCKS)	+= wakelock.o
  
  obj-$(CONFIG_MAGIC_SYSRQ)	+= poweroff.o
  
 +obj-$(CONFIG_SUSPEND)		+= wakeup_reason.o
  obj-$(CONFIG_ENERGY_MODEL)	+= energy_model.o
-Index: rpi-kernel/kernel/power/energy_model.c
+Index: kernel-rpi/kernel/power/energy_model.c
 ===================================================================
---- rpi-kernel.orig/kernel/power/energy_model.c
-+++ rpi-kernel/kernel/power/energy_model.c
+--- kernel-rpi.orig/kernel/power/energy_model.c
++++ kernel-rpi/kernel/power/energy_model.c
 @@ -52,6 +52,17 @@ static int em_debug_cpus_show(struct seq
  }
  DEFINE_SHOW_ATTRIBUTE(em_debug_cpus);
@@ -8053,10 +8036,10 @@ Index: rpi-kernel/kernel/power/energy_model.c
  	em_debug_create_pd(dev);
  	dev_info(dev, "EM: created perf domain\n");
  
-Index: rpi-kernel/kernel/power/hibernate.c
+Index: kernel-rpi/kernel/power/hibernate.c
 ===================================================================
---- rpi-kernel.orig/kernel/power/hibernate.c
-+++ rpi-kernel/kernel/power/hibernate.c
+--- kernel-rpi.orig/kernel/power/hibernate.c
++++ kernel-rpi/kernel/power/hibernate.c
 @@ -688,7 +688,7 @@ static int load_image_and_restore(void)
  		goto Unlock;
  
@@ -8084,10 +8067,10 @@ Index: rpi-kernel/kernel/power/hibernate.c
  	goto Finish;
  }
  
-Index: rpi-kernel/kernel/power/process.c
+Index: kernel-rpi/kernel/power/process.c
 ===================================================================
---- rpi-kernel.orig/kernel/power/process.c
-+++ rpi-kernel/kernel/power/process.c
+--- kernel-rpi.orig/kernel/power/process.c
++++ kernel-rpi/kernel/power/process.c
 @@ -85,18 +85,21 @@ static int try_to_freeze_tasks(bool user
  	elapsed = ktime_sub(end, start);
  	elapsed_msecs = ktime_to_ms(elapsed);
@@ -8115,10 +8098,10 @@ Index: rpi-kernel/kernel/power/process.c
  			read_lock(&tasklist_lock);
  			for_each_process_thread(g, p) {
  				if (p != current && !freezer_should_skip(p)
-Index: rpi-kernel/kernel/power/suspend.c
+Index: kernel-rpi/kernel/power/suspend.c
 ===================================================================
---- rpi-kernel.orig/kernel/power/suspend.c
-+++ rpi-kernel/kernel/power/suspend.c
+--- kernel-rpi.orig/kernel/power/suspend.c
++++ kernel-rpi/kernel/power/suspend.c
 @@ -30,6 +30,7 @@
  #include <trace/events/power.h>
  #include <linux/compiler.h>
@@ -8127,15 +8110,17 @@ Index: rpi-kernel/kernel/power/suspend.c
  
  #include "power.h"
  
-@@ -139,6 +140,7 @@ static void s2idle_loop(void)
+@@ -138,6 +139,9 @@ static void s2idle_loop(void)
+ 			break;
  		}
  
- 		pm_wakeup_clear(false);
-+		clear_wakeup_reasons();
- 
++    pm_wakeup_clear(false);
++    clear_wakeup_reasons();
++
  		s2idle_enter();
  	}
-@@ -359,6 +361,7 @@ static int suspend_prepare(suspend_state
+ 
+@@ -357,6 +361,7 @@ static int suspend_prepare(suspend_state
  	if (!error)
  		return 0;
  
@@ -8143,7 +8128,7 @@ Index: rpi-kernel/kernel/power/suspend.c
  	suspend_stats.failed_freeze++;
  	dpm_save_failed_step(SUSPEND_FREEZE);
  	pm_notifier_call_chain(PM_POST_SUSPEND);
-@@ -388,7 +391,7 @@ void __weak arch_suspend_enable_irqs(voi
+@@ -386,7 +391,7 @@ void __weak arch_suspend_enable_irqs(voi
   */
  static int suspend_enter(suspend_state_t state, bool *wakeup)
  {
@@ -8152,7 +8137,7 @@ Index: rpi-kernel/kernel/power/suspend.c
  
  	error = platform_suspend_prepare(state);
  	if (error)
-@@ -396,7 +399,11 @@ static int suspend_enter(suspend_state_t
+@@ -394,7 +399,11 @@ static int suspend_enter(suspend_state_t
  
  	error = dpm_suspend_late(PMSG_SUSPEND);
  	if (error) {
@@ -8164,7 +8149,7 @@ Index: rpi-kernel/kernel/power/suspend.c
  		goto Platform_finish;
  	}
  	error = platform_suspend_prepare_late(state);
-@@ -405,7 +412,11 @@ static int suspend_enter(suspend_state_t
+@@ -403,7 +412,11 @@ static int suspend_enter(suspend_state_t
  
  	error = dpm_suspend_noirq(PMSG_SUSPEND);
  	if (error) {
@@ -8176,7 +8161,7 @@ Index: rpi-kernel/kernel/power/suspend.c
  		goto Platform_early_resume;
  	}
  	error = platform_suspend_prepare_noirq(state);
-@@ -421,8 +432,10 @@ static int suspend_enter(suspend_state_t
+@@ -419,8 +432,10 @@ static int suspend_enter(suspend_state_t
  	}
  
  	error = suspend_disable_secondary_cpus();
@@ -8188,7 +8173,7 @@ Index: rpi-kernel/kernel/power/suspend.c
  
  	arch_suspend_disable_irqs();
  	BUG_ON(!irqs_disabled());
-@@ -493,6 +506,8 @@ int suspend_devices_and_enter(suspend_st
+@@ -491,6 +506,8 @@ int suspend_devices_and_enter(suspend_st
  	error = dpm_suspend_start(PMSG_SUSPEND);
  	if (error) {
  		pr_err("Some devices failed to suspend, or early wake event detected\n");
@@ -8197,10 +8182,10 @@ Index: rpi-kernel/kernel/power/suspend.c
  		goto Recover_platform;
  	}
  	suspend_test_finish("suspend devices");
-Index: rpi-kernel/kernel/power/swap.c
+Index: kernel-rpi/kernel/power/swap.c
 ===================================================================
---- rpi-kernel.orig/kernel/power/swap.c
-+++ rpi-kernel/kernel/power/swap.c
+--- kernel-rpi.orig/kernel/power/swap.c
++++ kernel-rpi/kernel/power/swap.c
 @@ -299,7 +299,7 @@ static int hib_submit_io(int op, int op_
  	return error;
  }
@@ -8231,11 +8216,11 @@ Index: rpi-kernel/kernel/power/swap.c
  		else
  			pr_debug("Image signature found, resuming\n");
  	} else {
-Index: rpi-kernel/kernel/printk/printk.c
+Index: kernel-rpi/kernel/printk/printk.c
 ===================================================================
---- rpi-kernel.orig/kernel/printk/printk.c
-+++ rpi-kernel/kernel/printk/printk.c
-@@ -2213,16 +2213,6 @@ static int __init console_setup(char *st
+--- kernel-rpi.orig/kernel/printk/printk.c
++++ kernel-rpi/kernel/printk/printk.c
+@@ -2215,16 +2215,6 @@ static int __init console_setup(char *st
  	char *s, *options, *brl_options = NULL;
  	int idx;
  
@@ -8252,10 +8237,10 @@ Index: rpi-kernel/kernel/printk/printk.c
  	if (_braille_console_setup(&str, &brl_options))
  		return 1;
  
-Index: rpi-kernel/kernel/rcu/rcutorture.c
+Index: kernel-rpi/kernel/rcu/rcutorture.c
 ===================================================================
---- rpi-kernel.orig/kernel/rcu/rcutorture.c
-+++ rpi-kernel/kernel/rcu/rcutorture.c
+--- kernel-rpi.orig/kernel/rcu/rcutorture.c
++++ kernel-rpi/kernel/rcu/rcutorture.c
 @@ -1238,34 +1238,28 @@ static void rcutorture_one_extend(int *r
  	/* First, put new protection in place to avoid critical-section gap. */
  	if (statesnew & RCUTORTURE_RDR_BH)
@@ -8340,10 +8325,10 @@ Index: rpi-kernel/kernel/rcu/rcutorture.c
  	return mask ?: RCUTORTURE_RDR_RCU;
  }
  
-Index: rpi-kernel/kernel/rcu/tasks.h
+Index: kernel-rpi/kernel/rcu/tasks.h
 ===================================================================
---- rpi-kernel.orig/kernel/rcu/tasks.h
-+++ rpi-kernel/kernel/rcu/tasks.h
+--- kernel-rpi.orig/kernel/rcu/tasks.h
++++ kernel-rpi/kernel/rcu/tasks.h
 @@ -197,7 +197,6 @@ static int __noreturn rcu_tasks_kthread(
  	 * This loop is terminated by the system going down.  ;-)
  	 */
@@ -8361,11 +8346,11 @@ Index: rpi-kernel/kernel/rcu/tasks.h
  	}
  }
  
-Index: rpi-kernel/kernel/rcu/tree.c
+Index: kernel-rpi/kernel/rcu/tree.c
 ===================================================================
---- rpi-kernel.orig/kernel/rcu/tree.c
-+++ rpi-kernel/kernel/rcu/tree.c
-@@ -1888,7 +1888,7 @@ static void rcu_gp_fqs(bool first_time)
+--- kernel-rpi.orig/kernel/rcu/tree.c
++++ kernel-rpi/kernel/rcu/tree.c
+@@ -1889,7 +1889,7 @@ static void rcu_gp_fqs(bool first_time)
  	struct rcu_node *rnp = rcu_get_root();
  
  	WRITE_ONCE(rcu_state.gp_activity, jiffies);
@@ -8374,7 +8359,7 @@ Index: rpi-kernel/kernel/rcu/tree.c
  	if (first_time) {
  		/* Collect dyntick-idle snapshots. */
  		force_qs_rnp(dyntick_save_progress_counter);
-@@ -2530,7 +2530,7 @@ static void rcu_do_batch(struct rcu_data
+@@ -2531,7 +2531,7 @@ static void rcu_do_batch(struct rcu_data
  	/* Reset ->qlen_last_fqs_check trigger if enough CBs have drained. */
  	if (count == 0 && rdp->qlen_last_fqs_check != 0) {
  		rdp->qlen_last_fqs_check = 0;
@@ -8383,7 +8368,7 @@ Index: rpi-kernel/kernel/rcu/tree.c
  	} else if (count < rdp->qlen_last_fqs_check - qhimark)
  		rdp->qlen_last_fqs_check = count;
  
-@@ -2876,10 +2876,10 @@ static void __call_rcu_core(struct rcu_d
+@@ -2877,10 +2877,10 @@ static void __call_rcu_core(struct rcu_d
  		} else {
  			/* Give the grace period a kick. */
  			rdp->blimit = DEFAULT_MAX_RCU_BLIMIT;
@@ -8396,7 +8381,7 @@ Index: rpi-kernel/kernel/rcu/tree.c
  			rdp->qlen_last_fqs_check = rcu_segcblist_n_cbs(&rdp->cblist);
  		}
  	}
-@@ -3986,7 +3986,7 @@ int rcutree_prepare_cpu(unsigned int cpu
+@@ -3987,7 +3987,7 @@ int rcutree_prepare_cpu(unsigned int cpu
  	/* Set up local state, ensuring consistent view of global state. */
  	raw_spin_lock_irqsave_rcu_node(rnp, flags);
  	rdp->qlen_last_fqs_check = 0;
@@ -8405,11 +8390,11 @@ Index: rpi-kernel/kernel/rcu/tree.c
  	rdp->blimit = blimit;
  	if (rcu_segcblist_empty(&rdp->cblist) && /* No early-boot CBs? */
  	    !rcu_segcblist_is_offloaded(&rdp->cblist))
-Index: rpi-kernel/kernel/rcu/tree_exp.h
+Index: kernel-rpi/kernel/rcu/tree_exp.h
 ===================================================================
---- rpi-kernel.orig/kernel/rcu/tree_exp.h
-+++ rpi-kernel/kernel/rcu/tree_exp.h
-@@ -759,7 +759,7 @@ static void sync_sched_exp_online_cleanu
+--- kernel-rpi.orig/kernel/rcu/tree_exp.h
++++ kernel-rpi/kernel/rcu/tree_exp.h
+@@ -760,7 +760,7 @@ static void sync_sched_exp_online_cleanu
  	my_cpu = get_cpu();
  	/* Quiescent state either not needed or already requested, leave. */
  	if (!(READ_ONCE(rnp->expmask) & rdp->grpmask) ||
@@ -8418,11 +8403,11 @@ Index: rpi-kernel/kernel/rcu/tree_exp.h
  		put_cpu();
  		return;
  	}
-Index: rpi-kernel/kernel/rcu/tree_plugin.h
+Index: kernel-rpi/kernel/rcu/tree_plugin.h
 ===================================================================
---- rpi-kernel.orig/kernel/rcu/tree_plugin.h
-+++ rpi-kernel/kernel/rcu/tree_plugin.h
-@@ -2573,7 +2573,7 @@ static void rcu_bind_gp_kthread(void)
+--- kernel-rpi.orig/kernel/rcu/tree_plugin.h
++++ kernel-rpi/kernel/rcu/tree_plugin.h
+@@ -2577,7 +2577,7 @@ static void rcu_bind_gp_kthread(void)
  }
  
  /* Record the current task on dyntick-idle entry. */
@@ -8431,7 +8416,7 @@ Index: rpi-kernel/kernel/rcu/tree_plugin.h
  {
  #if defined(CONFIG_TASKS_RCU) && defined(CONFIG_NO_HZ_FULL)
  	WRITE_ONCE(current->rcu_tasks_idle_cpu, smp_processor_id());
-@@ -2581,7 +2581,7 @@ static __always_inline void rcu_dynticks
+@@ -2585,7 +2585,7 @@ static __always_inline void rcu_dynticks
  }
  
  /* Record no current task on dyntick-idle exit. */
@@ -8440,7 +8425,7 @@ Index: rpi-kernel/kernel/rcu/tree_plugin.h
  {
  #if defined(CONFIG_TASKS_RCU) && defined(CONFIG_NO_HZ_FULL)
  	WRITE_ONCE(current->rcu_tasks_idle_cpu, -1);
-@@ -2589,7 +2589,7 @@ static __always_inline void rcu_dynticks
+@@ -2593,7 +2593,7 @@ static __always_inline void rcu_dynticks
  }
  
  /* Turn on heavyweight RCU tasks trace readers on idle/user entry. */
@@ -8449,7 +8434,7 @@ Index: rpi-kernel/kernel/rcu/tree_plugin.h
  {
  #ifdef CONFIG_TASKS_TRACE_RCU
  	if (IS_ENABLED(CONFIG_TASKS_TRACE_RCU_READ_MB))
-@@ -2598,7 +2598,7 @@ static __always_inline void rcu_dynticks
+@@ -2602,7 +2602,7 @@ static __always_inline void rcu_dynticks
  }
  
  /* Turn off heavyweight RCU tasks trace readers on idle/user exit. */
@@ -8458,10 +8443,10 @@ Index: rpi-kernel/kernel/rcu/tree_plugin.h
  {
  #ifdef CONFIG_TASKS_TRACE_RCU
  	if (IS_ENABLED(CONFIG_TASKS_TRACE_RCU_READ_MB))
-Index: rpi-kernel/kernel/rcu/tree_stall.h
+Index: kernel-rpi/kernel/rcu/tree_stall.h
 ===================================================================
---- rpi-kernel.orig/kernel/rcu/tree_stall.h
-+++ rpi-kernel/kernel/rcu/tree_stall.h
+--- kernel-rpi.orig/kernel/rcu/tree_stall.h
++++ kernel-rpi/kernel/rcu/tree_stall.h
 @@ -113,17 +113,14 @@ static void panic_on_rcu_stall(void)
  }
  
@@ -8520,10 +8505,10 @@ Index: rpi-kernel/kernel/rcu/tree_stall.h
  	}
  }
  
-Index: rpi-kernel/kernel/resource.c
+Index: kernel-rpi/kernel/resource.c
 ===================================================================
---- rpi-kernel.orig/kernel/resource.c
-+++ rpi-kernel/kernel/resource.c
+--- kernel-rpi.orig/kernel/resource.c
++++ kernel-rpi/kernel/resource.c
 @@ -214,12 +214,6 @@ static int __release_resource(struct res
  {
  	struct resource *tmp, **p, *chd;
@@ -8537,21 +8522,21 @@ Index: rpi-kernel/kernel/resource.c
  	p = &old->parent->child;
  	for (;;) {
  		tmp = *p;
-Index: rpi-kernel/kernel/sched/Makefile
+Index: kernel-rpi/kernel/sched/Makefile
 ===================================================================
---- rpi-kernel.orig/kernel/sched/Makefile
-+++ rpi-kernel/kernel/sched/Makefile
+--- kernel-rpi.orig/kernel/sched/Makefile
++++ kernel-rpi/kernel/sched/Makefile
 @@ -36,3 +36,5 @@ obj-$(CONFIG_CPU_FREQ_GOV_SCHEDUTIL) +=
  obj-$(CONFIG_MEMBARRIER) += membarrier.o
  obj-$(CONFIG_CPU_ISOLATION) += isolation.o
  obj-$(CONFIG_PSI) += psi.o
 +obj-$(CONFIG_SCHED_CORE) += core_sched.o
 +obj-$(CONFIG_PROC_LATSENSE) += latsense.o
-Index: rpi-kernel/kernel/sched/core.c
+Index: kernel-rpi/kernel/sched/core.c
 ===================================================================
---- rpi-kernel.orig/kernel/sched/core.c
-+++ rpi-kernel/kernel/sched/core.c
-@@ -66,6 +66,9 @@ const_debug unsigned int sysctl_sched_fe
+--- kernel-rpi.orig/kernel/sched/core.c
++++ kernel-rpi/kernel/sched/core.c
+@@ -67,6 +67,9 @@ const_debug unsigned int sysctl_sched_fe
   */
  const_debug unsigned int sysctl_sched_nr_migrate = 32;
  
@@ -8561,7 +8546,7 @@ Index: rpi-kernel/kernel/sched/core.c
  /*
   * period over which we measure -rt task CPU usage in us.
   * default: 1s
-@@ -74,6 +77,291 @@ unsigned int sysctl_sched_rt_period = 10
+@@ -75,6 +78,291 @@ unsigned int sysctl_sched_rt_period = 10
  
  __read_mostly int scheduler_running;
  
@@ -8853,7 +8838,7 @@ Index: rpi-kernel/kernel/sched/core.c
  /*
   * part of the period that we allow rt tasks to run in us.
   * default: 0.95s
-@@ -174,6 +462,79 @@ int sysctl_sched_rt_runtime = 950000;
+@@ -175,6 +463,79 @@ int sysctl_sched_rt_runtime = 950000;
   *
   */
  
@@ -8933,7 +8918,7 @@ Index: rpi-kernel/kernel/sched/core.c
  /*
   * __task_rq_lock - lock the rq @p resides on.
   */
-@@ -186,12 +547,12 @@ struct rq *__task_rq_lock(struct task_st
+@@ -187,12 +548,12 @@ struct rq *__task_rq_lock(struct task_st
  
  	for (;;) {
  		rq = task_rq(p);
@@ -8948,7 +8933,7 @@ Index: rpi-kernel/kernel/sched/core.c
  
  		while (unlikely(task_on_rq_migrating(p)))
  			cpu_relax();
-@@ -210,7 +571,7 @@ struct rq *task_rq_lock(struct task_stru
+@@ -211,7 +572,7 @@ struct rq *task_rq_lock(struct task_stru
  	for (;;) {
  		raw_spin_lock_irqsave(&p->pi_lock, rf->flags);
  		rq = task_rq(p);
@@ -8957,7 +8942,7 @@ Index: rpi-kernel/kernel/sched/core.c
  		/*
  		 *	move_queued_task()		task_rq_lock()
  		 *
-@@ -232,7 +593,7 @@ struct rq *task_rq_lock(struct task_stru
+@@ -233,7 +594,7 @@ struct rq *task_rq_lock(struct task_stru
  			rq_pin_lock(rq, rf);
  			return rq;
  		}
@@ -8966,7 +8951,7 @@ Index: rpi-kernel/kernel/sched/core.c
  		raw_spin_unlock_irqrestore(&p->pi_lock, rf->flags);
  
  		while (unlikely(task_on_rq_migrating(p)))
-@@ -302,7 +663,7 @@ void update_rq_clock(struct rq *rq)
+@@ -303,7 +664,7 @@ void update_rq_clock(struct rq *rq)
  {
  	s64 delta;
  
@@ -8975,7 +8960,7 @@ Index: rpi-kernel/kernel/sched/core.c
  
  	if (rq->clock_update_flags & RQCF_ACT_SKIP)
  		return;
-@@ -609,7 +970,7 @@ void resched_curr(struct rq *rq)
+@@ -610,7 +971,7 @@ void resched_curr(struct rq *rq)
  	struct task_struct *curr = rq->curr;
  	int cpu;
  
@@ -8984,7 +8969,7 @@ Index: rpi-kernel/kernel/sched/core.c
  
  	if (test_tsk_need_resched(curr))
  		return;
-@@ -633,10 +994,10 @@ void resched_cpu(int cpu)
+@@ -634,10 +995,10 @@ void resched_cpu(int cpu)
  	struct rq *rq = cpu_rq(cpu);
  	unsigned long flags;
  
@@ -8997,7 +8982,7 @@ Index: rpi-kernel/kernel/sched/core.c
  }
  
  #ifdef CONFIG_SMP
-@@ -1138,7 +1499,7 @@ static inline void uclamp_rq_inc_id(stru
+@@ -1139,7 +1500,7 @@ static inline void uclamp_rq_inc_id(stru
  	struct uclamp_se *uc_se = &p->uclamp[clamp_id];
  	struct uclamp_bucket *bucket;
  
@@ -9006,7 +8991,7 @@ Index: rpi-kernel/kernel/sched/core.c
  
  	/* Update task effective clamp */
  	p->uclamp[clamp_id] = uclamp_eff_get(p, clamp_id);
-@@ -1178,7 +1539,7 @@ static inline void uclamp_rq_dec_id(stru
+@@ -1179,7 +1540,7 @@ static inline void uclamp_rq_dec_id(stru
  	unsigned int bkt_clamp;
  	unsigned int rq_clamp;
  
@@ -9015,7 +9000,7 @@ Index: rpi-kernel/kernel/sched/core.c
  
  	/*
  	 * If sched_uclamp_used was enabled after task @p was enqueued,
-@@ -1526,7 +1887,7 @@ static void __init init_uclamp_rq(struct
+@@ -1527,7 +1888,7 @@ static void __init init_uclamp_rq(struct
  		};
  	}
  
@@ -9024,7 +9009,7 @@ Index: rpi-kernel/kernel/sched/core.c
  }
  
  static void __init init_uclamp(void)
-@@ -1581,10 +1942,16 @@ static inline void enqueue_task(struct r
+@@ -1582,10 +1943,16 @@ static inline void enqueue_task(struct r
  
  	uclamp_rq_inc(rq, p);
  	p->sched_class->enqueue_task(rq, p, flags);
@@ -9041,7 +9026,7 @@ Index: rpi-kernel/kernel/sched/core.c
  	if (!(flags & DEQUEUE_NOCLOCK))
  		update_rq_clock(rq);
  
-@@ -1742,7 +2109,7 @@ static inline bool is_cpu_allowed(struct
+@@ -1743,7 +2110,7 @@ static inline bool is_cpu_allowed(struct
  static struct rq *move_queued_task(struct rq *rq, struct rq_flags *rf,
  				   struct task_struct *p, int new_cpu)
  {
@@ -9050,7 +9035,7 @@ Index: rpi-kernel/kernel/sched/core.c
  
  	deactivate_task(rq, p, DEQUEUE_NOCLOCK);
  	set_task_cpu(p, new_cpu);
-@@ -1854,7 +2221,7 @@ void do_set_cpus_allowed(struct task_str
+@@ -1855,7 +2222,7 @@ void do_set_cpus_allowed(struct task_str
  		 * Because __kthread_bind() calls this on blocked tasks without
  		 * holding rq->lock.
  		 */
@@ -9059,7 +9044,7 @@ Index: rpi-kernel/kernel/sched/core.c
  		dequeue_task(rq, p, DEQUEUE_SAVE | DEQUEUE_NOCLOCK);
  	}
  	if (running)
-@@ -1991,7 +2358,7 @@ void set_task_cpu(struct task_struct *p,
+@@ -1992,7 +2359,7 @@ void set_task_cpu(struct task_struct *p,
  	 * task_rq_lock().
  	 */
  	WARN_ON_ONCE(debug_locks && !(lockdep_is_held(&p->pi_lock) ||
@@ -9068,7 +9053,7 @@ Index: rpi-kernel/kernel/sched/core.c
  #endif
  	/*
  	 * Clearly, migrating tasks to offline CPUs is a fairly daft thing.
-@@ -2502,7 +2869,7 @@ ttwu_do_activate(struct rq *rq, struct t
+@@ -2503,7 +2870,7 @@ ttwu_do_activate(struct rq *rq, struct t
  {
  	int en_flags = ENQUEUE_WAKEUP | ENQUEUE_NOCLOCK;
  
@@ -9077,7 +9062,7 @@ Index: rpi-kernel/kernel/sched/core.c
  
  	if (p->sched_contributes_to_load)
  		rq->nr_uninterruptible--;
-@@ -2650,9 +3017,6 @@ out:
+@@ -2651,9 +3018,6 @@ out:
  
  bool cpus_share_cache(int this_cpu, int that_cpu)
  {
@@ -9087,7 +9072,7 @@ Index: rpi-kernel/kernel/sched/core.c
  	return per_cpu(sd_llc_id, this_cpu) == per_cpu(sd_llc_id, that_cpu);
  }
  
-@@ -3234,6 +3598,8 @@ static inline void init_schedstats(void)
+@@ -3235,6 +3599,8 @@ static inline void init_schedstats(void)
   */
  int sched_fork(unsigned long clone_flags, struct task_struct *p)
  {
@@ -9096,7 +9081,7 @@ Index: rpi-kernel/kernel/sched/core.c
  	__sched_fork(clone_flags, p);
  	/*
  	 * We mark the process as NEW here. This guarantees that
-@@ -3263,6 +3629,10 @@ int sched_fork(unsigned long clone_flags
+@@ -3264,6 +3630,10 @@ int sched_fork(unsigned long clone_flags
  		p->prio = p->normal_prio = p->static_prio;
  		set_load_weight(p, false);
  
@@ -9107,7 +9092,7 @@ Index: rpi-kernel/kernel/sched/core.c
  		/*
  		 * We don't need the reset flag anymore after the fork. It has
  		 * fulfilled its duty:
-@@ -3279,6 +3649,24 @@ int sched_fork(unsigned long clone_flags
+@@ -3280,6 +3650,24 @@ int sched_fork(unsigned long clone_flags
  
  	init_entity_runnable_average(&p->se);
  
@@ -9132,7 +9117,7 @@ Index: rpi-kernel/kernel/sched/core.c
  #ifdef CONFIG_SCHED_INFO
  	if (likely(sched_info_on()))
  		memset(&p->sched_info, 0, sizeof(p->sched_info));
-@@ -3294,29 +3682,8 @@ int sched_fork(unsigned long clone_flags
+@@ -3295,29 +3683,8 @@ int sched_fork(unsigned long clone_flags
  	return 0;
  }
  
@@ -9163,7 +9148,7 @@ Index: rpi-kernel/kernel/sched/core.c
  	uclamp_post_fork(p);
  }
  
-@@ -3512,10 +3879,10 @@ prepare_lock_switch(struct rq *rq, struc
+@@ -3513,10 +3880,10 @@ prepare_lock_switch(struct rq *rq, struc
  	 * do an early lockdep release here:
  	 */
  	rq_unpin_lock(rq, rf);
@@ -9176,7 +9161,7 @@ Index: rpi-kernel/kernel/sched/core.c
  #endif
  }
  
-@@ -3526,8 +3893,8 @@ static inline void finish_lock_switch(st
+@@ -3527,8 +3894,8 @@ static inline void finish_lock_switch(st
  	 * fix up the runqueue lock - which gets 'carried over' from
  	 * prev into current:
  	 */
@@ -9187,7 +9172,7 @@ Index: rpi-kernel/kernel/sched/core.c
  }
  
  /*
-@@ -3677,7 +4044,7 @@ static void __balance_callback(struct rq
+@@ -3678,7 +4045,7 @@ static void __balance_callback(struct rq
  	void (*func)(struct rq *rq);
  	unsigned long flags;
  
@@ -9196,7 +9181,7 @@ Index: rpi-kernel/kernel/sched/core.c
  	head = rq->balance_callback;
  	rq->balance_callback = NULL;
  	while (head) {
-@@ -3688,7 +4055,7 @@ static void __balance_callback(struct rq
+@@ -3689,7 +4056,7 @@ static void __balance_callback(struct rq
  
  		func(rq);
  	}
@@ -9205,7 +9190,7 @@ Index: rpi-kernel/kernel/sched/core.c
  }
  
  static inline void balance_callback(struct rq *rq)
-@@ -3775,6 +4142,7 @@ context_switch(struct rq *rq, struct tas
+@@ -3776,6 +4143,7 @@ context_switch(struct rq *rq, struct tas
  		 * finish_task_switch()'s mmdrop().
  		 */
  		switch_mm_irqs_off(prev->active_mm, next->mm, next);
@@ -9213,7 +9198,7 @@ Index: rpi-kernel/kernel/sched/core.c
  
  		if (!prev->mm) {                        // from kernel
  			/* will mmdrop() in finish_task_switch(). */
-@@ -4340,7 +4708,7 @@ static void put_prev_task_balance(struct
+@@ -4341,7 +4709,7 @@ static void put_prev_task_balance(struct
   * Pick up the highest-prio task:
   */
  static inline struct task_struct *
@@ -9222,7 +9207,7 @@ Index: rpi-kernel/kernel/sched/core.c
  {
  	const struct sched_class *class;
  	struct task_struct *p;
-@@ -4380,6 +4748,529 @@ restart:
+@@ -4381,6 +4749,529 @@ restart:
  	BUG();
  }
  
@@ -9752,7 +9737,7 @@ Index: rpi-kernel/kernel/sched/core.c
  /*
   * __schedule() is the main scheduler function.
   *
-@@ -6517,12 +7408,15 @@ void __init init_idle(struct task_struct
+@@ -6518,12 +7409,15 @@ void __init init_idle(struct task_struct
  	__sched_fork(0, idle);
  
  	raw_spin_lock_irqsave(&idle->pi_lock, flags);
@@ -9769,7 +9754,7 @@ Index: rpi-kernel/kernel/sched/core.c
  #ifdef CONFIG_SMP
  	/*
  	 * Its possible that init_idle() gets called multiple times on a task,
-@@ -6552,7 +7446,7 @@ void __init init_idle(struct task_struct
+@@ -6553,7 +7447,7 @@ void __init init_idle(struct task_struct
  #ifdef CONFIG_SMP
  	idle->on_cpu = 1;
  #endif
@@ -9778,7 +9763,7 @@ Index: rpi-kernel/kernel/sched/core.c
  	raw_spin_unlock_irqrestore(&idle->pi_lock, flags);
  
  	/* Set the preempt count _outside_ the spinlocks! */
-@@ -6661,6 +7555,11 @@ void sched_setnuma(struct task_struct *p
+@@ -6662,6 +7556,11 @@ void sched_setnuma(struct task_struct *p
  }
  #endif /* CONFIG_NUMA_BALANCING */
  
@@ -9790,7 +9775,7 @@ Index: rpi-kernel/kernel/sched/core.c
  #ifdef CONFIG_HOTPLUG_CPU
  /*
   * Ensure that the idle task is using init_mm right before its CPU goes
-@@ -6675,6 +7574,7 @@ void idle_task_exit(void)
+@@ -6676,6 +7575,7 @@ void idle_task_exit(void)
  
  	if (mm != &init_mm) {
  		switch_mm(mm, &init_mm, current);
@@ -9798,7 +9783,7 @@ Index: rpi-kernel/kernel/sched/core.c
  		finish_arch_post_lock_switch();
  	}
  
-@@ -6932,6 +7832,8 @@ int sched_cpu_deactivate(unsigned int cp
+@@ -6933,6 +7833,8 @@ int sched_cpu_deactivate(unsigned int cp
  	 */
  	if (cpumask_weight(cpu_smt_mask(cpu)) == 2)
  		static_branch_dec_cpuslocked(&sched_smt_present);
@@ -9807,7 +9792,7 @@ Index: rpi-kernel/kernel/sched/core.c
  #endif
  
  	if (!sched_smp_initialized)
-@@ -6956,6 +7858,7 @@ static void sched_rq_cpu_starting(unsign
+@@ -6957,6 +7859,7 @@ static void sched_rq_cpu_starting(unsign
  
  int sched_cpu_starting(unsigned int cpu)
  {
@@ -9815,7 +9800,7 @@ Index: rpi-kernel/kernel/sched/core.c
  	sched_rq_cpu_starting(cpu);
  	sched_tick_start(cpu);
  	return 0;
-@@ -6983,6 +7886,7 @@ int sched_cpu_dying(unsigned int cpu)
+@@ -6984,6 +7887,7 @@ int sched_cpu_dying(unsigned int cpu)
  	update_max_interval();
  	nohz_balance_exit_idle(rq);
  	hrtick_clear(rq);
@@ -9823,7 +9808,7 @@ Index: rpi-kernel/kernel/sched/core.c
  	return 0;
  }
  #endif
-@@ -7124,7 +8028,7 @@ void __init sched_init(void)
+@@ -7125,7 +8029,7 @@ void __init sched_init(void)
  		struct rq *rq;
  
  		rq = cpu_rq(i);
@@ -9832,7 +9817,7 @@ Index: rpi-kernel/kernel/sched/core.c
  		rq->nr_running = 0;
  		rq->calc_load_active = 0;
  		rq->calc_load_update = jiffies + LOAD_FREQ;
-@@ -7186,6 +8090,16 @@ void __init sched_init(void)
+@@ -7187,6 +8091,16 @@ void __init sched_init(void)
  #endif /* CONFIG_SMP */
  		hrtick_rq_init(rq);
  		atomic_set(&rq->nr_iowait, 0);
@@ -9849,7 +9834,7 @@ Index: rpi-kernel/kernel/sched/core.c
  	}
  
  	set_load_weight(&init_task, false);
-@@ -7860,6 +8774,27 @@ static int cpu_uclamp_max_show(struct se
+@@ -7861,6 +8775,27 @@ static int cpu_uclamp_max_show(struct se
  	cpu_uclamp_print(sf, UCLAMP_MAX);
  	return 0;
  }
@@ -9877,7 +9862,7 @@ Index: rpi-kernel/kernel/sched/core.c
  #endif /* CONFIG_UCLAMP_TASK_GROUP */
  
  #ifdef CONFIG_FAIR_GROUP_SCHED
-@@ -8228,6 +9163,12 @@ static struct cftype cpu_legacy_files[]
+@@ -8229,6 +9164,12 @@ static struct cftype cpu_legacy_files[]
  		.seq_show = cpu_uclamp_max_show,
  		.write = cpu_uclamp_max_write,
  	},
@@ -9890,7 +9875,7 @@ Index: rpi-kernel/kernel/sched/core.c
  #endif
  	{ }	/* Terminate */
  };
-@@ -8409,6 +9350,12 @@ static struct cftype cpu_files[] = {
+@@ -8410,6 +9351,12 @@ static struct cftype cpu_files[] = {
  		.seq_show = cpu_uclamp_max_show,
  		.write = cpu_uclamp_max_write,
  	},
@@ -9903,10 +9888,10 @@ Index: rpi-kernel/kernel/sched/core.c
  #endif
  	{ }	/* terminate */
  };
-Index: rpi-kernel/kernel/sched/cpuacct.c
+Index: kernel-rpi/kernel/sched/cpuacct.c
 ===================================================================
---- rpi-kernel.orig/kernel/sched/cpuacct.c
-+++ rpi-kernel/kernel/sched/cpuacct.c
+--- kernel-rpi.orig/kernel/sched/cpuacct.c
++++ kernel-rpi/kernel/sched/cpuacct.c
 @@ -112,7 +112,7 @@ static u64 cpuacct_cpuusage_read(struct
  	/*
  	 * Take rq->lock to make 64-bit read safe on 32-bit platforms.
@@ -9958,10 +9943,10 @@ Index: rpi-kernel/kernel/sched/cpuacct.c
  #endif
  		}
  		seq_puts(m, "\n");
-Index: rpi-kernel/kernel/sched/cpufreq_schedutil.c
+Index: kernel-rpi/kernel/sched/cpufreq_schedutil.c
 ===================================================================
---- rpi-kernel.orig/kernel/sched/cpufreq_schedutil.c
-+++ rpi-kernel/kernel/sched/cpufreq_schedutil.c
+--- kernel-rpi.orig/kernel/sched/cpufreq_schedutil.c
++++ kernel-rpi/kernel/sched/cpufreq_schedutil.c
 @@ -27,6 +27,7 @@ struct sugov_policy {
  	struct list_head	tunables_hook;
  
@@ -10057,10 +10042,10 @@ Index: rpi-kernel/kernel/sched/cpufreq_schedutil.c
 -
 -}
 -#endif
-Index: rpi-kernel/kernel/sched/cputime.c
+Index: kernel-rpi/kernel/sched/cputime.c
 ===================================================================
---- rpi-kernel.orig/kernel/sched/cputime.c
-+++ rpi-kernel/kernel/sched/cputime.c
+--- kernel-rpi.orig/kernel/sched/cputime.c
++++ kernel-rpi/kernel/sched/cputime.c
 @@ -2,6 +2,7 @@
  /*
   * Simple CPU accounting cgroup controller
@@ -10089,10 +10074,10 @@ Index: rpi-kernel/kernel/sched/cputime.c
  }
  
  /*
-Index: rpi-kernel/kernel/sched/deadline.c
+Index: kernel-rpi/kernel/sched/deadline.c
 ===================================================================
---- rpi-kernel.orig/kernel/sched/deadline.c
-+++ rpi-kernel/kernel/sched/deadline.c
+--- kernel-rpi.orig/kernel/sched/deadline.c
++++ kernel-rpi/kernel/sched/deadline.c
 @@ -141,7 +141,7 @@ void __add_running_bw(u64 dl_bw, struct
  {
  	u64 old = dl_rq->running_bw;
@@ -10205,10 +10190,10 @@ Index: rpi-kernel/kernel/sched/deadline.c
  	.select_task_rq		= select_task_rq_dl,
  	.migrate_task_rq	= migrate_task_rq_dl,
  	.set_cpus_allowed       = set_cpus_allowed_dl,
-Index: rpi-kernel/kernel/sched/debug.c
+Index: kernel-rpi/kernel/sched/debug.c
 ===================================================================
---- rpi-kernel.orig/kernel/sched/debug.c
-+++ rpi-kernel/kernel/sched/debug.c
+--- kernel-rpi.orig/kernel/sched/debug.c
++++ kernel-rpi/kernel/sched/debug.c
 @@ -570,7 +570,7 @@ void print_cfs_rq(struct seq_file *m, in
  	SEQ_printf(m, "  .%-30s: %Ld.%06ld\n", "exec_clock",
  			SPLIT_NS(cfs_rq->exec_clock));
@@ -10238,7 +10223,7 @@ Index: rpi-kernel/kernel/sched/debug.c
  	SEQ_printf(m, "\n");
  }
  
-@@ -1041,6 +1045,10 @@ void proc_sched_show_task(struct task_st
+@@ -1031,6 +1035,10 @@ void proc_sched_show_task(struct task_st
  		__PS("clock-delta", t1-t0);
  	}
  
@@ -10249,10 +10234,10 @@ Index: rpi-kernel/kernel/sched/debug.c
  	sched_show_numa(p, m);
  }
  
-Index: rpi-kernel/kernel/sched/fair.c
+Index: kernel-rpi/kernel/sched/fair.c
 ===================================================================
---- rpi-kernel.orig/kernel/sched/fair.c
-+++ rpi-kernel/kernel/sched/fair.c
+--- kernel-rpi.orig/kernel/sched/fair.c
++++ kernel-rpi/kernel/sched/fair.c
 @@ -113,6 +113,13 @@ int __weak arch_asym_cpu_priority(int cp
   */
  #define fits_capacity(cap, max)	((cap) * 1280 < (max) * 1024)
@@ -10352,7 +10337,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  }
  
  static struct numa_group *deref_curr_numa_group(struct task_struct *p)
-@@ -4427,6 +4389,8 @@ check_preempt_tick(struct cfs_rq *cfs_rq
+@@ -4437,6 +4399,8 @@ check_preempt_tick(struct cfs_rq *cfs_rq
  static void
  set_next_entity(struct cfs_rq *cfs_rq, struct sched_entity *se)
  {
@@ -10361,7 +10346,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  	/* 'current' is not kept within the tree. */
  	if (se->on_rq) {
  		/*
-@@ -4486,7 +4450,7 @@ pick_next_entity(struct cfs_rq *cfs_rq,
+@@ -4496,7 +4460,7 @@ pick_next_entity(struct cfs_rq *cfs_rq,
  	 * Avoid running the skip buddy, if running something else can
  	 * be done without getting too unfair.
  	 */
@@ -10370,7 +10355,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  		struct sched_entity *second;
  
  		if (se == curr) {
-@@ -4513,8 +4477,6 @@ pick_next_entity(struct cfs_rq *cfs_rq,
+@@ -4523,8 +4487,6 @@ pick_next_entity(struct cfs_rq *cfs_rq,
  		se = cfs_rq->last;
  	}
  
@@ -10379,7 +10364,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  	return se;
  }
  
-@@ -5327,7 +5289,7 @@ static void __maybe_unused update_runtim
+@@ -5337,7 +5299,7 @@ static void __maybe_unused update_runtim
  {
  	struct task_group *tg;
  
@@ -10388,7 +10373,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  
  	rcu_read_lock();
  	list_for_each_entry_rcu(tg, &task_groups, list) {
-@@ -5346,7 +5308,7 @@ static void __maybe_unused unthrottle_of
+@@ -5356,7 +5318,7 @@ static void __maybe_unused unthrottle_of
  {
  	struct task_group *tg;
  
@@ -10397,7 +10382,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  
  	rcu_read_lock();
  	list_for_each_entry_rcu(tg, &task_groups, list) {
-@@ -5931,11 +5893,15 @@ find_idlest_group_cpu(struct sched_group
+@@ -5941,11 +5903,15 @@ find_idlest_group_cpu(struct sched_group
  
  	/* Traverse only the allowed CPUs */
  	for_each_cpu_and(i, sched_group_span(group), p->cpus_ptr) {
@@ -10414,7 +10399,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  			struct cpuidle_state *idle = idle_get_state(rq);
  			if (idle && idle->exit_latency < min_exit_latency) {
  				/*
-@@ -6096,7 +6062,8 @@ static int select_idle_core(struct task_
+@@ -6106,7 +6072,8 @@ static int select_idle_core(struct task_
  		bool idle = true;
  
  		for_each_cpu(cpu, cpu_smt_mask(core)) {
@@ -10424,7 +10409,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  				idle = false;
  				break;
  			}
-@@ -6263,6 +6230,11 @@ static int select_idle_sibling(struct ta
+@@ -6273,6 +6240,11 @@ static int select_idle_sibling(struct ta
  		task_util = uclamp_task_util(p);
  	}
  
@@ -10436,7 +10421,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  	if ((available_idle_cpu(target) || sched_idle_cpu(target)) &&
  	    asym_fits_capacity(task_util, target))
  		return target;
-@@ -6614,12 +6586,17 @@ compute_energy(struct task_struct *p, in
+@@ -6626,12 +6598,17 @@ compute_energy(struct task_struct *p, in
   * other use-cases too. So, until someone finds a better way to solve this,
   * let's keep things simple by re-using the existing slow path.
   */
@@ -10455,7 +10440,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  	struct sched_domain *sd;
  	struct perf_domain *pd;
  
-@@ -6628,6 +6605,13 @@ static int find_energy_efficient_cpu(str
+@@ -6640,6 +6617,13 @@ static int find_energy_efficient_cpu(str
  	if (!pd || READ_ONCE(rd->overutilized))
  		goto fail;
  
@@ -10469,7 +10454,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  	/*
  	 * Energy-aware wake-up happens on the lowest sched_domain starting
  	 * from sd_asym_cpucapacity spanning over this_cpu and prev_cpu.
-@@ -6642,6 +6626,10 @@ static int find_energy_efficient_cpu(str
+@@ -6654,6 +6638,10 @@ static int find_energy_efficient_cpu(str
  	if (!task_util_est(p))
  		goto unlock;
  
@@ -10480,7 +10465,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  	for (; pd; pd = pd->next) {
  		unsigned long cur_delta, spare_cap, max_spare_cap = 0;
  		unsigned long base_energy_pd;
-@@ -6672,7 +6660,7 @@ static int find_energy_efficient_cpu(str
+@@ -6684,7 +6672,7 @@ static int find_energy_efficient_cpu(str
  				continue;
  
  			/* Always use prev_cpu as a candidate. */
@@ -10489,7 +10474,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  				prev_delta = compute_energy(p, prev_cpu, pd);
  				prev_delta -= base_energy_pd;
  				best_delta = min(best_delta, prev_delta);
-@@ -6686,10 +6674,34 @@ static int find_energy_efficient_cpu(str
+@@ -6698,10 +6686,34 @@ static int find_energy_efficient_cpu(str
  				max_spare_cap = spare_cap;
  				max_spare_cap_cpu = cpu;
  			}
@@ -10525,7 +10510,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  			cur_delta = compute_energy(p, max_spare_cap_cpu, pd);
  			cur_delta -= base_energy_pd;
  			if (cur_delta < best_delta) {
-@@ -6701,6 +6713,9 @@ static int find_energy_efficient_cpu(str
+@@ -6713,6 +6725,9 @@ static int find_energy_efficient_cpu(str
  unlock:
  	rcu_read_unlock();
  
@@ -10535,7 +10520,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  	/*
  	 * Pick the best CPU if prev_cpu cannot be used, or if it saves at
  	 * least 6% of the energy used by prev_cpu.
-@@ -6728,8 +6743,6 @@ fail:
+@@ -6740,8 +6755,6 @@ fail:
   * certain conditions an idle sibling CPU if the domain has SD_WAKE_AFFINE set.
   *
   * Returns the target CPU number.
@@ -10544,7 +10529,7 @@ Index: rpi-kernel/kernel/sched/fair.c
   */
  static int
  select_task_rq_fair(struct task_struct *p, int prev_cpu, int sd_flag, int wake_flags)
-@@ -6740,11 +6753,19 @@ select_task_rq_fair(struct task_struct *
+@@ -6752,11 +6765,19 @@ select_task_rq_fair(struct task_struct *
  	int want_affine = 0;
  	int sync = (wake_flags & WF_SYNC) && !(current->flags & PF_EXITING);
  
@@ -10565,7 +10550,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  			if (new_cpu >= 0)
  				return new_cpu;
  			new_cpu = prev_cpu;
-@@ -6830,7 +6851,7 @@ static void migrate_task_rq_fair(struct
+@@ -6842,7 +6863,7 @@ static void migrate_task_rq_fair(struct
  		 * In case of TASK_ON_RQ_MIGRATING we in fact hold the 'old'
  		 * rq->lock and can modify state directly.
  		 */
@@ -10574,7 +10559,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  		detach_entity_cfs_rq(&p->se);
  
  	} else {
-@@ -7034,6 +7055,39 @@ preempt:
+@@ -7046,6 +7067,39 @@ preempt:
  		set_last_buddy(se);
  }
  
@@ -10614,7 +10599,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  struct task_struct *
  pick_next_task_fair(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
  {
-@@ -7458,7 +7512,7 @@ static int task_hot(struct task_struct *
+@@ -7470,7 +7524,7 @@ static int task_hot(struct task_struct *
  {
  	s64 delta;
  
@@ -10623,7 +10608,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  
  	if (p->sched_class != &fair_sched_class)
  		return 0;
-@@ -7480,6 +7534,14 @@ static int task_hot(struct task_struct *
+@@ -7492,6 +7546,14 @@ static int task_hot(struct task_struct *
  
  	if (sysctl_sched_migration_cost == -1)
  		return 1;
@@ -10638,7 +10623,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  	if (sysctl_sched_migration_cost == 0)
  		return 0;
  
-@@ -7556,7 +7618,7 @@ int can_migrate_task(struct task_struct
+@@ -7568,7 +7630,7 @@ int can_migrate_task(struct task_struct
  {
  	int tsk_cache_hot;
  
@@ -10647,7 +10632,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  
  	/*
  	 * We do not migrate tasks that are:
-@@ -7638,7 +7700,7 @@ int can_migrate_task(struct task_struct
+@@ -7650,7 +7712,7 @@ int can_migrate_task(struct task_struct
   */
  static void detach_task(struct task_struct *p, struct lb_env *env)
  {
@@ -10656,7 +10641,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  
  	deactivate_task(env->src_rq, p, DEQUEUE_NOCLOCK);
  	set_task_cpu(p, env->dst_cpu);
-@@ -7654,7 +7716,7 @@ static struct task_struct *detach_one_ta
+@@ -7666,7 +7728,7 @@ static struct task_struct *detach_one_ta
  {
  	struct task_struct *p;
  
@@ -10665,7 +10650,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  
  	list_for_each_entry_reverse(p,
  			&env->src_rq->cfs_tasks, se.group_node) {
-@@ -7690,7 +7752,7 @@ static int detach_tasks(struct lb_env *e
+@@ -7702,7 +7764,7 @@ static int detach_tasks(struct lb_env *e
  	struct task_struct *p;
  	int detached = 0;
  
@@ -10674,7 +10659,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  
  	if (env->imbalance <= 0)
  		return 0;
-@@ -7811,7 +7873,7 @@ next:
+@@ -7823,7 +7885,7 @@ next:
   */
  static void attach_task(struct rq *rq, struct task_struct *p)
  {
@@ -10683,7 +10668,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  
  	BUG_ON(task_rq(p) != rq);
  	activate_task(rq, p, ENQUEUE_NOCLOCK);
-@@ -8343,26 +8405,6 @@ group_is_overloaded(unsigned int imbalan
+@@ -8355,26 +8417,6 @@ group_is_overloaded(unsigned int imbalan
  	return false;
  }
  
@@ -10710,7 +10695,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  static inline enum
  group_type group_classify(unsigned int imbalance_pct,
  			  struct sched_group *group,
-@@ -8404,10 +8446,103 @@ static bool update_nohz_stats(struct rq
+@@ -8416,10 +8458,103 @@ static bool update_nohz_stats(struct rq
  
  	return rq->has_blocked_load;
  #else
@@ -10814,7 +10799,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  /**
   * update_sg_lb_stats - Update sched_group's statistics for load balancing.
   * @env: The load balancing environment.
-@@ -8416,6 +8551,7 @@ static bool update_nohz_stats(struct rq
+@@ -8428,6 +8563,7 @@ static bool update_nohz_stats(struct rq
   * @sg_status: Holds flag indicating the status of the sched_group
   */
  static inline void update_sg_lb_stats(struct lb_env *env,
@@ -10822,7 +10807,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  				      struct sched_group *group,
  				      struct sg_lb_stats *sgs,
  				      int *sg_status)
-@@ -8424,7 +8560,7 @@ static inline void update_sg_lb_stats(st
+@@ -8436,7 +8572,7 @@ static inline void update_sg_lb_stats(st
  
  	memset(sgs, 0, sizeof(*sgs));
  
@@ -10831,7 +10816,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  
  	for_each_cpu_and(i, sched_group_span(group), env->cpus) {
  		struct rq *rq = cpu_rq(i);
-@@ -8470,18 +8606,17 @@ static inline void update_sg_lb_stats(st
+@@ -8482,18 +8618,17 @@ static inline void update_sg_lb_stats(st
  		}
  	}
  
@@ -10857,7 +10842,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  	sgs->group_type = group_classify(env->sd->imbalance_pct, group, sgs);
  
  	/* Computing avg_load makes sense only when group is overloaded */
-@@ -8521,7 +8656,7 @@ static bool update_sd_pick_busiest(struc
+@@ -8533,7 +8668,7 @@ static bool update_sd_pick_busiest(struc
  	 * internally or be covered by avg_load imbalance (eventually).
  	 */
  	if (sgs->group_type == group_misfit_task &&
@@ -10866,7 +10851,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  	     sds->local_stat.group_type != group_has_spare))
  		return false;
  
-@@ -8605,7 +8740,7 @@ static bool update_sd_pick_busiest(struc
+@@ -8617,7 +8752,7 @@ static bool update_sd_pick_busiest(struc
  	 */
  	if ((env->sd->flags & SD_ASYM_CPUCAPACITY) &&
  	    (sgs->group_type <= group_fully_busy) &&
@@ -10875,7 +10860,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  		return false;
  
  	return true;
-@@ -8827,6 +8962,10 @@ find_idlest_group(struct sched_domain *s
+@@ -8839,6 +8974,10 @@ find_idlest_group(struct sched_domain *s
  					p->cpus_ptr))
  			continue;
  
@@ -10886,7 +10871,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  		local_group = cpumask_test_cpu(this_cpu,
  					       sched_group_span(group));
  
-@@ -8979,7 +9118,7 @@ static inline void update_sd_lb_stats(st
+@@ -8991,7 +9130,7 @@ static inline void update_sd_lb_stats(st
  				update_group_capacity(env->sd, env->dst_cpu);
  		}
  
@@ -10895,7 +10880,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  
  		if (local_group)
  			goto next_group;
-@@ -9399,7 +9538,13 @@ static struct rq *find_busiest_queue(str
+@@ -9411,7 +9550,13 @@ static struct rq *find_busiest_queue(str
  		 * average load.
  		 */
  		if (env->sd->flags & SD_ASYM_CPUCAPACITY &&
@@ -10910,7 +10895,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  		    nr_running == 1)
  			continue;
  
-@@ -9746,7 +9891,7 @@ more_balance:
+@@ -9758,7 +9903,7 @@ more_balance:
  		if (need_active_balance(&env)) {
  			unsigned long flags;
  
@@ -10919,7 +10904,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  
  			/*
  			 * Don't kick the active_load_balance_cpu_stop,
-@@ -9754,8 +9899,7 @@ more_balance:
+@@ -9766,8 +9911,7 @@ more_balance:
  			 * moved to this_cpu:
  			 */
  			if (!cpumask_test_cpu(this_cpu, busiest->curr->cpus_ptr)) {
@@ -10929,7 +10914,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  				env.flags |= LBF_ALL_PINNED;
  				goto out_one_pinned;
  			}
-@@ -9770,7 +9914,7 @@ more_balance:
+@@ -9782,7 +9926,7 @@ more_balance:
  				busiest->push_cpu = this_cpu;
  				active_balance = 1;
  			}
@@ -10938,7 +10923,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  
  			if (active_balance) {
  				stop_one_cpu_nowait(cpu_of(busiest),
-@@ -10522,7 +10666,7 @@ static void nohz_newidle_balance(struct
+@@ -10534,7 +10678,7 @@ static void nohz_newidle_balance(struct
  	    time_before(jiffies, READ_ONCE(nohz.next_blocked)))
  		return;
  
@@ -10947,7 +10932,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  	/*
  	 * This CPU is going to be idle and blocked load of idle CPUs
  	 * need to be updated. Run the ilb locally as it is a good
-@@ -10531,7 +10675,7 @@ static void nohz_newidle_balance(struct
+@@ -10543,7 +10687,7 @@ static void nohz_newidle_balance(struct
  	 */
  	if (!_nohz_idle_balance(this_rq, NOHZ_STATS_KICK, CPU_NEWLY_IDLE))
  		kick_ilb(NOHZ_STATS_KICK);
@@ -10956,7 +10941,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  }
  
  #else /* !CONFIG_NO_HZ_COMMON */
-@@ -10597,7 +10741,7 @@ static int newidle_balance(struct rq *th
+@@ -10609,7 +10753,7 @@ static int newidle_balance(struct rq *th
  		goto out;
  	}
  
@@ -10965,7 +10950,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  
  	update_blocked_averages(this_cpu);
  	rcu_read_lock();
-@@ -10635,7 +10779,7 @@ static int newidle_balance(struct rq *th
+@@ -10647,7 +10791,7 @@ static int newidle_balance(struct rq *th
  	}
  	rcu_read_unlock();
  
@@ -10974,7 +10959,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  
  	if (curr_cost > this_rq->max_idle_balance_cost)
  		this_rq->max_idle_balance_cost = curr_cost;
-@@ -10723,6 +10867,119 @@ static void rq_offline_fair(struct rq *r
+@@ -10735,6 +10879,119 @@ static void rq_offline_fair(struct rq *r
  
  #endif /* CONFIG_SMP */
  
@@ -11094,7 +11079,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  /*
   * scheduler tick hitting a task of our scheduling class.
   *
-@@ -10746,6 +11003,8 @@ static void task_tick_fair(struct rq *rq
+@@ -10758,6 +11015,8 @@ static void task_tick_fair(struct rq *rq
  
  	update_misfit_status(curr, rq);
  	update_overutilized_status(task_rq(curr));
@@ -11103,7 +11088,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  }
  
  /*
-@@ -11117,9 +11376,9 @@ void unregister_fair_sched_group(struct
+@@ -11129,9 +11388,9 @@ void unregister_fair_sched_group(struct
  
  		rq = cpu_rq(cpu);
  
@@ -11115,7 +11100,7 @@ Index: rpi-kernel/kernel/sched/fair.c
  	}
  }
  
-@@ -11241,6 +11500,7 @@ const struct sched_class fair_sched_clas
+@@ -11253,6 +11512,7 @@ const struct sched_class fair_sched_clas
  
  #ifdef CONFIG_SMP
  	.balance		= balance_fair,
@@ -11123,10 +11108,10 @@ Index: rpi-kernel/kernel/sched/fair.c
  	.select_task_rq		= select_task_rq_fair,
  	.migrate_task_rq	= migrate_task_rq_fair,
  
-Index: rpi-kernel/kernel/sched/idle.c
+Index: kernel-rpi/kernel/sched/idle.c
 ===================================================================
---- rpi-kernel.orig/kernel/sched/idle.c
-+++ rpi-kernel/kernel/sched/idle.c
+--- kernel-rpi.orig/kernel/sched/idle.c
++++ kernel-rpi/kernel/sched/idle.c
 @@ -430,8 +430,16 @@ static void set_next_task_idle(struct rq
  {
  	update_idle_core(rq);
@@ -11165,11 +11150,11 @@ Index: rpi-kernel/kernel/sched/idle.c
  	.select_task_rq		= select_task_rq_idle,
  	.set_cpus_allowed	= set_cpus_allowed_common,
  #endif
-Index: rpi-kernel/kernel/sched/pelt.h
+Index: kernel-rpi/kernel/sched/pelt.h
 ===================================================================
---- rpi-kernel.orig/kernel/sched/pelt.h
-+++ rpi-kernel/kernel/sched/pelt.h
-@@ -132,7 +132,7 @@ static inline void update_idle_rq_clock_
+--- kernel-rpi.orig/kernel/sched/pelt.h
++++ kernel-rpi/kernel/sched/pelt.h
+@@ -134,7 +134,7 @@ static inline void update_idle_rq_clock_
  
  static inline u64 rq_clock_pelt(struct rq *rq)
  {
@@ -11178,11 +11163,11 @@ Index: rpi-kernel/kernel/sched/pelt.h
  	assert_clock_updated(rq);
  
  	return rq->clock_pelt - rq->lost_idle_time;
-Index: rpi-kernel/kernel/sched/rt.c
+Index: kernel-rpi/kernel/sched/rt.c
 ===================================================================
---- rpi-kernel.orig/kernel/sched/rt.c
-+++ rpi-kernel/kernel/sched/rt.c
-@@ -887,7 +887,7 @@ static int do_sched_rt_period_timer(stru
+--- kernel-rpi.orig/kernel/sched/rt.c
++++ kernel-rpi/kernel/sched/rt.c
+@@ -892,7 +892,7 @@ static int do_sched_rt_period_timer(stru
  		if (skip)
  			continue;
  
@@ -11191,7 +11176,7 @@ Index: rpi-kernel/kernel/sched/rt.c
  		update_rq_clock(rq);
  
  		if (rt_rq->rt_time) {
-@@ -925,7 +925,7 @@ static int do_sched_rt_period_timer(stru
+@@ -930,7 +930,7 @@ static int do_sched_rt_period_timer(stru
  
  		if (enqueue)
  			sched_rt_rq_enqueue(rt_rq);
@@ -11200,7 +11185,7 @@ Index: rpi-kernel/kernel/sched/rt.c
  	}
  
  	if (!throttled && (!rt_bandwidth_enabled() || rt_b->rt_runtime == RUNTIME_INF))
-@@ -1624,7 +1624,7 @@ static struct task_struct *_pick_next_ta
+@@ -1633,7 +1633,7 @@ static struct task_struct *_pick_next_ta
  	return rt_task_of(rt_se);
  }
  
@@ -11209,7 +11194,7 @@ Index: rpi-kernel/kernel/sched/rt.c
  {
  	struct task_struct *p;
  
-@@ -1632,7 +1632,17 @@ static struct task_struct *pick_next_tas
+@@ -1641,7 +1641,17 @@ static struct task_struct *pick_next_tas
  		return NULL;
  
  	p = _pick_next_task_rt(rq);
@@ -11228,7 +11213,7 @@ Index: rpi-kernel/kernel/sched/rt.c
  	return p;
  }
  
-@@ -2094,9 +2104,9 @@ void rto_push_irq_work_func(struct irq_w
+@@ -2103,9 +2113,9 @@ void rto_push_irq_work_func(struct irq_w
  	 * When it gets updated, a check is made if a push is possible.
  	 */
  	if (has_pushable_tasks(rq)) {
@@ -11240,7 +11225,7 @@ Index: rpi-kernel/kernel/sched/rt.c
  	}
  
  	raw_spin_lock(&rd->rto_lock);
-@@ -2450,6 +2460,7 @@ const struct sched_class rt_sched_class
+@@ -2459,6 +2469,7 @@ const struct sched_class rt_sched_class
  
  #ifdef CONFIG_SMP
  	.balance		= balance_rt,
@@ -11248,10 +11233,10 @@ Index: rpi-kernel/kernel/sched/rt.c
  	.select_task_rq		= select_task_rq_rt,
  	.set_cpus_allowed       = set_cpus_allowed_common,
  	.rq_online              = rq_online_rt,
-Index: rpi-kernel/kernel/sched/sched.h
+Index: kernel-rpi/kernel/sched/sched.h
 ===================================================================
---- rpi-kernel.orig/kernel/sched/sched.h
-+++ rpi-kernel/kernel/sched/sched.h
+--- kernel-rpi.orig/kernel/sched/sched.h
++++ kernel-rpi/kernel/sched/sched.h
 @@ -16,6 +16,7 @@
  #include <linux/sched/init.h>
  #include <linux/sched/isolation.h>
@@ -12005,10 +11990,10 @@ Index: rpi-kernel/kernel/sched/sched.h
  #ifdef arch_scale_freq_capacity
  # ifndef arch_scale_freq_invariant
  #  define arch_scale_freq_invariant()	true
-Index: rpi-kernel/kernel/sched/stop_task.c
+Index: kernel-rpi/kernel/sched/stop_task.c
 ===================================================================
---- rpi-kernel.orig/kernel/sched/stop_task.c
-+++ rpi-kernel/kernel/sched/stop_task.c
+--- kernel-rpi.orig/kernel/sched/stop_task.c
++++ kernel-rpi/kernel/sched/stop_task.c
 @@ -34,15 +34,24 @@ static void set_next_task_stop(struct rq
  	stop->se.exec_start = rq_clock_task(rq);
  }
@@ -12044,10 +12029,10 @@ Index: rpi-kernel/kernel/sched/stop_task.c
  	.select_task_rq		= select_task_rq_stop,
  	.set_cpus_allowed	= set_cpus_allowed_common,
  #endif
-Index: rpi-kernel/kernel/sched/topology.c
+Index: kernel-rpi/kernel/sched/topology.c
 ===================================================================
---- rpi-kernel.orig/kernel/sched/topology.c
-+++ rpi-kernel/kernel/sched/topology.c
+--- kernel-rpi.orig/kernel/sched/topology.c
++++ kernel-rpi/kernel/sched/topology.c
 @@ -323,7 +323,6 @@ static void sched_energy_set(bool has_ea
   *    2. the SD_ASYM_CPUCAPACITY flag is set in the sched_domain hierarchy.
   *    3. no SMT is detected.
@@ -12155,10 +12140,10 @@ Index: rpi-kernel/kernel/sched/topology.c
  	} else {
  		cpumask_set_cpu(cpu, sched_group_span(sg));
  		cpumask_set_cpu(cpu, group_balance_mask(sg));
-Index: rpi-kernel/kernel/sched/wait.c
+Index: kernel-rpi/kernel/sched/wait.c
 ===================================================================
---- rpi-kernel.orig/kernel/sched/wait.c
-+++ rpi-kernel/kernel/sched/wait.c
+--- kernel-rpi.orig/kernel/sched/wait.c
++++ kernel-rpi/kernel/sched/wait.c
 @@ -223,13 +223,6 @@ void __wake_up_sync(struct wait_queue_he
  }
  EXPORT_SYMBOL_GPL(__wake_up_sync);	/* For internal use only */
@@ -12173,10 +12158,10 @@ Index: rpi-kernel/kernel/sched/wait.c
  /*
   * Note: we use "set_current_state()" _after_ the wait-queue add,
   * because we need a memory barrier there on SMP, so that any
-Index: rpi-kernel/kernel/signal.c
+Index: kernel-rpi/kernel/signal.c
 ===================================================================
---- rpi-kernel.orig/kernel/signal.c
-+++ rpi-kernel/kernel/signal.c
+--- kernel-rpi.orig/kernel/signal.c
++++ kernel-rpi/kernel/signal.c
 @@ -2097,6 +2097,15 @@ static inline bool may_ptrace_stop(void)
  	return true;
  }
@@ -12215,10 +12200,10 @@ Index: rpi-kernel/kernel/signal.c
  	set_special_state(TASK_TRACED);
  
  	/*
-Index: rpi-kernel/kernel/static_call.c
+Index: kernel-rpi/kernel/static_call.c
 ===================================================================
---- rpi-kernel.orig/kernel/static_call.c
-+++ rpi-kernel/kernel/static_call.c
+--- kernel-rpi.orig/kernel/static_call.c
++++ kernel-rpi/kernel/static_call.c
 @@ -150,7 +150,7 @@ void __static_call_update(struct static_
  
  	for (site_mod = &first; site_mod; site_mod = site_mod->next) {
@@ -12228,10 +12213,10 @@ Index: rpi-kernel/kernel/static_call.c
  
  		if (!site_mod->sites) {
  			/*
-Index: rpi-kernel/kernel/sys.c
+Index: kernel-rpi/kernel/sys.c
 ===================================================================
---- rpi-kernel.orig/kernel/sys.c
-+++ rpi-kernel/kernel/sys.c
+--- kernel-rpi.orig/kernel/sys.c
++++ kernel-rpi/kernel/sys.c
 @@ -2692,6 +2692,11 @@ int ksys_prctl(int option, unsigned long
  
  		error = (current->flags & PR_IO_FLUSHER) == PR_IO_FLUSHER;
@@ -12244,10 +12229,10 @@ Index: rpi-kernel/kernel/sys.c
  	default:
  		error = -EINVAL;
  		break;
-Index: rpi-kernel/kernel/sysctl.c
+Index: kernel-rpi/kernel/sysctl.c
 ===================================================================
---- rpi-kernel.orig/kernel/sysctl.c
-+++ rpi-kernel/kernel/sysctl.c
+--- kernel-rpi.orig/kernel/sysctl.c
++++ kernel-rpi/kernel/sysctl.c
 @@ -106,6 +106,9 @@
  
  #if defined(CONFIG_SYSCTL)
@@ -12258,36 +12243,62 @@ Index: rpi-kernel/kernel/sysctl.c
  /* Constants used for minimum and  maximum */
  #ifdef CONFIG_LOCKUP_DETECTOR
  static int sixty = 60;
-@@ -233,27 +236,7 @@ static int bpf_stats_handler(struct ctl_
- 	mutex_unlock(&bpf_stats_enabled_mutex);
- 	return ret;
- }
--
--static int bpf_unpriv_handler(struct ctl_table *table, int write,
--			      void *buffer, size_t *lenp, loff_t *ppos)
--{
--	int ret, unpriv_enable = *(int *)table->data;
--	bool locked_state = unpriv_enable == 1;
--	struct ctl_table tmp = *table;
--
--	if (write && !capable(CAP_SYS_ADMIN))
--		return -EPERM;
--
--	tmp.data = &unpriv_enable;
--	ret = proc_dointvec_minmax(&tmp, write, buffer, lenp, ppos);
--	if (write && !ret) {
--		if (locked_state && unpriv_enable != 1)
--			return -EPERM;
--		*(int *)table->data = unpriv_enable;
--	}
--	return ret;
--}
--#endif /* CONFIG_BPF_SYSCALL && CONFIG_SYSCTL */
-+#endif
- 
- /*
-  * /proc/sys support
-@@ -1731,6 +1714,20 @@ static struct ctl_table kern_table[] = {
+@@ -603,12 +606,12 @@ static int __do_proc_dointvec(void *tbl_
+ 	int *i, vleft, first = 1, err = 0;
+ 	size_t left;
+ 	char *p;
+-	
++
+ 	if (!tbl_data || !table->maxlen || !*lenp || (*ppos && !write)) {
+ 		*lenp = 0;
+ 		return 0;
+ 	}
+-	
++
+ 	i = (int *) tbl_data;
+ 	vleft = table->maxlen / sizeof(*i);
+ 	left = *lenp;
+@@ -820,7 +823,7 @@ static int do_proc_douintvec(struct ctl_
+  * @ppos: file position
+  *
+  * Reads/writes up to table->maxlen/sizeof(unsigned int) integer
+- * values from/to the user buffer, treated as an ASCII string. 
++ * values from/to the user buffer, treated as an ASCII string.
+  *
+  * Returns 0 on success.
+  */
+@@ -1349,7 +1352,7 @@ static int do_proc_dointvec_ms_jiffies_c
+  * @ppos: file position
+  *
+  * Reads/writes up to table->maxlen/sizeof(unsigned int) integer
+- * values from/to the user buffer, treated as an ASCII string. 
++ * values from/to the user buffer, treated as an ASCII string.
+  * The values read are assumed to be in seconds, and are converted into
+  * jiffies.
+  *
+@@ -1371,8 +1374,8 @@ int proc_dointvec_jiffies(struct ctl_tab
+  * @ppos: pointer to the file position
+  *
+  * Reads/writes up to table->maxlen/sizeof(unsigned int) integer
+- * values from/to the user buffer, treated as an ASCII string. 
+- * The values read are assumed to be in 1/USER_HZ seconds, and 
++ * values from/to the user buffer, treated as an ASCII string.
++ * The values read are assumed to be in 1/USER_HZ seconds, and
+  * are converted into jiffies.
+  *
+  * Returns 0 on success.
+@@ -1394,8 +1397,8 @@ int proc_dointvec_userhz_jiffies(struct
+  * @ppos: the current position in the file
+  *
+  * Reads/writes up to table->maxlen/sizeof(unsigned int) integer
+- * values from/to the user buffer, treated as an ASCII string. 
+- * The values read are assumed to be in 1/1000 seconds, and 
++ * values from/to the user buffer, treated as an ASCII string.
++ * The values read are assumed to be in 1/1000 seconds, and
+  * are converted into jiffies.
+  *
+  * Returns 0 on success.
+@@ -1738,6 +1741,20 @@ static struct ctl_table kern_table[] = {
  		.mode		= 0644,
  		.proc_handler	= proc_dointvec,
  	},
@@ -12308,7 +12319,7 @@ Index: rpi-kernel/kernel/sysctl.c
  #ifdef CONFIG_SCHEDSTATS
  	{
  		.procname	= "sched_schedstats",
-@@ -2646,9 +2643,10 @@ static struct ctl_table kern_table[] = {
+@@ -2653,9 +2670,10 @@ static struct ctl_table kern_table[] = {
  		.data		= &sysctl_unprivileged_bpf_disabled,
  		.maxlen		= sizeof(sysctl_unprivileged_bpf_disabled),
  		.mode		= 0644,
@@ -12322,7 +12333,7 @@ Index: rpi-kernel/kernel/sysctl.c
  	},
  	{
  		.procname	= "bpf_stats_enabled",
-@@ -2924,6 +2922,14 @@ static struct ctl_table vm_table[] = {
+@@ -2931,6 +2949,14 @@ static struct ctl_table vm_table[] = {
  		.extra2		= &one_thousand,
  	},
  	{
@@ -12337,7 +12348,7 @@ Index: rpi-kernel/kernel/sysctl.c
  		.procname	= "percpu_pagelist_fraction",
  		.data		= &percpu_pagelist_fraction,
  		.maxlen		= sizeof(percpu_pagelist_fraction),
-@@ -3044,15 +3050,15 @@ static struct ctl_table vm_table[] = {
+@@ -3051,15 +3077,15 @@ static struct ctl_table vm_table[] = {
  		.mode		= 0644,
  		.proc_handler	= mmap_min_addr_handler,
  	},
@@ -12362,7 +12373,7 @@ Index: rpi-kernel/kernel/sysctl.c
  #endif
  #ifdef CONFIG_NUMA
  	{
-@@ -3124,13 +3130,13 @@ static struct ctl_table vm_table[] = {
+@@ -3131,13 +3157,13 @@ static struct ctl_table vm_table[] = {
  		.mode		= 0644,
  		.proc_handler	= proc_doulongvec_minmax,
  	},
@@ -12383,13 +12394,10 @@ Index: rpi-kernel/kernel/sysctl.c
  #ifdef CONFIG_HAVE_ARCH_MMAP_RND_BITS
  	{
  		.procname	= "mmap_rnd_bits",
-@@ -3161,6 +3167,17 @@ static struct ctl_table vm_table[] = {
- 		.mode		= 0644,
- 		.proc_handler	= proc_dointvec_minmax,
- 		.extra1		= SYSCTL_ZERO,
-+		.extra2		= SYSCTL_ONE,
-+	},
-+#endif
+@@ -3171,6 +3197,17 @@ static struct ctl_table vm_table[] = {
+ 		.extra2		= SYSCTL_ONE,
+ 	},
+ #endif
 +#ifdef CONFIG_DISK_BASED_SWAP
 +	{
 +		.procname	= "disk_based_swap",
@@ -12398,13 +12406,25 @@ Index: rpi-kernel/kernel/sysctl.c
 +		.mode		= 0644,
 +		.proc_handler	= proc_dointvec_minmax,
 +		.extra1		= SYSCTL_ZERO,
- 		.extra2		= SYSCTL_ONE,
++		.extra2		= SYSCTL_ONE,
++	},
++#endif
+ 	{ }
+ };
+ 
+@@ -3289,7 +3326,7 @@ static struct ctl_table fs_table[] = {
+ 		.mode		= 0555,
+ 		.child		= inotify_table,
  	},
- #endif
-Index: rpi-kernel/kernel/time/posix-cpu-timers.c
+-#endif	
++#endif
+ #ifdef CONFIG_EPOLL
+ 	{
+ 		.procname	= "epoll",
+Index: kernel-rpi/kernel/time/posix-cpu-timers.c
 ===================================================================
---- rpi-kernel.orig/kernel/time/posix-cpu-timers.c
-+++ rpi-kernel/kernel/time/posix-cpu-timers.c
+--- kernel-rpi.orig/kernel/time/posix-cpu-timers.c
++++ kernel-rpi/kernel/time/posix-cpu-timers.c
 @@ -1101,28 +1101,13 @@ static void posix_cpu_timers_work(struct
  }
  
@@ -12436,10 +12456,10 @@ Index: rpi-kernel/kernel/time/posix-cpu-timers.c
  }
  
  /*
-Index: rpi-kernel/kernel/time/timekeeping.c
+Index: kernel-rpi/kernel/time/timekeeping.c
 ===================================================================
---- rpi-kernel.orig/kernel/time/timekeeping.c
-+++ rpi-kernel/kernel/time/timekeeping.c
+--- kernel-rpi.orig/kernel/time/timekeeping.c
++++ kernel-rpi/kernel/time/timekeeping.c
 @@ -1310,7 +1310,8 @@ int do_settimeofday64(const struct times
  	timekeeping_forward_now(tk);
  
@@ -12450,10 +12470,10 @@ Index: rpi-kernel/kernel/time/timekeeping.c
  
  	if (timespec64_compare(&tk->wall_to_monotonic, &ts_delta) > 0) {
  		ret = -EINVAL;
-Index: rpi-kernel/kernel/trace/ftrace.c
+Index: kernel-rpi/kernel/trace/ftrace.c
 ===================================================================
---- rpi-kernel.orig/kernel/trace/ftrace.c
-+++ rpi-kernel/kernel/trace/ftrace.c
+--- kernel-rpi.orig/kernel/trace/ftrace.c
++++ kernel-rpi/kernel/trace/ftrace.c
 @@ -6985,7 +6985,7 @@ __ftrace_ops_list_func(unsigned long ip,
  	struct ftrace_ops *op;
  	int bit;
@@ -12472,10 +12492,10 @@ Index: rpi-kernel/kernel/trace/ftrace.c
  	if (bit < 0)
  		return;
  
-Index: rpi-kernel/kernel/trace/ring_buffer.c
+Index: kernel-rpi/kernel/trace/ring_buffer.c
 ===================================================================
---- rpi-kernel.orig/kernel/trace/ring_buffer.c
-+++ rpi-kernel/kernel/trace/ring_buffer.c
+--- kernel-rpi.orig/kernel/trace/ring_buffer.c
++++ kernel-rpi/kernel/trace/ring_buffer.c
 @@ -5000,9 +5000,6 @@ void ring_buffer_reset(struct trace_buff
  	struct ring_buffer_per_cpu *cpu_buffer;
  	int cpu;
@@ -12495,11 +12515,11 @@ Index: rpi-kernel/kernel/trace/ring_buffer.c
  }
  EXPORT_SYMBOL_GPL(ring_buffer_reset);
  
-Index: rpi-kernel/kernel/trace/trace.c
+Index: kernel-rpi/kernel/trace/trace.c
 ===================================================================
---- rpi-kernel.orig/kernel/trace/trace.c
-+++ rpi-kernel/kernel/trace/trace.c
-@@ -3134,7 +3134,7 @@ struct trace_buffer_struct {
+--- kernel-rpi.orig/kernel/trace/trace.c
++++ kernel-rpi/kernel/trace/trace.c
+@@ -3140,7 +3140,7 @@ struct trace_buffer_struct {
  	char buffer[4][TRACE_BUF_SIZE];
  };
  
@@ -12508,7 +12528,7 @@ Index: rpi-kernel/kernel/trace/trace.c
  
  /*
   * Thise allows for lockless recording.  If we're nested too deeply, then
-@@ -3144,7 +3144,7 @@ static char *get_trace_buf(void)
+@@ -3150,7 +3150,7 @@ static char *get_trace_buf(void)
  {
  	struct trace_buffer_struct *buffer = this_cpu_ptr(trace_percpu_buffer);
  
@@ -12517,7 +12537,7 @@ Index: rpi-kernel/kernel/trace/trace.c
  		return NULL;
  
  	buffer->nesting++;
-@@ -3163,7 +3163,7 @@ static void put_trace_buf(void)
+@@ -3169,7 +3169,7 @@ static void put_trace_buf(void)
  
  static int alloc_percpu_trace_buffer(void)
  {
@@ -12526,10 +12546,10 @@ Index: rpi-kernel/kernel/trace/trace.c
  
  	if (trace_percpu_buffer)
  		return 0;
-Index: rpi-kernel/kernel/trace/trace.h
+Index: kernel-rpi/kernel/trace/trace.h
 ===================================================================
---- rpi-kernel.orig/kernel/trace/trace.h
-+++ rpi-kernel/kernel/trace/trace.h
+--- kernel-rpi.orig/kernel/trace/trace.h
++++ kernel-rpi/kernel/trace/trace.h
 @@ -573,6 +573,18 @@ struct tracer {
   *    then this function calls...
   *   The function callback, which can use the FTRACE bits to
@@ -12701,10 +12721,10 @@ Index: rpi-kernel/kernel/trace/trace.h
  }
  
  /**
-Index: rpi-kernel/kernel/trace/trace_events.c
+Index: kernel-rpi/kernel/trace/trace_events.c
 ===================================================================
---- rpi-kernel.orig/kernel/trace/trace_events.c
-+++ rpi-kernel/kernel/trace/trace_events.c
+--- kernel-rpi.orig/kernel/trace/trace_events.c
++++ kernel-rpi/kernel/trace/trace_events.c
 @@ -2462,22 +2462,12 @@ static struct trace_event_file *
  trace_create_new_event(struct trace_event_call *call,
  		       struct trace_array *tr)
@@ -12728,10 +12748,10 @@ Index: rpi-kernel/kernel/trace/trace_events.c
  	file->event_call = call;
  	file->tr = tr;
  	atomic_set(&file->sm_ref, 0);
-Index: rpi-kernel/kernel/trace/trace_events_hist.c
+Index: kernel-rpi/kernel/trace/trace_events_hist.c
 ===================================================================
---- rpi-kernel.orig/kernel/trace/trace_events_hist.c
-+++ rpi-kernel/kernel/trace/trace_events_hist.c
+--- kernel-rpi.orig/kernel/trace/trace_events_hist.c
++++ kernel-rpi/kernel/trace/trace_events_hist.c
 @@ -1684,10 +1684,9 @@ static struct hist_field *create_hist_fi
  		if (!hist_field->type)
  			goto free;
@@ -12745,7 +12765,7 @@ Index: rpi-kernel/kernel/trace/trace_events_hist.c
  			hist_field->fn = hist_field_dynstring;
  		else
  			hist_field->fn = hist_field_pstring;
-@@ -2624,10 +2623,8 @@ static inline void __update_field_vars(s
+@@ -2627,10 +2626,8 @@ static inline void __update_field_vars(s
  		if (val->flags & HIST_FIELD_FL_STRING) {
  			char *str = elt_data->field_var_str[j++];
  			char *val_str = (char *)(uintptr_t)var_val;
@@ -12757,7 +12777,7 @@ Index: rpi-kernel/kernel/trace/trace_events_hist.c
  			var_val = (u64)(uintptr_t)str;
  		}
  		tracing_map_set_var(elt, var_idx, var_val);
-@@ -3344,7 +3341,7 @@ static int check_synth_field(struct synt
+@@ -3347,7 +3344,7 @@ static int check_synth_field(struct synt
  
  	if (strcmp(field->type, hist_field->type) != 0) {
  		if (field->size != hist_field->size ||
@@ -12766,7 +12786,7 @@ Index: rpi-kernel/kernel/trace/trace_events_hist.c
  			return -EINVAL;
  	}
  
-@@ -4467,7 +4464,6 @@ static void hist_trigger_elt_update(stru
+@@ -4471,7 +4468,6 @@ static void hist_trigger_elt_update(stru
  			if (hist_field->flags & HIST_FIELD_FL_STRING) {
  				unsigned int str_start, var_str_idx, idx;
  				char *str, *val_str;
@@ -12774,7 +12794,7 @@ Index: rpi-kernel/kernel/trace/trace_events_hist.c
  
  				str_start = hist_data->n_field_var_str +
  					hist_data->n_save_var_str;
-@@ -4476,9 +4472,7 @@ static void hist_trigger_elt_update(stru
+@@ -4480,9 +4476,7 @@ static void hist_trigger_elt_update(stru
  
  				str = elt_data->field_var_str[idx];
  				val_str = (char *)(uintptr_t)hist_val;
@@ -12785,10 +12805,10 @@ Index: rpi-kernel/kernel/trace/trace_events_hist.c
  
  				hist_val = (u64)(uintptr_t)str;
  			}
-Index: rpi-kernel/kernel/trace/trace_functions.c
+Index: kernel-rpi/kernel/trace/trace_functions.c
 ===================================================================
---- rpi-kernel.orig/kernel/trace/trace_functions.c
-+++ rpi-kernel/kernel/trace/trace_functions.c
+--- kernel-rpi.orig/kernel/trace/trace_functions.c
++++ kernel-rpi/kernel/trace/trace_functions.c
 @@ -144,7 +144,7 @@ function_trace_call(unsigned long ip, un
  	pc = preempt_count();
  	preempt_disable_notrace();
@@ -12798,10 +12818,10 @@ Index: rpi-kernel/kernel/trace/trace_functions.c
  	if (bit < 0)
  		goto out;
  
-Index: rpi-kernel/kernel/trace/trace_uprobe.c
+Index: kernel-rpi/kernel/trace/trace_uprobe.c
 ===================================================================
---- rpi-kernel.orig/kernel/trace/trace_uprobe.c
-+++ rpi-kernel/kernel/trace/trace_uprobe.c
+--- kernel-rpi.orig/kernel/trace/trace_uprobe.c
++++ kernel-rpi/kernel/trace/trace_uprobe.c
 @@ -1312,7 +1312,6 @@ static int uprobe_perf_open(struct trace
  		return 0;
  
@@ -12810,10 +12830,10 @@ Index: rpi-kernel/kernel/trace/trace_uprobe.c
  		err = uprobe_apply(tu->inode, tu->offset, &tu->consumer, true);
  		if (err) {
  			uprobe_perf_close(call, event);
-Index: rpi-kernel/kernel/trace/tracing_map.c
+Index: kernel-rpi/kernel/trace/tracing_map.c
 ===================================================================
---- rpi-kernel.orig/kernel/trace/tracing_map.c
-+++ rpi-kernel/kernel/trace/tracing_map.c
+--- kernel-rpi.orig/kernel/trace/tracing_map.c
++++ kernel-rpi/kernel/trace/tracing_map.c
 @@ -15,7 +15,6 @@
  #include <linux/jhash.h>
  #include <linux/slab.h>
@@ -12930,10 +12950,10 @@ Index: rpi-kernel/kernel/trace/tracing_map.c
  	struct tracing_map_sort_entry *sort_entry, **entries;
  	int i, n_entries, ret;
  
-Index: rpi-kernel/kernel/user_namespace.c
+Index: kernel-rpi/kernel/user_namespace.c
 ===================================================================
---- rpi-kernel.orig/kernel/user_namespace.c
-+++ rpi-kernel/kernel/user_namespace.c
+--- kernel-rpi.orig/kernel/user_namespace.c
++++ kernel-rpi/kernel/user_namespace.c
 @@ -1375,6 +1375,7 @@ const struct proc_ns_operations userns_o
  	.owner		= userns_owner,
  	.get_parent	= ns_get_owner,
@@ -12942,10 +12962,10 @@ Index: rpi-kernel/kernel/user_namespace.c
  
  static __init int user_namespaces_init(void)
  {
-Index: rpi-kernel/kernel/watchdog.c
+Index: kernel-rpi/kernel/watchdog.c
 ===================================================================
---- rpi-kernel.orig/kernel/watchdog.c
-+++ rpi-kernel/kernel/watchdog.c
+--- kernel-rpi.orig/kernel/watchdog.c
++++ kernel-rpi/kernel/watchdog.c
 @@ -29,7 +29,7 @@
  
  static DEFINE_MUTEX(watchdog_mutex);
@@ -13010,10 +13030,10 @@ Index: rpi-kernel/kernel/watchdog.c
  	/* kick the softlockup detector */
  	if (completion_done(this_cpu_ptr(&softlockup_completion))) {
  		reinit_completion(this_cpu_ptr(&softlockup_completion));
-Index: rpi-kernel/kernel/watchdog_hld.c
+Index: kernel-rpi/kernel/watchdog_hld.c
 ===================================================================
---- rpi-kernel.orig/kernel/watchdog_hld.c
-+++ rpi-kernel/kernel/watchdog_hld.c
+--- kernel-rpi.orig/kernel/watchdog_hld.c
++++ kernel-rpi/kernel/watchdog_hld.c
 @@ -170,7 +170,17 @@ static int hardlockup_detector_event_cre
  	struct perf_event *evt;
  
@@ -13033,10 +13053,10 @@ Index: rpi-kernel/kernel/watchdog_hld.c
  
  	/* Try to register using hardware perf events */
  	evt = perf_event_create_kernel_counter(wd_attr, cpu, NULL,
-Index: rpi-kernel/kernel/workqueue.c
+Index: kernel-rpi/kernel/workqueue.c
 ===================================================================
---- rpi-kernel.orig/kernel/workqueue.c
-+++ rpi-kernel/kernel/workqueue.c
+--- kernel-rpi.orig/kernel/workqueue.c
++++ kernel-rpi/kernel/workqueue.c
 @@ -850,17 +850,8 @@ void wq_worker_running(struct task_struc
  
  	if (!worker->sleeping)
@@ -13094,10 +13114,10 @@ Index: rpi-kernel/kernel/workqueue.c
  	return ret;
  }
  
-Index: rpi-kernel/include/linux/cpufreq_times.h
+Index: kernel-rpi/include/linux/cpufreq_times.h
 ===================================================================
 --- /dev/null
-+++ rpi-kernel/include/linux/cpufreq_times.h
++++ kernel-rpi/include/linux/cpufreq_times.h
 @@ -0,0 +1,42 @@
 +/* drivers/cpufreq/cpufreq_times.c
 + *
@@ -13141,10 +13161,10 @@ Index: rpi-kernel/include/linux/cpufreq_times.h
 +	struct cpufreq_policy *policy, unsigned int new_freq) {}
 +#endif /* CONFIG_CPU_FREQ_TIMES */
 +#endif /* _LINUX_CPUFREQ_TIMES_H */
-Index: rpi-kernel/include/linux/mm.h
+Index: kernel-rpi/include/linux/mm.h
 ===================================================================
---- rpi-kernel.orig/include/linux/mm.h
-+++ rpi-kernel/include/linux/mm.h
+--- kernel-rpi.orig/include/linux/mm.h
++++ kernel-rpi/include/linux/mm.h
 @@ -210,6 +210,8 @@ extern int sysctl_overcommit_memory;
  extern int sysctl_overcommit_ratio;
  extern unsigned long sysctl_overcommit_kbytes;
@@ -13261,10 +13281,10 @@ Index: rpi-kernel/include/linux/mm.h
  
  /**
   * seal_check_future_write - Check for F_SEAL_FUTURE_WRITE flag and handle it
-Index: rpi-kernel/include/linux/mm_inline.h
+Index: kernel-rpi/include/linux/mm_inline.h
 ===================================================================
---- rpi-kernel.orig/include/linux/mm_inline.h
-+++ rpi-kernel/include/linux/mm_inline.h
+--- kernel-rpi.orig/include/linux/mm_inline.h
++++ kernel-rpi/include/linux/mm_inline.h
 @@ -24,7 +24,7 @@ static inline int page_is_file_lru(struc
  	return !PageSwapBacked(page);
  }
@@ -13655,10 +13675,10 @@ Index: rpi-kernel/include/linux/mm_inline.h
 +			-thp_nr_pages(page));
  }
  #endif
-Index: rpi-kernel/include/linux/mm_types.h
+Index: kernel-rpi/include/linux/mm_types.h
 ===================================================================
---- rpi-kernel.orig/include/linux/mm_types.h
-+++ rpi-kernel/include/linux/mm_types.h
+--- kernel-rpi.orig/include/linux/mm_types.h
++++ kernel-rpi/include/linux/mm_types.h
 @@ -15,6 +15,8 @@
  #include <linux/page-flags-layout.h>
  #include <linux/workqueue.h>
@@ -13828,10 +13848,10 @@ Index: rpi-kernel/include/linux/mm_types.h
  }
  
  #endif /* _LINUX_MM_TYPES_H */
-Index: rpi-kernel/include/linux/mmu_notifier.h
+Index: kernel-rpi/include/linux/mmu_notifier.h
 ===================================================================
---- rpi-kernel.orig/include/linux/mmu_notifier.h
-+++ rpi-kernel/include/linux/mmu_notifier.h
+--- kernel-rpi.orig/include/linux/mmu_notifier.h
++++ kernel-rpi/include/linux/mmu_notifier.h
 @@ -53,6 +53,14 @@ enum mmu_notifier_event {
  	MMU_NOTIFY_MIGRATE,
  };
@@ -13892,10 +13912,10 @@ Index: rpi-kernel/include/linux/mmu_notifier.h
  static inline int mmu_notifier_test_young(struct mm_struct *mm,
  					  unsigned long address)
  {
-Index: rpi-kernel/include/linux/mmzone.h
+Index: kernel-rpi/include/linux/mmzone.h
 ===================================================================
---- rpi-kernel.orig/include/linux/mmzone.h
-+++ rpi-kernel/include/linux/mmzone.h
+--- kernel-rpi.orig/include/linux/mmzone.h
++++ kernel-rpi/include/linux/mmzone.h
 @@ -274,6 +274,114 @@ enum lruvec_flags {
  					 */
  };
@@ -14041,10 +14061,10 @@ Index: rpi-kernel/include/linux/mmzone.h
  	ZONE_PADDING(_pad2_)
  
  	/* Per-node vmstats */
-Index: rpi-kernel/include/linux/sched.h
+Index: kernel-rpi/include/linux/sched.h
 ===================================================================
---- rpi-kernel.orig/include/linux/sched.h
-+++ rpi-kernel/include/linux/sched.h
+--- kernel-rpi.orig/include/linux/sched.h
++++ kernel-rpi/include/linux/sched.h
 @@ -699,10 +699,17 @@ struct task_struct {
  	const struct sched_class	*sched_class;
  	struct sched_entity		se;
@@ -14095,7 +14115,7 @@ Index: rpi-kernel/include/linux/sched.h
  	struct prev_cputime		prev_cputime;
  #ifdef CONFIG_VIRT_CPU_ACCOUNTING_GEN
  	struct vtime			vtime;
-@@ -1589,7 +1604,7 @@ extern struct pid *cad_pid;
+@@ -1588,7 +1603,7 @@ extern struct pid *cad_pid;
  #define tsk_used_math(p)			((p)->flags & PF_USED_MATH)
  #define used_math()				tsk_used_math(current)
  
@@ -14104,7 +14124,7 @@ Index: rpi-kernel/include/linux/sched.h
  {
  #ifdef CONFIG_SMP
  	return (current->flags & PF_NO_SETAFFINITY) &&
-@@ -1764,6 +1779,7 @@ extern struct task_struct *find_get_task
+@@ -1763,6 +1778,7 @@ extern struct task_struct *find_get_task
  
  extern int wake_up_state(struct task_struct *tsk, unsigned int state);
  extern int wake_up_process(struct task_struct *tsk);
@@ -14112,7 +14132,7 @@ Index: rpi-kernel/include/linux/sched.h
  extern void wake_up_new_task(struct task_struct *tsk);
  
  #ifdef CONFIG_SMP
-@@ -2091,4 +2107,14 @@ int sched_trace_rq_nr_running(struct rq
+@@ -2090,4 +2106,14 @@ int sched_trace_rq_nr_running(struct rq
  
  const struct cpumask *sched_trace_rd_span(struct root_domain *rd);
  
@@ -14127,10 +14147,10 @@ Index: rpi-kernel/include/linux/sched.h
 +#endif
 +
  #endif
-Index: rpi-kernel/include/linux/trace_events.h
+Index: kernel-rpi/include/linux/trace_events.h
 ===================================================================
---- rpi-kernel.orig/include/linux/trace_events.h
-+++ rpi-kernel/include/linux/trace_events.h
+--- kernel-rpi.orig/include/linux/trace_events.h
++++ kernel-rpi/include/linux/trace_events.h
 @@ -571,7 +571,7 @@ struct trace_event_file {
  
  #define PERF_MAX_TRACE_SIZE	2048
@@ -14140,10 +14160,10 @@ Index: rpi-kernel/include/linux/trace_events.h
  
  enum event_trigger_type {
  	ETT_NONE		= (0),
-Index: rpi-kernel/include/trace/events/asoc.h
+Index: kernel-rpi/include/trace/events/asoc.h
 ===================================================================
---- rpi-kernel.orig/include/trace/events/asoc.h
-+++ rpi-kernel/include/trace/events/asoc.h
+--- kernel-rpi.orig/include/trace/events/asoc.h
++++ kernel-rpi/include/trace/events/asoc.h
 @@ -7,6 +7,7 @@
  
  #include <linux/ktime.h>
@@ -14152,10 +14172,10 @@ Index: rpi-kernel/include/trace/events/asoc.h
  
  #define DAPM_DIRECT "(direct)"
  #define DAPM_ARROW(dir) (((dir) == SND_SOC_DAPM_DIR_OUT) ? "->" : "<-")
-Index: rpi-kernel/include/trace/events/f2fs.h
+Index: kernel-rpi/include/trace/events/f2fs.h
 ===================================================================
---- rpi-kernel.orig/include/trace/events/f2fs.h
-+++ rpi-kernel/include/trace/events/f2fs.h
+--- kernel-rpi.orig/include/trace/events/f2fs.h
++++ kernel-rpi/include/trace/events/f2fs.h
 @@ -807,20 +807,20 @@ TRACE_EVENT(f2fs_lookup_start,
  	TP_STRUCT__entry(
  		__field(dev_t,	dev)
@@ -14206,10 +14226,10 @@ Index: rpi-kernel/include/trace/events/f2fs.h
  		__entry->cino,
  		__entry->err)
  );
-Index: rpi-kernel/include/trace/events/pagemap.h
+Index: kernel-rpi/include/trace/events/pagemap.h
 ===================================================================
---- rpi-kernel.orig/include/trace/events/pagemap.h
-+++ rpi-kernel/include/trace/events/pagemap.h
+--- kernel-rpi.orig/include/trace/events/pagemap.h
++++ kernel-rpi/include/trace/events/pagemap.h
 @@ -27,24 +27,21 @@
  
  TRACE_EVENT(mm_lru_insertion,
@@ -14239,10 +14259,10 @@ Index: rpi-kernel/include/trace/events/pagemap.h
  		__entry->flags	= trace_pagemap_flags(page);
  	),
  
-Index: rpi-kernel/include/trace/events/sched.h
+Index: kernel-rpi/include/trace/events/sched.h
 ===================================================================
---- rpi-kernel.orig/include/trace/events/sched.h
-+++ rpi-kernel/include/trace/events/sched.h
+--- kernel-rpi.orig/include/trace/events/sched.h
++++ kernel-rpi/include/trace/events/sched.h
 @@ -403,6 +403,30 @@ DEFINE_EVENT_SCHEDSTAT(sched_stat_templa
  	     TP_ARGS(tsk, delay));
  
@@ -14274,10 +14294,10 @@ Index: rpi-kernel/include/trace/events/sched.h
   * Tracepoint for accounting runtime (time the task is executing
   * on a CPU).
   */
-Index: rpi-kernel/include/trace/events/ufs.h
+Index: kernel-rpi/include/trace/events/ufs.h
 ===================================================================
---- rpi-kernel.orig/include/trace/events/ufs.h
-+++ rpi-kernel/include/trace/events/ufs.h
+--- kernel-rpi.orig/include/trace/events/ufs.h
++++ kernel-rpi/include/trace/events/ufs.h
 @@ -11,6 +11,15 @@
  
  #include <linux/tracepoint.h>
@@ -14333,10 +14353,10 @@ Index: rpi-kernel/include/trace/events/ufs.h
  	)
  );
  
-Index: rpi-kernel/include/linux/page-flags-layout.h
+Index: kernel-rpi/include/linux/page-flags-layout.h
 ===================================================================
---- rpi-kernel.orig/include/linux/page-flags-layout.h
-+++ rpi-kernel/include/linux/page-flags-layout.h
+--- kernel-rpi.orig/include/linux/page-flags-layout.h
++++ kernel-rpi/include/linux/page-flags-layout.h
 @@ -24,6 +24,14 @@
  #error ZONES_SHIFT -- too many zones configured adjust calculation
  #endif
@@ -14379,10 +14399,10 @@ Index: rpi-kernel/include/linux/page-flags-layout.h
  	> BITS_PER_LONG - NR_PAGEFLAGS
  #error "Not enough bits in page flags"
  #endif
-Index: rpi-kernel/include/linux/interrupt.h
+Index: kernel-rpi/include/linux/interrupt.h
 ===================================================================
---- rpi-kernel.orig/include/linux/interrupt.h
-+++ rpi-kernel/include/linux/interrupt.h
+--- kernel-rpi.orig/include/linux/interrupt.h
++++ kernel-rpi/include/linux/interrupt.h
 @@ -61,6 +61,9 @@
   *                interrupt handler after suspending interrupts. For system
   *                wakeup devices users need to implement wakeup detection in
@@ -14401,10 +14421,10 @@ Index: rpi-kernel/include/linux/interrupt.h
  
  #define IRQF_TIMER		(__IRQF_TIMER | IRQF_NO_SUSPEND | IRQF_NO_THREAD)
  
-Index: rpi-kernel/include/linux/wakeup_reason.h
+Index: kernel-rpi/include/linux/wakeup_reason.h
 ===================================================================
 --- /dev/null
-+++ rpi-kernel/include/linux/wakeup_reason.h
++++ kernel-rpi/include/linux/wakeup_reason.h
 @@ -0,0 +1,37 @@
 +/*
 + * include/linux/wakeup_reason.h
@@ -14443,11 +14463,11 @@ Index: rpi-kernel/include/linux/wakeup_reason.h
 +#endif
 +
 +#endif /* _LINUX_WAKEUP_REASON_H */
-Index: rpi-kernel/include/linux/dma-mapping.h
+Index: kernel-rpi/include/linux/dma-mapping.h
 ===================================================================
---- rpi-kernel.orig/include/linux/dma-mapping.h
-+++ rpi-kernel/include/linux/dma-mapping.h
-@@ -144,6 +144,15 @@ u64 dma_get_required_mask(struct device
+--- kernel-rpi.orig/include/linux/dma-mapping.h
++++ kernel-rpi/include/linux/dma-mapping.h
+@@ -152,6 +152,15 @@ u64 dma_get_required_mask(struct device
  size_t dma_max_mapping_size(struct device *dev);
  bool dma_need_sync(struct device *dev, dma_addr_t dma_addr);
  unsigned long dma_get_merge_boundary(struct device *dev);
@@ -14463,7 +14483,7 @@ Index: rpi-kernel/include/linux/dma-mapping.h
  #else /* CONFIG_HAS_DMA */
  static inline dma_addr_t dma_map_page_attrs(struct device *dev,
  		struct page *page, size_t offset, size_t size,
-@@ -257,16 +266,50 @@ static inline unsigned long dma_get_merg
+@@ -265,16 +274,50 @@ static inline unsigned long dma_get_merg
  {
  	return 0;
  }
@@ -14518,10 +14538,10 @@ Index: rpi-kernel/include/linux/dma-mapping.h
  
  static inline dma_addr_t dma_map_single_attrs(struct device *dev, void *ptr,
  		size_t size, enum dma_data_direction dir, unsigned long attrs)
-Index: rpi-kernel/include/linux/dma-map-ops.h
+Index: kernel-rpi/include/linux/dma-map-ops.h
 ===================================================================
---- rpi-kernel.orig/include/linux/dma-map-ops.h
-+++ rpi-kernel/include/linux/dma-map-ops.h
+--- kernel-rpi.orig/include/linux/dma-map-ops.h
++++ kernel-rpi/include/linux/dma-map-ops.h
 @@ -22,11 +22,11 @@ struct dma_map_ops {
  			gfp_t gfp);
  	void (*free_pages)(struct device *dev, size_t size, struct page *vaddr,
@@ -14560,10 +14580,10 @@ Index: rpi-kernel/include/linux/dma-map-ops.h
  int dma_common_get_sgtable(struct device *dev, struct sg_table *sgt,
  		void *cpu_addr, dma_addr_t dma_addr, size_t size,
  		unsigned long attrs);
-Index: rpi-kernel/drivers/iommu/dma-iommu.c
+Index: kernel-rpi/drivers/iommu/dma-iommu.c
 ===================================================================
---- rpi-kernel.orig/drivers/iommu/dma-iommu.c
-+++ rpi-kernel/drivers/iommu/dma-iommu.c
+--- kernel-rpi.orig/drivers/iommu/dma-iommu.c
++++ kernel-rpi/drivers/iommu/dma-iommu.c
 @@ -20,9 +20,11 @@
  #include <linux/mm.h>
  #include <linux/mutex.h>
@@ -15245,10 +15265,10 @@ Index: rpi-kernel/drivers/iommu/dma-iommu.c
  	return iova_cache_get();
  }
  arch_initcall(iommu_dma_init);
-Index: rpi-kernel/include/linux/io-pgtable.h
+Index: kernel-rpi/include/linux/io-pgtable.h
 ===================================================================
---- rpi-kernel.orig/include/linux/io-pgtable.h
-+++ rpi-kernel/include/linux/io-pgtable.h
+--- kernel-rpi.orig/include/linux/io-pgtable.h
++++ kernel-rpi/include/linux/io-pgtable.h
 @@ -25,8 +25,6 @@ enum io_pgtable_fmt {
   * @tlb_flush_walk: Synchronously invalidate all intermediate TLB state
   *                  (sometimes referred to as the "walk cache") for a virtual
@@ -15367,10 +15387,10 @@ Index: rpi-kernel/include/linux/io-pgtable.h
  		iop->cfg.tlb->tlb_add_page(gather, iova, granule, iop->cookie);
  }
  
-Index: rpi-kernel/include/linux/iommu.h
+Index: kernel-rpi/include/linux/iommu.h
 ===================================================================
---- rpi-kernel.orig/include/linux/iommu.h
-+++ rpi-kernel/include/linux/iommu.h
+--- kernel-rpi.orig/include/linux/iommu.h
++++ kernel-rpi/include/linux/iommu.h
 @@ -118,6 +118,7 @@ enum iommu_attr {
  	DOMAIN_ATTR_FSL_PAMUV1,
  	DOMAIN_ATTR_NESTING,	/* two stages of translation */
@@ -15425,10 +15445,10 @@ Index: rpi-kernel/include/linux/iommu.h
  
  static inline void __iommu_device_set_ops(struct iommu_device *iommu,
  					  const struct iommu_ops *ops)
-Index: rpi-kernel/drivers/iommu/iommu.c
+Index: kernel-rpi/drivers/iommu/iommu.c
 ===================================================================
---- rpi-kernel.orig/drivers/iommu/iommu.c
-+++ rpi-kernel/drivers/iommu/iommu.c
+--- kernel-rpi.orig/drivers/iommu/iommu.c
++++ kernel-rpi/drivers/iommu/iommu.c
 @@ -8,6 +8,7 @@
  
  #include <linux/device.h>
@@ -15437,7 +15457,7 @@ Index: rpi-kernel/drivers/iommu/iommu.c
  #include <linux/bug.h>
  #include <linux/types.h>
  #include <linux/init.h>
-@@ -1465,12 +1466,14 @@ EXPORT_SYMBOL_GPL(fsl_mc_device_group);
+@@ -1470,12 +1471,14 @@ EXPORT_SYMBOL_GPL(fsl_mc_device_group);
  static int iommu_get_def_domain_type(struct device *dev)
  {
  	const struct iommu_ops *ops = dev->bus->iommu_ops;
@@ -15455,7 +15475,7 @@ Index: rpi-kernel/drivers/iommu/iommu.c
  }
  
  static int iommu_group_alloc_default_domain(struct bus_type *bus,
-@@ -1512,7 +1515,7 @@ static int iommu_alloc_default_domain(st
+@@ -1517,7 +1520,7 @@ static int iommu_alloc_default_domain(st
  	if (group->default_domain)
  		return 0;
  
@@ -15464,7 +15484,7 @@ Index: rpi-kernel/drivers/iommu/iommu.c
  
  	return iommu_group_alloc_default_domain(dev->bus, group, type);
  }
-@@ -1650,12 +1653,8 @@ struct __group_domain_type {
+@@ -1655,12 +1658,8 @@ struct __group_domain_type {
  
  static int probe_get_default_domain_type(struct device *dev, void *data)
  {
@@ -15478,7 +15498,7 @@ Index: rpi-kernel/drivers/iommu/iommu.c
  
  	if (type) {
  		if (gtype->type && gtype->type != type) {
-@@ -1966,6 +1965,16 @@ out_unlock:
+@@ -1971,6 +1970,16 @@ out_unlock:
  }
  EXPORT_SYMBOL_GPL(iommu_attach_device);
  
@@ -15495,7 +15515,7 @@ Index: rpi-kernel/drivers/iommu/iommu.c
  /*
   * Check flags and other user provided data for valid combinations. We also
   * make sure no reserved fields or unused flags are set. This is to ensure
-@@ -2332,36 +2341,82 @@ phys_addr_t iommu_iova_to_phys(struct io
+@@ -2337,36 +2346,82 @@ phys_addr_t iommu_iova_to_phys(struct io
  }
  EXPORT_SYMBOL_GPL(iommu_iova_to_phys);
  
@@ -15600,7 +15620,7 @@ Index: rpi-kernel/drivers/iommu/iommu.c
  }
  
  static int __iommu_map(struct iommu_domain *domain, unsigned long iova,
-@@ -2374,7 +2429,7 @@ static int __iommu_map(struct iommu_doma
+@@ -2379,7 +2434,7 @@ static int __iommu_map(struct iommu_doma
  	phys_addr_t orig_paddr = paddr;
  	int ret = 0;
  
@@ -15609,7 +15629,7 @@ Index: rpi-kernel/drivers/iommu/iommu.c
  		     domain->pgsize_bitmap == 0UL))
  		return -ENODEV;
  
-@@ -2398,18 +2453,21 @@ static int __iommu_map(struct iommu_doma
+@@ -2403,18 +2458,21 @@ static int __iommu_map(struct iommu_doma
  	pr_debug("map: iova 0x%lx pa %pa size 0x%zx\n", iova, &paddr, size);
  
  	while (size) {
@@ -15638,7 +15658,7 @@ Index: rpi-kernel/drivers/iommu/iommu.c
  	}
  
  	/* unroll mapping in case something went wrong */
-@@ -2429,7 +2487,7 @@ static int _iommu_map(struct iommu_domai
+@@ -2434,7 +2492,7 @@ static int _iommu_map(struct iommu_domai
  
  	ret = __iommu_map(domain, iova, paddr, size, prot, gfp);
  	if (ret == 0 && ops->iotlb_sync_map)
@@ -15647,7 +15667,7 @@ Index: rpi-kernel/drivers/iommu/iommu.c
  
  	return ret;
  }
-@@ -2449,6 +2507,19 @@ int iommu_map_atomic(struct iommu_domain
+@@ -2454,6 +2512,19 @@ int iommu_map_atomic(struct iommu_domain
  }
  EXPORT_SYMBOL_GPL(iommu_map_atomic);
  
@@ -15667,7 +15687,7 @@ Index: rpi-kernel/drivers/iommu/iommu.c
  static size_t __iommu_unmap(struct iommu_domain *domain,
  			    unsigned long iova, size_t size,
  			    struct iommu_iotlb_gather *iotlb_gather)
-@@ -2458,7 +2529,7 @@ static size_t __iommu_unmap(struct iommu
+@@ -2463,7 +2534,7 @@ static size_t __iommu_unmap(struct iommu
  	unsigned long orig_iova = iova;
  	unsigned int min_pagesz;
  
@@ -15676,7 +15696,7 @@ Index: rpi-kernel/drivers/iommu/iommu.c
  		     domain->pgsize_bitmap == 0UL))
  		return 0;
  
-@@ -2486,9 +2557,9 @@ static size_t __iommu_unmap(struct iommu
+@@ -2491,9 +2562,9 @@ static size_t __iommu_unmap(struct iommu
  	 * or we hit an area that isn't mapped.
  	 */
  	while (unmapped < size) {
@@ -15689,7 +15709,7 @@ Index: rpi-kernel/drivers/iommu/iommu.c
  		if (!unmapped_page)
  			break;
  
-@@ -2561,7 +2632,7 @@ static size_t __iommu_map_sg(struct iomm
+@@ -2566,7 +2637,7 @@ static size_t __iommu_map_sg(struct iomm
  	}
  
  	if (ops->iotlb_sync_map)
@@ -15698,10 +15718,10 @@ Index: rpi-kernel/drivers/iommu/iommu.c
  	return mapped;
  
  out_err:
-Index: rpi-kernel/drivers/iommu/io-pgtable-arm-v7s.c
+Index: kernel-rpi/drivers/iommu/io-pgtable-arm-v7s.c
 ===================================================================
---- rpi-kernel.orig/drivers/iommu/io-pgtable-arm-v7s.c
-+++ rpi-kernel/drivers/iommu/io-pgtable-arm-v7s.c
+--- kernel-rpi.orig/drivers/iommu/io-pgtable-arm-v7s.c
++++ kernel-rpi/drivers/iommu/io-pgtable-arm-v7s.c
 @@ -44,26 +44,25 @@
  
  /*
@@ -15778,7 +15798,7 @@ Index: rpi-kernel/drivers/iommu/io-pgtable-arm-v7s.c
  	void *table = NULL;
  
  	if (lvl == 1)
-@@ -280,7 +284,7 @@ static void __arm_v7s_free_table(void *t
+@@ -284,7 +288,7 @@ static void __arm_v7s_free_table(void *t
  {
  	struct io_pgtable_cfg *cfg = &data->iop.cfg;
  	struct device *dev = cfg->iommu_dev;
@@ -15787,7 +15807,7 @@ Index: rpi-kernel/drivers/iommu/io-pgtable-arm-v7s.c
  
  	if (!cfg->coherent_walk)
  		dma_unmap_single(dev, __arm_v7s_dma_addr(table), size,
-@@ -424,7 +428,7 @@ static int arm_v7s_init_pte(struct arm_v
+@@ -428,7 +432,7 @@ static int arm_v7s_init_pte(struct arm_v
  			arm_v7s_iopte *tblp;
  			size_t sz = ARM_V7S_BLOCK_SIZE(lvl);
  
@@ -15796,7 +15816,7 @@ Index: rpi-kernel/drivers/iommu/io-pgtable-arm-v7s.c
  			if (WARN_ON(__arm_v7s_unmap(data, NULL, iova + i * sz,
  						    sz, lvl, tblp) != sz))
  				return -EINVAL;
-@@ -477,7 +481,7 @@ static int __arm_v7s_map(struct arm_v7s_
+@@ -481,7 +485,7 @@ static int __arm_v7s_map(struct arm_v7s_
  	int num_entries = size >> ARM_V7S_LVL_SHIFT(lvl);
  
  	/* Find our entry at the current level */
@@ -15805,7 +15825,7 @@ Index: rpi-kernel/drivers/iommu/io-pgtable-arm-v7s.c
  
  	/* If we can install a leaf entry at this level, then do so */
  	if (num_entries)
-@@ -515,42 +519,53 @@ static int __arm_v7s_map(struct arm_v7s_
+@@ -519,42 +523,53 @@ static int __arm_v7s_map(struct arm_v7s_
  	return __arm_v7s_map(data, iova, paddr, size, prot, lvl + 1, cptep, gfp);
  }
  
@@ -15875,7 +15895,7 @@ Index: rpi-kernel/drivers/iommu/io-pgtable-arm-v7s.c
  		arm_v7s_iopte pte = data->pgd[i];
  
  		if (ARM_V7S_PTE_IS_TABLE(pte, 1))
-@@ -584,7 +599,7 @@ static arm_v7s_iopte arm_v7s_split_cont(
+@@ -588,7 +603,7 @@ static arm_v7s_iopte arm_v7s_split_cont(
  	__arm_v7s_pte_sync(ptep, ARM_V7S_CONT_PAGES, &iop->cfg);
  
  	size *= ARM_V7S_CONT_PAGES;
@@ -15884,7 +15904,7 @@ Index: rpi-kernel/drivers/iommu/io-pgtable-arm-v7s.c
  	return pte;
  }
  
-@@ -602,9 +617,9 @@ static size_t arm_v7s_split_blk_unmap(st
+@@ -606,9 +621,9 @@ static size_t arm_v7s_split_blk_unmap(st
  	if (!tablep)
  		return 0; /* Bytes unmapped */
  
@@ -15896,7 +15916,7 @@ Index: rpi-kernel/drivers/iommu/io-pgtable-arm-v7s.c
  
  	pte = arm_v7s_prot_to_pte(arm_v7s_pte_to_prot(blk_pte, 1), 2, cfg);
  	if (num_entries > 1)
-@@ -646,7 +661,7 @@ static size_t __arm_v7s_unmap(struct arm
+@@ -650,7 +665,7 @@ static size_t __arm_v7s_unmap(struct arm
  	if (WARN_ON(lvl > 2))
  		return 0;
  
@@ -15905,7 +15925,7 @@ Index: rpi-kernel/drivers/iommu/io-pgtable-arm-v7s.c
  	ptep += idx;
  	do {
  		pte[i] = READ_ONCE(ptep[i]);
-@@ -712,15 +727,32 @@ static size_t __arm_v7s_unmap(struct arm
+@@ -716,15 +731,32 @@ static size_t __arm_v7s_unmap(struct arm
  	return __arm_v7s_unmap(data, gather, iova, size, lvl + 1, ptep);
  }
  
@@ -15942,7 +15962,7 @@ Index: rpi-kernel/drivers/iommu/io-pgtable-arm-v7s.c
  }
  
  static phys_addr_t arm_v7s_iova_to_phys(struct io_pgtable_ops *ops,
-@@ -732,7 +764,7 @@ static phys_addr_t arm_v7s_iova_to_phys(
+@@ -736,7 +768,7 @@ static phys_addr_t arm_v7s_iova_to_phys(
  	u32 mask;
  
  	do {
@@ -15951,7 +15971,7 @@ Index: rpi-kernel/drivers/iommu/io-pgtable-arm-v7s.c
  		pte = READ_ONCE(*ptep);
  		ptep = iopte_deref(pte, lvl, data);
  	} while (ARM_V7S_PTE_IS_TABLE(pte, lvl));
-@@ -751,15 +783,14 @@ static struct io_pgtable *arm_v7s_alloc_
+@@ -755,15 +787,14 @@ static struct io_pgtable *arm_v7s_alloc_
  {
  	struct arm_v7s_io_pgtable *data;
  
@@ -15969,7 +15989,7 @@ Index: rpi-kernel/drivers/iommu/io-pgtable-arm-v7s.c
  			    IO_PGTABLE_QUIRK_ARM_MTK_EXT |
  			    IO_PGTABLE_QUIRK_NON_STRICT))
  		return NULL;
-@@ -775,15 +806,17 @@ static struct io_pgtable *arm_v7s_alloc_
+@@ -779,15 +810,17 @@ static struct io_pgtable *arm_v7s_alloc_
  
  	spin_lock_init(&data->split_lock);
  	data->l2_tables = kmem_cache_create("io-pgtable_armv7s_l2",
@@ -15989,7 +16009,7 @@ Index: rpi-kernel/drivers/iommu/io-pgtable-arm-v7s.c
  		.iova_to_phys	= arm_v7s_iova_to_phys,
  	};
  
-@@ -866,7 +899,6 @@ static void __init dummy_tlb_add_page(st
+@@ -870,7 +903,6 @@ static void __init dummy_tlb_add_page(st
  static const struct iommu_flush_ops dummy_tlb_ops __initconst = {
  	.tlb_flush_all	= dummy_tlb_flush_all,
  	.tlb_flush_walk	= dummy_tlb_flush,
@@ -15997,10 +16017,10 @@ Index: rpi-kernel/drivers/iommu/io-pgtable-arm-v7s.c
  	.tlb_add_page	= dummy_tlb_add_page,
  };
  
-Index: rpi-kernel/drivers/iommu/io-pgtable-arm.c
+Index: kernel-rpi/drivers/iommu/io-pgtable-arm.c
 ===================================================================
---- rpi-kernel.orig/drivers/iommu/io-pgtable-arm.c
-+++ rpi-kernel/drivers/iommu/io-pgtable-arm.c
+--- kernel-rpi.orig/drivers/iommu/io-pgtable-arm.c
++++ kernel-rpi/drivers/iommu/io-pgtable-arm.c
 @@ -46,6 +46,9 @@
  #define ARM_LPAE_PGD_SIZE(d)						\
  	(sizeof(arm_lpae_iopte) << (d)->pgd_bits)
@@ -16140,7 +16160,7 @@ Index: rpi-kernel/drivers/iommu/io-pgtable-arm.c
  	return 0;
  }
  
-@@ -323,7 +333,7 @@ static arm_lpae_iopte arm_lpae_install_t
+@@ -324,7 +334,7 @@ static arm_lpae_iopte arm_lpae_install_t
  		return old;
  
  	/* Even if it's not ours, there's no point waiting; just kick it */
@@ -16149,7 +16169,7 @@ Index: rpi-kernel/drivers/iommu/io-pgtable-arm.c
  	if (old == curr)
  		WRITE_ONCE(*ptep, new | ARM_LPAE_PTE_SW_SYNC);
  
-@@ -331,20 +341,30 @@ static arm_lpae_iopte arm_lpae_install_t
+@@ -332,20 +342,30 @@ static arm_lpae_iopte arm_lpae_install_t
  }
  
  static int __arm_lpae_map(struct arm_lpae_io_pgtable *data, unsigned long iova,
@@ -16185,7 +16205,7 @@ Index: rpi-kernel/drivers/iommu/io-pgtable-arm.c
  
  	/* We can't allocate tables at the final level */
  	if (WARN_ON(lvl >= ARM_LPAE_MAX_LEVELS - 1))
-@@ -361,7 +381,7 @@ static int __arm_lpae_map(struct arm_lpa
+@@ -362,7 +382,7 @@ static int __arm_lpae_map(struct arm_lpa
  		if (pte)
  			__arm_lpae_free_pages(cptep, tblsz, cfg);
  	} else if (!cfg->coherent_walk && !(pte & ARM_LPAE_PTE_SW_SYNC)) {
@@ -16194,7 +16214,7 @@ Index: rpi-kernel/drivers/iommu/io-pgtable-arm.c
  	}
  
  	if (pte && !iopte_leaf(pte, lvl, data->iop.fmt)) {
-@@ -373,7 +393,8 @@ static int __arm_lpae_map(struct arm_lpa
+@@ -374,7 +394,8 @@ static int __arm_lpae_map(struct arm_lpa
  	}
  
  	/* Rinse, repeat */
@@ -16204,7 +16224,7 @@ Index: rpi-kernel/drivers/iommu/io-pgtable-arm.c
  }
  
  static arm_lpae_iopte arm_lpae_prot_to_pte(struct arm_lpae_io_pgtable *data,
-@@ -440,8 +461,9 @@ static arm_lpae_iopte arm_lpae_prot_to_p
+@@ -441,8 +462,9 @@ static arm_lpae_iopte arm_lpae_prot_to_p
  	return pte;
  }
  
@@ -16216,7 +16236,7 @@ Index: rpi-kernel/drivers/iommu/io-pgtable-arm.c
  {
  	struct arm_lpae_io_pgtable *data = io_pgtable_ops_to_data(ops);
  	struct io_pgtable_cfg *cfg = &data->iop.cfg;
-@@ -450,11 +472,7 @@ static int arm_lpae_map(struct io_pgtabl
+@@ -451,11 +473,7 @@ static int arm_lpae_map(struct io_pgtabl
  	arm_lpae_iopte prot;
  	long iaext = (s64)iova >> cfg->ias;
  
@@ -16229,7 +16249,7 @@ Index: rpi-kernel/drivers/iommu/io-pgtable-arm.c
  		return -EINVAL;
  
  	if (cfg->quirks & IO_PGTABLE_QUIRK_ARM_TTBR1)
-@@ -462,8 +480,13 @@ static int arm_lpae_map(struct io_pgtabl
+@@ -463,8 +481,13 @@ static int arm_lpae_map(struct io_pgtabl
  	if (WARN_ON(iaext || paddr >> cfg->oas))
  		return -ERANGE;
  
@@ -16244,7 +16264,7 @@ Index: rpi-kernel/drivers/iommu/io-pgtable-arm.c
  	/*
  	 * Synchronise all PTE updates for the new mapping before there's
  	 * a chance for anything to kick off a table walk for the new iova.
-@@ -473,6 +496,13 @@ static int arm_lpae_map(struct io_pgtabl
+@@ -474,6 +497,13 @@ static int arm_lpae_map(struct io_pgtabl
  	return ret;
  }
  
@@ -16258,7 +16278,7 @@ Index: rpi-kernel/drivers/iommu/io-pgtable-arm.c
  static void __arm_lpae_free_pgtable(struct arm_lpae_io_pgtable *data, int lvl,
  				    arm_lpae_iopte *ptep)
  {
-@@ -516,14 +546,15 @@ static size_t arm_lpae_split_blk_unmap(s
+@@ -517,14 +547,15 @@ static size_t arm_lpae_split_blk_unmap(s
  				       struct iommu_iotlb_gather *gather,
  				       unsigned long iova, size_t size,
  				       arm_lpae_iopte blk_pte, int lvl,
@@ -16276,7 +16296,7 @@ Index: rpi-kernel/drivers/iommu/io-pgtable-arm.c
  
  	if (WARN_ON(lvl == ARM_LPAE_MAX_LEVELS))
  		return 0;
-@@ -532,18 +563,21 @@ static size_t arm_lpae_split_blk_unmap(s
+@@ -533,18 +564,21 @@ static size_t arm_lpae_split_blk_unmap(s
  	if (!tablep)
  		return 0; /* Bytes unmapped */
  
@@ -16302,8 +16322,8 @@ Index: rpi-kernel/drivers/iommu/io-pgtable-arm.c
 +		__arm_lpae_init_pte(data, blk_paddr, pte, lvl, 1, &tablep[i]);
  	}
  
- 	pte = arm_lpae_install_table(tablep, ptep, blk_pte, cfg);
-@@ -554,80 +588,96 @@ static size_t arm_lpae_split_blk_unmap(s
+ 	pte = arm_lpae_install_table(tablep, ptep, blk_pte, data);
+@@ -555,80 +589,96 @@ static size_t arm_lpae_split_blk_unmap(s
  		 * block, but anything else is invalid. We can't misinterpret
  		 * a page entry here since we're never at the last level.
  		 */
@@ -16430,7 +16450,7 @@ Index: rpi-kernel/drivers/iommu/io-pgtable-arm.c
  		return 0;
  
  	if (cfg->quirks & IO_PGTABLE_QUIRK_ARM_TTBR1)
-@@ -635,7 +685,14 @@ static size_t arm_lpae_unmap(struct io_p
+@@ -636,7 +686,14 @@ static size_t arm_lpae_unmap(struct io_p
  	if (WARN_ON(iaext))
  		return 0;
  
@@ -16446,7 +16466,7 @@ Index: rpi-kernel/drivers/iommu/io-pgtable-arm.c
  }
  
  static phys_addr_t arm_lpae_iova_to_phys(struct io_pgtable_ops *ops,
-@@ -750,7 +807,9 @@ arm_lpae_alloc_pgtable(struct io_pgtable
+@@ -751,7 +808,9 @@ arm_lpae_alloc_pgtable(struct io_pgtable
  
  	data->iop.ops = (struct io_pgtable_ops) {
  		.map		= arm_lpae_map,
@@ -16456,7 +16476,7 @@ Index: rpi-kernel/drivers/iommu/io-pgtable-arm.c
  		.iova_to_phys	= arm_lpae_iova_to_phys,
  	};
  
-@@ -767,7 +826,8 @@ arm_64_lpae_alloc_pgtable_s1(struct io_p
+@@ -768,7 +827,8 @@ arm_64_lpae_alloc_pgtable_s1(struct io_p
  
  	if (cfg->quirks & ~(IO_PGTABLE_QUIRK_ARM_NS |
  			    IO_PGTABLE_QUIRK_NON_STRICT |
@@ -16466,7 +16486,7 @@ Index: rpi-kernel/drivers/iommu/io-pgtable-arm.c
  		return NULL;
  
  	data = arm_lpae_alloc_pgtable(cfg);
-@@ -779,10 +839,15 @@ arm_64_lpae_alloc_pgtable_s1(struct io_p
+@@ -780,10 +840,15 @@ arm_64_lpae_alloc_pgtable_s1(struct io_p
  		tcr->sh = ARM_LPAE_TCR_SH_IS;
  		tcr->irgn = ARM_LPAE_TCR_RGN_WBWA;
  		tcr->orgn = ARM_LPAE_TCR_RGN_WBWA;
@@ -16483,7 +16503,7 @@ Index: rpi-kernel/drivers/iommu/io-pgtable-arm.c
  	}
  
  	tg1 = cfg->quirks & IO_PGTABLE_QUIRK_ARM_TTBR1;
-@@ -1088,7 +1153,6 @@ static void __init dummy_tlb_add_page(st
+@@ -1089,7 +1154,6 @@ static void __init dummy_tlb_add_page(st
  static const struct iommu_flush_ops dummy_tlb_ops __initconst = {
  	.tlb_flush_all	= dummy_tlb_flush_all,
  	.tlb_flush_walk	= dummy_tlb_flush,
@@ -16491,10 +16511,10 @@ Index: rpi-kernel/drivers/iommu/io-pgtable-arm.c
  	.tlb_add_page	= dummy_tlb_add_page,
  };
  
-Index: rpi-kernel/include/uapi/linux/futex.h
+Index: kernel-rpi/include/uapi/linux/futex.h
 ===================================================================
---- rpi-kernel.orig/include/uapi/linux/futex.h
-+++ rpi-kernel/include/uapi/linux/futex.h
+--- kernel-rpi.orig/include/uapi/linux/futex.h
++++ kernel-rpi/include/uapi/linux/futex.h
 @@ -21,6 +21,7 @@
  #define FUTEX_WAKE_BITSET	10
  #define FUTEX_WAIT_REQUEUE_PI	11
@@ -16511,10 +16531,10 @@ Index: rpi-kernel/include/uapi/linux/futex.h
  
  /*
   * Support for robust futexes: the kernel cleans up held futexes at
-Index: rpi-kernel/include/linux/buildid.h
+Index: kernel-rpi/include/linux/buildid.h
 ===================================================================
 --- /dev/null
-+++ rpi-kernel/include/linux/buildid.h
++++ kernel-rpi/include/linux/buildid.h
 @@ -0,0 +1,20 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +#ifndef _LINUX_BUILDID_H
@@ -16536,10 +16556,10 @@ Index: rpi-kernel/include/linux/buildid.h
 +#endif
 +
 +#endif
-Index: rpi-kernel/include/linux/module.h
+Index: kernel-rpi/include/linux/module.h
 ===================================================================
---- rpi-kernel.orig/include/linux/module.h
-+++ rpi-kernel/include/linux/module.h
+--- kernel-rpi.orig/include/linux/module.h
++++ kernel-rpi/include/linux/module.h
 @@ -11,6 +11,7 @@
  
  #include <linux/list.h>
@@ -16591,10 +16611,10 @@ Index: rpi-kernel/include/linux/module.h
  					  char *namebuf)
  {
  	return NULL;
-Index: rpi-kernel/sound/drivers/virmidi.c
+Index: kernel-rpi/sound/drivers/virmidi.c
 ===================================================================
---- rpi-kernel.orig/sound/drivers/virmidi.c
-+++ rpi-kernel/sound/drivers/virmidi.c
+--- kernel-rpi.orig/sound/drivers/virmidi.c
++++ kernel-rpi/sound/drivers/virmidi.c
 @@ -43,7 +43,6 @@
  MODULE_AUTHOR("Takashi Iwai <tiwai@suse.de>");
  MODULE_DESCRIPTION("Dummy soundcard for virtual rawmidi devices");
@@ -16603,10 +16623,10 @@ Index: rpi-kernel/sound/drivers/virmidi.c
  
  #define MAX_MIDI_DEVICES	4
  
-Index: rpi-kernel/include/linux/bpf.h
+Index: kernel-rpi/include/linux/bpf.h
 ===================================================================
---- rpi-kernel.orig/include/linux/bpf.h
-+++ rpi-kernel/include/linux/bpf.h
+--- kernel-rpi.orig/include/linux/bpf.h
++++ kernel-rpi/include/linux/bpf.h
 @@ -173,7 +173,7 @@ struct bpf_map {
  	atomic64_t usercnt;
  	struct work_struct work;
@@ -16646,10 +16666,10 @@ Index: rpi-kernel/include/linux/bpf.h
  void bpf_map_init_from_attr(struct bpf_map *map, union bpf_attr *attr);
  int  generic_map_lookup_batch(struct bpf_map *map,
  			      const union bpf_attr *attr,
-Index: rpi-kernel/lib/buildid.c
+Index: kernel-rpi/lib/buildid.c
 ===================================================================
 --- /dev/null
-+++ rpi-kernel/lib/buildid.c
++++ kernel-rpi/lib/buildid.c
 @@ -0,0 +1,191 @@
 +// SPDX-License-Identifier: GPL-2.0
 +
@@ -16842,10 +16862,10 @@ Index: rpi-kernel/lib/buildid.c
 +	build_id_parse_buf(&__start_notes, vmlinux_build_id, size);
 +}
 +#endif
-Index: rpi-kernel/lib/Makefile
+Index: kernel-rpi/lib/Makefile
 ===================================================================
---- rpi-kernel.orig/lib/Makefile
-+++ rpi-kernel/lib/Makefile
+--- kernel-rpi.orig/lib/Makefile
++++ kernel-rpi/lib/Makefile
 @@ -36,7 +36,8 @@ lib-y := ctype.o string.o vsprintf.o cmd
  	 flex_proportions.o ratelimit.o show_mem.o \
  	 is_single_threaded.o plist.o decompress.o kobject_uevent.o \
@@ -16856,10 +16876,10 @@ Index: rpi-kernel/lib/Makefile
  
  lib-$(CONFIG_PRINTK) += dump_stack.o
  lib-$(CONFIG_SMP) += cpumask.o
-Index: rpi-kernel/lib/dump_stack.c
+Index: kernel-rpi/lib/dump_stack.c
 ===================================================================
---- rpi-kernel.orig/lib/dump_stack.c
-+++ rpi-kernel/lib/dump_stack.c
+--- kernel-rpi.orig/lib/dump_stack.c
++++ kernel-rpi/lib/dump_stack.c
 @@ -5,6 +5,7 @@
   */
  
@@ -16899,10 +16919,10 @@ Index: rpi-kernel/lib/dump_stack.c
  
  	if (dump_stack_arch_desc_str[0] != '\0')
  		printk("%sHardware name: %s\n",
-Index: rpi-kernel/init/Kconfig
+Index: kernel-rpi/init/Kconfig
 ===================================================================
---- rpi-kernel.orig/init/Kconfig
-+++ rpi-kernel/init/Kconfig
+--- kernel-rpi.orig/init/Kconfig
++++ kernel-rpi/init/Kconfig
 @@ -126,6 +126,21 @@ config COMPILE_TEST
  	  here. If you are a user/distributor, say N here to exclude useless
  	  drivers to be distributed.
@@ -16983,10 +17003,10 @@ Index: rpi-kernel/init/Kconfig
  config RSEQ
  	bool "Enable rseq() system call" if EXPERT
  	default y
-Index: rpi-kernel/init/do_mounts.c
+Index: kernel-rpi/init/do_mounts.c
 ===================================================================
---- rpi-kernel.orig/init/do_mounts.c
-+++ rpi-kernel/init/do_mounts.c
+--- kernel-rpi.orig/init/do_mounts.c
++++ kernel-rpi/init/do_mounts.c
 @@ -589,6 +589,7 @@ void __init prepare_namespace(void)
  		ssleep(root_delay);
  	}
@@ -17004,10 +17024,10 @@ Index: rpi-kernel/init/do_mounts.c
  
  	md_run_setup();
  
-Index: rpi-kernel/init/init_task.c
+Index: kernel-rpi/init/init_task.c
 ===================================================================
---- rpi-kernel.orig/init/init_task.c
-+++ rpi-kernel/init/init_task.c
+--- kernel-rpi.orig/init/init_task.c
++++ kernel-rpi/init/init_task.c
 @@ -13,6 +13,9 @@
  #include <linux/numa.h>
  #include <linux/scs.h>
@@ -17018,10 +17038,10 @@ Index: rpi-kernel/init/init_task.c
  #include <linux/uaccess.h>
  
  static struct signal_struct init_signals = {
-Index: rpi-kernel/init/main.c
+Index: kernel-rpi/init/main.c
 ===================================================================
---- rpi-kernel.orig/init/main.c
-+++ rpi-kernel/init/main.c
+--- kernel-rpi.orig/init/main.c
++++ kernel-rpi/init/main.c
 @@ -43,6 +43,7 @@
  #include <linux/rcupdate.h>
  #include <linux/moduleparam.h>
@@ -17063,10 +17083,10 @@ Index: rpi-kernel/init/main.c
  	}
  	init_dup(file);
  	init_dup(file);
-Index: rpi-kernel/drivers/tty/Makefile
+Index: kernel-rpi/drivers/tty/Makefile
 ===================================================================
---- rpi-kernel.orig/drivers/tty/Makefile
-+++ rpi-kernel/drivers/tty/Makefile
+--- kernel-rpi.orig/drivers/tty/Makefile
++++ kernel-rpi/drivers/tty/Makefile
 @@ -2,7 +2,7 @@
  obj-$(CONFIG_TTY)		+= tty_io.o n_tty.o tty_ioctl.o tty_ldisc.o \
  				   tty_buffer.o tty_port.o tty_mutex.o \
@@ -17076,10 +17096,10 @@ Index: rpi-kernel/drivers/tty/Makefile
  obj-$(CONFIG_LEGACY_PTYS)	+= pty.o
  obj-$(CONFIG_UNIX98_PTYS)	+= pty.o
  obj-$(CONFIG_AUDIT)		+= tty_audit.o
-Index: rpi-kernel/drivers/tty/ttynull.c
+Index: kernel-rpi/drivers/tty/ttynull.c
 ===================================================================
---- rpi-kernel.orig/drivers/tty/ttynull.c
-+++ rpi-kernel/drivers/tty/ttynull.c
+--- kernel-rpi.orig/drivers/tty/ttynull.c
++++ kernel-rpi/drivers/tty/ttynull.c
 @@ -2,6 +2,13 @@
  /*
   * Copyright (C) 2019 Axis Communications AB
@@ -17112,10 +17132,10 @@ Index: rpi-kernel/drivers/tty/ttynull.c
  static int __init ttynull_init(void)
  {
  	struct tty_driver *driver;
-Index: rpi-kernel/include/linux/console.h
+Index: kernel-rpi/include/linux/console.h
 ===================================================================
---- rpi-kernel.orig/include/linux/console.h
-+++ rpi-kernel/include/linux/console.h
+--- kernel-rpi.orig/include/linux/console.h
++++ kernel-rpi/include/linux/console.h
 @@ -62,7 +62,7 @@ struct consw {
  	int	(*con_font_get)(struct vc_data *vc, struct console_font *font);
  	int	(*con_font_default)(struct vc_data *vc,
@@ -17149,10 +17169,10 @@ Index: rpi-kernel/include/linux/console.h
  #endif
  extern bool console_suspend_enabled;
  
-Index: rpi-kernel/fs/signalfd.c
+Index: kernel-rpi/fs/signalfd.c
 ===================================================================
---- rpi-kernel.orig/fs/signalfd.c
-+++ rpi-kernel/fs/signalfd.c
+--- kernel-rpi.orig/fs/signalfd.c
++++ kernel-rpi/fs/signalfd.c
 @@ -35,7 +35,10 @@
  
  void signalfd_cleanup(struct sighand_struct *sighand)
@@ -17165,10 +17185,10 @@ Index: rpi-kernel/fs/signalfd.c
  }
  
  struct signalfd_ctx {
-Index: rpi-kernel/fs/proc/Makefile
+Index: kernel-rpi/fs/proc/Makefile
 ===================================================================
---- rpi-kernel.orig/fs/proc/Makefile
-+++ rpi-kernel/fs/proc/Makefile
+--- kernel-rpi.orig/fs/proc/Makefile
++++ kernel-rpi/fs/proc/Makefile
 @@ -27,6 +27,7 @@ proc-y	+= softirqs.o
  proc-y	+= namespaces.o
  proc-y	+= self.o
@@ -17177,10 +17197,10 @@ Index: rpi-kernel/fs/proc/Makefile
  proc-$(CONFIG_PROC_SYSCTL)	+= proc_sysctl.o
  proc-$(CONFIG_NET)		+= proc_net.o
  proc-$(CONFIG_PROC_KCORE)	+= kcore.o
-Index: rpi-kernel/fs/proc/base.c
+Index: kernel-rpi/fs/proc/base.c
 ===================================================================
---- rpi-kernel.orig/fs/proc/base.c
-+++ rpi-kernel/fs/proc/base.c
+--- kernel-rpi.orig/fs/proc/base.c
++++ kernel-rpi/fs/proc/base.c
 @@ -96,6 +96,7 @@
  #include <linux/posix-timers.h>
  #include <linux/time_namespace.h>
@@ -17212,10 +17232,10 @@ Index: rpi-kernel/fs/proc/base.c
  };
  
  static int proc_tid_base_readdir(struct file *file, struct dir_context *ctx)
-Index: rpi-kernel/fs/proc/internal.h
+Index: kernel-rpi/fs/proc/internal.h
 ===================================================================
---- rpi-kernel.orig/fs/proc/internal.h
-+++ rpi-kernel/fs/proc/internal.h
+--- kernel-rpi.orig/fs/proc/internal.h
++++ kernel-rpi/fs/proc/internal.h
 @@ -146,6 +146,7 @@ unsigned name_to_int(const struct qstr *
   * array.c
   */
@@ -17224,10 +17244,10 @@ Index: rpi-kernel/fs/proc/internal.h
  
  extern void proc_task_name(struct seq_file *m, struct task_struct *p,
  			   bool escape);
-Index: rpi-kernel/fs/proc/latsense.c
+Index: kernel-rpi/fs/proc/latsense.c
 ===================================================================
 --- /dev/null
-+++ rpi-kernel/fs/proc/latsense.c
++++ kernel-rpi/fs/proc/latsense.c
 @@ -0,0 +1,94 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
@@ -17323,10 +17343,10 @@ Index: rpi-kernel/fs/proc/latsense.c
 +	.llseek		= seq_lseek,
 +	.release	= single_release,
 +};
-Index: rpi-kernel/drivers/cpufreq/Makefile
+Index: kernel-rpi/drivers/cpufreq/Makefile
 ===================================================================
---- rpi-kernel.orig/drivers/cpufreq/Makefile
-+++ rpi-kernel/drivers/cpufreq/Makefile
+--- kernel-rpi.orig/drivers/cpufreq/Makefile
++++ kernel-rpi/drivers/cpufreq/Makefile
 @@ -5,6 +5,9 @@ obj-$(CONFIG_CPU_FREQ)			+= cpufreq.o fr
  # CPUfreq stats
  obj-$(CONFIG_CPU_FREQ_STAT)             += cpufreq_stats.o
@@ -17337,10 +17357,10 @@ Index: rpi-kernel/drivers/cpufreq/Makefile
  # CPUfreq governors 
  obj-$(CONFIG_CPU_FREQ_GOV_PERFORMANCE)	+= cpufreq_performance.o
  obj-$(CONFIG_CPU_FREQ_GOV_POWERSAVE)	+= cpufreq_powersave.o
-Index: rpi-kernel/drivers/cpufreq/cpufreq.c
+Index: kernel-rpi/drivers/cpufreq/cpufreq.c
 ===================================================================
---- rpi-kernel.orig/drivers/cpufreq/cpufreq.c
-+++ rpi-kernel/drivers/cpufreq/cpufreq.c
+--- kernel-rpi.orig/drivers/cpufreq/cpufreq.c
++++ kernel-rpi/drivers/cpufreq/cpufreq.c
 @@ -16,6 +16,7 @@
  
  #include <linux/cpu.h>
@@ -17365,10 +17385,10 @@ Index: rpi-kernel/drivers/cpufreq/cpufreq.c
  
  		write_lock_irqsave(&cpufreq_driver_lock, flags);
  		list_add(&policy->policy_list, &cpufreq_policy_list);
-Index: rpi-kernel/drivers/cpufreq/Kconfig
+Index: kernel-rpi/drivers/cpufreq/Kconfig
 ===================================================================
---- rpi-kernel.orig/drivers/cpufreq/Kconfig
-+++ rpi-kernel/drivers/cpufreq/Kconfig
+--- kernel-rpi.orig/drivers/cpufreq/Kconfig
++++ kernel-rpi/drivers/cpufreq/Kconfig
 @@ -34,6 +34,13 @@ config CPU_FREQ_STAT
  
  	  If in doubt, say N.
@@ -17383,10 +17403,10 @@ Index: rpi-kernel/drivers/cpufreq/Kconfig
  choice
  	prompt "Default CPUFreq governor"
  	default CPU_FREQ_DEFAULT_GOV_USERSPACE if ARM_SA1100_CPUFREQ || ARM_SA1110_CPUFREQ
-Index: rpi-kernel/include/linux/sched/latsense.h
+Index: kernel-rpi/include/linux/sched/latsense.h
 ===================================================================
 --- /dev/null
-+++ rpi-kernel/include/linux/sched/latsense.h
++++ kernel-rpi/include/linux/sched/latsense.h
 @@ -0,0 +1,8 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +#ifndef _LINUX_SCHED_LATSENSE_H
@@ -17396,10 +17416,10 @@ Index: rpi-kernel/include/linux/sched/latsense.h
 +extern int proc_sched_get_latency_sensitive(struct task_struct *p);
 +
 +#endif /* _LINUX_SCHED_LATSENSE_H */
-Index: rpi-kernel/drivers/cpufreq/cpufreq_times.c
+Index: kernel-rpi/drivers/cpufreq/cpufreq_times.c
 ===================================================================
 --- /dev/null
-+++ rpi-kernel/drivers/cpufreq/cpufreq_times.c
++++ kernel-rpi/drivers/cpufreq/cpufreq_times.c
 @@ -0,0 +1,211 @@
 +/* drivers/cpufreq/cpufreq_times.c
 + *
@@ -17612,10 +17632,10 @@ Index: rpi-kernel/drivers/cpufreq/cpufreq_times.c
 +	if (index >= 0)
 +		WRITE_ONCE(freqs->last_index, index);
 +}
-Index: rpi-kernel/include/trace/events/android_fs.h
+Index: kernel-rpi/include/trace/events/android_fs.h
 ===================================================================
 --- /dev/null
-+++ rpi-kernel/include/trace/events/android_fs.h
++++ kernel-rpi/include/trace/events/android_fs.h
 @@ -0,0 +1,66 @@
 +#undef TRACE_SYSTEM
 +#define TRACE_SYSTEM android_fs
@@ -17683,10 +17703,10 @@ Index: rpi-kernel/include/trace/events/android_fs.h
 +	return path;
 +}
 +#endif
-Index: rpi-kernel/include/trace/events/android_fs_template.h
+Index: kernel-rpi/include/trace/events/android_fs_template.h
 ===================================================================
 --- /dev/null
-+++ rpi-kernel/include/trace/events/android_fs_template.h
++++ kernel-rpi/include/trace/events/android_fs_template.h
 @@ -0,0 +1,64 @@
 +#if !defined(_TRACE_ANDROID_FS_TEMPLATE_H) || defined(TRACE_HEADER_MULTI_READ)
 +#define _TRACE_ANDROID_FS_TEMPLATE_H
@@ -17752,10 +17772,10 @@ Index: rpi-kernel/include/trace/events/android_fs_template.h
 +);
 +
 +#endif /* _TRACE_ANDROID_FS_TEMPLATE_H */
-Index: rpi-kernel/include/trace/events/namei.h
+Index: kernel-rpi/include/trace/events/namei.h
 ===================================================================
 --- /dev/null
-+++ rpi-kernel/include/trace/events/namei.h
++++ kernel-rpi/include/trace/events/namei.h
 @@ -0,0 +1,42 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +#undef TRACE_SYSTEM
@@ -17799,10 +17819,10 @@ Index: rpi-kernel/include/trace/events/namei.h
 +
 +/* This part must be outside protection */
 +#include <trace/define_trace.h>
-Index: rpi-kernel/kernel/power/wakeup_reason.c
+Index: kernel-rpi/kernel/power/wakeup_reason.c
 ===================================================================
 --- /dev/null
-+++ rpi-kernel/kernel/power/wakeup_reason.c
++++ kernel-rpi/kernel/power/wakeup_reason.c
 @@ -0,0 +1,435 @@
 +/*
 + * kernel/power/wakeup_reason.c
@@ -18239,10 +18259,10 @@ Index: rpi-kernel/kernel/power/wakeup_reason.c
 +}
 +
 +late_initcall(wakeup_reason_init);
-Index: rpi-kernel/kernel/sched/core_sched.c
+Index: kernel-rpi/kernel/sched/core_sched.c
 ===================================================================
 --- /dev/null
-+++ rpi-kernel/kernel/sched/core_sched.c
++++ kernel-rpi/kernel/sched/core_sched.c
 @@ -0,0 +1,232 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +
@@ -18476,10 +18496,10 @@ Index: rpi-kernel/kernel/sched/core_sched.c
 +	return err;
 +}
 +
-Index: rpi-kernel/kernel/watchdog_buddy_cpu.c
+Index: kernel-rpi/kernel/watchdog_buddy_cpu.c
 ===================================================================
 --- /dev/null
-+++ rpi-kernel/kernel/watchdog_buddy_cpu.c
++++ kernel-rpi/kernel/watchdog_buddy_cpu.c
 @@ -0,0 +1,128 @@
 +// SPDX-License-Identifier: GPL-2.0
 +

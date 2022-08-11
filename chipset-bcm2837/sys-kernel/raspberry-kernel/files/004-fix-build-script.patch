@@ -1,7 +1,7 @@
-Index: rpi-linux-kernel/scripts/Makefile
+Index: kernel-rpi/scripts/Makefile
 ===================================================================
---- rpi-linux-kernel.orig/scripts/Makefile
-+++ rpi-linux-kernel/scripts/Makefile
+--- kernel-rpi.orig/scripts/Makefile
++++ kernel-rpi/scripts/Makefile
 @@ -3,8 +3,8 @@
  # scripts contains sources for various helper programs used throughout
  # the kernel for the build process.
@@ -13,10 +13,10 @@ Index: rpi-linux-kernel/scripts/Makefile
  
  hostprogs-always-$(CONFIG_BUILD_BIN2C)			+= bin2c
  hostprogs-always-$(CONFIG_KALLSYMS)			+= kallsyms
-Index: rpi-linux-kernel/scripts/dtc/Makefile
+Index: kernel-rpi/scripts/dtc/Makefile
 ===================================================================
---- rpi-linux-kernel.orig/scripts/dtc/Makefile
-+++ rpi-linux-kernel/scripts/dtc/Makefile
+--- kernel-rpi.orig/scripts/dtc/Makefile
++++ kernel-rpi/scripts/dtc/Makefile
 @@ -11,7 +11,7 @@ dtc-objs	+= dtc-lexer.lex.o dtc-parser.t
  # Source files need to get at the userspace version of libfdt_env.h to compile
  HOST_EXTRACFLAGS += -I $(srctree)/$(src)/libfdt
@@ -33,8 +33,8 @@ Index: rpi-linux-kernel/scripts/dtc/Makefile
 -HOSTCFLAGS_yamltree.o := $(shell pkg-config --cflags yaml-0.1)
 +HOSTCFLAGS_yamltree.o := $(shell $(PKG_CONFIG) --cflags yaml-0.1)
  # To link libyaml installed in a non-default path
--HOSTLDLIBS_dtc	:= $(shell pkg-config yaml-0.1 --libs)
-+HOSTLDLIBS_dtc	:= $(shell $(PKG_CONFIG) yaml-0.1 --libs)
+-HOSTLDLIBS_dtc	:= $(shell pkg-config --libs yaml-0.1)
++HOSTLDLIBS_dtc	:= $(shell $(PKG_CONFIG) --libs yaml-0.1)
  endif
  
  # Generated files need one more search path to include headers in source tree
