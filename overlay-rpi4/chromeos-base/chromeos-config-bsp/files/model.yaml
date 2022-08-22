@@ -1,0 +1,14 @@
+# Copyright 2022 Fyde Innovations. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# This board only supports a single config, defined below, as it is a
+# migrated pre-unibuild device.
+device-config: &device_config
+  name: rpi4
+
+# Required dunder for chromeos-config to support a single device.
+chromeos:
+  devices:
+    - skus:
+        - config: *device_config

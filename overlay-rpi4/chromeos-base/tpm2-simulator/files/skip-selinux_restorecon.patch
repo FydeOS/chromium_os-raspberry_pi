@@ -1,0 +1,15 @@
+diff --git a/simulator.cc b/simulator.cc
+index 19fb8f299d..a49a878170 100644
+--- a/simulator.cc
++++ b/simulator.cc
+@@ -153,10 +153,6 @@ void SimulatorDaemon::OnTpmPathChange(const base::FilePath& path, bool error) {
+     return;
+   }
+   if (!initialized_ && base::PathExists(path)) {
+-    if (HANDLE_EINTR(selinux_restorecon(path.value().c_str(), 0)) < 0) {
+-      PLOG(ERROR) << "restorecon(" << path.value() << ") failed";
+-    }
+-
+     LOG(INFO) << "vTPM initialized: " << path.value();
+     tpm_watcher_.reset();
+     initialized_ = true;
