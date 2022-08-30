@@ -1,0 +1,12 @@
+diff --git a/seccomp/tpm2-simulator-arm.policy b/tpm2-simulator/seccomp/tpm2-simulator-arm.policy
+index 8a0d481480..68790e9873 100644
+--- a/seccomp/tpm2-simulator-arm.policy
++++ b/seccomp/tpm2-simulator-arm.policy
+@@ -26,6 +26,7 @@ fstat: 1
+ stat: 1
+ fstat64: 1
+ stat64: 1
++statx: 1
+ read: 1
+ write: 1
+ close: 1

@@ -39,6 +39,7 @@ DEPEND="${COMMON_DEPEND}"
 
 PATCHES=(
   "${FILESDIR}"/skip-selinux_restorecon.patch
+  "${FILESDIR}"/tpm2-simulator-0.0.1-fix-arm-policy.patch
 )
 
 src_install() {
