@@ -19,9 +19,9 @@ else
 	# * "e432bc3" is the first 7 hex digits of the commit hash.
 	# * Go to https://github.com/raspberrypi/userland/commits/master and find the full hash
 	GIT_COMMIT="54fd97ae4066a10b6b02089bc769ceed328737e0"
-	SRC_URI="https://github.com/raspberrypi/userland/archive/${GIT_COMMIT}.tar.gz -> ${P}.tar.gz"
+	SRC_URI="https://gitee.com/openFyde/raspberrypi-userland/repository/archive/${GIT_COMMIT}.tar.gz -> ${P}.tar.gz"
   RESTRICT="mirror"
-	S="${WORKDIR}/userland-${GIT_COMMIT}"
+	S="${WORKDIR}/raspberrypi-userland-${GIT_COMMIT}"
 fi
 KEYWORDS="arm arm64"
 
