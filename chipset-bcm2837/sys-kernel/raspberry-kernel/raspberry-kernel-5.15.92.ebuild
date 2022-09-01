@@ -5,7 +5,7 @@
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=7
-CROS_WORKON_REPO="https://github.com/raspberrypi"
+CROS_WORKON_REPO="https://gerrit.openfyde.cn/github.com/raspberrypi"
 CROS_WORKON_COMMIT="14b35093ca68bf2c81bbc90aace5007142b40b40"
 CROS_WORKON_PROJECT="linux"
 CROS_WORKON_LOCALNAME="kernel/v5.10-rpi"
