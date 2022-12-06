@@ -1,10 +1,13 @@
-# Copyright 2014 The Chromium OS Authors. All rights reserved.
+# Copyright (c) 2022 Fyde Innovations Limited and the openFyde Authors.
+# Distributed under the license specified in the root directory of this project.
+
+# Copyright 2014 The ChromiumOS Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI="6"
 
-CROS_WORKON_COMMIT="a5ac45890d256866bac77140da7981e6a8a41c42"
-CROS_WORKON_TREE="7a7f01716f76660e5547da42fe22f360242dc4cc"
+CROS_WORKON_COMMIT="6fb145be9c91a22d9fa7a0a79b472864f8eb8ace"
+CROS_WORKON_TREE="b1b08597cd479b77dac627221dc8b1d5fe4ce7d5"
 CROS_WORKON_PROJECT="chromiumos/platform/minigbm"
 CROS_WORKON_LOCALNAME="../platform/minigbm"
 CROS_WORKON_OUTOFTREE_BUILD=1
@@ -41,7 +44,7 @@ DEPEND="${RDEPEND}
 	)"
 
 src_prepare() {
-  eapply "${FILESDIR}/vc4_v3d.patch"
+	eapply "${FILESDIR}/vc4_v3d.patch"
 	default
 	sanitizers-setup-env
 	cros-common.mk_src_prepare
@@ -71,7 +74,7 @@ src_configure() {
 	use video_cards_vc4 && append-cppflags -DDRV_VC4 && export DRV_VC4=1
 	use video_cards_virgl && append-cppflags -DDRV_VIRGL && export DRV_VIRGL=1
 	use linear_align_256 && append-cppflags -DLINEAR_ALIGN_256
-  use video_cards_v3d && append-cppflags -DDRV_V3D && export DRV_V3D=1
+	use video_cards_v3d && append-cppflags -DDRV_V3D && export DRV_V3D=1
 	cros-common.mk_src_configure
 }
 

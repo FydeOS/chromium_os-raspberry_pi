@@ -1,5 +1,3 @@
-diff --git a/drv.c b/drv.c
-index ada02ba..7747cab 100644
 --- a/drv.c
 +++ b/drv.c
 @@ -14,7 +14,6 @@
@@ -10,7 +8,7 @@ index ada02ba..7747cab 100644
  #ifdef __ANDROID__
  #include <cutils/log.h>
  #include <libgen.h>
-@@ -42,6 +41,9 @@ extern const struct backend backend_rockchip;
+@@ -42,6 +41,9 @@
  #ifdef DRV_VC4
  extern const struct backend backend_vc4;
  #endif
@@ -20,31 +18,29 @@ index ada02ba..7747cab 100644
  
  // Dumb / generic drivers
  extern const struct backend backend_evdi;
-@@ -83,6 +85,9 @@ static const struct backend *drv_get_backend(int fd)
- #endif
+@@ -84,6 +86,9 @@
  #ifdef DRV_VC4
  		&backend_vc4,
-+#endif
+ #endif
 +#ifdef DRV_V3D
 +    &backend_v3d,
- #endif
++#endif
  		&backend_evdi,	   &backend_marvell, &backend_meson,	 &backend_nouveau,
  		&backend_komeda,   &backend_radeon,  &backend_synaptics, &backend_virtgpu,
-@@ -93,6 +98,9 @@ static const struct backend *drv_get_backend(int fd)
+ 		&backend_udl,	   &backend_virtgpu, &backend_vkms
+@@ -93,6 +98,9 @@
  		const struct backend *b = backend_list[i];
  		if (!strcmp(drm_version->name, b->name)) {
  			drmFreeVersion(drm_version);
 +#ifdef DEBUG
-+      drv_log("%s driver is picked.\n", b->name);
++      drv_logd("%s driver is picked.\n", b->name);
 +#endif
  			return b;
  		}
  	}
-diff --git a/drv_helpers.c b/drv_helpers.c
-index 6ea4b8e..2565dd8 100644
 --- a/drv_helpers.c
 +++ b/drv_helpers.c
-@@ -601,3 +601,113 @@ void drv_resolve_format_and_use_flags_helper(struct driver *drv, uint32_t format
+@@ -601,3 +601,113 @@
  		break;
  	}
  }
@@ -158,20 +154,15 @@ index 6ea4b8e..2565dd8 100644
 +    }
 +    return "Unknown format";
 +}
-diff --git a/drv_helpers.h b/drv_helpers.h
-index edb69bf..599d452 100644
 --- a/drv_helpers.h
 +++ b/drv_helpers.h
-@@ -47,5 +47,5 @@ bool drv_has_modifier(const uint64_t *list, uint32_t count, uint64_t modifier);
+@@ -47,5 +47,5 @@
  void drv_resolve_format_and_use_flags_helper(struct driver *drv, uint32_t format,
  					     uint64_t use_flags, uint32_t *out_format,
  					     uint64_t *out_use_flags);
 -
 +char *getDrmFormatString(uint32_t drmFormat);
  #endif
-diff --git a/external/v3d_drm.h b/external/v3d_drm.h
-new file mode 100644
-index 0000000..b8c6f9d
 --- /dev/null
 +++ b/external/v3d_drm.h
 @@ -0,0 +1,267 @@
@@ -442,9 +433,6 @@ index 0000000..b8c6f9d
 +#endif
 +
 +#endif /* _V3D_DRM_H_ */
-diff --git a/v3d.c b/v3d.c
-new file mode 100644
-index 0000000..e5dedd6
 --- /dev/null
 +++ b/v3d.c
 @@ -0,0 +1,201 @@
@@ -530,7 +518,7 @@ index 0000000..e5dedd6
 +  drv_add_combinations(drv, texture_target_formats, ARRAY_SIZE(texture_target_formats),
 +    &metadata, texture_use_flags);
 +#endif
-+  drv_log("v3d driver init.\n");
++  drv_logi("v3d driver init.\n");
 +  return 0;
 +}
 +#if 0
@@ -555,14 +543,14 @@ index 0000000..e5dedd6
 +  bo->meta.tiling = (modifier == DRM_FORMAT_MOD_LINEAR ? V3D_TILING_RASTER: V3D_TILING_UIF_NO_XOR);
 +  ret = drmIoctl(bo->drv->fd, DRM_IOCTL_V3D_CREATE_BO, &bo_create);
 +  if (ret) {
-+    drv_log("DRM_IOCTL_V3D_CREATE_BO failed (size=%zu), ret=%d, format:%s\n", bo->meta.total_size, ret, getDrmFormatString(format));
++    drv_logv("DRM_IOCTL_V3D_CREATE_BO failed (size=%zu), ret=%d, format:%s\n", bo->meta.total_size, ret, getDrmFormatString(format));
 +    return -errno;
 +  }
 +
 +  for (plane = 0; plane < bo->meta.num_planes; plane++)
 +    bo->handles[plane].u32 = bo_create.handle;
 +#ifdef DEBUG
-+ drv_log("create bo handler:0x%x, size:%zu, format:%s, width:%u, height:%u\n",
++ drv_logv("create bo handler:0x%x, size:%zu, format:%s, width:%u, height:%u\n",
 +   bo_create.handle, bo->meta.total_size, getDrmFormatString(format), width, height);
 +#endif
 +  return 0;
@@ -605,14 +593,14 @@ index 0000000..e5dedd6
 +  bo_create.size = bo->meta.total_size;
 +  ret = drmIoctl(bo->drv->fd, DRM_IOCTL_V3D_CREATE_BO, &bo_create);
 +  if (ret) {
-+    drv_log("DRM_IOCTL_V3D_CREATE_BO failed (size=%zu), ret=%d, format:%s\n", bo->meta.total_size, ret, getDrmFormatString(format));
++    drv_logv("DRM_IOCTL_V3D_CREATE_BO failed (size=%zu), ret=%d, format:%s\n", bo->meta.total_size, ret, getDrmFormatString(format));
 +    return -errno;
 +  }
 +
 +  for (plane = 0; plane < bo->meta.num_planes; plane++)
 +    bo->handles[plane].u32 = bo_create.handle;
 +#ifdef DEBUG
-+ drv_log("create bo handler:0x%x, size:%zu, format:%s, width:%u, height:%u, use_flags:0x%llx\n",
++ drv_logv("create bo handler:0x%x, size:%zu, format:%s, width:%u, height:%u, use_flags:0x%llx\n",
 +   bo_create.handle, bo->meta.total_size, getDrmFormatString(format), width, height, use_flags & (BO_USE_SW_MASK | BO_USE_SCANOUT));
 +#endif
 +  return 0;
@@ -626,7 +614,7 @@ index 0000000..e5dedd6
 +
 +  ret = drmIoctl(bo->drv->fd, DRM_IOCTL_V3D_MMAP_BO, &bo_map);
 +  if (ret) {
-+    drv_log("DRM_V3D_MMAP_BO failed\n");
++    drv_loge("DRM_V3D_MMAP_BO failed\n");
 +    return MAP_FAILED;
 +  }
 +  vma->length = bo->meta.total_size;
@@ -649,8 +637,6 @@ index 0000000..e5dedd6
 +};
 +
 +#endif // DEV_V3D
-diff --git a/vc4.c b/vc4.c
-index 820e4fe..fa8f45d 100644
 --- a/vc4.c
 +++ b/vc4.c
 @@ -3,9 +3,7 @@
@@ -691,8 +677,6 @@ index 820e4fe..fa8f45d 100644
 -	drv_modify_combination(drv, DRM_FORMAT_YVU420, &LINEAR_METADATA, BO_USE_HW_VIDEO_ENCODER);
 -	drv_modify_combination(drv, DRM_FORMAT_NV12, &LINEAR_METADATA,
 -			       BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT | BO_USE_HW_VIDEO_ENCODER);
--
--	return drv_modify_linear_combinations(drv);
 +  struct format_metadata metadata = {1, VC4_TILING_NONE,DRM_FORMAT_MOD_LINEAR};
 +  drv_add_combinations(drv, render_target_formats, ARRAY_SIZE(render_target_formats),
 +          &metadata, BO_USE_RENDER_MASK);
@@ -707,13 +691,14 @@ index 820e4fe..fa8f45d 100644
 +  drv_modify_combination(drv, DRM_FORMAT_R8, &metadata, BO_USE_CAMERA_READ |
 +                              BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
 +			      BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
-+
-+  drv_log("vc4 driver inited.\n");
+ 
+-	return drv_modify_linear_combinations(drv);
++  drv_logi("vc4 driver inited.\n");
 +  return drv_modify_linear_combinations(drv);
  }
  
  static int vc4_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t height,
-@@ -48,36 +53,24 @@ static int vc4_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t he
+@@ -48,20 +53,6 @@
  	uint32_t stride;
  	struct drm_vc4_create_bo bo_create = { 0 };
  
@@ -721,47 +706,28 @@ index 820e4fe..fa8f45d 100644
 -	case DRM_FORMAT_MOD_LINEAR:
 -		break;
 -	case DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED:
--		drv_log("DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED not supported yet\n");
+-		drv_loge("DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED not supported yet\n");
 -		return -EINVAL;
 -	default:
 -		return -EINVAL;
 -	}
-+  stride = drv_stride_from_format(format, width, 0);
-+  stride = ALIGN(stride, 64);
-+  drv_bo_from_format(bo, stride, height, format);
- 
+-
 -	/*
 -	 * Since the ARM L1 cache line size is 64 bytes, align to that as a
 -	 * performance optimization.
 -	 */
--	stride = drv_stride_from_format(format, width, 0);
--	stride = ALIGN(stride, 64);
--	drv_bo_from_format(bo, stride, height, format);
-+  bo_create.size = bo->meta.total_size;
+ 	stride = drv_stride_from_format(format, width, 0);
+ 	stride = ALIGN(stride, 64);
+ 	drv_bo_from_format(bo, stride, height, format);
+@@ -77,6 +68,11 @@
+ 	for (plane = 0; plane < bo->meta.num_planes; plane++)
+ 		bo->handles[plane].u32 = bo_create.handle;
  
--	bo_create.size = bo->meta.total_size;
-+  ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VC4_CREATE_BO, &bo_create);
-+  if (ret) {
-+    drv_log("DRM_IOCTL_VC4_CREATE_BO failed (size=%zu)\n", bo->meta.total_size);
-+    return -errno;
-+  }
- 
--	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VC4_CREATE_BO, &bo_create);
--	if (ret) {
--		drv_log("DRM_IOCTL_VC4_CREATE_BO failed (size=%zu)\n", bo->meta.total_size);
--		return -errno;
--	}
--
--	for (plane = 0; plane < bo->meta.num_planes; plane++)
--		bo->handles[plane].u32 = bo_create.handle;
--
--	return 0;
-+  for (plane = 0; plane < bo->meta.num_planes; plane++)
-+    bo->handles[plane].u32 = bo_create.handle;
 +#ifdef DEBUG
-+  drv_log("create bo for vc4: handle:0x%x, size:%zu, format:%s\n", bo_create.handle, bo->meta.total_size, getDrmFormatString(format));
++	drv_logd("create bo handler:0x%x, size:%zu, format:%s, width:%u, height:%u\n",
++		bo_create.handle, bo->meta.total_size, getDrmFormatString(format), width, height);
 +#endif
-+  return 0;
++
+ 	return 0;
  }
  
- static int vc4_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t format,

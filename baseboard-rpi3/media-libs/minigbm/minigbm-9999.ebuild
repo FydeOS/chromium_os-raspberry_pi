@@ -1,7 +1,4 @@
-# Copyright (c) 2022 Fyde Innovations Limited and the openFyde Authors.
-# Distributed under the license specified in the root directory of this project.
-
-# Copyright 2014 The Chromium OS Authors. All rights reserved.
+# Copyright 2014 The ChromiumOS Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI="6"
@@ -20,14 +17,14 @@ SLOT="0"
 KEYWORDS="~*"
 VIDEO_CARDS="
 	amdgpu exynos intel marvell mediatek msm
-	radeon radeonsi rockchip tegra vc4 virgl v3d
+	radeon radeonsi rockchip tegra vc4 virgl
 "
-IUSE="-asan kernel-3_18 linear_align_256"
+IUSE="-asan linear_align_256"
 for card in ${VIDEO_CARDS}; do
 	IUSE+=" video_cards_${card}"
 done
 
-MINI_GBM_PLATFORMS_USE=( mt8183 mt8192 mt8195 sc7280)
+MINI_GBM_PLATFORMS_USE=( mt8183 mt8186 mt8192 mt8195 sc7280)
 IUSE+=" ${MINI_GBM_PLATFORMS_USE[*]/#/minigbm_platform_}"
 
 RDEPEND="
@@ -54,12 +51,11 @@ src_configure() {
 	use video_cards_exynos && append-cppflags -DDRV_EXYNOS && export DRV_EXYNOS=1
 	use video_cards_intel && append-cppflags -DDRV_I915 && export DRV_I915=1
 	if use video_cards_intel ; then
-		if ! use kernel-3_18; then
-			append-cppflags -DI915_SCANOUT_Y_TILED
-		fi
+		append-cppflags -DI915_SCANOUT_Y_TILED
 	fi
 	use video_cards_marvell && append-cppflags -DDRV_MARVELL && export DRV_MARVELL=1
 	use minigbm_platform_mt8183 && append-cppflags -DMTK_MT8183
+	use minigbm_platform_mt8186 && append-cppflags -DMTK_MT8186
 	use minigbm_platform_mt8192 && append-cppflags -DMTK_MT8192
 	use minigbm_platform_mt8195 && append-cppflags -DMTK_MT8195
 	use minigbm_platform_sc7280 && append-cppflags -DSC_7280
@@ -72,7 +68,6 @@ src_configure() {
 	use video_cards_vc4 && append-cppflags -DDRV_VC4 && export DRV_VC4=1
 	use video_cards_virgl && append-cppflags -DDRV_VIRGL && export DRV_VIRGL=1
 	use linear_align_256 && append-cppflags -DLINEAR_ALIGN_256
-  use video_cards_v3d && append-cppflags -DDRV_V3D && export DRV_V3D=1
 	cros-common.mk_src_configure
 }
 
