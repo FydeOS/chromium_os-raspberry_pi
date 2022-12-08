@@ -6,7 +6,7 @@ EAPI="5"
 DESCRIPTION="Raspberry Pi firmware"
 HOMEPAGE="https://fydeos.io"
 
-LICENSE="BSD"
+LICENSE="BSD-Fyde"
 SLOT="0"
 KEYWORDS="*"
 IUSE=""

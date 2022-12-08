@@ -17,6 +17,8 @@ SLOT="0"
 KEYWORDS="amd64 arm arm64 ~ppc x86"
 IUSE="selinux static-libs"
 
+RESTRICT="arm? ( binchecks )"
+
 DEPEND=""
 RDEPEND="!<sys-apps/openrc-0.11.8
 		 selinux? ( sec-policy/selinux-entropyd )"
