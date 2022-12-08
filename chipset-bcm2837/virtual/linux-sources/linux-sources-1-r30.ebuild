@@ -1,29 +1,25 @@
 # Copyright (c) 2022 Fyde Innovations Limited and the openFyde Authors.
 # Distributed under the license specified in the root directory of this project.
 
-# Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
+# Copyright 2012 The ChromiumOS Authors
 # Distributed under the terms of the GNU General Public License v2
 
-EAPI="5"
+EAPI="7"
 
 DESCRIPTION="Chrome OS Kernel virtual package"
 HOMEPAGE="http://src.chromium.org"
 
-LICENSE="GPL-2"
+LICENSE="metapackage"
 SLOT="0"
 KEYWORDS="*"
 
 IUSE_KERNEL_VERS=(
-	kernel-3_8
-	kernel-3_10
-	kernel-3_14
-	kernel-3_18
 	kernel-4_4
 	kernel-4_14
 	kernel-4_19
-	kernel-4_19-ht
 	kernel-5_4
-  kernel-5_10
+	kernel-5_10
+	kernel-5_15
 	kernel-experimental
 	kernel-next
 	kernel-upstream
@@ -31,19 +27,16 @@ IUSE_KERNEL_VERS=(
 	kernel-upstream-next
 )
 IUSE="${IUSE_KERNEL_VERS[*]}"
-REQUIRED_USE="?? ( ${IUSE_KERNEL_VERS[*]} )"
+# exactly one of foo, bar, or baz must be set, but not several
+REQUIRED_USE="^^ ( ${IUSE_KERNEL_VERS[*]} )"
 
 RDEPEND="
-	kernel-3_8? ( sys-kernel/chromeos-kernel-3_8 )
-	kernel-3_10? ( sys-kernel/chromeos-kernel-3_10 )
-	kernel-3_14? ( sys-kernel/chromeos-kernel-3_14 )
-	kernel-3_18? ( sys-kernel/chromeos-kernel-3_18 )
 	kernel-4_4? ( sys-kernel/chromeos-kernel-4_4 )
 	kernel-4_14? ( sys-kernel/chromeos-kernel-4_14 )
 	kernel-4_19? ( sys-kernel/chromeos-kernel-4_19 )
-	kernel-4_19-ht? ( sys-kernel/chromeos-kernel-4_19-ht )
-	kernel-5_4? ( sys-kernel/raspberry-kernel )
-  kernel-5_10? ( sys-kernel/raspberry-kernel )
+	kernel-5_4? ( sys-kernel/chromeos-kernel-5_4 )
+	kernel-5_10? ( sys-kernel/raspberry-kernel )
+	kernel-5_15? ( sys-kernel/chromeos-kernel-5_15 )
 	kernel-experimental? ( sys-kernel/chromeos-kernel-experimental )
 	kernel-next? ( sys-kernel/chromeos-kernel-next )
 	kernel-upstream? ( sys-kernel/chromeos-kernel-upstream )
@@ -58,6 +51,7 @@ RDEPEND+="
 "
 
 # Default to the latest kernel if none has been selected.
+# TODO: This defaulting does not work. Fix or remove.
 RDEPEND_DEFAULT="sys-kernel/chromeos-kernel-5_4"
 # Here be dragons!
 RDEPEND+="
