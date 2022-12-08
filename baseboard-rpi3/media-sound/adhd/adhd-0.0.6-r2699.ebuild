@@ -1,26 +1,26 @@
 # Copyright (c) 2022 Fyde Innovations Limited and the openFyde Authors.
 # Distributed under the license specified in the root directory of this project.
 
-# Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
+# Copyright 2012 The ChromiumOS Authors
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
 EAPI=7
-CROS_WORKON_COMMIT="cf46341faafb78c8b6d3b405215042f757fad0b0"
-CROS_WORKON_TREE="c49124bfc111eb4ae54eab9b08f43e0b7fe85592"
+CROS_WORKON_COMMIT="0eb69d5bd5c84ff1bf39feb7332d8c02d8b3d9e2"
+CROS_WORKON_TREE="8f59c52f3f0399066ee5b6cc74b5d100463aa484"
 CROS_WORKON_PROJECT="chromiumos/third_party/adhd"
 CROS_WORKON_LOCALNAME="adhd"
 CROS_WORKON_USE_VCSID=1
 
 inherit toolchain-funcs autotools cros-fuzzer cros-sanitizers cros-workon
-inherit cros-unibuild systemd user libchrome-version
+inherit cros-unibuild systemd user
 
 DESCRIPTION="Google A/V Daemon"
 HOMEPAGE="https://chromium.googlesource.com/chromiumos/third_party/adhd/"
 SRC_URI=""
 LICENSE="BSD-Google"
 KEYWORDS="*"
-IUSE="asan +cras-apm fuzzer selinux systemd"
+IUSE="asan +cras-apm cras-ml dlc featured fuzzer selinux systemd"
 
 COMMON_DEPEND="
 	>=chromeos-base/metrics-0.0.1-r3152:=
@@ -30,6 +30,7 @@ COMMON_DEPEND="
 	media-libs/ladspa-sdk:=
 	media-libs/sbc:=
 	media-libs/speex:=
+	cras-ml? ( sci-libs/tensorflow:= )
 	>=sys-apps/dbus-1.4.12:=
 	selinux? ( sys-libs/libselinux:= )
 	virtual/udev:=
@@ -38,9 +39,10 @@ COMMON_DEPEND="
 RDEPEND="
 	${COMMON_DEPEND}
 	media-sound/alsa-utils
+	dlc? ( media-sound/sr-bt-dlc:= )
 	media-plugins/alsa-plugins
 	chromeos-base/chromeos-config-tools
-	chromeos-base/featured
+	featured? ( chromeos-base/featured )
 "
 
 DEPEND="
@@ -50,8 +52,8 @@ DEPEND="
 "
 
 src_prepare() {
-  eapply $FILESDIR/*.patch
-	cd cras
+	eapply $FILESDIR/*.patch
+	cd cras || die
 	eautoreconf
 	default
 }
@@ -63,22 +65,25 @@ src_configure() {
 		export FUZZER_LDFLAGS="-fsanitize=fuzzer"
 	fi
 
-	cd cras
+	cd cras || die
 	# Disable external libraries for fuzzers.
 	if use fuzzer ; then
 		# Disable "gc-sections" for fuzzer builds, https://crbug.com/1026125 .
 		append-ldflags "-Wl,--no-gc-sections"
 		econf $(use_enable cras-apm webrtc-apm) \
+			$(use_enable cras-ml ml) \
 			--with-system-cras-rust \
+			$(use_enable featured) \
 			$(use_enable amd64 fuzzer)
 	else
 		econf $(use_enable selinux) \
 			$(use_enable cras-apm webrtc-apm) \
+			$(use_enable cras-ml ml) \
 			--enable-hats \
 			--enable-metrics \
 			--with-system-cras-rust \
-			$(use_enable amd64 fuzzer) \
-			BASE_VER="$(libchrome_ver)"
+			$(use_enable dlc) \
+			$(use_enable featured)
 	fi
 }
 
@@ -90,7 +95,7 @@ src_test() {
 	if ! use x86 && ! use amd64 ; then
 		elog "Skipping unit tests on non-x86 platform"
 	else
-		cd cras
+		cd cras || die
 		# This is an ugly hack that happens to work, but should not be copied.
 		LD_LIBRARY_PATH="${SYSROOT}/usr/$(get_libdir)" \
 		emake check
@@ -129,10 +134,14 @@ src_install() {
 		insinto /etc/cras
 		doins cras-config/dsp.ini.sample
 		# Install fuzzer binary
-		fuzzer_install "${S}/OWNERS" cras/src/cras_rclient_message_fuzzer
-		local fuzzer_component_id="777118"
-		fuzzer_install "${S}/OWNERS" cras/src/cras_hfp_slc_fuzzer \
+		local fuzzer_component_id="890231"
+		fuzzer_install "${S}/OWNERS.fuzz" cras/src/cras_rclient_message_fuzzer \
+			--comp "${fuzzer_component_id}"
+		fuzzer_install "${S}/OWNERS.fuzz" cras/src/cras_hfp_slc_fuzzer \
 			--dict "${S}/cras/src/fuzz/cras_hfp_slc.dict" \
+			--comp "${fuzzer_component_id}"
+		local fuzzer_component_id="769744"
+		fuzzer_install "${S}/OWNERS.fuzz" cras/src/cras_fl_media_fuzzer \
 			--comp "${fuzzer_component_id}"
 	fi
   insinto /etc/init

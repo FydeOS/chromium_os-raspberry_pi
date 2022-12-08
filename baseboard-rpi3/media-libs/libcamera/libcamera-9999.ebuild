@@ -1,13 +1,10 @@
-# Copyright (c) 2022 Fyde Innovations Limited and the openFyde Authors.
-# Distributed under the license specified in the root directory of this project.
-
-# Copyright 2021 The Chromium OS Authors. All rights reserved.
+# Copyright 2021 The ChromiumOS Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=7
 
 CROS_WORKON_PROJECT="chromiumos/third_party/libcamera"
-#CROS_WORKON_INCREMENTAL_BUILD="1"
+CROS_WORKON_INCREMENTAL_BUILD="1"
 
 inherit cros-camera cros-workon meson
 
@@ -26,7 +23,6 @@ RDEPEND="
 	media-libs/libcamera-configs
 	media-libs/libjpeg-turbo
 	media-libs/libexif
-  dev-libs/boost
 	>=net-libs/gnutls-3.3:=
 	media-libs/libyuv
 	udev? ( virtual/libudev )
@@ -39,9 +35,15 @@ DEPEND="
 "
 
 src_configure() {
+	# By default Chrome OS build system adds the CFLAGS/CXXFLAGS
+	# -fno-unwind-tables and -fno-asynchronous-unwind-table as part of
+	# disabling exception support. This prevents unwinding of stack frames to
+	# show backtrace. Calling 'cros_enable_cxx_exceptions' to remove those
+	# flags when debugging is enabled.
+	use debug && cros_enable_cxx_exceptions
+
 	local pipelines=(
 		"uvcvideo"
-    "raspberrypi"
 		$(usev ipu3)
 		$(usev rkisp1)
 	)
@@ -59,11 +61,9 @@ src_configure() {
 		-Dandroid="enabled"
 		-Dandroid_platform="cros"
 		-Dpipelines="$(pipeline_list "${pipelines[@]}")"
-    -Dipas="raspberrypi"
 		--buildtype "$(usex debug debug plain)"
 		--sysconfdir /etc/camera
 	)
-  filter-flags "-fno-exceptions"
 	meson_src_configure
 }
 

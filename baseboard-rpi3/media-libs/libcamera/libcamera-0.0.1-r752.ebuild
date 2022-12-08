@@ -1,15 +1,15 @@
 # Copyright (c) 2022 Fyde Innovations Limited and the openFyde Authors.
 # Distributed under the license specified in the root directory of this project.
 
-# Copyright 2021 The Chromium OS Authors. All rights reserved.
+# Copyright 2021 The ChromiumOS Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=7
 
 CROS_WORKON_COMMIT="72b6c710d448d5a1ff9407f9f7c7780660ee556a"
-CROS_WORKON_TREE="c66f4eadb3ce21b120447bb910bc9606c3fc499b"
+CROS_WORKON_TREE="4662bf133b2155e155c25375baefc17f970be9e1"
 CROS_WORKON_PROJECT="chromiumos/third_party/libcamera"
-#CROS_WORKON_INCREMENTAL_BUILD="1"
+# CROS_WORKON_INCREMENTAL_BUILD="1"
 
 inherit cros-camera cros-workon meson
 
@@ -31,7 +31,7 @@ RDEPEND="
 	>=net-libs/gnutls-3.3:=
 	media-libs/libyuv
 	udev? ( virtual/libudev )
-  dev-libs/boost
+	dev-libs/boost
 "
 
 DEPEND="
@@ -41,9 +41,16 @@ DEPEND="
 "
 
 src_configure() {
+	# By default Chrome OS build system adds the CFLAGS/CXXFLAGS
+	# -fno-unwind-tables and -fno-asynchronous-unwind-table as part of
+	# disabling exception support. This prevents unwinding of stack frames to
+	# show backtrace. Calling 'cros_enable_cxx_exceptions' to remove those
+	# flags when debugging is enabled.
+	use debug && cros_enable_cxx_exceptions
+
 	local pipelines=(
 		"uvcvideo"
-    "raspberrypi"
+		"raspberrypi"
 		$(usev ipu3)
 		$(usev rkisp1)
 	)
@@ -61,12 +68,12 @@ src_configure() {
 		-Dandroid="enabled"
 		-Dandroid_platform="cros"
 		-Dpipelines="$(pipeline_list "${pipelines[@]}")"
-    -Dipas="raspberrypi"
+		-Dipas="raspberrypi"
 		--buildtype "$(usex debug debug plain)"
 		--sysconfdir /etc/camera
 	)
- # append-flags '-Wno-error=shadow' '-std=c99'
-  filter-flags "-fno-exceptions"
+	# append-flags '-Wno-error=shadow' '-std=c99'
+	filter-flags "-fno-exceptions"
 	meson_src_configure
 }
 
@@ -80,10 +87,10 @@ src_install() {
 	cros-camera_dohal "${D}/usr/$(get_libdir)/libcamera-hal.so" libcamera-hal.so
 
 	dostrip -x "/usr/$(get_libdir)/libcamera/"
-  insinto /etc/camera/libcamera
-  doins ${FILESDIR}/camera_hal.yaml
-  insinto /lib/udev/rules.d
-  doins ${FILESDIR}/99-rpi-camera.rules
+	insinto /etc/camera/libcamera
+	doins ${FILESDIR}/camera_hal.yaml
+	insinto /lib/udev/rules.d
+	doins ${FILESDIR}/99-rpi-camera.rules
 }
 
 PATCHES=( "${FILESDIR}"/fix-rpi-build.patch )

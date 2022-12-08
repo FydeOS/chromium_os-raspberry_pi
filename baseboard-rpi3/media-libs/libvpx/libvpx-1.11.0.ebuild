@@ -1,28 +1,29 @@
 # Copyright (c) 2022 Fyde Innovations Limited and the openFyde Authors.
 # Distributed under the license specified in the root directory of this project.
 
-# Copyright 1999-2018 Gentoo Foundation
+# Copyright 1999-2022 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
-EAPI=6
+EAPI="7"
 inherit toolchain-funcs multilib-minimal
 
 # To create a new testdata tarball:
-# 1. Unpack source tarbll or checkout git tag
-# 2. export LIBVPX_TEST_DATA_PATH=libvpx-testdata
-# 3. configure --enable-unit-tests --enable-vp9-highbitdepth
-# 4. make testdata
-# 5. tar -cjf libvpx-testdata-${MY_PV}.tar.bz2 libvpx-testdata
+# 1. Unpack source tarball or checkout git tag
+# 2. mkdir libvpx-testdata
+# 3. export LIBVPX_TEST_DATA_PATH=libvpx-testdata
+# 4. configure --enable-unit-tests --enable-vp9-highbitdepth
+# 5. make testdata
+# 6. tar -caf libvpx-testdata-${MY_PV}.tar.xz libvpx-testdata
 
-LIBVPX_TESTDATA_VER=1.7.0
+LIBVPX_TESTDATA_VER=1.11.0
 
 DESCRIPTION="WebM VP8 and VP9 Codec SDK"
 HOMEPAGE="https://www.webmproject.org"
 SRC_URI="https://github.com/webmproject/${PN}/archive/v${PV}.tar.gz -> ${P}.tar.gz
-	test? ( mirror://gentoo/${PN}-testdata-${LIBVPX_TESTDATA_VER}.tar.xz )"
+	test? ( https://dev.gentoo.org/~sam/distfiles/${CATEGORY}/${PN}/${PN}-testdata-${LIBVPX_TESTDATA_VER}.tar.xz )"
 
 LICENSE="BSD"
-SLOT="0/5"
+SLOT="0/7"
 KEYWORDS="*"
 IUSE="cpu_flags_x86_avx cpu_flags_x86_avx2 doc cpu_flags_x86_mmx postproc cpu_flags_x86_sse cpu_flags_x86_sse2 cpu_flags_x86_sse3 cpu_flags_x86_ssse3 cpu_flags_x86_sse4_1 +highbitdepth static-libs svc test +threads"
 
@@ -35,12 +36,10 @@ REQUIRED_USE="
 # Disable test phase when USE="-test"
 RESTRICT="!test? ( test )"
 
-RDEPEND=""
-DEPEND="abi_x86_32? ( dev-lang/yasm )
+BDEPEND="dev-lang/perl
+	abi_x86_32? ( dev-lang/yasm )
 	abi_x86_64? ( dev-lang/yasm )
 	abi_x86_x32? ( dev-lang/yasm )
-	x86-fbsd? ( dev-lang/yasm )
-	amd64-fbsd? ( dev-lang/yasm )
 	doc? (
 		app-doc/doxygen
 		dev-lang/php
@@ -55,10 +54,10 @@ src_configure() {
 	# https://bugs.gentoo.org/show_bug.cgi?id=384585
 	# https://bugs.gentoo.org/show_bug.cgi?id=465988
 	# copied from php-pear-r1.eclass
-	addpredict /usr/share/snmp/mibs/.index
-	addpredict /var/lib/net-snmp/
-	addpredict /var/lib/net-snmp/mib_indexes
-	addpredict /session_mm_cli0.sem
+	addpredict /usr/share/snmp/mibs/.index #nowarn
+	addpredict /var/lib/net-snmp/ #nowarn
+	addpredict /var/lib/net-snmp/mib_indexes #nowarn
+	addpredict /session_mm_cli0.sem #nowarn
 	multilib-minimal_src_configure
 }
 
@@ -73,22 +72,20 @@ multilib_src_configure() {
 		--enable-vp8
 		--enable-vp9
 		--enable-shared
-		--extra-cflags="${CFLAGS}"
-        --cpu=cortex-a53
+		--cpu=cortex-a53
+		$(use_enable postproc)
+		$(use_enable static-libs static)
+		$(use_enable test unit-tests)
+		$(use_enable threads multithread)
+		$(use_enable highbitdepth vp9-highbitdepth)
 		$(use_enable cpu_flags_x86_avx avx)
 		$(use_enable cpu_flags_x86_avx2 avx2)
 		$(use_enable cpu_flags_x86_mmx mmx)
-		$(use_enable postproc)
 		$(use cpu_flags_x86_sse2 && use_enable cpu_flags_x86_sse sse || echo --disable-sse)
 		$(use_enable cpu_flags_x86_sse2 sse2)
 		$(use_enable cpu_flags_x86_sse3 sse3)
 		$(use_enable cpu_flags_x86_sse4_1 sse4_1)
 		$(use_enable cpu_flags_x86_ssse3 ssse3)
-		$(use_enable svc experimental) $(use_enable svc spatial-svc)
-		$(use_enable static-libs static)
-		$(use_enable test unit-tests)
-		$(use_enable threads multithread)
-		$(use_enable highbitdepth vp9-highbitdepth)
 	)
 
 	# let the build system decide which AS to use (it honours $AS but
@@ -98,6 +95,27 @@ multilib_src_configure() {
 		i?86*) export AS=yasm;;
 		x86_64*) export AS=yasm;;
 	esac
+
+	# libvpx is fragile: both for tests at runtime.
+	# We force using the generic target unless we know things work to
+	# avoid runtime breakage on exotic arches.
+	if [[ ${ABI} == amd64 ]] ; then
+		myconfargs+=( --force-target=x86_64-linux-gcc )
+	elif [[ ${ABI} == x86 ]] ; then
+		myconfargs+=( --force-target=x86-linux-gcc )
+	elif [[ ${ABI} == arm64 ]] ; then
+		myconfargs+=( --force-target=arm64-linux-gcc )
+	elif [[ ${ABI} == arm ]] && [[ ${CHOST} == *armv7* ]] ; then
+		myconfargs+=( --force-target=armv7-linux-gcc )
+	elif [[ ${ABI} == ppc64 ]] && [[ $(tc-endian) != big ]] && use cpu_flags_ppc_vsx3; then
+		# only enable this target for at least power9 CPU running little-endian
+		myconfargs+=( --force-target=ppc64le-linux-gcc )
+	else
+		myconfargs+=( --force-target=generic-gnu )
+	fi
+
+	# powerpc toolchain is not recognized anymore, #694368
+	#[[ ${CHOST} == powerpc-* ]] && myconfargs+=( --force-target=generic-gnu )
 
 	# Build with correct toolchain.
 	tc-export CC CXX AR NM
@@ -111,12 +129,15 @@ multilib_src_configure() {
 		myconfargs+=( --disable-examples --disable-install-docs --disable-docs )
 	fi
 
-	"${S}"/configure "${myconfargs[@]}"
+	echo "${S}"/configure "${myconfargs[@]}" >&2
+	"${S}"/configure "${myconfargs[@]}" || die
 }
 
 multilib_src_compile() {
 	# build verbose by default and do not build examples that will not be installed
-	emake verbose=yes GEN_EXAMPLES=
+	# disable stripping of debug info, bug #752057
+	# (only works as long as upstream does not use non-gnu strip)
+	emake verbose=yes GEN_EXAMPLES= HAVE_GNU_STRIP=no
 }
 
 multilib_src_test() {
