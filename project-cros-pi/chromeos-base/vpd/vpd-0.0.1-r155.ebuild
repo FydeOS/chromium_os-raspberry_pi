@@ -1,12 +1,12 @@
 # Copyright (c) 2022 Fyde Innovations Limited and the openFyde Authors.
 # Distributed under the license specified in the root directory of this project.
 
-# Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
+# Copyright 2012 The ChromiumOS Authors
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=7
-CROS_WORKON_COMMIT="21ac829a3c671e9728ef6b68a049ad180aa9a898"
-CROS_WORKON_TREE="401c010e3f553367b3f7e55ce0e05452559ffda6"
+CROS_WORKON_COMMIT="256955cdec97e1fc3b99e8af1723e033690526f4"
+CROS_WORKON_TREE="ff0591721691e9ba0edff18d4fbf54a709187e30"
 CROS_WORKON_PROJECT="chromiumos/platform/vpd"
 CROS_WORKON_LOCALNAME="platform/vpd"
 

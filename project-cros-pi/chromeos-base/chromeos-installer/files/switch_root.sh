@@ -97,9 +97,6 @@ main() {
  fi
  umount $tmpdir
  rmdir $tmpdir
- if [ -d $ARC_DIR ]; then
-   touch $CLEAN_OVERLAY
- fi 
 }
 
 main $@

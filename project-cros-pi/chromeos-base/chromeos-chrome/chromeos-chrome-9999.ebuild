@@ -1,4 +1,4 @@
-# Copyright 2012 The Chromium OS Authors. All rights reserved.
+# Copyright 2012 The ChromiumOS Authors
 # Distributed under the terms of the GNU General Public License v2
 
 # Usage: by default, downloads chromium browser from the build server.
@@ -44,13 +44,13 @@ IUSE="
 	+chrome_remoting
 	clang_tidy
 	component_build
+	compressed_ash
 	cros-debug
 	debug_fission
 	+dwarf5
 	+fonts
 	hibernate
 	hw_details
-	goma
 	goma_thinlto
 	+highdpi
 	iioservice
@@ -68,7 +68,7 @@ IUSE="
 	orderfile_generate
 	+orderfile_use
 	orderfile_verify
-	remoteexec
+	protected_av1
 	+runhooks
 	strict_toolchain_checks
 	subpixel_rendering
@@ -87,7 +87,6 @@ REQUIRED_USE="
 	cfi? ( thinlto )
 	afdo_verify? ( !afdo_use )
 	orderfile_generate? ( !orderfile_use )
-	?? ( goma remoteexec )
 	"
 
 OZONE_PLATFORM_PREFIX=ozone_platform_
@@ -181,7 +180,6 @@ RDEPEND="${RDEPEND}
 		app-accessibility/googletts
 	)
 	libcxx? (
-		sys-libs/libcxxabi
 		sys-libs/libcxx
 	)
 	oobe_config? ( chromeos-base/oobe_config )
@@ -193,7 +191,6 @@ DEPEND="${DEPEND}
 	${RDEPEND}
 	chromeos-base/protofiles
 	>=dev-util/gperf-3.0.3
-	>=dev-util/pkgconfig-0.23
 	arm? ( x11-libs/libdrm )
 "
 
@@ -229,11 +226,11 @@ echotf() { echox "${1:-$?}" true false ; }
 usetf()  { usex "$1" true false ; }
 
 use_remoteexec() {
-	[[ "${USE_REMOTEEXEC:-$(usetf remoteexec)}" == "true" ]]
+	[[ -n "${USE_REMOTEEXEC}" && "${USE_REMOTEEXEC}" == "true" ]]
 }
 
 use_goma() {
-	[[ "${USE_GOMA:-$(usetf goma)}" == "true" ]]
+	[[ -n "${USE_GOMA}" && "${USE_GOMA}" == "true" ]]
 }
 
 should_upload_build_logs() {
@@ -249,6 +246,9 @@ set_build_args() {
 	# shellcheck disable=SC2119
 	# suppressing the false warning not to specify the optional argument of 'echotf".
 	use_goma_thin_lto=$(use goma_thinlto && use_goma && use thinlto; echotf)
+	# shellcheck disable=SC2119
+	# suppressing the false warning not to specify the optional argument of 'echotf".
+	use_protected_av1=$(use intel_oemcrypto || use protected_av1; echotf)
 	BUILD_ARGS=(
 		"is_chromeos_device=true"
 		# is_official_build sometimes implies extra optimizations (e.g. it will allow
@@ -262,7 +262,7 @@ set_build_args() {
 		"${EXTRA_GN_ARGS}"
 		"enable_pseudolocales=$(usetf cros-debug)"
 		"use_arc_protected_media=$(usetf arc_hw_oemcrypto)"
-		"use_chromeos_protected_av1=$(usetf intel_oemcrypto)"
+		"use_chromeos_protected_av1=${use_protected_av1}"
 		"use_chromeos_protected_media=$(usetf cdm_factory_daemon)"
 		"use_iioservice=$(usetf iioservice)"
 		"use_v4l2_codec=$(usetf v4l2_codec)"
@@ -360,6 +360,9 @@ set_build_args() {
 		local arm_arch=$(get-flag march)
 		if [[ -n "${arm_arch}" ]]; then
 			BUILD_STRING_ARGS+=( "arm_arch=${arm_arch}" )
+			# Remove -march flag from {CC,CPP,CXX}FLAGS etc.
+			# Chromium will append -march=${arm_arch}.
+			filter-flags "-march=*"
 		fi
 		;;
 	arm64)
@@ -369,33 +372,13 @@ set_build_args() {
 		local arm_arch=$(get-flag march)
 		if [[ -n "${arm_arch}" ]]; then
 			BUILD_STRING_ARGS+=( "arm_arch=${arm_arch}" )
+			# Remove -march flag from {CC,CPP,CXX}FLAGS etc.
+			# Chromium will append -march=${arm_arch}.
+			filter-flags "-march=*"
 		fi
 		;;
 	amd64)
 		BUILD_STRING_ARGS+=( "target_cpu=x64" )
-		;;
-	mips)
-		local mips_arch target_arch
-
-		# shellcheck disable=SC2086 # suppressing the false warning of expanding vars.
-		mips_arch="$($(tc-getCPP) ${CFLAGS} ${CPPFLAGS} -E -P - <<<_MIPS_ARCH)"
-		# Strip away any enclosing quotes.
-		mips_arch="${mips_arch//\"}"
-		# TODO(benchan): Use tc-endian from toolchain-func to determine endianess
-		# when Chrome later cares about big-endian.
-		case "${mips_arch}" in
-		mips64*)
-			target_arch=mips64el
-			;;
-		*)
-			target_arch=mipsel
-			;;
-		esac
-
-		BUILD_STRING_ARGS+=(
-			"target_cpu=${target_arch}"
-			"mips_arch_variant=${mips_arch}"
-		)
 		;;
 	*)
 		die "Unsupported architecture: ${ARCH}"
@@ -443,7 +426,6 @@ set_build_args() {
 	if use_remoteexec; then
 		BUILD_ARGS+=(
 			"use_remoteexec=true"
-			"use_rbe=true"
 		)
 		BUILD_STRING_ARGS+=(
 			"rbe_cc_cfg_file=${CHROME_ROOT}/src/buildtools/reclient_cfgs/rewrapper_chroot_compile.cfg"
@@ -733,9 +715,11 @@ setup_test_lists() {
 		capture_unittests
 		dawn_end2end_tests
 		dawn_unittests
+		fake_dmserver
 		gl_tests
 		jpeg_decode_accelerator_unittest
 		ozone_gl_unittests
+		ozone_integration_tests
 		sandbox_linux_unittests
 		wayland_client_integration_tests
 		wayland_client_perftests
@@ -800,6 +784,11 @@ setup_compile_flags() {
 	# https://crbug.com/889079
 	use arm && filter-flags "-Wl,--fix-cortex-a53-843419"
 
+	# Chrome is expected to have its own sanitizer story independent of our
+	# $CFLAGS. Since we set `use_asan` and similar in `args.gn`, filter any
+	# sanitizers out here.
+	filter-flags '-fsanitize=*' '-fsanitize-trap=*'
+
 	# There are some flags we want to only use in the ebuild.
 	# The rest will be exported to the simple chrome workflow.
 	EBUILD_CFLAGS=()
@@ -837,6 +826,17 @@ setup_compile_flags() {
 	# Add "-faddrsig" flag required to efficiently support "--icf=all".
 	append-flags -faddrsig
 	append-flags -Wno-unknown-warning-option
+
+	if use arm && use debug_fission; then
+		# FIXME(b/243982712)
+		# ChromeOS has reached the 4GB ceiling when compiling Chrome in debug
+		# mode on 32-bit systems. After some investigation, we learnt that we
+		# can remove 1.5GB of debug info by disabling debug info from libc++
+		# symbols. This is a workaround to disable those symbols until we can
+		# get dwp compression.
+		append-flags -D_LIBCPP_NO_DEBUG_INFO -Wno-backend-plugin
+	fi
+
 	export CXXFLAGS_host+=" -Wno-unknown-warning-option"
 	export CFLAGS_host+=" -Wno-unknown-warning-option"
 	export LDFLAGS_host+=" --unwindlib=libgcc"
@@ -948,6 +948,17 @@ src_configure() {
 		"cros_v8_snapshot_extra_cppflags=${CPPFLAGS_host}"
 		"cros_v8_snapshot_extra_ldflags=${LDFLAGS_host}"
 	)
+	if use nacl && use arm64; then
+		# Flags for building 32-bit NaCl on ARM64.
+		BUILD_STRING_ARGS+=(
+			"cros_nacl_helper_arm32_ar=llvm-ar"
+			"cros_nacl_helper_arm32_cc=armv7a-cros-linux-gnueabihf-clang"
+			"cros_nacl_helper_arm32_cxx=armv7a-cros-linux-gnueabihf-clang++"
+			"cros_nacl_helper_arm32_ld=armv7a-cros-linux-gnueabihf-clang++"
+			"cros_nacl_helper_arm32_readelf=llvm-readelf"
+			"cros_nacl_helper_arm32_sysroot=/usr/armv7a-cros-linux-gnueabihf"
+		)
+	fi
 
 	local arg
 	for arg in "${BUILD_STRING_ARGS[@]}"; do
@@ -1244,14 +1255,15 @@ src_install() {
 	LS=$(ls -alhS "${FROM}")
 	einfo "CHROME_DIR after build\n${LS}"
 
+	insinto /etc/init
+	doins "${FILESDIR}"/mount-ash-chrome.conf
+
 	# Copy a D-Bus config file that includes other configs that are installed to
 	# /opt/google/chrome/dbus by deploy_chrome.
 	insinto /etc/dbus-1/system.d
 	doins "${FILESDIR}"/chrome.conf
 
-	# Copy Quickoffice resources for official build.
-	# Quickoffice is not yet available for arm64, https://crbug.com/881489
-	if use chrome_internal && [[ "${ARCH}" != "arm64" ]]; then
+	if use chrome_internal; then
 		local qo_install_root="/usr/share/chromeos-assets/quickoffice"
 		insinto "${qo_install_root}"
 		QUICKOFFICE="${CHROME_ROOT}"/src/chrome/browser/resources/chromeos/quickoffice
@@ -1265,6 +1277,9 @@ src_install() {
 		local qo_path=""
 		case "${ARCH}" in
 		arm)
+			qo_path="${QUICKOFFICE}"/_platform_specific/arm
+			;;
+		arm64)
 			qo_path="${QUICKOFFICE}"/_platform_specific/arm
 			;;
 		amd64)
@@ -1371,6 +1386,9 @@ src_install() {
 		"--strip-flags=${PORTAGE_STRIP_FLAGS}"
 		--verbose
 	)
+	if use compressed_ash; then
+		cmd+=(--compressed-ash)
+	fi
 	einfo "${cmd[*]}"
 	"${cmd[@]}" || die
 	LS=$(ls -alhS "${D}/${CHROME_DIR}")
@@ -1418,6 +1436,15 @@ src_install() {
 		into /usr/local
 		dobin "${CHROME_ROOT}"/src/build/lacros/mojo_connection_lacros_launcher.py
 	fi
+
+	if use chrome_internal; then
+		# Copy LibAssistant v1 and v2 libraries to a temp build folder for later
+		# installation of `assistant-dlc`.
+		exeinto /build/share/libassistant
+		doexe "${FROM}/libassistant.so"
+		doexe "${FROM}/libassistant_v2.so"
+	fi
+
 	# The icu data is used by both chromeos-base/chrome-icu and this package.
 	# chromeos-base/chrome-icu is responsible for installing the icu
 	# data, so we remove it from ${D} here.
