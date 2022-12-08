@@ -1,6 +1,6 @@
 --- a/third_party/ffmpeg/chromium/config/ChromeOS/linux/arm-neon/config_components.h
 +++ b/third_party/ffmpeg/chromium/config/ChromeOS/linux/arm-neon/config_components.h
-@@ -127,7 +127,7 @@
+@@ -128,7 +128,7 @@
  #define CONFIG_H264_CRYSTALHD_DECODER 0
  #define CONFIG_H264_V4L2M2M_DECODER 0
  #define CONFIG_H264_MEDIACODEC_DECODER 0
@@ -9,7 +9,7 @@
  #define CONFIG_H264_QSV_DECODER 0
  #define CONFIG_H264_RKMPP_DECODER 0
  #define CONFIG_HAP_DECODER 0
-@@ -169,13 +169,13 @@
+@@ -170,13 +170,13 @@
  #define CONFIG_MOTIONPIXELS_DECODER 0
  #define CONFIG_MPEG1VIDEO_DECODER 0
  #define CONFIG_MPEG2VIDEO_DECODER 0
@@ -26,7 +26,7 @@
  #define CONFIG_MPEG2_CRYSTALHD_DECODER 0
  #define CONFIG_MPEG2_V4L2M2M_DECODER 0
  #define CONFIG_MPEG2_QSV_DECODER 0
-@@ -280,7 +280,7 @@
+@@ -284,7 +284,7 @@
  #define CONFIG_VC1_DECODER 0
  #define CONFIG_VC1_CRYSTALHD_DECODER 0
  #define CONFIG_VC1IMAGE_DECODER 0
@@ -49,14 +49,14 @@
      NULL };
 --- a/third_party/ffmpeg/ffmpeg_generated.gni
 +++ b/third_party/ffmpeg/ffmpeg_generated.gni
-@@ -537,6 +537,7 @@
+@@ -550,6 +550,7 @@
    ffmpeg_c_sources += [
      "libavcodec/arm/blockdsp_init_neon.c",
      "libavcodec/arm/idctdsp_init_neon.c",
 +    "libavcodec/mmaldec.c",
    ]
    ffmpeg_gas_sources += [
-     "libavcodec/arm/autorename_libavcodec_arm_pixblockdsp_neon.S",
+     "libavcodec/arm/autorename_libavcodec_arm_idctdsp_neon.S",
 --- a/third_party/ffmpeg/libavcodec/mmaldec.c
 +++ b/third_party/ffmpeg/libavcodec/mmaldec.c
 @@ -23,7 +23,6 @@
@@ -132,14 +132,14 @@
      if ((ret = ffmmal_fill_output_port(avctx)) < 0)
          return ret;
  
-@@ -853,3 +841,4 @@
+@@ -854,3 +842,4 @@
  FFMMAL_DEC(mpeg2, AV_CODEC_ID_MPEG2VIDEO)
  FFMMAL_DEC(mpeg4, AV_CODEC_ID_MPEG4)
  FFMMAL_DEC(vc1, AV_CODEC_ID_VC1)
 +FFMMAL_DEC(vp8, AV_CODEC_ID_VP8)
 --- a/third_party/ffmpeg/chromium/config/ChromeOS/linux/arm64/config_components.h
 +++ b/third_party/ffmpeg/chromium/config/ChromeOS/linux/arm64/config_components.h
-@@ -127,7 +127,7 @@
+@@ -128,7 +128,7 @@
  #define CONFIG_H264_CRYSTALHD_DECODER 0
  #define CONFIG_H264_V4L2M2M_DECODER 0
  #define CONFIG_H264_MEDIACODEC_DECODER 0
@@ -148,7 +148,7 @@
  #define CONFIG_H264_QSV_DECODER 0
  #define CONFIG_H264_RKMPP_DECODER 0
  #define CONFIG_HAP_DECODER 0
-@@ -172,10 +172,10 @@
+@@ -173,10 +173,10 @@
  #define CONFIG_MPEG4_DECODER 1
  #define CONFIG_MPEG4_CRYSTALHD_DECODER 0
  #define CONFIG_MPEG4_V4L2M2M_DECODER 0
@@ -161,7 +161,7 @@
  #define CONFIG_MPEG2_CRYSTALHD_DECODER 0
  #define CONFIG_MPEG2_V4L2M2M_DECODER 0
  #define CONFIG_MPEG2_QSV_DECODER 0
-@@ -280,7 +280,7 @@
+@@ -284,7 +284,7 @@
  #define CONFIG_VC1_DECODER 0
  #define CONFIG_VC1_CRYSTALHD_DECODER 0
  #define CONFIG_VC1IMAGE_DECODER 0
@@ -184,10 +184,10 @@
      NULL };
 --- a/third_party/ffmpeg/chromium/config/ChromeOS/linux/arm64/config.h
 +++ b/third_party/ffmpeg/chromium/config/ChromeOS/linux/arm64/config.h
-@@ -560,7 +560,7 @@
- #define CONFIG_CUDA_SDK 0
+@@ -567,7 +567,7 @@
  #define CONFIG_LIBNPP 0
  #define CONFIG_LIBMFX 0
+ #define CONFIG_LIBVPL 0
 -#define CONFIG_MMAL 0
 +#define CONFIG_MMAL 1
  #define CONFIG_OMX 0
@@ -195,7 +195,7 @@
  #define CONFIG_AMF 0
 --- a/third_party/ffmpeg/libavcodec/allcodecs.c
 +++ b/third_party/ffmpeg/libavcodec/allcodecs.c
-@@ -368,6 +368,7 @@
+@@ -376,6 +376,7 @@
  extern const FFCodec ff_vp8_decoder;
  extern const FFCodec ff_vp8_rkmpp_decoder;
  extern const FFCodec ff_vp8_v4l2m2m_decoder;
@@ -205,10 +205,10 @@
  extern const FFCodec ff_vp9_v4l2m2m_decoder;
 --- a/third_party/ffmpeg/chromium/config/ChromeOS/linux/arm-neon/config.h
 +++ b/third_party/ffmpeg/chromium/config/ChromeOS/linux/arm-neon/config.h
-@@ -560,7 +560,7 @@
- #define CONFIG_CUDA_SDK 0
+@@ -567,7 +567,7 @@
  #define CONFIG_LIBNPP 0
  #define CONFIG_LIBMFX 0
+ #define CONFIG_LIBVPL 0
 -#define CONFIG_MMAL 0
 +#define CONFIG_MMAL 1
  #define CONFIG_OMX 0

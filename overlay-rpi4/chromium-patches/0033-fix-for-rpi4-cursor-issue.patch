@@ -11,7 +11,7 @@ Subject: [PATCH 76/86] fix for rpi4 cursor issue
 
 --- a/ash/shell.cc
 +++ b/ash/shell.cc
-@@ -240,6 +240,7 @@
+@@ -251,6 +251,7 @@
  #include "ui/wm/core/shadow_controller.h"
  #include "ui/wm/core/visibility_controller.h"
  #include "ui/wm/core/window_modality_controller.h"
@@ -19,7 +19,7 @@ Subject: [PATCH 76/86] fix for rpi4 cursor issue
  
  namespace ash {
  
-@@ -484,6 +485,13 @@
+@@ -494,6 +495,13 @@
    CursorWindowController* cursor_window_controller =
        window_tree_host_manager_->cursor_window_controller();
  
@@ -33,18 +33,17 @@ Subject: [PATCH 76/86] fix for rpi4 cursor issue
    if (cursor_window_controller->is_cursor_compositing_enabled() == enabled)
      return;
    cursor_window_controller->SetCursorCompositingEnabled(enabled);
-@@ -1354,6 +1362,11 @@
+@@ -1396,6 +1404,10 @@
    // since it may need to add observers to root windows.
    window_restore_controller_ = std::make_unique<WindowRestoreController>();
  
-+//---***FYDEOS BEGIN***---
 +  if (fydeos::switches::ForceShowCursor()){
 +    cursor_manager_->SetNoHideCursor();
 +  }
-+//---***FYDEOS END***---
-   cursor_manager_->HideCursor();  // Hide the mouse cursor on startup.
-   cursor_manager_->SetCursor(ui::mojom::CursorType::kPointer);
++
+   static_cast<CursorManager*>(cursor_manager_.get())->Init();
  
+   mojo::PendingRemote<device::mojom::Fingerprint> fingerprint;
 --- a/ui/wm/core/cursor_manager.cc
 +++ b/ui/wm/core/cursor_manager.cc
 @@ -91,6 +91,9 @@
@@ -77,15 +76,15 @@ Subject: [PATCH 76/86] fix for rpi4 cursor issue
    if (cursor_lock_count_ == 0 &&
 --- a/ui/wm/core/cursor_manager.h
 +++ b/ui/wm/core/cursor_manager.h
-@@ -66,6 +66,7 @@
-   void RemoveObserver(aura::client::CursorClientObserver* observer) override;
+@@ -69,6 +69,7 @@
    bool ShouldHideCursorOnKeyEvent(const ui::KeyEvent& event) const override;
+   bool ShouldHideCursorOnTouchEvent(const ui::TouchEvent& event) const override;
    gfx::Size GetSystemCursorSize() const override;
 +  void SetNoHideCursor();
  
   private:
    // Overridden from NativeCursorManagerDelegate:
-@@ -86,6 +87,10 @@
+@@ -89,6 +90,10 @@
    // UnlockCursor().
    int cursor_lock_count_;
  
@@ -153,17 +152,17 @@ Subject: [PATCH 76/86] fix for rpi4 cursor issue
  
 --- a/ash/wm/native_cursor_manager_ash.cc
 +++ b/ash/wm/native_cursor_manager_ash.cc
-@@ -16,6 +16,9 @@
- #include "ui/base/cursor/mojom/cursor_type.mojom-shared.h"
+@@ -17,6 +17,9 @@
  #include "ui/base/layout.h"
+ #include "ui/wm/core/cursor_loader.h"
  #include "ui/wm/core/native_cursor_manager_delegate.h"
 +//---***FYDEOS BEGIN***---
 +#include "fydeos/switches/display/display_switches.h"
 +//---***FYDEOS END***---
  
  namespace ash {
- namespace {
-@@ -132,6 +135,10 @@
+ 
+@@ -138,6 +141,10 @@
    if (visible) {
      SetCursor(delegate->GetCursor(), delegate);
    } else {
@@ -176,7 +175,7 @@ Subject: [PATCH 76/86] fix for rpi4 cursor issue
      SetCursorOnAllRootWindows(invisible_cursor);
 --- a/ui/ozone/platform/drm/gpu/drm_device.cc
 +++ b/ui/ozone/platform/drm/gpu/drm_device.cc
-@@ -27,6 +27,9 @@
+@@ -30,6 +30,9 @@
  #include "ui/ozone/platform/drm/gpu/hardware_display_plane.h"
  #include "ui/ozone/platform/drm/gpu/hardware_display_plane_manager_atomic.h"
  #include "ui/ozone/platform/drm/gpu/hardware_display_plane_manager_legacy.h"
@@ -186,7 +185,7 @@ Subject: [PATCH 76/86] fix for rpi4 cursor issue
  
  namespace ui {
  
-@@ -263,7 +266,13 @@
+@@ -257,7 +260,13 @@
    }
  
    // Use atomic only if kernel allows it.
@@ -201,7 +200,7 @@ Subject: [PATCH 76/86] fix for rpi4 cursor issue
    if (is_atomic_)
      plane_manager_ = std::make_unique<HardwareDisplayPlaneManagerAtomic>(this);
    else
-@@ -487,6 +496,10 @@
+@@ -481,6 +490,10 @@
    DCHECK(file_.IsValid());
    TRACE_EVENT2("drm", "DrmDevice::SetCursor", "crtc_id", crtc_id, "handle",
                 handle);
@@ -214,7 +213,7 @@ Subject: [PATCH 76/86] fix for rpi4 cursor issue
  }
 --- a/chrome/browser/chrome_content_browser_client.cc
 +++ b/chrome/browser/chrome_content_browser_client.cc
-@@ -378,6 +378,7 @@
+@@ -393,6 +393,7 @@
  #include "components/user_manager/user_manager.h"
  #include "services/service_manager/public/mojom/interface_provider_spec.mojom.h"
  #include "storage/browser/file_system/external_mount_points.h"
@@ -222,7 +221,7 @@ Subject: [PATCH 76/86] fix for rpi4 cursor issue
  #elif BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS_LACROS)
  #include "chrome/browser/chrome_browser_main_linux.h"
  #elif BUILDFLAG(IS_ANDROID)
-@@ -2248,6 +2249,10 @@
+@@ -2445,6 +2446,10 @@
    static const char* const kCommonSwitchNames[] = {
        embedder_support::kUserAgent,
        switches::kUserDataDir,  // Make logs go to the right file.
@@ -235,7 +234,7 @@ Subject: [PATCH 76/86] fix for rpi4 cursor issue
                                   std::size(kCommonSwitchNames));
 --- a/ui/ozone/platform/drm/gpu/drm_device.h
 +++ b/ui/ozone/platform/drm/gpu/drm_device.h
-@@ -283,6 +283,9 @@
+@@ -286,6 +286,9 @@
    const bool is_primary_device_;
  
    bool is_atomic_ = false;
@@ -247,7 +246,7 @@ Subject: [PATCH 76/86] fix for rpi4 cursor issue
  
 --- a/ui/ozone/platform/drm/BUILD.gn
 +++ b/ui/ozone/platform/drm/BUILD.gn
-@@ -162,7 +162,7 @@
+@@ -166,7 +166,7 @@
    }
  
    if (is_chromeos_ash) {

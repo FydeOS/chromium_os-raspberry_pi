@@ -260,7 +260,7 @@ Signed-off-by: Fangzhou Chen <fangzhou@fydeos.io>
    }
 --- a/media/base/decoder.h
 +++ b/media/base/decoder.h
-@@ -50,7 +50,10 @@
+@@ -52,7 +52,10 @@
    // kChromeOs = 15,  // DEPRECATED, should be kVaapi or kV4L2 instead.
    kV4L2 = 16,       // V4L2VideoDecoder
  
@@ -274,7 +274,7 @@ Signed-off-by: Fangzhou Chen <fangzhou@fydeos.io>
    kMaxValue = kTesting
 --- a/media/filters/BUILD.gn
 +++ b/media/filters/BUILD.gn
-@@ -174,6 +174,8 @@
+@@ -181,6 +181,8 @@
        sources += [
          "ffmpeg_video_decoder.cc",
          "ffmpeg_video_decoder.h",
@@ -323,22 +323,7 @@ Signed-off-by: Fangzhou Chen <fangzhou@fydeos.io>
  #endif
  
  #if BUILDFLAG(ENABLE_LIBVPX)
-@@ -125,6 +129,14 @@
- #if BUILDFLAG(ENABLE_FFMPEG_VIDEO_DECODERS)
-   // When the FFmpegVideoDecoder has been updated for RTC add
-   // `FFmpegVideoDecoder::SupportedConfigsForWebRTC()` to `supported_configs`.
-+  //---***FYDEOS BEGIN***---
-+  if (fydeos::switches::UseRpiVideoDecoder()) {
-+    SupportedVideoDecoderConfigs rpi_configs =
-+      RpiVideoDecoder::SupportedConfigsForWebRTC();
-+    supported_configs.insert(supported_configs.end(), rpi_configs.begin(),
-+                             rpi_configs.end());
-+  }
-+  //---***FYDEOS END***---
- #endif
- 
-   return supported_configs;
-@@ -199,6 +211,10 @@
+@@ -135,6 +139,10 @@
    }
  
  #if BUILDFLAG(ENABLE_FFMPEG_VIDEO_DECODERS)
@@ -417,7 +402,7 @@ Signed-off-by: Fangzhou Chen <fangzhou@fydeos.io>
    if (use_static_angle) {
 --- a/media/gpu/test/BUILD.gn
 +++ b/media/gpu/test/BUILD.gn
-@@ -133,6 +133,7 @@
+@@ -114,6 +114,7 @@
      "//media:test_support",
      "//media/gpu",
      "//mojo/core/embedder:embedder",
@@ -437,7 +422,7 @@ Signed-off-by: Fangzhou Chen <fangzhou@fydeos.io>
    data_deps = [ "//third_party/mesa_headers" ]
 --- a/chrome/browser/chrome_content_browser_client.cc
 +++ b/chrome/browser/chrome_content_browser_client.cc
-@@ -2252,6 +2252,7 @@
+@@ -2449,6 +2449,7 @@
        //---***FYDEOS BEGIN***---
        fydeos::switches::kForceLegacyPlaneManager,
        fydeos::switches::kForceShowCursor,
@@ -447,7 +432,7 @@ Signed-off-by: Fangzhou Chen <fangzhou@fydeos.io>
    command_line->CopySwitchesFrom(browser_command_line, kCommonSwitchNames,
 --- a/media/mojo/mojom/stable/stable_video_decoder_types_mojom_traits.h
 +++ b/media/mojo/mojom/stable/stable_video_decoder_types_mojom_traits.h
-@@ -1016,6 +1016,7 @@
+@@ -1140,6 +1140,7 @@
        case ::media::VideoDecoderType::kGav1:
        case ::media::VideoDecoderType::kD3D11:
        case ::media::VideoDecoderType::kBroker:
