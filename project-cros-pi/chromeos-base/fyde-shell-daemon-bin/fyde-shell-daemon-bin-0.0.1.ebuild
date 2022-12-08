@@ -6,7 +6,7 @@ EAPI="5"
 DESCRIPTION="Setup shell daemon helper to allow certain privileged extension to execute shell commands"
 HOMEPAGE="https://fydeos.io"
 
-LICENSE="BSD"
+LICENSE="BSD-Fyde"
 SLOT="0"
 KEYWORDS="*"
 IUSE=""
