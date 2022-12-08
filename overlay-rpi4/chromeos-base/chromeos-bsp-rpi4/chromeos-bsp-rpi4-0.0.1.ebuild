@@ -6,7 +6,7 @@ inherit udev
 DESCRIPTION="drivers, config files for Raspberry Pi 4"
 HOMEPAGE="https://fydeos.io"
 
-LICENSE="BSD"
+LICENSE="BSD-Fyde"
 SLOT="0"
 KEYWORDS="*"
 IUSE=""
