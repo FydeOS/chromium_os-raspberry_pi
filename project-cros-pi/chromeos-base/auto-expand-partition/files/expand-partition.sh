@@ -6,8 +6,19 @@ print_usage() {
   echo "$script version:${VERSION} (c) 2020 Fyde Innovations"
   echo "  Usage: $script -d | --dst <target disk partition>
   Example: $script -d /dev/sda1
-  This script will expand the target partition with the available empty disk space."  
+  This script will expand the target partition of removable disk with the available empty disk space."
   exit
+}
+
+is_os_running_from_installer() {
+  # if current os isn't running from installer, do not expand
+  if [ -x "/usr/sbin/is_running_from_installer" ]; then
+    [ "$(/usr/sbin/is_running_from_installer)" = "yes" ]
+  else
+    # If there's no `is_running_from_installer`, it's an unexpected case,
+    # we'd better not do the expansion.
+    return 1
+  fi
 }
 
 # get disk device from partition device.
@@ -69,6 +80,12 @@ expand_partition() {
 target_partition=""
 
 [ $# -le 1 ] && print_usage
+
+if ! is_os_running_from_installer; then
+  echo "The system is not running from removable disk."
+  print_usage
+  exit 0
+fi
 
 while [ $# -gt 1 ]; do
         opt=$1
