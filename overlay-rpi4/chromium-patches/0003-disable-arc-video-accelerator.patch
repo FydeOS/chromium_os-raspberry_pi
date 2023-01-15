@@ -1,0 +1,25 @@
+Index: src/ash/components/arc/video_accelerator/gpu_arc_video_decode_accelerator.cc
+===================================================================
+--- src.orig/ash/components/arc/video_accelerator/gpu_arc_video_decode_accelerator.cc
++++ src/ash/components/arc/video_accelerator/gpu_arc_video_decode_accelerator.cc
+@@ -382,8 +382,8 @@ void GpuArcVideoDecodeAccelerator::Initi
+   }
+
+   profile_ = config->profile;
+-#if BUILDFLAG(USE_CHROMEOS_MEDIA_ACCELERATION)
+   const bool use_vd = base::FeatureList::IsEnabled(arc::kVideoDecoder);
++#if !BUILDFLAG(USE_CHROMEOS_MEDIA_ACCELERATION)
+ #if BUILDFLAG(USE_ARC_PROTECTED_MEDIA)
+   if (!use_vd) {
+     LOG(ERROR) << "Unsupported path: builds with USE_ARC_PROTECTED_MEDIA must "
+@@ -392,8 +392,10 @@ void GpuArcVideoDecodeAccelerator::Initi
+         mojom::VideoDecodeAccelerator::Result::PLATFORM_FAILURE);
+   }
+ #endif  // BUILDFLAG(USE_ARC_PROTECTED_MEDIA)
++#endif
+   media::VideoDecodeAccelerator::Config vda_config =
+       CreateVdaConfig(profile_, use_vd);
++#if !BUILDFLAG(USE_CHROMEOS_MEDIA_ACCELERATION)
+   if (use_vd) {
+     VLOGF(2) << "Using VideoDecoder-backed VdVideoDecodeAccelerator.";
+     vda_ = media::VdVideoDecodeAccelerator::Create(

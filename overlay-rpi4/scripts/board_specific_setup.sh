@@ -69,11 +69,5 @@ board_setup() {
   install_hybrid_mbr "$1"
 }
 
-. $(dirname ${BASH_SOURCE[0]})/fydeos_version.sh
-CHROMEOS_PATCH=15
-if [ -n "${CHROMEOS_BUILD}" ]; then
-  CHROMEOS_VERSION_STRING="${CHROMEOS_BUILD}.${CHROMEOS_BRANCH}.${CHROMEOS_PATCH}.$(get_build_number ${CHROMEOS_PATCH})"
-fi
-
 skip_blacklist_check=1
 skip_test_image_content=1
