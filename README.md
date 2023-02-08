@@ -1,5 +1,6 @@
-[<img src="https://img.shields.io/badge/Join%20Telegram%20Group-FydeOS-yellowgreen.svg?style=popout-square&logo=telegram&colorA=870611&colorB=333333">](https://t.me/hi_fydeos)
+[<img src="https://img.shields.io/endpoint?url=https://openfyde-referral-badge-njwdjt8vwpnb.runkit.sh/">](https://github.com/openFyde/overlay-rpi4-openfyde) 
 
+![TG](https://img.shields.io/endpoint?color=neon&style=flat&color=fedcba&url=https://telegram-badge-t2fuv4m3rno2.runkit.sh/?url=https://t.me/hi_fydeos)
 
 <br>
 
