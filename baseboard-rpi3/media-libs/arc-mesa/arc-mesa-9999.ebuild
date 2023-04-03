@@ -1,7 +1,4 @@
-# Copyright (c) 2022 Fyde Innovations Limited and the openFyde Authors.
-# Distributed under the license specified in the root directory of this project.
-
-# Copyright 2018 The Chromium OS Authors. All rights reserved.
+# Copyright 2018 The ChromiumOS Authors
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -69,7 +66,7 @@ multilib_src_configure() {
 		-Dgles2=enabled
 		-Dshared-glapi=enabled
 		-Ddri-drivers=
-		-Dgallium-drivers="v3d"
+		-Dgallium-drivers=v3d
 		-Dgallium-vdpau=disabled
 		-Dgallium-xa=disabled
 		-Dplatforms=android
@@ -101,7 +98,6 @@ multilib_src_install() {
 
 	exeinto "${ARC_PREFIX}/vendor/$(get_libdir)/dri"
 	newexe "${BUILD_DIR}/src/gallium/targets/dri/libgallium_dri.so" v3d_dri.so
-  dosym v3d_dri.so "${ARC_PREFIX}"/vendor/$(get_libdir)/dri/vc4_dri.so
 
 	if use vulkan; then
 		exeinto "${ARC_PREFIX}/vendor/$(get_libdir)/hw"
@@ -118,8 +114,7 @@ multilib_src_install_all() {
 
 	# Install init files to advertise supported API versions.
 	insinto "${ARC_PREFIX}/vendor/etc/init"
-	#doins "${FILESDIR}/gles31.rc"
-  doins ${FILESDIR}/gles31/init.gpu.rc
+	doins "${FILESDIR}/gles32.rc"
 
 	# Install vulkan files
 	if use vulkan; then

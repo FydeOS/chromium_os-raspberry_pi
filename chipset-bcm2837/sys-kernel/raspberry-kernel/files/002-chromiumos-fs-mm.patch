@@ -1,8 +1,8 @@
-Index: kernel-rpi/drivers/Kconfig
+Index: rpi4-kernel/drivers/Kconfig
 ===================================================================
---- kernel-rpi.orig/drivers/Kconfig
-+++ kernel-rpi/drivers/Kconfig
-@@ -235,4 +235,7 @@ source "drivers/interconnect/Kconfig"
+--- rpi4-kernel.orig/drivers/Kconfig
++++ rpi4-kernel/drivers/Kconfig
+@@ -236,4 +236,7 @@ source "drivers/interconnect/Kconfig"
  source "drivers/counter/Kconfig"
  
  source "drivers/most/Kconfig"
@@ -10,29 +10,29 @@ Index: kernel-rpi/drivers/Kconfig
 +source "drivers/pkglist/Kconfig"
 +
  endmenu
-Index: kernel-rpi/drivers/Makefile
+Index: rpi4-kernel/drivers/Makefile
 ===================================================================
---- kernel-rpi.orig/drivers/Makefile
-+++ kernel-rpi/drivers/Makefile
-@@ -189,3 +189,5 @@ obj-$(CONFIG_GNSS)		+= gnss/
+--- rpi4-kernel.orig/drivers/Makefile
++++ rpi4-kernel/drivers/Makefile
+@@ -187,3 +187,5 @@ obj-$(CONFIG_GNSS)		+= gnss/
  obj-$(CONFIG_INTERCONNECT)	+= interconnect/
  obj-$(CONFIG_COUNTER)		+= counter/
  obj-$(CONFIG_MOST)		+= most/
 +
 +obj-$(CONFIG_PKGLIST)   += pkglist/
-Index: kernel-rpi/drivers/char/mem.c
+Index: rpi4-kernel/drivers/char/mem.c
 ===================================================================
---- kernel-rpi.orig/drivers/char/mem.c
-+++ kernel-rpi/drivers/char/mem.c
-@@ -34,6 +34,7 @@
- #include <linux/pseudo_fs.h>
- #include <uapi/linux/magic.h>
- #include <linux/mount.h>
+--- rpi4-kernel.orig/drivers/char/mem.c
++++ rpi4-kernel/drivers/char/mem.c
+@@ -30,6 +30,7 @@
+ #include <linux/uio.h>
+ #include <linux/uaccess.h>
+ #include <linux/security.h>
 +#include <linux/low-mem-notify.h>
  
  #ifdef CONFIG_IA64
  # include <linux/efi.h>
-@@ -986,6 +987,9 @@ static const struct memdev {
+@@ -707,6 +708,9 @@ static const struct memdev {
  #ifdef CONFIG_PRINTK
  	[11] = { "kmsg", 0644, &kmsg_fops, 0 },
  #endif
@@ -42,10 +42,10 @@ Index: kernel-rpi/drivers/char/mem.c
  };
  
  static int memory_open(struct inode *inode, struct file *filp)
-Index: kernel-rpi/drivers/pkglist/Kconfig
+Index: rpi4-kernel/drivers/pkglist/Kconfig
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/drivers/pkglist/Kconfig
++++ rpi4-kernel/drivers/pkglist/Kconfig
 @@ -0,0 +1,30 @@
 +config PKGLIST
 +	tristate "Package list for emulated 'SD card' file system for Android"
@@ -77,18 +77,18 @@ Index: kernel-rpi/drivers/pkglist/Kconfig
 +	help
 +	  This does not allow configuration of sdcardfs.
 +endchoice
-Index: kernel-rpi/drivers/pkglist/Makefile
+Index: rpi4-kernel/drivers/pkglist/Makefile
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/drivers/pkglist/Makefile
++++ rpi4-kernel/drivers/pkglist/Makefile
 @@ -0,0 +1,3 @@
 +obj-$(CONFIG_PKGLIST) += pkg.o
 +pkg-$(CONFIG_PKGLIST_USE_CONFIGFS) += pkglist.o
 +pkg-$(CONFIG_PKGLIST_NO_CONFIG) += pkglist_none.o
-Index: kernel-rpi/drivers/pkglist/pkglist.c
+Index: rpi4-kernel/drivers/pkglist/pkglist.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/drivers/pkglist/pkglist.c
++++ rpi4-kernel/drivers/pkglist/pkglist.c
 @@ -0,0 +1,966 @@
 +/*
 + * Copyright (C) 2017 Google Inc., Author: Daniel Rosenberg <drosen@google.com>
@@ -1056,10 +1056,10 @@ Index: kernel-rpi/drivers/pkglist/pkglist.c
 +MODULE_AUTHOR("Daniel Rosenberg, Google");
 +MODULE_DESCRIPTION("Configfs Pkglist implementation");
 +MODULE_LICENSE("GPL v2");
-Index: kernel-rpi/drivers/pkglist/pkglist_none.c
+Index: rpi4-kernel/drivers/pkglist/pkglist_none.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/drivers/pkglist/pkglist_none.c
++++ rpi4-kernel/drivers/pkglist/pkglist_none.c
 @@ -0,0 +1,57 @@
 +/*
 + * Copyright (C) 2017 Google Inc., Author: Daniel Rosenberg <drosen@google.com>
@@ -1118,11 +1118,11 @@ Index: kernel-rpi/drivers/pkglist/pkglist_none.c
 +MODULE_AUTHOR("Daniel Rosenberg, Google");
 +MODULE_DESCRIPTION("Empty Pkglist implementation");
 +MODULE_LICENSE("GPL v2");
-Index: kernel-rpi/fs/Kconfig
+Index: rpi4-kernel/fs/Kconfig
 ===================================================================
---- kernel-rpi.orig/fs/Kconfig
-+++ kernel-rpi/fs/Kconfig
-@@ -266,6 +266,7 @@ source "fs/orangefs/Kconfig"
+--- rpi4-kernel.orig/fs/Kconfig
++++ rpi4-kernel/fs/Kconfig
+@@ -290,6 +290,7 @@ source "fs/orangefs/Kconfig"
  source "fs/adfs/Kconfig"
  source "fs/affs/Kconfig"
  source "fs/ecryptfs/Kconfig"
@@ -1130,11 +1130,11 @@ Index: kernel-rpi/fs/Kconfig
  source "fs/hfs/Kconfig"
  source "fs/hfsplus/Kconfig"
  source "fs/befs/Kconfig"
-Index: kernel-rpi/fs/Makefile
+Index: rpi4-kernel/fs/Makefile
 ===================================================================
---- kernel-rpi.orig/fs/Makefile
-+++ kernel-rpi/fs/Makefile
-@@ -89,6 +89,7 @@ obj-$(CONFIG_ISO9660_FS)	+= isofs/
+--- rpi4-kernel.orig/fs/Makefile
++++ rpi4-kernel/fs/Makefile
+@@ -86,6 +86,7 @@ obj-$(CONFIG_ISO9660_FS)	+= isofs/
  obj-$(CONFIG_HFSPLUS_FS)	+= hfsplus/ # Before hfs to find wrapped HFS+
  obj-$(CONFIG_HFS_FS)		+= hfs/
  obj-$(CONFIG_ECRYPT_FS)		+= ecryptfs/
@@ -1142,10 +1142,10 @@ Index: kernel-rpi/fs/Makefile
  obj-$(CONFIG_VXFS_FS)		+= freevxfs/
  obj-$(CONFIG_NFS_FS)		+= nfs/
  obj-$(CONFIG_EXPORTFS)		+= exportfs/
-Index: kernel-rpi/fs/esdfs/Kconfig
+Index: rpi4-kernel/fs/esdfs/Kconfig
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/fs/esdfs/Kconfig
++++ rpi4-kernel/fs/esdfs/Kconfig
 @@ -0,0 +1,7 @@
 +config ESD_FS
 +	tristate "Emulated 'SD card' file system for Android (EXPERIMENTAL)"
@@ -1154,10 +1154,10 @@ Index: kernel-rpi/fs/esdfs/Kconfig
 +	help
 +	  Esdfs is a wrapfs-based file system, designed to implement the
 +	  Android "sdcard" FUSE-backed file system from within the kernel.
-Index: kernel-rpi/fs/esdfs/Makefile
+Index: rpi4-kernel/fs/esdfs/Makefile
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/fs/esdfs/Makefile
++++ rpi4-kernel/fs/esdfs/Makefile
 @@ -0,0 +1,7 @@
 +ESDFS_VERSION="0.2"
 +
@@ -1166,10 +1166,10 @@ Index: kernel-rpi/fs/esdfs/Makefile
 +obj-$(CONFIG_ESD_FS) += esdfs.o
 +
 +esdfs-y := dentry.o file.o inode.o main.o super.o lookup.o mmap.o derive.o
-Index: kernel-rpi/fs/esdfs/dentry.c
+Index: rpi4-kernel/fs/esdfs/dentry.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/fs/esdfs/dentry.c
++++ rpi4-kernel/fs/esdfs/dentry.c
 @@ -0,0 +1,158 @@
 +/*
 + * Copyright (c) 1998-2014 Erez Zadok
@@ -1329,10 +1329,10 @@ Index: kernel-rpi/fs/esdfs/dentry.c
 +	.d_compare	= esdfs_d_compare,
 +	.d_release	= esdfs_d_release,
 +};
-Index: kernel-rpi/fs/esdfs/derive.c
+Index: rpi4-kernel/fs/esdfs/derive.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/fs/esdfs/derive.c
++++ rpi4-kernel/fs/esdfs/derive.c
 @@ -0,0 +1,608 @@
 +/*
 + * Copyright (c) 2013-2014 Motorola Mobility LLC
@@ -1409,7 +1409,7 @@ Index: kernel-rpi/fs/esdfs/derive.c
 +{
 +	struct esdfs_inode_info *inode_i = ESDFS_I(dentry->d_inode);
 +	bool is_root;
-+	int ret;
++	int __maybe_unused ret;
 +	kuid_t appid;
 +	struct qstr q_Download = QSTR_LITERAL("Download");
 +	struct qstr q_Android = QSTR_LITERAL("Android");
@@ -1745,7 +1745,7 @@ Index: kernel-rpi/fs/esdfs/derive.c
 +		if (test_opt(sbi, SPECIAL_DOWNLOAD))
 +			return make_kuid(sbi->dl_ns,
 +					 sbi->lower_dl_perms.raw_uid);
-+		/* fall through */
++		fallthrough;
 +	case ESDFS_TREE_ROOT:
 +	case ESDFS_TREE_MEDIA:
 +	case ESDFS_TREE_ANDROID:
@@ -1782,7 +1782,7 @@ Index: kernel-rpi/fs/esdfs/derive.c
 +		if (test_opt(sbi, SPECIAL_DOWNLOAD))
 +			return make_kgid(sbi->dl_ns,
 +					 sbi->lower_dl_perms.raw_gid);
-+		/* fall through */
++		fallthrough;
 +	case ESDFS_TREE_ROOT:
 +	case ESDFS_TREE_MEDIA:
 +	case ESDFS_TREE_ANDROID:
@@ -1847,8 +1847,8 @@ Index: kernel-rpi/fs/esdfs/derive.c
 +		error = security_path_chown(&path, newattrs.ia_uid,
 +						newattrs.ia_gid);
 +		if (!error)
-+			error = notify_change(path.dentry, &newattrs,
-+						&delegated_inode);
++			error = notify_change(&init_user_ns, path.dentry,
++						&newattrs, &delegated_inode);
 +		inode_unlock(inode);
 +		if (delegated_inode) {
 +			error = break_deleg_wait(&delegated_inode);
@@ -1932,8 +1932,8 @@ Index: kernel-rpi/fs/esdfs/derive.c
 +	mode = S_IFREG;
 +	lower_parent_dentry = lock_parent(lower_dentry);
 +	esdfs_set_lower_mode(ESDFS_SB(dir_dentry->d_sb), inode_i, &mode);
-+	err = vfs_create(lower_dir_path.dentry->d_inode, lower_dentry, mode,
-+			 true);
++	err = vfs_create(&init_user_ns, lower_dir_path.dentry->d_inode,
++			 lower_dentry, mode, true);
 +	unlock_dir(lower_parent_dentry);
 +	dput(lower_dentry);
 +
@@ -1942,10 +1942,10 @@ Index: kernel-rpi/fs/esdfs/derive.c
 +	esdfs_revert_creds(creds, &mask);
 +	return err;
 +}
-Index: kernel-rpi/fs/esdfs/esdfs.h
+Index: rpi4-kernel/fs/esdfs/esdfs.h
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/fs/esdfs/esdfs.h
++++ rpi4-kernel/fs/esdfs/esdfs.h
 @@ -0,0 +1,627 @@
 +/*
 + * Copyright (c) 1998-2014 Erez Zadok
@@ -2574,10 +2574,10 @@ Index: kernel-rpi/fs/esdfs/esdfs.h
 +}
 +
 +#endif	/* not _ESDFS_H_ */
-Index: kernel-rpi/fs/esdfs/file.c
+Index: rpi4-kernel/fs/esdfs/file.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/fs/esdfs/file.c
++++ rpi4-kernel/fs/esdfs/file.c
 @@ -0,0 +1,471 @@
 +/*
 + * Copyright (c) 1998-2014 Erez Zadok
@@ -2959,7 +2959,7 @@ Index: kernel-rpi/fs/esdfs/file.c
 +/*
 + * Wrapfs read_iter, redirect modified iocb to lower read_iter
 + */
-+ssize_t
++static ssize_t
 +esdfs_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 +{
 +	int err;
@@ -2987,7 +2987,7 @@ Index: kernel-rpi/fs/esdfs/file.c
 +/*
 + * Wrapfs write_iter, redirect modified iocb to lower write_iter
 + */
-+ssize_t
++static ssize_t
 +esdfs_write_iter(struct kiocb *iocb, struct iov_iter *iter)
 +{
 +	int err;
@@ -3050,11 +3050,11 @@ Index: kernel-rpi/fs/esdfs/file.c
 +	.fsync		= esdfs_fsync,
 +	.fasync		= esdfs_fasync,
 +};
-Index: kernel-rpi/fs/esdfs/inode.c
+Index: rpi4-kernel/fs/esdfs/inode.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/fs/esdfs/inode.c
-@@ -0,0 +1,534 @@
++++ rpi4-kernel/fs/esdfs/inode.c
+@@ -0,0 +1,550 @@
 +/*
 + * Copyright (c) 1998-2014 Erez Zadok
 + * Copyright (c) 2009	   Shrikar Archak
@@ -3071,8 +3071,8 @@ Index: kernel-rpi/fs/esdfs/inode.c
 +#include "esdfs.h"
 +#include <linux/fsnotify.h>
 +
-+static int esdfs_create(struct inode *dir, struct dentry *dentry,
-+			 umode_t mode, bool want_excl)
++static int esdfs_create(struct user_namespace *mnt_userns, struct inode *dir,
++			struct dentry *dentry, umode_t mode, bool want_excl)
 +{
 +	int err;
 +	struct dentry *lower_dentry;
@@ -3104,7 +3104,8 @@ Index: kernel-rpi/fs/esdfs/inode.c
 +	esdfs_set_lower_mode(ESDFS_SB(dir->i_sb), ESDFS_I(dir), &mode);
 +
 +	lower_inode = esdfs_lower_inode(dir);
-+	err = vfs_create(lower_inode, lower_dentry, mode, want_excl);
++	err = vfs_create(mnt_userns, lower_inode, lower_dentry, mode,
++			 want_excl);
 +	if (err)
 +		goto out;
 +
@@ -3158,7 +3159,7 @@ Index: kernel-rpi/fs/esdfs/inode.c
 +	 */
 +	lower_dir_inode = lower_dir_dentry->d_inode;
 +
-+	err = vfs_unlink(lower_dir_inode, lower_dentry, NULL);
++	err = vfs_unlink(&init_user_ns, lower_dir_inode, lower_dentry, NULL);
 +
 +	/*
 +	 * Note: unlinking on top of NFS can cause silly-renamed files.
@@ -3185,7 +3186,8 @@ Index: kernel-rpi/fs/esdfs/inode.c
 +	return err;
 +}
 +
-+static int esdfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
++static int esdfs_mkdir(struct user_namespace *mnt_userns, struct inode *dir,
++		       struct dentry *dentry, umode_t mode)
 +{
 +	int err;
 +	struct dentry *lower_dentry;
@@ -3209,7 +3211,8 @@ Index: kernel-rpi/fs/esdfs/inode.c
 +
 +	mode |= S_IFDIR;
 +	esdfs_set_lower_mode(ESDFS_SB(dir->i_sb), ESDFS_I(dir), &mode);
-+	err = vfs_mkdir(lower_parent_dentry->d_inode, lower_dentry, mode);
++	err = vfs_mkdir(mnt_userns, lower_parent_dentry->d_inode, lower_dentry,
++			mode);
 +	if (err)
 +		goto unlock_lower_parent;
 +
@@ -3265,7 +3268,7 @@ Index: kernel-rpi/fs/esdfs/inode.c
 +		goto out;
 +	}
 +
-+	err = vfs_rmdir(lower_dir_dentry->d_inode, lower_dentry);
++	err = vfs_rmdir(&init_user_ns, lower_dir_dentry->d_inode, lower_dentry);
 +	if (err)
 +		goto out;
 +
@@ -3287,8 +3290,10 @@ Index: kernel-rpi/fs/esdfs/inode.c
 + * The locking rules in esdfs_rename are complex.  We could use a simpler
 + * superblock-level name-space lock for renames and copy-ups.
 + */
-+static int esdfs_rename(struct inode *old_dir, struct dentry *old_dentry,
-+			struct inode *new_dir, struct dentry *new_dentry, unsigned int flags)
++static int esdfs_rename(struct user_namespace *mnt_userns,
++			struct inode *old_dir, struct dentry *old_dentry,
++			struct inode *new_dir, struct dentry *new_dentry,
++			unsigned int flags)
 +{
 +	int err = 0;
 +	struct esdfs_sb_info *sbi = ESDFS_SB(old_dir->i_sb);
@@ -3300,6 +3305,7 @@ Index: kernel-rpi/fs/esdfs/inode.c
 +	struct path lower_old_path, lower_new_path;
 +	int mask;
 +	const struct cred *creds;
++	struct renamedata rd;
 +
 +	if (test_opt(sbi, SPECIAL_DOWNLOAD)) {
 +		if ((ESDFS_I(old_dir)->tree == ESDFS_TREE_DOWNLOAD
@@ -3353,9 +3359,15 @@ Index: kernel-rpi/fs/esdfs/inode.c
 +		goto out;
 +	}
 +
-+	err = vfs_rename(lower_old_dir_dentry->d_inode, lower_old_dentry,
-+			 lower_new_dir_dentry->d_inode, lower_new_dentry,
-+			 NULL, flags);
++	rd.old_mnt_userns = mnt_userns;
++	rd.old_dir = lower_old_dir_dentry->d_inode;
++	rd.old_dentry = lower_old_dentry;
++	rd.new_mnt_userns = mnt_userns;
++	rd.new_dir = lower_new_dir_dentry->d_inode;
++	rd.new_dentry = lower_new_dentry;
++	rd.flags = flags;
++
++	err = vfs_rename(&rd);
 +	if (err)
 +		goto out;
 +
@@ -3384,13 +3396,14 @@ Index: kernel-rpi/fs/esdfs/inode.c
 +	return err;
 +}
 +
-+static int esdfs_permission(struct inode *inode, int mask)
++static int esdfs_permission(struct user_namespace *mnt_userns,
++			    struct inode *inode, int mask)
 +{
 +	struct inode *lower_inode;
 +	int err;
 +
 +	/* First, check the upper permissions */
-+	err = generic_permission(inode, mask);
++	err = generic_permission(mnt_userns, inode, mask);
 +
 +	/* Basic checking of the lower inode (can't override creds here) */
 +	lower_inode = esdfs_lower_inode(inode);
@@ -3408,7 +3421,8 @@ Index: kernel-rpi/fs/esdfs/inode.c
 +	return err;
 +}
 +
-+static int esdfs_setattr(struct dentry *dentry, struct iattr *ia)
++static int esdfs_setattr(struct user_namespace *mnt_userns,
++			 struct dentry *dentry, struct iattr *ia)
 +{
 +	int err;
 +	loff_t oldsize;
@@ -3439,7 +3453,7 @@ Index: kernel-rpi/fs/esdfs/inode.c
 +	 * this user can change the lower inode: that should happen when
 +	 * calling notify_change on the lower inode.
 +	 */
-+	err = setattr_prepare(dentry, ia);
++	err = setattr_prepare(mnt_userns, dentry, ia);
 +	if (err)
 +		return err;
 +
@@ -3506,7 +3520,8 @@ Index: kernel-rpi/fs/esdfs/inode.c
 +	 * tries to open(), unlink(), then ftruncate() a file.
 +	 */
 +	inode_lock(lower_dentry->d_inode);
-+	err = notify_change(lower_dentry, &lower_ia, /* note: lower_ia */
++	err = notify_change(mnt_userns, lower_dentry,
++			    &lower_ia, /* note: lower_ia */
 +			    NULL);
 +	inode_unlock(lower_dentry->d_inode);
 +	if (err)
@@ -3526,8 +3541,9 @@ Index: kernel-rpi/fs/esdfs/inode.c
 +	return err;
 +}
 +
-+static int esdfs_getattr(const struct path *path, struct kstat *stat,
-+			u32 request_mask, unsigned int flags)
++static int esdfs_getattr(struct user_namespace *mnt_userns,
++			 const struct path *path, struct kstat *stat,
++			 u32 request_mask, unsigned int flags)
 +{
 +	int err;
 +	struct dentry *dentry = path->dentry;
@@ -3556,7 +3572,7 @@ Index: kernel-rpi/fs/esdfs/inode.c
 +	lower_inode = esdfs_lower_inode(inode);
 +	esdfs_copy_attr(inode, lower_inode);
 +	fsstack_copy_inode_size(inode, lower_inode);
-+	generic_fillattr(inode, stat);
++	generic_fillattr(mnt_userns, inode, stat);
 +
 +	stat->blocks = lower_stat.blocks;
 +
@@ -3589,10 +3605,10 @@ Index: kernel-rpi/fs/esdfs/inode.c
 +	.setattr	= esdfs_setattr,
 +	.getattr	= esdfs_getattr,
 +};
-Index: kernel-rpi/fs/esdfs/lookup.c
+Index: rpi4-kernel/fs/esdfs/lookup.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/fs/esdfs/lookup.c
++++ rpi4-kernel/fs/esdfs/lookup.c
 @@ -0,0 +1,474 @@
 +/*
 + * Copyright (c) 1998-2014 Erez Zadok
@@ -4068,10 +4084,10 @@ Index: kernel-rpi/fs/esdfs/lookup.c
 +		dput(real_parent);
 +	return ret;
 +}
-Index: kernel-rpi/fs/esdfs/main.c
+Index: rpi4-kernel/fs/esdfs/main.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/fs/esdfs/main.c
++++ rpi4-kernel/fs/esdfs/main.c
 @@ -0,0 +1,725 @@
 +/*
 + * Copyright (c) 1998-2014 Erez Zadok
@@ -4798,10 +4814,10 @@ Index: kernel-rpi/fs/esdfs/main.c
 +
 +module_init(init_esdfs_fs);
 +module_exit(exit_esdfs_fs);
-Index: kernel-rpi/fs/esdfs/mmap.c
+Index: rpi4-kernel/fs/esdfs/mmap.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/fs/esdfs/mmap.c
++++ rpi4-kernel/fs/esdfs/mmap.c
 @@ -0,0 +1,98 @@
 +/*
 + * Copyright (c) 1998-2014 Erez Zadok
@@ -4901,10 +4917,10 @@ Index: kernel-rpi/fs/esdfs/mmap.c
 +	.open		= esdfs_vm_open,
 +	.close		= esdfs_vm_close,
 +};
-Index: kernel-rpi/fs/esdfs/super.c
+Index: rpi4-kernel/fs/esdfs/super.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/fs/esdfs/super.c
++++ rpi4-kernel/fs/esdfs/super.c
 @@ -0,0 +1,290 @@
 +/*
 + * Copyright (c) 1998-2014 Erez Zadok
@@ -5196,10 +5212,10 @@ Index: kernel-rpi/fs/esdfs/super.c
 +	.destroy_inode	= esdfs_destroy_inode,
 +	.drop_inode	= generic_delete_inode,
 +};
-Index: kernel-rpi/include/linux/low-mem-notify.h
+Index: rpi4-kernel/include/linux/low-mem-notify.h
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/include/linux/low-mem-notify.h
++++ rpi4-kernel/include/linux/low-mem-notify.h
 @@ -0,0 +1,22 @@
 +#ifndef _LINUX_LOW_MEM_NOTIFY_H
 +#define _LINUX_LOW_MEM_NOTIFY_H
@@ -5223,11 +5239,11 @@ Index: kernel-rpi/include/linux/low-mem-notify.h
 +#endif
 +
 +#endif
-Index: kernel-rpi/include/linux/mm.h
+Index: rpi4-kernel/include/linux/mm.h
 ===================================================================
---- kernel-rpi.orig/include/linux/mm.h
-+++ kernel-rpi/include/linux/mm.h
-@@ -201,6 +201,7 @@ static inline void __mm_zero_struct_page
+--- rpi4-kernel.orig/include/linux/mm.h
++++ rpi4-kernel/include/linux/mm.h
+@@ -202,6 +202,7 @@ static inline void __mm_zero_struct_page
  #define DEFAULT_MAX_MAP_COUNT	(USHRT_MAX - MAPCOUNT_ELF_CORE_MARGIN)
  
  extern int sysctl_max_map_count;
@@ -5235,7 +5251,7 @@ Index: kernel-rpi/include/linux/mm.h
  
  extern unsigned long sysctl_user_reserve_kbytes;
  extern unsigned long sysctl_admin_reserve_kbytes;
-@@ -2534,7 +2535,7 @@ static inline int vma_adjust(struct vm_a
+@@ -2555,7 +2556,7 @@ static inline int vma_adjust(struct vm_a
  extern struct vm_area_struct *vma_merge(struct mm_struct *,
  	struct vm_area_struct *prev, unsigned long addr, unsigned long end,
  	unsigned long vm_flags, struct anon_vma *, struct file *, pgoff_t,
@@ -5244,7 +5260,7 @@ Index: kernel-rpi/include/linux/mm.h
  extern struct anon_vma *find_mergeable_anon_vma(struct vm_area_struct *);
  extern int __split_vma(struct mm_struct *, struct vm_area_struct *,
  	unsigned long addr, int new_below);
-@@ -3180,6 +3181,9 @@ unsigned long wp_shared_mapping_range(st
+@@ -3262,6 +3263,9 @@ unsigned long wp_shared_mapping_range(st
  #endif
  
  extern int sysctl_nr_trim_pages;
@@ -5252,13 +5268,13 @@ Index: kernel-rpi/include/linux/mm.h
 +extern int min_filelist_kbytes_handler(struct ctl_table *table, int write,
 +  void *buf, size_t *len, loff_t *pos);
  
- /**
-  * seal_check_future_write - Check for F_SEAL_FUTURE_WRITE flag and handle it
-Index: kernel-rpi/mm/vmscan.c
+ #ifdef CONFIG_PRINTK
+ void mem_dump_obj(void *object);
+Index: rpi4-kernel/mm/vmscan.c
 ===================================================================
---- kernel-rpi.orig/mm/vmscan.c
-+++ kernel-rpi/mm/vmscan.c
-@@ -186,6 +186,28 @@ static void set_task_reclaim_state(struc
+--- rpi4-kernel.orig/mm/vmscan.c
++++ rpi4-kernel/mm/vmscan.c
+@@ -188,6 +188,28 @@ static void set_task_reclaim_state(struc
  	task->reclaim_state = rs;
  }
  
@@ -5287,7 +5303,7 @@ Index: kernel-rpi/mm/vmscan.c
  static LIST_HEAD(shrinker_list);
  static DECLARE_RWSEM(shrinker_rwsem);
  
-@@ -2227,6 +2249,28 @@ enum scan_balance {
+@@ -2498,6 +2520,28 @@ enum scan_balance {
  };
  
  /*
@@ -5316,7 +5332,7 @@ Index: kernel-rpi/mm/vmscan.c
   * Determine how aggressively the anon and file LRU lists should be
   * scanned.  The relative value of each set of LRU lists is determined
   * by looking at the fraction of the pages scanned we did rotate back
-@@ -2265,6 +2309,15 @@ static void get_scan_count(struct lruvec
+@@ -2537,6 +2581,15 @@ static void get_scan_count(struct lruvec
  		goto out;
  	}
  
@@ -5332,22 +5348,10 @@ Index: kernel-rpi/mm/vmscan.c
  	/*
  	 * Do not apply any pressure balancing cleverness when the
  	 * system is close to OOM, scan both anon and file equally
-Index: kernel-rpi/fs/overlayfs/ovl_entry.h
+Index: rpi4-kernel/fs/overlayfs/super.c
 ===================================================================
---- kernel-rpi.orig/fs/overlayfs/ovl_entry.h
-+++ kernel-rpi/fs/overlayfs/ovl_entry.h
-@@ -18,6 +18,7 @@ struct ovl_config {
- 	int xino;
- 	bool metacopy;
- 	bool ovl_volatile;
-+	bool override_creds;
- };
- 
- struct ovl_sb {
-Index: kernel-rpi/fs/overlayfs/super.c
-===================================================================
---- kernel-rpi.orig/fs/overlayfs/super.c
-+++ kernel-rpi/fs/overlayfs/super.c
+--- rpi4-kernel.orig/fs/overlayfs/super.c
++++ rpi4-kernel/fs/overlayfs/super.c
 @@ -53,6 +53,11 @@ module_param_named(xino_auto, ovl_xino_a
  MODULE_PARM_DESC(xino_auto,
  		 "Auto enable xino feature");
@@ -5360,17 +5364,17 @@ Index: kernel-rpi/fs/overlayfs/super.c
  static void ovl_entry_stack_free(struct ovl_entry *oe)
  {
  	unsigned int i;
-@@ -378,6 +383,9 @@ static int ovl_show_options(struct seq_f
- 			   ofs->config.metacopy ? "on" : "off");
- 	if (ofs->config.ovl_volatile)
+@@ -388,6 +393,9 @@ static int ovl_show_options(struct seq_f
  		seq_puts(m, ",volatile");
-+	if (ofs->config.override_creds != ovl_override_creds_def)
-+		seq_show_option(m, "override_creds",
-+				ofs->config.override_creds ? "on" : "off");
+ 	if (ofs->config.userxattr)
+ 		seq_puts(m, ",userxattr");
++  if (ofs->config.override_creds != ovl_override_creds_def)
++    seq_show_option(m, "override_creds",
++      ofs->config.override_creds ? "on" : "off");
  	return 0;
  }
  
-@@ -430,6 +438,8 @@ enum {
+@@ -443,6 +451,8 @@ enum {
  	OPT_METACOPY_ON,
  	OPT_METACOPY_OFF,
  	OPT_VOLATILE,
@@ -5379,7 +5383,7 @@ Index: kernel-rpi/fs/overlayfs/super.c
  	OPT_ERR,
  };
  
-@@ -449,6 +459,8 @@ static const match_table_t ovl_tokens =
+@@ -465,6 +475,8 @@ static const match_table_t ovl_tokens =
  	{OPT_METACOPY_ON,		"metacopy=on"},
  	{OPT_METACOPY_OFF,		"metacopy=off"},
  	{OPT_VOLATILE,			"volatile"},
@@ -5388,7 +5392,7 @@ Index: kernel-rpi/fs/overlayfs/super.c
  	{OPT_ERR,			NULL}
  };
  
-@@ -508,6 +520,7 @@ static int ovl_parse_opt(char *opt, stru
+@@ -524,6 +536,7 @@ static int ovl_parse_opt(char *opt, stru
  	config->redirect_mode = kstrdup(ovl_redirect_mode_def(), GFP_KERNEL);
  	if (!config->redirect_mode)
  		return -ENOMEM;
@@ -5396,8 +5400,8 @@ Index: kernel-rpi/fs/overlayfs/super.c
  
  	while ((p = ovl_next_opt(&opt)) != NULL) {
  		int token;
-@@ -597,6 +610,14 @@ static int ovl_parse_opt(char *opt, stru
- 			config->ovl_volatile = true;
+@@ -625,6 +638,14 @@ static int ovl_parse_opt(char *opt, stru
+ 			config->userxattr = true;
  			break;
  
 +		case OPT_OVERRIDE_CREDS_ON:
@@ -5411,7 +5415,7 @@ Index: kernel-rpi/fs/overlayfs/super.c
  		default:
  			pr_err("unrecognized mount option \"%s\" or missing value\n",
  					p);
-@@ -743,14 +764,10 @@ retry:
+@@ -793,14 +814,10 @@ retry:
  			goto retry;
  		}
  
@@ -5430,19 +5434,16 @@ Index: kernel-rpi/fs/overlayfs/super.c
  
  		/*
  		 * Try to remove POSIX ACL xattrs from workdir.  We are good if:
-@@ -944,9 +961,9 @@ static unsigned int ovl_split_lowerdirs(
- static int __maybe_unused
- ovl_posix_acl_xattr_get(const struct xattr_handler *handler,
+@@ -1012,7 +1029,7 @@ ovl_posix_acl_xattr_get(const struct xat
  			struct dentry *dentry, struct inode *inode,
--			const char *name, void *buffer, size_t size)
-+			const char *name, void *buffer, size_t size, int flags)
+ 			const char *name, void *buffer, size_t size, int flags)
  {
--	return ovl_xattr_get(dentry, inode, handler->name, buffer, size);
+-	return ovl_xattr_get(dentry, inode, handler->name, buffer, size, int flags);
 +	return ovl_xattr_get(dentry, inode, handler->name, buffer, size, flags);
  }
  
  static int __maybe_unused
-@@ -1009,7 +1026,8 @@ out_acl_release:
+@@ -1073,7 +1090,8 @@ out_acl_release:
  
  static int ovl_own_xattr_get(const struct xattr_handler *handler,
  			     struct dentry *dentry, struct inode *inode,
@@ -5452,20 +5453,16 @@ Index: kernel-rpi/fs/overlayfs/super.c
  {
  	return -EOPNOTSUPP;
  }
-@@ -1024,9 +1042,10 @@ static int ovl_own_xattr_set(const struc
- 
- static int ovl_other_xattr_get(const struct xattr_handler *handler,
+@@ -1091,7 +1109,7 @@ static int ovl_other_xattr_get(const str
  			       struct dentry *dentry, struct inode *inode,
--			       const char *name, void *buffer, size_t size)
-+			       const char *name, void *buffer, size_t size,
-+			       int flags)
+ 			       const char *name, void *buffer, size_t size, int flags)
  {
--	return ovl_xattr_get(dentry, inode, name, buffer, size);
+-	return ovl_xattr_get(dentry, inode, name, buffer, size, int flags);
 +	return ovl_xattr_get(dentry, inode, name, buffer, size, flags);
  }
  
  static int ovl_other_xattr_set(const struct xattr_handler *handler,
-@@ -2034,7 +2053,6 @@ static int ovl_fill_super(struct super_b
+@@ -2151,7 +2169,6 @@ static int ovl_fill_super(struct super_b
  	kfree(splitlower);
  
  	sb->s_root = root_dentry;
@@ -5473,22 +5470,21 @@ Index: kernel-rpi/fs/overlayfs/super.c
  	return 0;
  
  out_free_oe:
-Index: kernel-rpi/fs/overlayfs/overlayfs.h
+Index: rpi4-kernel/fs/overlayfs/overlayfs.h
 ===================================================================
---- kernel-rpi.orig/fs/overlayfs/overlayfs.h
-+++ kernel-rpi/fs/overlayfs/overlayfs.h
-@@ -184,7 +184,9 @@ static inline ssize_t ovl_do_getxattr(st
+--- rpi4-kernel.orig/fs/overlayfs/overlayfs.h
++++ rpi4-kernel/fs/overlayfs/overlayfs.h
+@@ -187,7 +187,8 @@ static inline ssize_t ovl_do_getxattr(st
  				      size_t size)
  {
  	const char *name = ovl_xattr(ofs, ox);
--	return vfs_getxattr(dentry, name, value, size);
-+	struct inode *ip = d_inode(dentry);
-+
-+	return __vfs_getxattr(dentry, ip, name, value, size, XATTR_NOSECURITY);
- }
+-	int err = vfs_getxattr(&init_user_ns, dentry, name, value, size);
++  struct inode *ip = d_inode(dentry);
++	int err = __vfs_getxattr(&init_user_ns, dentry, ip, name, value, size, XATTR_NOSECURITY);
+ 	int len = (value && err > 0) ? err : 0;
  
- static inline int ovl_do_setxattr(struct ovl_fs *ofs, struct dentry *dentry,
-@@ -251,6 +253,7 @@ int ovl_want_write(struct dentry *dentry
+ 	pr_debug("getxattr(%pd2, \"%s\", \"%*pE\", %zu, 0) = %i\n",
+@@ -280,6 +281,7 @@ int ovl_want_write(struct dentry *dentry
  void ovl_drop_write(struct dentry *dentry);
  struct dentry *ovl_workdir(struct dentry *dentry);
  const struct cred *ovl_override_creds(struct super_block *sb);
@@ -5496,16 +5492,7 @@ Index: kernel-rpi/fs/overlayfs/overlayfs.h
  int ovl_can_decode_fh(struct super_block *sb);
  struct dentry *ovl_indexdir(struct super_block *sb);
  bool ovl_index_all(struct super_block *sb);
-@@ -464,7 +467,7 @@ int ovl_permission(struct inode *inode,
- int ovl_xattr_set(struct dentry *dentry, struct inode *inode, const char *name,
- 		  const void *value, size_t size, int flags);
- int ovl_xattr_get(struct dentry *dentry, struct inode *inode, const char *name,
--		  void *value, size_t size);
-+		  void *value, size_t size, int flags);
- ssize_t ovl_listxattr(struct dentry *dentry, char *list, size_t size);
- struct posix_acl *ovl_get_acl(struct inode *inode, int type);
- int ovl_update_time(struct inode *inode, struct timespec64 *ts, int flags);
-@@ -519,7 +522,6 @@ struct ovl_cattr {
+@@ -563,7 +565,6 @@ struct ovl_cattr {
  
  #define OVL_CATTR(m) (&(struct ovl_cattr) { .mode = (m) })
  
@@ -5513,56 +5500,11 @@ Index: kernel-rpi/fs/overlayfs/overlayfs.h
  struct dentry *ovl_create_real(struct inode *dir, struct dentry *newdentry,
  			       struct ovl_cattr *attr);
  int ovl_cleanup(struct inode *dir, struct dentry *dentry);
-Index: kernel-rpi/include/linux/xattr.h
+Index: rpi4-kernel/fs/kernfs/inode.c
 ===================================================================
---- kernel-rpi.orig/include/linux/xattr.h
-+++ kernel-rpi/include/linux/xattr.h
-@@ -33,7 +33,7 @@ struct xattr_handler {
- 	bool (*list)(struct dentry *dentry);
- 	int (*get)(const struct xattr_handler *, struct dentry *dentry,
- 		   struct inode *inode, const char *name, void *buffer,
--		   size_t size);
-+		   size_t size, int flags);
- 	int (*set)(const struct xattr_handler *, struct dentry *dentry,
- 		   struct inode *inode, const char *name, const void *buffer,
- 		   size_t size, int flags);
-@@ -47,7 +47,8 @@ struct xattr {
- 	size_t value_len;
- };
- 
--ssize_t __vfs_getxattr(struct dentry *, struct inode *, const char *, void *, size_t);
-+ssize_t __vfs_getxattr(struct dentry *, struct inode *,
-+  const char * name, void *buffer, size_t size, int flags);
- ssize_t vfs_getxattr(struct dentry *, const char *, void *, size_t);
- ssize_t vfs_listxattr(struct dentry *d, char *list, size_t size);
- int __vfs_setxattr(struct dentry *, struct inode *, const char *, const void *, size_t, int);
-Index: kernel-rpi/fs/xattr.c
-===================================================================
---- kernel-rpi.orig/fs/xattr.c
-+++ kernel-rpi/fs/xattr.c
-@@ -363,7 +363,7 @@ vfs_getxattr_alloc(struct dentry *dentry
- 
- ssize_t
- __vfs_getxattr(struct dentry *dentry, struct inode *inode, const char *name,
--	       void *value, size_t size)
-+	       void *value, size_t size, int flags)
- {
- 	const struct xattr_handler *handler;
-   int error;
-@@ -403,7 +403,7 @@ EXPORT_SYMBOL(__vfs_getxattr);
- ssize_t
- vfs_getxattr(struct dentry *dentry, const char *name, void *value, size_t size)
- {
--	return __vfs_getxattr(dentry, inode, name, value, size);
-+	return __vfs_getxattr(dentry, dentry->d_inode, name, value, size, 0);
- }
- EXPORT_SYMBOL_GPL(vfs_getxattr);
- 
-Index: kernel-rpi/fs/kernfs/inode.c
-===================================================================
---- kernel-rpi.orig/fs/kernfs/inode.c
-+++ kernel-rpi/fs/kernfs/inode.c
-@@ -310,7 +310,7 @@ int kernfs_xattr_set(struct kernfs_node
+--- rpi4-kernel.orig/fs/kernfs/inode.c
++++ rpi4-kernel/fs/kernfs/inode.c
+@@ -313,7 +313,7 @@ int kernfs_xattr_set(struct kernfs_node
  
  static int kernfs_vfs_xattr_get(const struct xattr_handler *handler,
  				struct dentry *unused, struct inode *inode,
@@ -5571,11 +5513,11 @@ Index: kernel-rpi/fs/kernfs/inode.c
  {
  	const char *name = xattr_full_name(handler, suffix);
  	struct kernfs_node *kn = inode->i_private;
-Index: kernel-rpi/mm/shmem.c
+Index: rpi4-kernel/mm/shmem.c
 ===================================================================
---- kernel-rpi.orig/mm/shmem.c
-+++ kernel-rpi/mm/shmem.c
-@@ -3270,7 +3270,8 @@ static int shmem_initxattrs(struct inode
+--- rpi4-kernel.orig/mm/shmem.c
++++ rpi4-kernel/mm/shmem.c
+@@ -3208,7 +3208,8 @@ static int shmem_initxattrs(struct inode
  
  static int shmem_xattr_handler_get(const struct xattr_handler *handler,
  				   struct dentry *unused, struct inode *inode,
@@ -5585,10 +5527,10 @@ Index: kernel-rpi/mm/shmem.c
  {
  	struct shmem_inode_info *info = SHMEM_I(inode);
  
-Index: kernel-rpi/fs/ext4/xattr_hurd.c
+Index: rpi4-kernel/fs/ext4/xattr_hurd.c
 ===================================================================
---- kernel-rpi.orig/fs/ext4/xattr_hurd.c
-+++ kernel-rpi/fs/ext4/xattr_hurd.c
+--- rpi4-kernel.orig/fs/ext4/xattr_hurd.c
++++ rpi4-kernel/fs/ext4/xattr_hurd.c
 @@ -21,7 +21,8 @@ ext4_xattr_hurd_list(struct dentry *dent
  static int
  ext4_xattr_hurd_get(const struct xattr_handler *handler,
@@ -5599,10 +5541,10 @@ Index: kernel-rpi/fs/ext4/xattr_hurd.c
  {
  	if (!test_opt(inode->i_sb, XATTR_USER))
  		return -EOPNOTSUPP;
-Index: kernel-rpi/fs/ext4/xattr_trusted.c
+Index: rpi4-kernel/fs/ext4/xattr_trusted.c
 ===================================================================
---- kernel-rpi.orig/fs/ext4/xattr_trusted.c
-+++ kernel-rpi/fs/ext4/xattr_trusted.c
+--- rpi4-kernel.orig/fs/ext4/xattr_trusted.c
++++ rpi4-kernel/fs/ext4/xattr_trusted.c
 @@ -22,7 +22,7 @@ ext4_xattr_trusted_list(struct dentry *d
  static int
  ext4_xattr_trusted_get(const struct xattr_handler *handler,
@@ -5612,10 +5554,10 @@ Index: kernel-rpi/fs/ext4/xattr_trusted.c
  {
  	return ext4_xattr_get(inode, EXT4_XATTR_INDEX_TRUSTED,
  			      name, buffer, size);
-Index: kernel-rpi/fs/ext4/xattr_user.c
+Index: rpi4-kernel/fs/ext4/xattr_user.c
 ===================================================================
---- kernel-rpi.orig/fs/ext4/xattr_user.c
-+++ kernel-rpi/fs/ext4/xattr_user.c
+--- rpi4-kernel.orig/fs/ext4/xattr_user.c
++++ rpi4-kernel/fs/ext4/xattr_user.c
 @@ -21,7 +21,8 @@ ext4_xattr_user_list(struct dentry *dent
  static int
  ext4_xattr_user_get(const struct xattr_handler *handler,
@@ -5626,11 +5568,11 @@ Index: kernel-rpi/fs/ext4/xattr_user.c
  {
  	if (!test_opt(inode->i_sb, XATTR_USER))
  		return -EOPNOTSUPP;
-Index: kernel-rpi/include/linux/mm_types.h
+Index: rpi4-kernel/include/linux/mm_types.h
 ===================================================================
---- kernel-rpi.orig/include/linux/mm_types.h
-+++ kernel-rpi/include/linux/mm_types.h
-@@ -339,11 +339,13 @@ struct vm_area_struct {
+--- rpi4-kernel.orig/include/linux/mm_types.h
++++ rpi4-kernel/include/linux/mm_types.h
+@@ -351,11 +351,13 @@ struct vm_area_struct {
  	 * For areas with an address space and backing store,
  	 * linkage into the address_space->i_mmap interval tree.
  	 */
@@ -5649,7 +5591,7 @@ Index: kernel-rpi/include/linux/mm_types.h
  	/*
  	 * A file's MAP_PRIVATE vma can be in both i_mmap tree and anon_vma
  	 * list, after a COW of one of the file pages.	A MAP_SHARED vma
-@@ -808,4 +810,13 @@ typedef struct {
+@@ -809,4 +811,13 @@ typedef struct {
  	unsigned long val;
  } swp_entry_t;
  
@@ -5663,11 +5605,11 @@ Index: kernel-rpi/include/linux/mm_types.h
 +}
 +
  #endif /* _LINUX_MM_TYPES_H */
-Index: kernel-rpi/mm/mempolicy.c
+Index: rpi4-kernel/mm/mempolicy.c
 ===================================================================
---- kernel-rpi.orig/mm/mempolicy.c
-+++ kernel-rpi/mm/mempolicy.c
-@@ -827,7 +827,8 @@ static int mbind_range(struct mm_struct
+--- rpi4-kernel.orig/mm/mempolicy.c
++++ rpi4-kernel/mm/mempolicy.c
+@@ -808,7 +808,8 @@ static int mbind_range(struct mm_struct
  			((vmstart - vma->vm_start) >> PAGE_SHIFT);
  		prev = vma_merge(mm, prev, vmstart, vmend, vma->vm_flags,
  				 vma->anon_vma, vma->vm_file, pgoff,
@@ -5677,11 +5619,11 @@ Index: kernel-rpi/mm/mempolicy.c
  		if (prev) {
  			vma = prev;
  			goto replace;
-Index: kernel-rpi/mm/mmap.c
+Index: rpi4-kernel/mm/mmap.c
 ===================================================================
---- kernel-rpi.orig/mm/mmap.c
-+++ kernel-rpi/mm/mmap.c
-@@ -1028,7 +1028,8 @@ again:
+--- rpi4-kernel.orig/mm/mmap.c
++++ rpi4-kernel/mm/mmap.c
+@@ -1029,7 +1029,8 @@ again:
   */
  static inline int is_mergeable_vma(struct vm_area_struct *vma,
  				struct file *file, unsigned long vm_flags,
@@ -5691,7 +5633,7 @@ Index: kernel-rpi/mm/mmap.c
  {
  	/*
  	 * VM_SOFTDIRTY should not prevent from VMA merging, if we
-@@ -1046,6 +1047,8 @@ static inline int is_mergeable_vma(struc
+@@ -1047,6 +1048,8 @@ static inline int is_mergeable_vma(struc
  		return 0;
  	if (!is_mergeable_vm_userfaultfd_ctx(vma, vm_userfaultfd_ctx))
  		return 0;
@@ -5700,7 +5642,7 @@ Index: kernel-rpi/mm/mmap.c
  	return 1;
  }
  
-@@ -1078,9 +1081,10 @@ static int
+@@ -1079,9 +1082,10 @@ static int
  can_vma_merge_before(struct vm_area_struct *vma, unsigned long vm_flags,
  		     struct anon_vma *anon_vma, struct file *file,
  		     pgoff_t vm_pgoff,
@@ -5713,7 +5655,7 @@ Index: kernel-rpi/mm/mmap.c
  	    is_mergeable_anon_vma(anon_vma, vma->anon_vma, vma)) {
  		if (vma->vm_pgoff == vm_pgoff)
  			return 1;
-@@ -1099,9 +1103,10 @@ static int
+@@ -1100,9 +1104,10 @@ static int
  can_vma_merge_after(struct vm_area_struct *vma, unsigned long vm_flags,
  		    struct anon_vma *anon_vma, struct file *file,
  		    pgoff_t vm_pgoff,
@@ -5726,7 +5668,7 @@ Index: kernel-rpi/mm/mmap.c
  	    is_mergeable_anon_vma(anon_vma, vma->anon_vma, vma)) {
  		pgoff_t vm_pglen;
  		vm_pglen = vma_pages(vma);
-@@ -1159,7 +1164,8 @@ struct vm_area_struct *vma_merge(struct
+@@ -1160,7 +1165,8 @@ struct vm_area_struct *vma_merge(struct
  			unsigned long end, unsigned long vm_flags,
  			struct anon_vma *anon_vma, struct file *file,
  			pgoff_t pgoff, struct mempolicy *policy,
@@ -5736,7 +5678,7 @@ Index: kernel-rpi/mm/mmap.c
  {
  	pgoff_t pglen = (end - addr) >> PAGE_SHIFT;
  	struct vm_area_struct *area, *next;
-@@ -1189,7 +1195,8 @@ struct vm_area_struct *vma_merge(struct
+@@ -1190,7 +1196,8 @@ struct vm_area_struct *vma_merge(struct
  			mpol_equal(vma_policy(prev), policy) &&
  			can_vma_merge_after(prev, vm_flags,
  					    anon_vma, file, pgoff,
@@ -5746,7 +5688,7 @@ Index: kernel-rpi/mm/mmap.c
  		/*
  		 * OK, it can.  Can we now merge in the successor as well?
  		 */
-@@ -1198,7 +1205,8 @@ struct vm_area_struct *vma_merge(struct
+@@ -1199,7 +1206,8 @@ struct vm_area_struct *vma_merge(struct
  				can_vma_merge_before(next, vm_flags,
  						     anon_vma, file,
  						     pgoff+pglen,
@@ -5756,7 +5698,7 @@ Index: kernel-rpi/mm/mmap.c
  				is_mergeable_anon_vma(prev->anon_vma,
  						      next->anon_vma, NULL)) {
  							/* cases 1, 6 */
-@@ -1221,7 +1229,8 @@ struct vm_area_struct *vma_merge(struct
+@@ -1222,7 +1230,8 @@ struct vm_area_struct *vma_merge(struct
  			mpol_equal(policy, vma_policy(next)) &&
  			can_vma_merge_before(next, vm_flags,
  					     anon_vma, file, pgoff+pglen,
@@ -5766,7 +5708,7 @@ Index: kernel-rpi/mm/mmap.c
  		if (prev && addr < prev->vm_end)	/* case 4 */
  			err = __vma_adjust(prev, prev->vm_start,
  					 addr, prev->vm_pgoff, NULL, next);
-@@ -1532,7 +1541,8 @@ unsigned long do_mmap(struct file *file,
+@@ -1524,7 +1533,8 @@ unsigned long do_mmap(struct file *file,
  			if (path_noexec(&file->f_path)) {
  				if (vm_flags & VM_EXEC)
  					return -EPERM;
@@ -5776,7 +5718,7 @@ Index: kernel-rpi/mm/mmap.c
  			}
  
  			if (!file->f_op->mmap)
-@@ -1765,7 +1775,7 @@ unsigned long mmap_region(struct file *f
+@@ -1759,7 +1769,7 @@ unsigned long mmap_region(struct file *f
  	 * Can we just expand an old mapping?
  	 */
  	vma = vma_merge(mm, prev, addr, addr + len, vm_flags,
@@ -5785,7 +5727,7 @@ Index: kernel-rpi/mm/mmap.c
  	if (vma)
  		goto out;
  
-@@ -1824,7 +1834,8 @@ unsigned long mmap_region(struct file *f
+@@ -1808,7 +1818,8 @@ unsigned long mmap_region(struct file *f
  		 */
  		if (unlikely(vm_flags != vma->vm_flags && prev)) {
  			merge = vma_merge(mm, prev, vma->vm_start, vma->vm_end, vma->vm_flags,
@@ -5795,7 +5737,7 @@ Index: kernel-rpi/mm/mmap.c
  			if (merge) {
  				/* ->mmap() can change vma->vm_file and fput the original file. So
  				 * fput the vma->vm_file here or we would add an extra fput for file
-@@ -3100,7 +3111,7 @@ static int do_brk_flags(unsigned long ad
+@@ -3072,7 +3083,7 @@ static int do_brk_flags(unsigned long ad
  
  	/* Can we just expand an old private anonymous mapping? */
  	vma = vma_merge(mm, prev, addr, addr + len, flags,
@@ -5804,7 +5746,7 @@ Index: kernel-rpi/mm/mmap.c
  	if (vma)
  		goto out;
  
-@@ -3299,7 +3310,7 @@ struct vm_area_struct *copy_vma(struct v
+@@ -3265,7 +3276,7 @@ struct vm_area_struct *copy_vma(struct v
  		return NULL;	/* should never get here */
  	new_vma = vma_merge(mm, prev, addr, addr + len, vma->vm_flags,
  			    vma->anon_vma, vma->vm_file, pgoff, vma_policy(vma),
@@ -5813,11 +5755,11 @@ Index: kernel-rpi/mm/mmap.c
  	if (new_vma) {
  		/*
  		 * Source vma may have been merged into new_vma
-Index: kernel-rpi/mm/mprotect.c
+Index: rpi4-kernel/mm/mprotect.c
 ===================================================================
---- kernel-rpi.orig/mm/mprotect.c
-+++ kernel-rpi/mm/mprotect.c
-@@ -454,7 +454,7 @@ mprotect_fixup(struct vm_area_struct *vm
+--- rpi4-kernel.orig/mm/mprotect.c
++++ rpi4-kernel/mm/mprotect.c
+@@ -464,7 +464,7 @@ mprotect_fixup(struct vm_area_struct *vm
  	pgoff = vma->vm_pgoff + ((start - vma->vm_start) >> PAGE_SHIFT);
  	*pprev = vma_merge(mm, *pprev, start, end, newflags,
  			   vma->anon_vma, vma->vm_file, pgoff, vma_policy(vma),
@@ -5826,11 +5768,11 @@ Index: kernel-rpi/mm/mprotect.c
  	if (*pprev) {
  		vma = *pprev;
  		VM_WARN_ON((vma->vm_flags ^ newflags) & ~VM_SOFTDIRTY);
-Index: kernel-rpi/mm/mlock.c
+Index: rpi4-kernel/mm/mlock.c
 ===================================================================
---- kernel-rpi.orig/mm/mlock.c
-+++ kernel-rpi/mm/mlock.c
-@@ -540,7 +540,7 @@ static int mlock_fixup(struct vm_area_st
+--- rpi4-kernel.orig/mm/mlock.c
++++ rpi4-kernel/mm/mlock.c
+@@ -511,7 +511,7 @@ static int mlock_fixup(struct vm_area_st
  	pgoff = vma->vm_pgoff + ((start - vma->vm_start) >> PAGE_SHIFT);
  	*prev = vma_merge(mm, *prev, start, end, newflags, vma->anon_vma,
  			  vma->vm_file, pgoff, vma_policy(vma),
@@ -5839,11 +5781,11 @@ Index: kernel-rpi/mm/mlock.c
  	if (*prev) {
  		vma = *prev;
  		goto success;
-Index: kernel-rpi/fs/userfaultfd.c
+Index: rpi4-kernel/fs/userfaultfd.c
 ===================================================================
---- kernel-rpi.orig/fs/userfaultfd.c
-+++ kernel-rpi/fs/userfaultfd.c
-@@ -869,7 +869,8 @@ static int userfaultfd_release(struct in
+--- rpi4-kernel.orig/fs/userfaultfd.c
++++ rpi4-kernel/fs/userfaultfd.c
+@@ -877,7 +877,8 @@ static int userfaultfd_release(struct in
  				 new_flags, vma->anon_vma,
  				 vma->vm_file, vma->vm_pgoff,
  				 vma_policy(vma),
@@ -5853,7 +5795,7 @@ Index: kernel-rpi/fs/userfaultfd.c
  		if (prev)
  			vma = prev;
  		else
-@@ -1410,7 +1411,8 @@ static int userfaultfd_register(struct u
+@@ -1436,7 +1437,8 @@ static int userfaultfd_register(struct u
  		prev = vma_merge(mm, prev, start, vma_end, new_flags,
  				 vma->anon_vma, vma->vm_file, vma->vm_pgoff,
  				 vma_policy(vma),
@@ -5863,7 +5805,7 @@ Index: kernel-rpi/fs/userfaultfd.c
  		if (prev) {
  			vma = prev;
  			goto next;
-@@ -1580,7 +1582,8 @@ static int userfaultfd_unregister(struct
+@@ -1613,7 +1615,8 @@ static int userfaultfd_unregister(struct
  		prev = vma_merge(mm, prev, start, vma_end, new_flags,
  				 vma->anon_vma, vma->vm_file, vma->vm_pgoff,
  				 vma_policy(vma),
@@ -5873,10 +5815,10 @@ Index: kernel-rpi/fs/userfaultfd.c
  		if (prev) {
  			vma = prev;
  			goto next;
-Index: kernel-rpi/fs/proc/task_mmu.c
+Index: rpi4-kernel/fs/proc/task_mmu.c
 ===================================================================
---- kernel-rpi.orig/fs/proc/task_mmu.c
-+++ kernel-rpi/fs/proc/task_mmu.c
+--- rpi4-kernel.orig/fs/proc/task_mmu.c
++++ rpi4-kernel/fs/proc/task_mmu.c
 @@ -123,6 +123,56 @@ static void release_task_mempolicy(struc
  }
  #endif
@@ -5951,7 +5893,7 @@ Index: kernel-rpi/fs/proc/task_mmu.c
  	}
  
  done:
-@@ -836,6 +893,11 @@ static int show_smap(struct seq_file *m,
+@@ -837,6 +894,11 @@ static int show_smap(struct seq_file *m,
  	smap_gather_stats(vma, &mss, 0);
  
  	show_map_vma(m, vma);
@@ -5963,10 +5905,10 @@ Index: kernel-rpi/fs/proc/task_mmu.c
  
  	SEQ_PUT_DEC("Size:           ", vma->vm_end - vma->vm_start);
  	SEQ_PUT_DEC(" kB\nKernelPageSize: ", vma_kernel_pagesize(vma));
-Index: kernel-rpi/include/linux/netfilter/xt_qtaguid.h
+Index: rpi4-kernel/include/linux/netfilter/xt_qtaguid.h
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/include/linux/netfilter/xt_qtaguid.h
++++ rpi4-kernel/include/linux/netfilter/xt_qtaguid.h
 @@ -0,0 +1,15 @@
 +#ifndef _XT_QTAGUID_MATCH_H
 +#define _XT_QTAGUID_MATCH_H
@@ -5983,10 +5925,10 @@ Index: kernel-rpi/include/linux/netfilter/xt_qtaguid.h
 +
 +int qtaguid_untag(struct socket *sock, bool kernel);
 +#endif /* _XT_QTAGUID_MATCH_H */
-Index: kernel-rpi/net/netfilter/xt_qtaguid.c
+Index: rpi4-kernel/net/netfilter/xt_qtaguid.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/net/netfilter/xt_qtaguid.c
++++ rpi4-kernel/net/netfilter/xt_qtaguid.c
 @@ -0,0 +1,3328 @@
 +/*
 + * Kernel iptables module to track stats for packets based on user tags.
@@ -9316,11 +9258,11 @@ Index: kernel-rpi/net/netfilter/xt_qtaguid.c
 +MODULE_ALIAS("ip6t_owner");
 +MODULE_ALIAS("ipt_qtaguid");
 +MODULE_ALIAS("ip6t_qtaguid");
-Index: kernel-rpi/net/netfilter/Makefile
+Index: rpi4-kernel/net/netfilter/Makefile
 ===================================================================
---- kernel-rpi.orig/net/netfilter/Makefile
-+++ kernel-rpi/net/netfilter/Makefile
-@@ -196,6 +196,7 @@ obj-$(CONFIG_NETFILTER_XT_MATCH_CGROUP)
+--- rpi4-kernel.orig/net/netfilter/Makefile
++++ rpi4-kernel/net/netfilter/Makefile
+@@ -194,6 +194,7 @@ obj-$(CONFIG_NETFILTER_XT_MATCH_CGROUP)
  obj-$(CONFIG_NETFILTER_XT_MATCH_PHYSDEV) += xt_physdev.o
  obj-$(CONFIG_NETFILTER_XT_MATCH_PKTTYPE) += xt_pkttype.o
  obj-$(CONFIG_NETFILTER_XT_MATCH_POLICY) += xt_policy.o
@@ -9328,10 +9270,10 @@ Index: kernel-rpi/net/netfilter/Makefile
  obj-$(CONFIG_NETFILTER_XT_MATCH_QUOTA) += xt_quota.o
  obj-$(CONFIG_NETFILTER_XT_MATCH_RATEEST) += xt_rateest.o
  obj-$(CONFIG_NETFILTER_XT_MATCH_REALM) += xt_realm.o
-Index: kernel-rpi/net/netfilter/xt_qtaguid_internal.h
+Index: rpi4-kernel/net/netfilter/xt_qtaguid_internal.h
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/net/netfilter/xt_qtaguid_internal.h
++++ rpi4-kernel/net/netfilter/xt_qtaguid_internal.h
 @@ -0,0 +1,353 @@
 +/*
 + * Kernel iptables module to track stats for packets based on user tags.
@@ -9686,10 +9628,10 @@ Index: kernel-rpi/net/netfilter/xt_qtaguid_internal.h
 +
 +/*----------------------------------------------*/
 +#endif  /* ifndef __XT_QTAGUID_INTERNAL_H__ */
-Index: kernel-rpi/net/netfilter/xt_qtaguid_print.c
+Index: rpi4-kernel/net/netfilter/xt_qtaguid_print.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/net/netfilter/xt_qtaguid_print.c
++++ rpi4-kernel/net/netfilter/xt_qtaguid_print.c
 @@ -0,0 +1,565 @@
 +/*
 + * Pretty printing Support for iptables xt_qtaguid module.
@@ -10256,10 +10198,10 @@ Index: kernel-rpi/net/netfilter/xt_qtaguid_print.c
 +		return "bad event num";
 +	return netdev_event_strings[netdev_event];
 +}
-Index: kernel-rpi/net/netfilter/xt_qtaguid_print.h
+Index: rpi4-kernel/net/netfilter/xt_qtaguid_print.h
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/net/netfilter/xt_qtaguid_print.h
++++ rpi4-kernel/net/netfilter/xt_qtaguid_print.h
 @@ -0,0 +1,120 @@
 +/*
 + * Pretty printing Support for iptables xt_qtaguid module.
@@ -10381,12 +10323,12 @@ Index: kernel-rpi/net/netfilter/xt_qtaguid_print.h
 +/*------------------------------------------*/
 +const char *netdev_evt_str(int netdev_event);
 +#endif  /* ifndef __XT_QTAGUID_PRINT_H__ */
-Index: kernel-rpi/include/linux/mm_inline.h
+Index: rpi4-kernel/include/linux/mm_inline.h
 ===================================================================
---- kernel-rpi.orig/include/linux/mm_inline.h
-+++ kernel-rpi/include/linux/mm_inline.h
-@@ -45,6 +45,25 @@ static __always_inline void update_lru_s
- #endif
+--- rpi4-kernel.orig/include/linux/mm_inline.h
++++ rpi4-kernel/include/linux/mm_inline.h
+@@ -79,6 +79,25 @@ static __always_inline enum lru_list pag
+ 	return lru;
  }
  
 +static inline bool lru_gen_enabled(void)
@@ -10409,13 +10351,13 @@ Index: kernel-rpi/include/linux/mm_inline.h
 +}
 +
  static __always_inline void add_page_to_lru_list(struct page *page,
- 				struct lruvec *lruvec, enum lru_list lru)
+ 				struct lruvec *lruvec)
  {
-Index: kernel-rpi/mm/madvise.c
+Index: rpi4-kernel/mm/madvise.c
 ===================================================================
---- kernel-rpi.orig/mm/madvise.c
-+++ kernel-rpi/mm/madvise.c
-@@ -136,7 +136,7 @@ static long madvise_behavior(struct vm_a
+--- rpi4-kernel.orig/mm/madvise.c
++++ rpi4-kernel/mm/madvise.c
+@@ -138,7 +138,7 @@ static long madvise_behavior(struct vm_a
  	pgoff = vma->vm_pgoff + ((start - vma->vm_start) >> PAGE_SHIFT);
  	*prev = vma_merge(mm, *prev, start, end, new_flags, vma->anon_vma,
  			  vma->vm_file, pgoff, vma_policy(vma),
@@ -10424,11 +10366,11 @@ Index: kernel-rpi/mm/madvise.c
  	if (*prev) {
  		vma = *prev;
  		goto success;
-Index: kernel-rpi/include/uapi/linux/netfilter/xt_IDLETIMER.h
+Index: rpi4-kernel/include/uapi/linux/netfilter/xt_IDLETIMER.h
 ===================================================================
---- kernel-rpi.orig/include/uapi/linux/netfilter/xt_IDLETIMER.h
-+++ kernel-rpi/include/uapi/linux/netfilter/xt_IDLETIMER.h
-@@ -34,11 +34,18 @@
+--- rpi4-kernel.orig/include/uapi/linux/netfilter/xt_IDLETIMER.h
++++ rpi4-kernel/include/uapi/linux/netfilter/xt_IDLETIMER.h
+@@ -19,11 +19,18 @@
  #define MAX_IDLETIMER_LABEL_SIZE 28
  #define XT_IDLETIMER_ALARM 0x01
  
@@ -10447,11 +10389,11 @@ Index: kernel-rpi/include/uapi/linux/netfilter/xt_IDLETIMER.h
  	/* for kernel module internal use only */
  	struct idletimer_tg *timer __attribute__((aligned(8)));
  };
-Index: kernel-rpi/fs/namespace.c
+Index: rpi4-kernel/fs/namespace.c
 ===================================================================
---- kernel-rpi.orig/fs/namespace.c
-+++ kernel-rpi/fs/namespace.c
-@@ -3180,6 +3180,15 @@ int path_mount(const char *dev_name, str
+--- rpi4-kernel.orig/fs/namespace.c
++++ rpi4-kernel/fs/namespace.c
+@@ -3275,6 +3275,15 @@ int path_mount(const char *dev_name, str
  	if (!(flags & MS_NOATIME))
  		mnt_flags |= MNT_RELATIME;
  
@@ -10467,10 +10409,10 @@ Index: kernel-rpi/fs/namespace.c
  	/* Separate the per-mountpoint flags */
  	if (flags & MS_NOSUID)
  		mnt_flags |= MNT_NOSUID;
-Index: kernel-rpi/net/ipv4/af_inet.c
+Index: rpi4-kernel/net/ipv4/af_inet.c
 ===================================================================
---- kernel-rpi.orig/net/ipv4/af_inet.c
-+++ kernel-rpi/net/ipv4/af_inet.c
+--- rpi4-kernel.orig/net/ipv4/af_inet.c
++++ rpi4-kernel/net/ipv4/af_inet.c
 @@ -419,6 +419,9 @@ int inet_release(struct socket *sock)
  		if (!sk->sk_kern_sock)
  			BPF_CGROUP_RUN_PROG_INET_SOCK_RELEASE(sk);
@@ -10481,11 +10423,11 @@ Index: kernel-rpi/net/ipv4/af_inet.c
  		/* Applications forget to leave groups before exiting */
  		ip_mc_drop_socket(sk);
  
-Index: kernel-rpi/net/netfilter/Kconfig
+Index: rpi4-kernel/net/netfilter/Kconfig
 ===================================================================
---- kernel-rpi.orig/net/netfilter/Kconfig
-+++ kernel-rpi/net/netfilter/Kconfig
-@@ -1467,6 +1467,22 @@ config NETFILTER_XT_MATCH_PKTTYPE
+--- rpi4-kernel.orig/net/netfilter/Kconfig
++++ rpi4-kernel/net/netfilter/Kconfig
+@@ -1500,6 +1500,22 @@ config NETFILTER_XT_MATCH_PKTTYPE
  
  	  To compile it as a module, choose M here.  If unsure, say N.
  
@@ -10508,10 +10450,10 @@ Index: kernel-rpi/net/netfilter/Kconfig
  config NETFILTER_XT_MATCH_QUOTA
  	tristate '"quota" match support'
  	depends on NETFILTER_ADVANCED
-Index: kernel-rpi/net/netfilter/xt_IDLETIMER.c
+Index: rpi4-kernel/net/netfilter/xt_IDLETIMER.c
 ===================================================================
---- kernel-rpi.orig/net/netfilter/xt_IDLETIMER.c
-+++ kernel-rpi/net/netfilter/xt_IDLETIMER.c
+--- rpi4-kernel.orig/net/netfilter/xt_IDLETIMER.c
++++ rpi4-kernel/net/netfilter/xt_IDLETIMER.c
 @@ -6,6 +6,7 @@
   * After timer expires a kevent will be sent.
   *
@@ -10890,10 +10832,10 @@ Index: kernel-rpi/net/netfilter/xt_IDLETIMER.c
  MODULE_ALIAS("ipt_IDLETIMER");
  MODULE_ALIAS("ip6t_IDLETIMER");
 +MODULE_ALIAS("arpt_IDLETIMER");
-Index: kernel-rpi/include/linux/pkglist.h
+Index: rpi4-kernel/include/linux/pkglist.h
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/include/linux/pkglist.h
++++ rpi4-kernel/include/linux/pkglist.h
 @@ -0,0 +1,38 @@
 +#ifndef _PKGLIST_H_
 +#define _PKGLIST_H_
@@ -10933,10 +10875,10 @@ Index: kernel-rpi/include/linux/pkglist.h
 +void pkglist_register_update_listener(struct pkg_list *pkg);
 +void pkglist_unregister_update_listener(struct pkg_list *pkg);
 +#endif
-Index: kernel-rpi/include/uapi/linux/magic.h
+Index: rpi4-kernel/include/uapi/linux/magic.h
 ===================================================================
---- kernel-rpi.orig/include/uapi/linux/magic.h
-+++ kernel-rpi/include/uapi/linux/magic.h
+--- rpi4-kernel.orig/include/uapi/linux/magic.h
++++ rpi4-kernel/include/uapi/linux/magic.h
 @@ -58,6 +58,8 @@
  #define REISER2FS_SUPER_MAGIC_STRING	"ReIsEr2Fs"
  #define REISER2FS_JR_SUPER_MAGIC_STRING	"ReIsEr3Fs"
@@ -10946,11 +10888,11 @@ Index: kernel-rpi/include/uapi/linux/magic.h
  #define SMB_SUPER_MAGIC		0x517B
  #define CGROUP_SUPER_MAGIC	0x27e0eb
  #define CGROUP2_SUPER_MAGIC	0x63677270
-Index: kernel-rpi/kernel/sysctl.c
+Index: rpi4-kernel/kernel/sysctl.c
 ===================================================================
---- kernel-rpi.orig/kernel/sysctl.c
-+++ kernel-rpi/kernel/sysctl.c
-@@ -3051,6 +3051,15 @@ static struct ctl_table vm_table[] = {
+--- rpi4-kernel.orig/kernel/sysctl.c
++++ rpi4-kernel/kernel/sysctl.c
+@@ -3069,6 +3069,15 @@ static struct ctl_table vm_table[] = {
  		.mode		= 0644,
  		.proc_handler	= mmap_min_addr_handler,
  	},
@@ -10966,7 +10908,7 @@ Index: kernel-rpi/kernel/sysctl.c
  #endif
  #ifdef CONFIG_NUMA
  	{
-@@ -3122,6 +3131,13 @@ static struct ctl_table vm_table[] = {
+@@ -3140,6 +3149,13 @@ static struct ctl_table vm_table[] = {
  		.mode		= 0644,
  		.proc_handler	= proc_doulongvec_minmax,
  	},
@@ -10980,11 +10922,11 @@ Index: kernel-rpi/kernel/sysctl.c
  #ifdef CONFIG_HAVE_ARCH_MMAP_RND_BITS
  	{
  		.procname	= "mmap_rnd_bits",
-Index: kernel-rpi/mm/Kconfig
+Index: rpi4-kernel/mm/Kconfig
 ===================================================================
---- kernel-rpi.orig/mm/Kconfig
-+++ kernel-rpi/mm/Kconfig
-@@ -337,6 +337,23 @@ config DEFAULT_MMAP_MIN_ADDR
+--- rpi4-kernel.orig/mm/Kconfig
++++ rpi4-kernel/mm/Kconfig
+@@ -321,6 +321,23 @@ config DEFAULT_MMAP_MIN_ADDR
  	  This value can be changed after boot using the
  	  /proc/sys/vm/mmap_min_addr tunable.
  
@@ -11008,9 +10950,9 @@ Index: kernel-rpi/mm/Kconfig
  config ARCH_SUPPORTS_MEMORY_FAILURE
  	bool
  
-@@ -859,4 +876,15 @@ config ARCH_HAS_HUGEPD
- config MAPPING_DIRTY_HELPERS
-         bool
+@@ -899,4 +916,15 @@ config SECRETMEM
+ 
+ source "mm/damon/Kconfig"
  
 +config LOW_MEM_NOTIFY
 +  bool "Create device that lets processes detect low-memory conditions"
@@ -11024,11 +10966,11 @@ Index: kernel-rpi/mm/Kconfig
 +    unusable before the OOM killer is triggered.
 +
  endmenu
-Index: kernel-rpi/mm/util.c
+Index: rpi4-kernel/mm/util.c
 ===================================================================
---- kernel-rpi.orig/mm/util.c
-+++ kernel-rpi/mm/util.c
-@@ -739,6 +739,7 @@ int sysctl_overcommit_memory __read_most
+--- rpi4-kernel.orig/mm/util.c
++++ rpi4-kernel/mm/util.c
+@@ -848,6 +848,7 @@ int sysctl_overcommit_memory __read_most
  int sysctl_overcommit_ratio __read_mostly = 50;
  unsigned long sysctl_overcommit_kbytes __read_mostly;
  int sysctl_max_map_count __read_mostly = DEFAULT_MAX_MAP_COUNT;
@@ -11036,10 +10978,10 @@ Index: kernel-rpi/mm/util.c
  unsigned long sysctl_user_reserve_kbytes __read_mostly = 1UL << 17; /* 128MB */
  unsigned long sysctl_admin_reserve_kbytes __read_mostly = 1UL << 13; /* 8MB */
  
-Index: kernel-rpi/mm/low-mem-notify.c
+Index: rpi4-kernel/mm/low-mem-notify.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/mm/low-mem-notify.c
++++ rpi4-kernel/mm/low-mem-notify.c
 @@ -0,0 +1,398 @@
 +/*
 + * mm/low-mem-notify.c
@@ -11439,22 +11381,22 @@ Index: kernel-rpi/mm/low-mem-notify.c
 +module_init(low_mem_init)
 +
 +#endif
-Index: kernel-rpi/mm/Makefile
+Index: rpi4-kernel/mm/Makefile
 ===================================================================
---- kernel-rpi.orig/mm/Makefile
-+++ kernel-rpi/mm/Makefile
-@@ -111,6 +111,7 @@ obj-$(CONFIG_CMA_DEBUGFS) += cma_debug.o
+--- rpi4-kernel.orig/mm/Makefile
++++ rpi4-kernel/mm/Makefile
+@@ -117,6 +117,7 @@ obj-$(CONFIG_SECRETMEM) += secretmem.o
+ obj-$(CONFIG_CMA_SYSFS) += cma_sysfs.o
  obj-$(CONFIG_USERFAULTFD) += userfaultfd.o
  obj-$(CONFIG_IDLE_PAGE_TRACKING) += page_idle.o
- obj-$(CONFIG_FRAME_VECTOR) += frame_vector.o
 +obj-$(CONFIG_LOW_MEM_NOTIFY) += low-mem-notify.o
  obj-$(CONFIG_DEBUG_PAGE_REF) += debug_page_ref.o
+ obj-$(CONFIG_DAMON) += damon/
  obj-$(CONFIG_HARDENED_USERCOPY) += usercopy.o
- obj-$(CONFIG_PERCPU_STATS) += percpu-stats.o
-Index: kernel-rpi/fs/cifs/xattr.c
+Index: rpi4-kernel/fs/cifs/xattr.c
 ===================================================================
---- kernel-rpi.orig/fs/cifs/xattr.c
-+++ kernel-rpi/fs/cifs/xattr.c
+--- rpi4-kernel.orig/fs/cifs/xattr.c
++++ rpi4-kernel/fs/cifs/xattr.c
 @@ -281,7 +281,7 @@ static int cifs_creation_time_get(struct
  
  static int cifs_xattr_get(const struct xattr_handler *handler,
@@ -11464,11 +11406,11 @@ Index: kernel-rpi/fs/cifs/xattr.c
  {
  	ssize_t rc = -EOPNOTSUPP;
  	unsigned int xid;
-Index: kernel-rpi/fs/overlayfs/copy_up.c
+Index: rpi4-kernel/fs/overlayfs/copy_up.c
 ===================================================================
---- kernel-rpi.orig/fs/overlayfs/copy_up.c
-+++ kernel-rpi/fs/overlayfs/copy_up.c
-@@ -964,7 +964,7 @@ static int ovl_copy_up_flags(struct dent
+--- rpi4-kernel.orig/fs/overlayfs/copy_up.c
++++ rpi4-kernel/fs/overlayfs/copy_up.c
+@@ -1046,7 +1046,7 @@ static int ovl_copy_up_flags(struct dent
  		dput(parent);
  		dput(next);
  	}
@@ -11477,10 +11419,10 @@ Index: kernel-rpi/fs/overlayfs/copy_up.c
  
  	return err;
  }
-Index: kernel-rpi/fs/overlayfs/dir.c
+Index: rpi4-kernel/fs/overlayfs/dir.c
 ===================================================================
---- kernel-rpi.orig/fs/overlayfs/dir.c
-+++ kernel-rpi/fs/overlayfs/dir.c
+--- rpi4-kernel.orig/fs/overlayfs/dir.c
++++ rpi4-kernel/fs/overlayfs/dir.c
 @@ -137,7 +137,8 @@ kill_whiteout:
  	goto out;
  }
@@ -11491,7 +11433,7 @@ Index: kernel-rpi/fs/overlayfs/dir.c
  {
  	int err;
  	struct dentry *d, *dentry = *newdentry;
-@@ -566,7 +567,7 @@ static int ovl_create_or_link(struct den
+@@ -569,7 +570,7 @@ static int ovl_create_or_link(struct den
  			      struct ovl_cattr *attr, bool origin)
  {
  	int err;
@@ -11500,27 +11442,39 @@ Index: kernel-rpi/fs/overlayfs/dir.c
  	struct cred *override_cred;
  	struct dentry *parent = dentry->d_parent;
  
-@@ -593,14 +594,15 @@ static int ovl_create_or_link(struct den
+@@ -589,9 +590,9 @@ static int ovl_create_or_link(struct den
+ 			goto out_revert_creds;
+ 	}
+ 
++	err = -ENOMEM;
++	override_cred = prepare_creds();
+ 	if (!attr->hardlink) {
+-		err = -ENOMEM;
+-		override_cred = prepare_creds();
+ 		if (!override_cred)
+ 			goto out_revert_creds;
+ 		/*
+@@ -610,13 +611,13 @@ static int ovl_create_or_link(struct den
+ 		override_cred->fsuid = inode->i_uid;
  		override_cred->fsgid = inode->i_gid;
- 		if (!attr->hardlink) {
- 			err = security_dentry_create_files_as(dentry,
--					attr->mode, &dentry->d_name, old_cred,
-+					attr->mode, &dentry->d_name,
-+					old_cred ? old_cred : current_cred(),
- 					override_cred);
- 			if (err) {
- 				put_cred(override_cred);
- 				goto out_revert_creds;
- 			}
+ 		err = security_dentry_create_files_as(dentry,
+-				attr->mode, &dentry->d_name, old_cred,
++				attr->mode, &dentry->d_name, old_cred ? old_cred : current_cred(),
+ 				override_cred);
+ 		if (err) {
+ 			put_cred(override_cred);
+ 			goto out_revert_creds;
  		}
 -		put_cred(override_creds(override_cred));
 +		hold_cred = override_creds(override_cred);
  		put_cred(override_cred);
- 
- 		if (!ovl_dentry_is_whiteout(dentry))
-@@ -609,7 +611,9 @@ static int ovl_create_or_link(struct den
- 			err = ovl_create_over_whiteout(dentry, inode, attr);
  	}
+ 
+@@ -624,9 +625,10 @@ static int ovl_create_or_link(struct den
+ 		err = ovl_create_upper(dentry, inode, attr);
+ 	else
+ 		err = ovl_create_over_whiteout(dentry, inode, attr);
+-
  out_revert_creds:
 -	revert_creds(old_cred);
 +	ovl_revert_creds(dentry->d_sb, old_cred ?: hold_cred);
@@ -11529,7 +11483,7 @@ Index: kernel-rpi/fs/overlayfs/dir.c
  	return err;
  }
  
-@@ -685,7 +689,7 @@ static int ovl_set_link_redirect(struct
+@@ -703,7 +705,7 @@ static int ovl_set_link_redirect(struct
  
  	old_cred = ovl_override_creds(dentry->d_sb);
  	err = ovl_set_redirect(dentry, false);
@@ -11538,7 +11492,7 @@ Index: kernel-rpi/fs/overlayfs/dir.c
  
  	return err;
  }
-@@ -904,7 +908,7 @@ static int ovl_do_remove(struct dentry *
+@@ -921,7 +923,7 @@ static int ovl_do_remove(struct dentry *
  		err = ovl_remove_upper(dentry, is_dir, &list);
  	else
  		err = ovl_remove_and_whiteout(dentry, &list);
@@ -11547,7 +11501,7 @@ Index: kernel-rpi/fs/overlayfs/dir.c
  	if (!err) {
  		if (is_dir)
  			clear_nlink(dentry->d_inode);
-@@ -1213,13 +1217,9 @@ static int ovl_rename(struct inode *oldd
+@@ -1230,13 +1232,9 @@ static int ovl_rename(struct user_namesp
  				goto out_dput;
  		}
  	} else {
@@ -11564,7 +11518,7 @@ Index: kernel-rpi/fs/overlayfs/dir.c
  	}
  
  	if (olddentry == trap)
-@@ -1278,7 +1278,7 @@ out_dput_old:
+@@ -1295,7 +1293,7 @@ out_dput_old:
  out_unlock:
  	unlock_rename(new_upperdir, old_upperdir);
  out_revert_creds:
@@ -11573,10 +11527,10 @@ Index: kernel-rpi/fs/overlayfs/dir.c
  	if (update_nlink)
  		ovl_nlink_end(new);
  out_drop_write:
-Index: kernel-rpi/fs/overlayfs/file.c
+Index: rpi4-kernel/fs/overlayfs/file.c
 ===================================================================
---- kernel-rpi.orig/fs/overlayfs/file.c
-+++ kernel-rpi/fs/overlayfs/file.c
+--- rpi4-kernel.orig/fs/overlayfs/file.c
++++ rpi4-kernel/fs/overlayfs/file.c
 @@ -17,7 +17,6 @@
  
  struct ovl_aio_req {
@@ -11585,14 +11539,7 @@ Index: kernel-rpi/fs/overlayfs/file.c
  	struct kiocb *orig_iocb;
  	struct fd fd;
  };
-@@ -54,13 +53,13 @@ static struct file *ovl_open_realfile(co
- 	err = inode_permission(realinode, MAY_OPEN | acc_mode);
- 	if (err) {
- 		realfile = ERR_PTR(err);
--	} else if (!inode_owner_or_capable(realinode)) {
-+	} else if (old_cred && !inode_owner_or_capable(realinode)) {
- 		realfile = ERR_PTR(-EPERM);
- 	} else {
+@@ -61,7 +60,7 @@ static struct file *ovl_open_realfile(co
  		realfile = open_with_fake_path(&file->f_path, flags, realinode,
  					       current_cred());
  	}
@@ -11601,7 +11548,7 @@ Index: kernel-rpi/fs/overlayfs/file.c
  
  	pr_debug("open(%p[%pD2/%c], 0%o) -> (%p, 0%o)\n",
  		 file, file, ovl_whatisit(inode, realinode), file->f_flags,
-@@ -210,7 +209,7 @@ static loff_t ovl_llseek(struct file *fi
+@@ -205,7 +204,7 @@ static loff_t ovl_llseek(struct file *fi
  
  	old_cred = ovl_override_creds(inode->i_sb);
  	ret = vfs_llseek(real.file, offset, whence);
@@ -11610,7 +11557,7 @@ Index: kernel-rpi/fs/overlayfs/file.c
  
  	file->f_pos = real.file->f_pos;
  	ovl_inode_unlock(inode);
-@@ -258,14 +257,6 @@ static rwf_t ovl_iocb_to_rwf(int ifl)
+@@ -253,14 +252,6 @@ static rwf_t ovl_iocb_to_rwf(int ifl)
  	return flags;
  }
  
@@ -11625,7 +11572,7 @@ Index: kernel-rpi/fs/overlayfs/file.c
  static void ovl_aio_cleanup_handler(struct ovl_aio_req *aio_req)
  {
  	struct kiocb *iocb = &aio_req->iocb;
-@@ -282,7 +273,8 @@ static void ovl_aio_cleanup_handler(stru
+@@ -277,7 +268,8 @@ static void ovl_aio_cleanup_handler(stru
  	}
  
  	orig_iocb->ki_pos = iocb->ki_pos;
@@ -11635,7 +11582,7 @@ Index: kernel-rpi/fs/overlayfs/file.c
  }
  
  static void ovl_aio_rw_complete(struct kiocb *iocb, long res, long res2)
-@@ -309,12 +301,6 @@ static ssize_t ovl_read_iter(struct kioc
+@@ -304,12 +296,6 @@ static ssize_t ovl_read_iter(struct kioc
  	if (ret)
  		return ret;
  
@@ -11648,7 +11595,7 @@ Index: kernel-rpi/fs/overlayfs/file.c
  	old_cred = ovl_override_creds(file_inode(file)->i_sb);
  	if (is_sync_kiocb(iocb)) {
  		ret = vfs_iter_read(real.file, iter, &iocb->ki_pos,
-@@ -332,16 +318,15 @@ static ssize_t ovl_read_iter(struct kioc
+@@ -327,16 +313,15 @@ static ssize_t ovl_read_iter(struct kioc
  		aio_req->orig_iocb = iocb;
  		kiocb_clone(&aio_req->iocb, iocb, real.file);
  		aio_req->iocb.ki_complete = ovl_aio_rw_complete;
@@ -11668,7 +11615,7 @@ Index: kernel-rpi/fs/overlayfs/file.c
  	fdput(real);
  
  	return ret;
-@@ -370,12 +355,6 @@ static ssize_t ovl_write_iter(struct kio
+@@ -365,12 +350,6 @@ static ssize_t ovl_write_iter(struct kio
  	if (ret)
  		goto out_unlock;
  
@@ -11681,7 +11628,7 @@ Index: kernel-rpi/fs/overlayfs/file.c
  	if (!ovl_should_sync(OVL_FS(inode->i_sb)))
  		ifl &= ~(IOCB_DSYNC | IOCB_SYNC);
  
-@@ -405,15 +384,12 @@ static ssize_t ovl_write_iter(struct kio
+@@ -400,15 +379,12 @@ static ssize_t ovl_write_iter(struct kio
  		kiocb_clone(&aio_req->iocb, iocb, real.file);
  		aio_req->iocb.ki_flags = ifl;
  		aio_req->iocb.ki_complete = ovl_aio_rw_complete;
@@ -11698,83 +11645,16 @@ Index: kernel-rpi/fs/overlayfs/file.c
  	fdput(real);
  
  out_unlock:
-@@ -422,48 +398,45 @@ out_unlock:
- 	return ret;
- }
- 
--/*
-- * Calling iter_file_splice_write() directly from overlay's f_op may deadlock
-- * due to lock order inversion between pipe->mutex in iter_file_splice_write()
-- * and file_start_write(real.file) in ovl_write_iter().
-- *
-- * So do everything ovl_write_iter() does and call iter_file_splice_write() on
-- * the real file.
-- */
--static ssize_t ovl_splice_write(struct pipe_inode_info *pipe, struct file *out,
--				loff_t *ppos, size_t len, unsigned int flags)
-+static ssize_t ovl_splice_read(struct file *in, loff_t *ppos,
-+			 struct pipe_inode_info *pipe, size_t len,
-+			 unsigned int flags)
- {
-+	ssize_t ret;
- 	struct fd real;
- 	const struct cred *old_cred;
--	struct inode *inode = file_inode(out);
--	struct inode *realinode = ovl_inode_real(inode);
--	ssize_t ret;
- 
--	inode_lock(inode);
--	/* Update mode */
--	ovl_copyattr(realinode, inode);
--	ret = file_remove_privs(out);
-+	ret = ovl_real_fdget(in, &real);
- 	if (ret)
--		goto out_unlock;
-+		return ret;
-+
-+	old_cred = ovl_override_creds(file_inode(in)->i_sb);
-+	ret = generic_file_splice_read(real.file, ppos, pipe, len, flags);
-+	ovl_revert_creds(file_inode(in)->i_sb, old_cred);
-+
-+	ovl_file_accessed(in);
-+	fdput(real);
-+	return ret;
-+}
-+
-+static ssize_t
-+ovl_splice_write(struct pipe_inode_info *pipe, struct file *out,
-+			  loff_t *ppos, size_t len, unsigned int flags)
-+{
-+	struct fd real;
-+	const struct cred *old_cred;
-+	ssize_t ret;
- 
- 	ret = ovl_real_fdget(out, &real);
- 	if (ret)
--		goto out_unlock;
--
--	old_cred = ovl_override_creds(inode->i_sb);
--	file_start_write(real.file);
-+		return ret;
- 
-+	old_cred = ovl_override_creds(file_inode(out)->i_sb);
- 	ret = iter_file_splice_write(pipe, real.file, ppos, len, flags);
-+	ovl_revert_creds(file_inode(out)->i_sb, old_cred);
- 
--	file_end_write(real.file);
--	/* Update size */
--	ovl_copyattr(realinode, inode);
+@@ -452,7 +428,7 @@ static ssize_t ovl_splice_write(struct p
+ 	file_end_write(real.file);
+ 	/* Update size */
+ 	ovl_copyattr(inode);
 -	revert_creds(old_cred);
-+	ovl_file_accessed(out);
++	ovl_revert_creds(inode->i_sb, old_cred);
  	fdput(real);
--
--out_unlock:
--	inode_unlock(inode);
--
- 	return ret;
- }
  
-@@ -485,7 +458,7 @@ static int ovl_fsync(struct file *file,
+ out_unlock:
+@@ -479,7 +455,7 @@ static int ovl_fsync(struct file *file,
  	if (file_inode(real.file) == ovl_inode_upper(file_inode(file))) {
  		old_cred = ovl_override_creds(file_inode(file)->i_sb);
  		ret = vfs_fsync_range(real.file, start, end, datasync);
@@ -11783,16 +11663,16 @@ Index: kernel-rpi/fs/overlayfs/file.c
  	}
  
  	fdput(real);
-@@ -509,7 +482,7 @@ static int ovl_mmap(struct file *file, s
+@@ -503,7 +479,7 @@ static int ovl_mmap(struct file *file, s
  
  	old_cred = ovl_override_creds(file_inode(file)->i_sb);
  	ret = call_mmap(vma->vm_file, vma);
 -	revert_creds(old_cred);
 +	ovl_revert_creds(file_inode(file)->i_sb, old_cred);
+ 	ovl_file_accessed(file);
  
- 	if (ret) {
- 		/* Drop reference count from new vm_file value */
-@@ -537,7 +510,7 @@ static long ovl_fallocate(struct file *f
+ 	return ret;
+@@ -529,7 +505,7 @@ static long ovl_fallocate(struct file *f
  
  	old_cred = ovl_override_creds(file_inode(file)->i_sb);
  	ret = vfs_fallocate(real.file, mode, offset, len);
@@ -11800,8 +11680,8 @@ Index: kernel-rpi/fs/overlayfs/file.c
 +	ovl_revert_creds(file_inode(file)->i_sb, old_cred);
  
  	/* Update size */
- 	ovl_copyattr(ovl_inode_real(inode), inode);
-@@ -559,7 +532,7 @@ static int ovl_fadvise(struct file *file
+ 	ovl_copyattr(inode);
+@@ -554,7 +530,7 @@ static int ovl_fadvise(struct file *file
  
  	old_cred = ovl_override_creds(file_inode(file)->i_sb);
  	ret = vfs_fadvise(real.file, offset, len, advice);
@@ -11810,7 +11690,7 @@ Index: kernel-rpi/fs/overlayfs/file.c
  
  	fdput(real);
  
-@@ -715,7 +688,7 @@ static loff_t ovl_copyfile(struct file *
+@@ -613,7 +589,7 @@ static loff_t ovl_copyfile(struct file *
  						flags);
  		break;
  	}
@@ -11818,30 +11698,21 @@ Index: kernel-rpi/fs/overlayfs/file.c
 +	ovl_revert_creds(file_inode(file_out)->i_sb, old_cred);
  
  	/* Update size */
- 	ovl_copyattr(ovl_inode_real(inode_out), inode_out);
-@@ -775,7 +748,7 @@ const struct file_operations ovl_file_op
- #ifdef CONFIG_COMPAT
- 	.compat_ioctl	= ovl_compat_ioctl,
- #endif
--	.splice_read    = generic_file_splice_read,
-+	.splice_read    = ovl_splice_read,
- 	.splice_write   = ovl_splice_write,
- 
- 	.copy_file_range	= ovl_copy_file_range,
-Index: kernel-rpi/fs/overlayfs/inode.c
+ 	ovl_copyattr(inode_out);
+Index: rpi4-kernel/fs/overlayfs/inode.c
 ===================================================================
---- kernel-rpi.orig/fs/overlayfs/inode.c
-+++ kernel-rpi/fs/overlayfs/inode.c
-@@ -80,7 +80,7 @@ int ovl_setattr(struct dentry *dentry, s
+--- rpi4-kernel.orig/fs/overlayfs/inode.c
++++ rpi4-kernel/fs/overlayfs/inode.c
+@@ -78,7 +78,7 @@ int ovl_setattr(struct user_namespace *m
  		inode_lock(upperdentry->d_inode);
  		old_cred = ovl_override_creds(dentry->d_sb);
- 		err = notify_change(upperdentry, attr, NULL);
+ 		err = notify_change(&init_user_ns, upperdentry, attr, NULL);
 -		revert_creds(old_cred);
-+		ovl_revert_creds(dentry->d_sb, old_cred);
++    ovl_revert_creds(dentry->d_sb, old_cred);
  		if (!err)
- 			ovl_copyattr(upperdentry->d_inode, dentry->d_inode);
+ 			ovl_copyattr(dentry->d_inode);
  		inode_unlock(upperdentry->d_inode);
-@@ -272,7 +272,7 @@ int ovl_getattr(const struct path *path,
+@@ -270,7 +270,7 @@ int ovl_getattr(struct user_namespace *m
  		stat->nlink = dentry->d_inode->i_nlink;
  
  out:
@@ -11850,16 +11721,16 @@ Index: kernel-rpi/fs/overlayfs/inode.c
  
  	return err;
  }
-@@ -306,7 +306,7 @@ int ovl_permission(struct inode *inode,
+@@ -305,7 +305,7 @@ int ovl_permission(struct user_namespace
  		mask |= MAY_READ;
  	}
- 	err = inode_permission(realinode, mask);
+ 	err = inode_permission(&init_user_ns, realinode, mask);
 -	revert_creds(old_cred);
 +	ovl_revert_creds(inode->i_sb, old_cred);
  
  	return err;
  }
-@@ -323,7 +323,7 @@ static const char *ovl_get_link(struct d
+@@ -322,7 +322,7 @@ static const char *ovl_get_link(struct d
  
  	old_cred = ovl_override_creds(dentry->d_sb);
  	p = vfs_get_link(ovl_dentry_real(dentry), done);
@@ -11868,27 +11739,25 @@ Index: kernel-rpi/fs/overlayfs/inode.c
  	return p;
  }
  
-@@ -368,7 +368,7 @@ int ovl_xattr_set(struct dentry *dentry,
+@@ -374,7 +374,7 @@ int ovl_xattr_set(struct dentry *dentry,
  		WARN_ON(flags != XATTR_REPLACE);
- 		err = vfs_removexattr(realdentry, name);
+ 		err = vfs_removexattr(&init_user_ns, realdentry, name);
  	}
 -	revert_creds(old_cred);
 +	ovl_revert_creds(dentry->d_sb, old_cred);
  
  	/* copy c/mtime */
- 	ovl_copyattr(d_inode(realdentry), inode);
-@@ -389,8 +389,8 @@ int ovl_xattr_get(struct dentry *dentry,
- 
+ 	ovl_copyattr(inode);
+@@ -396,7 +396,7 @@ int ovl_xattr_get(struct dentry *dentry,
  	old_cred = ovl_override_creds(dentry->d_sb);
- 	res = __vfs_getxattr(realdentry, d_inode(realdentry), name,
--           value, size, flags);
+ 	res = __vfs_getxattr(&init_user_ns, realdentry, d_inode(realdentry), name,
+           value, size, flags);
 -	revert_creds(old_cred);
-+			     value, size, flags);
 +	ovl_revert_creds(dentry->d_sb, old_cred);
  	return res;
  }
  
-@@ -418,7 +418,7 @@ ssize_t ovl_listxattr(struct dentry *den
+@@ -424,7 +424,7 @@ ssize_t ovl_listxattr(struct dentry *den
  
  	old_cred = ovl_override_creds(dentry->d_sb);
  	res = vfs_listxattr(realdentry, list, size);
@@ -11897,7 +11766,7 @@ Index: kernel-rpi/fs/overlayfs/inode.c
  	if (res <= 0 || size == 0)
  		return res;
  
-@@ -453,7 +453,7 @@ struct posix_acl *ovl_get_acl(struct ino
+@@ -462,7 +462,7 @@ struct posix_acl *ovl_get_acl(struct ino
  
  	old_cred = ovl_override_creds(inode->i_sb);
  	acl = get_acl(realinode, type);
@@ -11906,7 +11775,7 @@ Index: kernel-rpi/fs/overlayfs/inode.c
  
  	return acl;
  }
-@@ -487,7 +487,7 @@ static int ovl_fiemap(struct inode *inod
+@@ -496,7 +496,7 @@ static int ovl_fiemap(struct inode *inod
  
  	old_cred = ovl_override_creds(inode->i_sb);
  	err = realinode->i_op->fiemap(realinode, fieinfo, start, len);
@@ -11915,10 +11784,10 @@ Index: kernel-rpi/fs/overlayfs/inode.c
  
  	return err;
  }
-Index: kernel-rpi/fs/overlayfs/namei.c
+Index: rpi4-kernel/fs/overlayfs/namei.c
 ===================================================================
---- kernel-rpi.orig/fs/overlayfs/namei.c
-+++ kernel-rpi/fs/overlayfs/namei.c
+--- rpi4-kernel.orig/fs/overlayfs/namei.c
++++ rpi4-kernel/fs/overlayfs/namei.c
 @@ -108,7 +108,8 @@ int ovl_check_fb_len(struct ovl_fb *fb,
  static struct ovl_fh *ovl_get_fh(struct ovl_fs *ofs, struct dentry *dentry,
  				 enum ovl_xattr ox)
@@ -11942,7 +11811,7 @@ Index: kernel-rpi/fs/overlayfs/namei.c
  	goto out;
  }
  
-@@ -1098,7 +1099,7 @@ struct dentry *ovl_lookup(struct inode *
+@@ -1106,7 +1107,7 @@ struct dentry *ovl_lookup(struct inode *
  	ovl_dentry_update_reval(dentry, upperdentry,
  			DCACHE_OP_REVALIDATE | DCACHE_OP_WEAK_REVALIDATE);
  
@@ -11951,7 +11820,7 @@ Index: kernel-rpi/fs/overlayfs/namei.c
  	if (origin_path) {
  		dput(origin_path->dentry);
  		kfree(origin_path);
-@@ -1125,7 +1126,7 @@ out_put_upper:
+@@ -1133,7 +1134,7 @@ out_put_upper:
  	kfree(upperredirect);
  out:
  	kfree(d.redirect);
@@ -11960,7 +11829,7 @@ Index: kernel-rpi/fs/overlayfs/namei.c
  	return ERR_PTR(err);
  }
  
-@@ -1177,7 +1178,7 @@ bool ovl_lower_positive(struct dentry *d
+@@ -1185,7 +1186,7 @@ bool ovl_lower_positive(struct dentry *d
  			dput(this);
  		}
  	}
@@ -11969,10 +11838,10 @@ Index: kernel-rpi/fs/overlayfs/namei.c
  
  	return positive;
  }
-Index: kernel-rpi/fs/overlayfs/readdir.c
+Index: rpi4-kernel/fs/overlayfs/readdir.c
 ===================================================================
---- kernel-rpi.orig/fs/overlayfs/readdir.c
-+++ kernel-rpi/fs/overlayfs/readdir.c
+--- rpi4-kernel.orig/fs/overlayfs/readdir.c
++++ rpi4-kernel/fs/overlayfs/readdir.c
 @@ -286,7 +286,7 @@ static int ovl_check_whiteouts(struct de
  		}
  		inode_unlock(dir->d_inode);
@@ -11982,7 +11851,7 @@ Index: kernel-rpi/fs/overlayfs/readdir.c
  
  	return err;
  }
-@@ -784,7 +784,7 @@ static int ovl_iterate(struct file *file
+@@ -789,7 +789,7 @@ static int ovl_iterate(struct file *file
  	}
  	err = 0;
  out:
@@ -11991,7 +11860,7 @@ Index: kernel-rpi/fs/overlayfs/readdir.c
  	return err;
  }
  
-@@ -836,7 +836,7 @@ static struct file *ovl_dir_open_realfil
+@@ -841,7 +841,7 @@ static struct file *ovl_dir_open_realfil
  
  	old_cred = ovl_override_creds(file_inode(file)->i_sb);
  	res = ovl_path_open(realpath, O_RDONLY | (file->f_flags & O_LARGEFILE));
@@ -12000,7 +11869,7 @@ Index: kernel-rpi/fs/overlayfs/readdir.c
  
  	return res;
  }
-@@ -966,7 +966,7 @@ int ovl_check_empty_dir(struct dentry *d
+@@ -967,7 +967,7 @@ int ovl_check_empty_dir(struct dentry *d
  
  	old_cred = ovl_override_creds(dentry->d_sb);
  	err = ovl_dir_read_merged(dentry, list, &root);
@@ -12009,11 +11878,11 @@ Index: kernel-rpi/fs/overlayfs/readdir.c
  	if (err)
  		return err;
  
-Index: kernel-rpi/net/core/dev_ioctl.c
+Index: rpi4-kernel/net/core/dev_ioctl.c
 ===================================================================
---- kernel-rpi.orig/net/core/dev_ioctl.c
-+++ kernel-rpi/net/core/dev_ioctl.c
-@@ -495,7 +495,7 @@ int dev_ioctl(struct net *net, unsigned
+--- rpi4-kernel.orig/net/core/dev_ioctl.c
++++ rpi4-kernel/net/core/dev_ioctl.c
+@@ -577,7 +577,7 @@ int dev_ioctl(struct net *net, unsigned
  	case SIOCBRADDIF:
  	case SIOCBRDELIF:
  	case SIOCSHWTSTAMP:
@@ -12022,11 +11891,11 @@ Index: kernel-rpi/net/core/dev_ioctl.c
  			return -EPERM;
  		fallthrough;
  	case SIOCBONDSLAVEINFOQUERY:
-Index: kernel-rpi/net/core/sysctl_net_core.c
+Index: rpi4-kernel/net/core/sysctl_net_core.c
 ===================================================================
---- kernel-rpi.orig/net/core/sysctl_net_core.c
-+++ kernel-rpi/net/core/sysctl_net_core.c
-@@ -613,6 +613,8 @@ static __net_init int sysctl_core_net_in
+--- rpi4-kernel.orig/net/core/sysctl_net_core.c
++++ rpi4-kernel/net/core/sysctl_net_core.c
+@@ -624,6 +624,8 @@ static __net_init int sysctl_core_net_in
  {
  	struct ctl_table *tbl;
  
@@ -12035,10 +11904,10 @@ Index: kernel-rpi/net/core/sysctl_net_core.c
  	tbl = netns_core_table;
  	if (!net_eq(net, &init_net)) {
  		tbl = kmemdup(tbl, sizeof(netns_core_table), GFP_KERNEL);
-Index: kernel-rpi/net/xfrm/xfrm_algo.c
+Index: rpi4-kernel/net/xfrm/xfrm_algo.c
 ===================================================================
---- kernel-rpi.orig/net/xfrm/xfrm_algo.c
-+++ kernel-rpi/net/xfrm/xfrm_algo.c
+--- rpi4-kernel.orig/net/xfrm/xfrm_algo.c
++++ rpi4-kernel/net/xfrm/xfrm_algo.c
 @@ -237,7 +237,7 @@ static struct xfrm_algo_desc aalg_list[]
  
  	.uinfo = {
@@ -12048,11 +11917,11 @@ Index: kernel-rpi/net/xfrm/xfrm_algo.c
  			.icv_fullbits = 256,
  		}
  	},
-Index: kernel-rpi/net/xfrm/xfrm_state.c
+Index: rpi4-kernel/net/xfrm/xfrm_state.c
 ===================================================================
---- kernel-rpi.orig/net/xfrm/xfrm_state.c
-+++ kernel-rpi/net/xfrm/xfrm_state.c
-@@ -2406,21 +2406,23 @@ int xfrm_user_policy(struct sock *sk, in
+--- rpi4-kernel.orig/net/xfrm/xfrm_state.c
++++ rpi4-kernel/net/xfrm/xfrm_state.c
+@@ -2441,21 +2441,23 @@ int xfrm_user_policy(struct sock *sk, in
  	if (IS_ERR(data))
  		return PTR_ERR(data);
  
@@ -12089,10 +11958,10 @@ Index: kernel-rpi/net/xfrm/xfrm_state.c
  
  	err = -EINVAL;
  	rcu_read_lock();
-Index: kernel-rpi/net/xfrm/xfrm_sysctl.c
+Index: rpi4-kernel/net/xfrm/xfrm_sysctl.c
 ===================================================================
---- kernel-rpi.orig/net/xfrm/xfrm_sysctl.c
-+++ kernel-rpi/net/xfrm/xfrm_sysctl.c
+--- rpi4-kernel.orig/net/xfrm/xfrm_sysctl.c
++++ rpi4-kernel/net/xfrm/xfrm_sysctl.c
 @@ -56,8 +56,10 @@ int __net_init xfrm_sysctl_init(struct n
  	table[3].data = &net->xfrm.sysctl_acq_expires;
  
@@ -12106,11 +11975,11 @@ Index: kernel-rpi/net/xfrm/xfrm_sysctl.c
  
  	net->xfrm.sysctl_hdr = register_net_sysctl(net, "net/core", table);
  	if (!net->xfrm.sysctl_hdr)
-Index: kernel-rpi/net/xfrm/xfrm_user.c
+Index: rpi4-kernel/net/xfrm/xfrm_user.c
 ===================================================================
---- kernel-rpi.orig/net/xfrm/xfrm_user.c
-+++ kernel-rpi/net/xfrm/xfrm_user.c
-@@ -2722,20 +2722,22 @@ static int xfrm_user_rcv_msg(struct sk_b
+--- rpi4-kernel.orig/net/xfrm/xfrm_user.c
++++ rpi4-kernel/net/xfrm/xfrm_user.c
+@@ -2875,20 +2875,22 @@ static int xfrm_user_rcv_msg(struct sk_b
  	if (!netlink_net_capable(skb, CAP_NET_ADMIN))
  		return -EPERM;
  
@@ -12145,11 +12014,11 @@ Index: kernel-rpi/net/xfrm/xfrm_user.c
  
  	if ((type == (XFRM_MSG_GETSA - XFRM_MSG_BASE) ||
  	     type == (XFRM_MSG_GETPOLICY - XFRM_MSG_BASE)) &&
-Index: kernel-rpi/kernel/cgroup/cgroup-v1.c
+Index: rpi4-kernel/kernel/cgroup/cgroup-v1.c
 ===================================================================
---- kernel-rpi.orig/kernel/cgroup/cgroup-v1.c
-+++ kernel-rpi/kernel/cgroup/cgroup-v1.c
-@@ -512,7 +512,8 @@ static ssize_t __cgroup1_procs_write(str
+--- rpi4-kernel.orig/kernel/cgroup/cgroup-v1.c
++++ rpi4-kernel/kernel/cgroup/cgroup-v1.c
+@@ -519,7 +519,8 @@ static ssize_t __cgroup1_procs_write(str
  	tcred = get_task_cred(task);
  	if (!uid_eq(cred->euid, GLOBAL_ROOT_UID) &&
  	    !uid_eq(cred->euid, tcred->uid) &&
@@ -12159,11 +12028,11 @@ Index: kernel-rpi/kernel/cgroup/cgroup-v1.c
  		ret = -EACCES;
  	put_cred(tcred);
  	if (ret)
-Index: kernel-rpi/kernel/cgroup/cgroup.c
+Index: rpi4-kernel/kernel/cgroup/cgroup.c
 ===================================================================
---- kernel-rpi.orig/kernel/cgroup/cgroup.c
-+++ kernel-rpi/kernel/cgroup/cgroup.c
-@@ -1711,7 +1711,6 @@ int rebind_subsystems(struct cgroup_root
+--- rpi4-kernel.orig/kernel/cgroup/cgroup.c
++++ rpi4-kernel/kernel/cgroup/cgroup.c
+@@ -1742,7 +1742,6 @@ int rebind_subsystems(struct cgroup_root
  	struct cgroup *dcgrp = &dst_root->cgrp;
  	struct cgroup_subsys *ss;
  	int ssid, i, ret;
@@ -12171,7 +12040,7 @@ Index: kernel-rpi/kernel/cgroup/cgroup.c
  
  	lockdep_assert_held(&cgroup_mutex);
  
-@@ -1728,28 +1727,8 @@ int rebind_subsystems(struct cgroup_root
+@@ -1759,28 +1758,8 @@ int rebind_subsystems(struct cgroup_root
  		/* can't move between two non-dummy roots either */
  		if (ss->root != &cgrp_dfl_root && dst_root != &cgrp_dfl_root)
  			return -EBUSY;
@@ -12200,7 +12069,7 @@ Index: kernel-rpi/kernel/cgroup/cgroup.c
  	do_each_subsys_mask(ss, ssid, ss_mask) {
  		struct cgroup_root *src_root = ss->root;
  		struct cgroup *scgrp = &src_root->cgrp;
-@@ -1758,12 +1737,10 @@ int rebind_subsystems(struct cgroup_root
+@@ -1789,12 +1768,10 @@ int rebind_subsystems(struct cgroup_root
  
  		WARN_ON(!css || cgroup_css(dcgrp, ss));
  
@@ -12217,7 +12086,7 @@ Index: kernel-rpi/kernel/cgroup/cgroup.c
  
  		/* rebind */
  		RCU_INIT_POINTER(scgrp->subsys[ssid], NULL);
-@@ -2170,10 +2147,8 @@ static void cgroup_kill_sb(struct super_
+@@ -2213,10 +2190,8 @@ static void cgroup_kill_sb(struct super_
  	 * And don't kill the default root.
  	 */
  	if (list_empty(&root->cgrp.self.children) && root != &cgrp_dfl_root &&
@@ -12229,7 +12098,7 @@ Index: kernel-rpi/kernel/cgroup/cgroup.c
  	cgroup_put(&root->cgrp);
  	kernfs_kill_sb(sb);
  }
-@@ -5720,9 +5695,6 @@ int __init cgroup_init_early(void)
+@@ -5875,9 +5850,6 @@ int __init cgroup_init_early(void)
  	return 0;
  }
  
@@ -12239,7 +12108,7 @@ Index: kernel-rpi/kernel/cgroup/cgroup.c
  /**
   * cgroup_init - cgroup initialization
   *
-@@ -5761,12 +5733,6 @@ int __init cgroup_init(void)
+@@ -5916,12 +5888,6 @@ int __init cgroup_init(void)
  
  	mutex_unlock(&cgroup_mutex);
  
@@ -12252,7 +12121,7 @@ Index: kernel-rpi/kernel/cgroup/cgroup.c
  	for_each_subsys(ss, ssid) {
  		if (ss->early_init) {
  			struct cgroup_subsys_state *css =
-@@ -6305,10 +6271,6 @@ static int __init cgroup_disable(char *s
+@@ -6512,10 +6478,6 @@ static int __init cgroup_disable(char *s
  			    strcmp(token, ss->legacy_name))
  				continue;
  
@@ -12263,7 +12132,7 @@ Index: kernel-rpi/kernel/cgroup/cgroup.c
  			static_branch_disable(cgroup_subsys_enabled_key[i]);
  			pr_info("Disabling %s control group subsystem\n",
  				ss->name);
-@@ -6318,31 +6280,6 @@ static int __init cgroup_disable(char *s
+@@ -6534,31 +6496,6 @@ static int __init cgroup_disable(char *s
  }
  __setup("cgroup_disable=", cgroup_disable);
  
@@ -12295,11 +12164,11 @@ Index: kernel-rpi/kernel/cgroup/cgroup.c
  void __init __weak enable_debug_cgroup(void) { }
  
  static int __init enable_cgroup_debug(char *str)
-Index: kernel-rpi/kernel/cgroup/rstat.c
+Index: rpi4-kernel/kernel/cgroup/rstat.c
 ===================================================================
---- kernel-rpi.orig/kernel/cgroup/rstat.c
-+++ kernel-rpi/kernel/cgroup/rstat.c
-@@ -421,6 +421,8 @@ static void root_cgroup_cputime(struct t
+--- rpi4-kernel.orig/kernel/cgroup/rstat.c
++++ rpi4-kernel/kernel/cgroup/rstat.c
+@@ -433,6 +433,8 @@ static void root_cgroup_cputime(struct t
  		cputime->sum_exec_runtime += user;
  		cputime->sum_exec_runtime += sys;
  		cputime->sum_exec_runtime += cpustat[CPUTIME_STEAL];
@@ -12308,11 +12177,11 @@ Index: kernel-rpi/kernel/cgroup/rstat.c
  	}
  }
  
-Index: kernel-rpi/include/linux/cgroup.h
+Index: rpi4-kernel/include/linux/cgroup.h
 ===================================================================
---- kernel-rpi.orig/include/linux/cgroup.h
-+++ kernel-rpi/include/linux/cgroup.h
-@@ -432,6 +432,18 @@ static inline void cgroup_put(struct cgr
+--- rpi4-kernel.orig/include/linux/cgroup.h
++++ rpi4-kernel/include/linux/cgroup.h
+@@ -433,6 +433,18 @@ static inline void cgroup_put(struct cgr
  	css_put(&cgrp->self);
  }
  
@@ -12331,7 +12200,7 @@ Index: kernel-rpi/include/linux/cgroup.h
  /**
   * task_css_set_check - obtain a task's css_set with extra access conditions
   * @task: the task to obtain css_set for
-@@ -446,7 +458,6 @@ static inline void cgroup_put(struct cgr
+@@ -447,7 +459,6 @@ static inline void cgroup_put(struct cgr
   * as locks used during the cgroup_subsys::attach() methods.
   */
  #ifdef CONFIG_PROVE_RCU
@@ -12339,8 +12208,8 @@ Index: kernel-rpi/include/linux/cgroup.h
  extern spinlock_t css_set_lock;
  #define task_css_set_check(task, __c)					\
  	rcu_dereference_check((task)->cgroups,				\
-@@ -704,6 +715,8 @@ struct cgroup;
- static inline u64 cgroup_id(struct cgroup *cgrp) { return 1; }
+@@ -708,6 +719,8 @@ struct cgroup;
+ static inline u64 cgroup_id(const struct cgroup *cgrp) { return 1; }
  static inline void css_get(struct cgroup_subsys_state *css) {}
  static inline void css_put(struct cgroup_subsys_state *css) {}
 +static inline void cgroup_lock(void) {}
@@ -12348,3 +12217,250 @@ Index: kernel-rpi/include/linux/cgroup.h
  static inline int cgroup_attach_task_all(struct task_struct *from,
  					 struct task_struct *t) { return 0; }
  static inline int cgroupstats_build(struct cgroupstats *stats,
+Index: rpi4-kernel/include/linux/xattr.h
+===================================================================
+--- rpi4-kernel.orig/include/linux/xattr.h
++++ rpi4-kernel/include/linux/xattr.h
+@@ -34,7 +34,7 @@ struct xattr_handler {
+ 	bool (*list)(struct dentry *dentry);
+ 	int (*get)(const struct xattr_handler *, struct dentry *dentry,
+ 		   struct inode *inode, const char *name, void *buffer,
+-		   size_t size);
++		   size_t size, int flags);
+ 	int (*set)(const struct xattr_handler *,
+ 		   struct user_namespace *mnt_userns, struct dentry *dentry,
+ 		   struct inode *inode, const char *name, const void *buffer,
+Index: rpi4-kernel/security/security.c
+===================================================================
+--- rpi4-kernel.orig/security/security.c
++++ rpi4-kernel/security/security.c
+@@ -749,27 +749,27 @@ static int lsm_superblock_alloc(struct s
+ 
+ /* Security operations */
+ 
+-int security_binder_set_context_mgr(struct task_struct *mgr)
++int security_binder_set_context_mgr(const struct cred *mgr)
+ {
+-	return call_int_hook(binder_set_context_mgr, 0, mgr);
++  return call_int_hook(binder_set_context_mgr, 0, mgr);
+ }
+ 
+-int security_binder_transaction(struct task_struct *from,
+-				struct task_struct *to)
++int security_binder_transaction(const struct cred *from,
++        const struct cred *to)
+ {
+-	return call_int_hook(binder_transaction, 0, from, to);
++  return call_int_hook(binder_transaction, 0, from, to);
+ }
+ 
+-int security_binder_transfer_binder(struct task_struct *from,
+-				    struct task_struct *to)
++int security_binder_transfer_binder(const struct cred *from,
++            const struct cred *to)
+ {
+-	return call_int_hook(binder_transfer_binder, 0, from, to);
++  return call_int_hook(binder_transfer_binder, 0, from, to);
+ }
+ 
+-int security_binder_transfer_file(struct task_struct *from,
+-				  struct task_struct *to, struct file *file)
++int security_binder_transfer_file(const struct cred *from,
++          const struct cred *to, struct file *file)
+ {
+-	return call_int_hook(binder_transfer_file, 0, from, to, file);
++  return call_int_hook(binder_transfer_file, 0, from, to, file);
+ }
+ 
+ int security_ptrace_access_check(struct task_struct *child, unsigned int mode)
+Index: rpi4-kernel/include/linux/lsm_hook_defs.h
+===================================================================
+--- rpi4-kernel.orig/include/linux/lsm_hook_defs.h
++++ rpi4-kernel/include/linux/lsm_hook_defs.h
+@@ -26,13 +26,13 @@
+  *   #undef LSM_HOOK
+  * };
+  */
+-LSM_HOOK(int, 0, binder_set_context_mgr, struct task_struct *mgr)
+-LSM_HOOK(int, 0, binder_transaction, struct task_struct *from,
+-	 struct task_struct *to)
+-LSM_HOOK(int, 0, binder_transfer_binder, struct task_struct *from,
+-	 struct task_struct *to)
+-LSM_HOOK(int, 0, binder_transfer_file, struct task_struct *from,
+-	 struct task_struct *to, struct file *file)
++LSM_HOOK(int, 0, binder_set_context_mgr, const struct cred *mgr)
++LSM_HOOK(int, 0, binder_transaction, const struct cred *from,
++	 const struct cred *to)
++LSM_HOOK(int, 0, binder_transfer_binder, const struct cred *from,
++	 const struct cred *to)
++LSM_HOOK(int, 0, binder_transfer_file, const struct cred *from,
++	 const struct cred *to, struct file *file)
+ LSM_HOOK(int, 0, ptrace_access_check, struct task_struct *child,
+ 	 unsigned int mode)
+ LSM_HOOK(int, 0, ptrace_traceme, struct task_struct *parent)
+Index: rpi4-kernel/security/commoncap.c
+===================================================================
+--- rpi4-kernel.orig/security/commoncap.c
++++ rpi4-kernel/security/commoncap.c
+@@ -298,8 +298,8 @@ int cap_inode_need_killpriv(struct dentr
+ 	struct inode *inode = d_backing_inode(dentry);
+ 	int error;
+ 
+-	error = __vfs_getxattr(dentry, inode, XATTR_NAME_CAPS, NULL, 0,
+-            XATTR_NOSECURITY);
++	error = __vfs_getxattr(&init_user_ns, dentry, inode, XATTR_NAME_CAPS,
++			       NULL, 0, XATTR_NOSECURITY);
+ 	return error > 0;
+ }
+ 
+@@ -402,10 +402,8 @@ int cap_inode_getsecurity(struct user_na
+ 				      &tmpbuf, size, GFP_NOFS);
+ 	dput(dentry);
+ 
+-	if (ret < 0 || !tmpbuf) {
+-		size = ret;
+-		goto out_free;
+-	}
++	if (ret < 0 || !tmpbuf)
++		return ret;
+ 
+ 	fs_ns = inode->i_sb->s_user_ns;
+ 	cap = (struct vfs_cap_data *) tmpbuf;
+@@ -666,9 +664,9 @@ int get_vfs_caps_from_disk(struct user_n
+ 		return -ENODATA;
+ 
+ 	fs_ns = inode->i_sb->s_user_ns;
+-	size = __vfs_getxattr((struct dentry *)dentry, inode,
++	size = __vfs_getxattr(&init_user_ns, (struct dentry *)dentry, inode,
+ 			      XATTR_NAME_CAPS, &data, XATTR_CAPS_SZ,
+-            XATTR_NOSECURITY);
++			      XATTR_NOSECURITY);
+ 	if (size == -ENODATA || size == -EOPNOTSUPP)
+ 		/* no data, that's ok */
+ 		return -ENODATA;
+Index: rpi4-kernel/fs/ecryptfs/ecryptfs_kernel.h
+===================================================================
+--- rpi4-kernel.orig/fs/ecryptfs/ecryptfs_kernel.h
++++ rpi4-kernel/fs/ecryptfs/ecryptfs_kernel.h
+@@ -662,6 +662,7 @@ int ecryptfs_read_lower_page_segment(str
+ 				     pgoff_t page_index,
+ 				     size_t offset_in_page, size_t size,
+ 				     struct inode *ecryptfs_inode);
++int ecryptfs_fsync_lower(struct inode *ecryptfs_inode, int datasync);
+ struct page *ecryptfs_get_locked_page(struct inode *inode, loff_t index);
+ int ecryptfs_parse_packet_length(unsigned char *data, size_t *size,
+ 				 size_t *length_size);
+Index: rpi4-kernel/fs/ecryptfs/mmap.c
+===================================================================
+--- rpi4-kernel.orig/fs/ecryptfs/mmap.c
++++ rpi4-kernel/fs/ecryptfs/mmap.c
+@@ -422,8 +422,9 @@ static int ecryptfs_write_inode_size_to_
+ 		goto out;
+ 	}
+ 	inode_lock(lower_inode);
+-	size = __vfs_getxattr(lower_dentry, lower_inode, ECRYPTFS_XATTR_NAME,
+-			      xattr_virt, PAGE_SIZE, XATTR_NOSECURITY);
++	size = __vfs_getxattr(&init_user_ns, lower_dentry, lower_inode,
++			      ECRYPTFS_XATTR_NAME, xattr_virt, PAGE_SIZE,
++			      XATTR_NOSECURITY);
+ 	if (size < 0)
+ 		size = 8;
+ 	put_unaligned_be64(i_size_read(ecryptfs_inode), xattr_virt);
+Index: rpi4-kernel/mm/page_alloc.c
+===================================================================
+--- rpi4-kernel.orig/mm/page_alloc.c
++++ rpi4-kernel/mm/page_alloc.c
+@@ -72,6 +72,7 @@
+ #include <linux/padata.h>
+ #include <linux/khugepaged.h>
+ #include <linux/buffer_head.h>
++#include <linux/low-mem-notify.h>
+ #include <asm/sections.h>
+ #include <asm/tlbflush.h>
+ #include <asm/div64.h>
+@@ -4820,6 +4821,7 @@ should_reclaim_retry(gfp_t gfp_mask, uns
+ 	 * several times in the row.
+ 	 */
+ 	if (*no_progress_loops > MAX_RECLAIM_RETRIES) {
++    low_mem_notify();
+ 		/* Before OOM, exhaust highatomic_reserve */
+ 		return unreserve_highatomic_pageblock(ac, true);
+ 	}
+@@ -5433,6 +5435,7 @@ struct page *__alloc_pages(gfp_t gfp, un
+ 			&alloc_gfp, &alloc_flags))
+ 		return NULL;
+ 
++  low_mem_check();
+ 	/*
+ 	 * Forbid the first pass from falling back to types that fragment
+ 	 * memory until all local zones are considered.
+Index: rpi4-kernel/fs/ecryptfs/read_write.c
+===================================================================
+--- rpi4-kernel.orig/fs/ecryptfs/read_write.c
++++ rpi4-kernel/fs/ecryptfs/read_write.c
+@@ -261,3 +261,25 @@ int ecryptfs_read_lower_page_segment(str
+ 	flush_dcache_page(page_for_ecryptfs);
+ 	return rc;
+ }
++
++/**
++ * ecryptfs_fsync_lower
++ * @ecryptfs_inode: The eCryptfs inode
++ * @datasync: Only perform a fdatasync operation
++ *
++ * Write back data and metadata for the lower file to disk.  If @datasync is
++ * set only metadata needed to access modified file data is written.
++ *
++ * Returns 0 on success; less than zero on error
++ */
++int ecryptfs_fsync_lower(struct inode *ecryptfs_inode, int datasync)
++{
++	struct file *lower_file;
++
++	lower_file = ecryptfs_inode_to_private(ecryptfs_inode)->lower_file;
++	if (!lower_file)
++		return -EIO;
++	if (!lower_file->f_op->fsync)
++		return 0;
++	return vfs_fsync(lower_file, datasync);
++}
+Index: rpi4-kernel/kernel/events/core.c
+===================================================================
+--- rpi4-kernel.orig/kernel/events/core.c
++++ rpi4-kernel/kernel/events/core.c
+@@ -6673,7 +6673,7 @@ static void perf_pending_task(struct cal
+ 	put_event(event);
+ }
+ 
+-/*              
++/*
+  * We assume there is only KVM supporting the callbacks.
+  * Later on, we might change it to a list if there is
+  * another virtualization implementation supporting the callbacks.
+@@ -12193,9 +12193,9 @@ perf_check_permission(struct perf_event_
+  * @group_fd:		group leader event fd
+  * @flags:		perf event open flags
+  */
+-SYSCALL_DEFINE5(perf_event_open,
+-		struct perf_event_attr __user *, attr_uptr,
+-		pid_t, pid, int, cpu, int, group_fd, unsigned long, flags)
++int ksys_perf_event_open(
++		struct perf_event_attr __user * attr_uptr,
++		pid_t pid, int cpu, int group_fd, unsigned long flags)
+ {
+ 	struct perf_event *group_leader = NULL, *output_event = NULL;
+ 	struct perf_event *event, *sibling;
+@@ -12654,6 +12654,13 @@ err_fd:
+ 	return err;
+ }
+ 
++SYSCALL_DEFINE5(perf_event_open,
++               struct perf_event_attr __user *, attr_uptr,
++               pid_t, pid, int, cpu, int, group_fd, unsigned long, flags)
++{
++      return ksys_perf_event_open(attr_uptr, pid, cpu, group_fd, flags);
++}
++
+ /**
+  * perf_event_create_kernel_counter
+  *

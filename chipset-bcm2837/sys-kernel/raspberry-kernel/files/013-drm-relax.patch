@@ -1,8 +1,8 @@
-Index: kernel-rpi/drivers/gpu/drm/drm_drv.c
+Index: rpi4-kernel/drivers/gpu/drm/drm_drv.c
 ===================================================================
---- kernel-rpi.orig/drivers/gpu/drm/drm_drv.c
-+++ kernel-rpi/drivers/gpu/drm/drm_drv.c
-@@ -1026,6 +1026,8 @@ out:
+--- rpi4-kernel.orig/drivers/gpu/drm/drm_drv.c
++++ rpi4-kernel/drivers/gpu/drm/drm_drv.c
+@@ -1024,6 +1024,8 @@ out:
  	return err;
  }
  
@@ -11,25 +11,22 @@ Index: kernel-rpi/drivers/gpu/drm/drm_drv.c
  static const struct file_operations drm_stub_fops = {
  	.owner = THIS_MODULE,
  	.open = drm_stub_open,
-@@ -1056,6 +1058,12 @@ static int __init drm_core_init(void)
+@@ -1055,6 +1057,9 @@ static int __init drm_core_init(void)
  
  	drm_debugfs_root = debugfs_create_dir("dri", NULL);
  
-+  if (!debugfs_create_bool("drm_master_relax", S_IRUSR | S_IWUSR,
-+        drm_debugfs_root, &drm_master_relax)) {
-+    DRM_ERROR(
-+        "Cannot create /sys/kernel/debug/dri/drm_master_relax\n");
-+  }
++  debugfs_create_bool("drm_master_relax", S_IRUSR | S_IWUSR,
++        drm_debugfs_root, &drm_master_relax);
 +
  	ret = register_chrdev(DRM_MAJOR, "drm", &drm_stub_fops);
  	if (ret < 0)
  		goto error;
-Index: kernel-rpi/include/drm/drm_drv.h
+Index: rpi4-kernel/include/drm/drm_drv.h
 ===================================================================
---- kernel-rpi.orig/include/drm/drm_drv.h
-+++ kernel-rpi/include/drm/drm_drv.h
-@@ -591,6 +591,8 @@ struct drm_driver {
- void *__devm_drm_dev_alloc(struct device *parent, struct drm_driver *driver,
+--- rpi4-kernel.orig/include/drm/drm_drv.h
++++ rpi4-kernel/include/drm/drm_drv.h
+@@ -479,6 +479,8 @@ void *__devm_drm_dev_alloc(struct device
+ 			   const struct drm_driver *driver,
  			   size_t size, size_t offset);
  
 +extern bool drm_master_relax;
@@ -37,11 +34,11 @@ Index: kernel-rpi/include/drm/drm_drv.h
  /**
   * devm_drm_dev_alloc - Resource managed allocation of a &drm_device instance
   * @parent: Parent device object
-Index: kernel-rpi/drivers/gpu/drm/drm_auth.c
+Index: rpi4-kernel/drivers/gpu/drm/drm_auth.c
 ===================================================================
---- kernel-rpi.orig/drivers/gpu/drm/drm_auth.c
-+++ kernel-rpi/drivers/gpu/drm/drm_auth.c
-@@ -205,7 +205,7 @@ static int drm_new_set_master(struct drm
+--- rpi4-kernel.orig/drivers/gpu/drm/drm_auth.c
++++ rpi4-kernel/drivers/gpu/drm/drm_auth.c
+@@ -235,7 +235,7 @@ static int drm_new_set_master(struct drm
  static int
  drm_master_check_perm(struct drm_device *dev, struct drm_file *file_priv)
  {

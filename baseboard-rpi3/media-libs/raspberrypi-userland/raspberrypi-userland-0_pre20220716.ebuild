@@ -23,7 +23,7 @@ else
   RESTRICT="mirror"
 	S="${WORKDIR}/userland-${GIT_COMMIT}"
 fi
-KEYWORDS="~arm ~arm64"
+KEYWORDS="arm arm64"
 
 DESCRIPTION="Raspberry Pi userspace tools and libraries"
 HOMEPAGE="https://github.com/raspberrypi/userland"
@@ -47,10 +47,11 @@ PATCHES=(
 	# See https://github.com/raspberrypi/userland/pull/659
 	"${FILESDIR}/${PN}-pkgconf-arm64.patch"
   "${FILESDIR}/remove-man-install-instructions.patch"
+  "${FILESDIR}/add_mmal_arm64.patch"
 )
 
 src_prepare() {
-  cros_use_gcc
+  #cros_use_gcc
 	cmake_src_prepare
 	sed -i \
 		-e 's:DESTINATION ${VMCS_INSTALL_PREFIX}/src:DESTINATION ${VMCS_INSTALL_PREFIX}/'"share/doc/${PF}:" \

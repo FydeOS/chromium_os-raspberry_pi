@@ -1,0 +1,56 @@
+Index: mesa-freedreno/src/gallium/drivers/v3d/v3d_screen.c
+===================================================================
+--- mesa-freedreno.orig/src/gallium/drivers/v3d/v3d_screen.c
++++ mesa-freedreno/src/gallium/drivers/v3d/v3d_screen.c
+@@ -834,8 +834,11 @@ static struct disk_cache *
+ v3d_screen_get_disk_shader_cache(struct pipe_screen *pscreen)
+ {
+         struct v3d_screen *screen = v3d_screen(pscreen);
+-
++#ifdef ENABLE_SHADER_CACHE
+         return screen->disk_cache;
++#else
++        return NULL;
++#endif
+ }
+ 
+ struct pipe_screen *
+Index: mesa-freedreno/src/gallium/targets/dri/meson.build
+===================================================================
+--- mesa-freedreno.orig/src/gallium/targets/dri/meson.build
++++ mesa-freedreno/src/gallium/targets/dri/meson.build
+@@ -66,33 +66,7 @@ libgallium_dri = shared_library(
+   name_suffix : 'so',
+ )
+ 
+-foreach d : [[with_gallium_kmsro, [
+-               'armada-drm_dri.so',
+-               'exynos_dri.so',
+-               'hx8357d_dri.so',
+-               'ili9225_dri.so',
+-               'ili9341_dri.so',
+-               'imx-drm_dri.so',
+-               'imx-dcss_dri.so',
+-               'imx-lcdif_dri.so',
+-               'ingenic-drm_dri.so',
+-               'kirin_dri.so',
+-               'komeda_dri.so',
+-               'mali-dp_dri.so',
+-               'mcde_dri.so',
+-               'mediatek_dri.so',
+-               'meson_dri.so',
+-               'mi0283qt_dri.so',
+-               'mxsfb-drm_dri.so',
+-               'pl111_dri.so',
+-               'rcar-du_dri.so',
+-               'repaper_dri.so',
+-               'rockchip_dri.so',
+-               'st7586_dri.so',
+-               'st7735r_dri.so',
+-               'stm_dri.so',
+-	       'sun4i-drm_dri.so',
+-             ]],
++foreach d : [
+              [with_gallium_radeonsi, 'radeonsi_dri.so'],
+              [with_gallium_nouveau, 'nouveau_dri.so'],
+              [with_gallium_freedreno, ['msm_dri.so', 'kgsl_dri.so']],

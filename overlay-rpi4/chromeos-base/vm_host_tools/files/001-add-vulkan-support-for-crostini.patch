@@ -1,0 +1,15 @@
+Index: vm_tools/concierge/termina_vm.cc
+===================================================================
+--- vm_tools.orig/concierge/termina_vm.cc
++++ vm_tools/concierge/termina_vm.cc
+@@ -367,6 +367,10 @@ bool TerminaVm::Start(VmBuilder vm_build
+   process_.SetPreExecCallback(base::BindOnce(
+       &SetUpCrosvmProcess, base::FilePath(kTerminaCpuCgroup).Append("tasks")));
+ 
++  if (USE_CROSVM_VULKAN) {
++    vm_builder.EnableVulkan(true).EnableRenderServer(true);
++  }
++
+   if (USE_CROSVM_SIBLINGS) {
+     auto cmds = vm_builder.BuildSiblingCmds(GetVvuDevicesInfo(), runtime_dir_);
+     if (!cmds) {

@@ -21,7 +21,7 @@ S=${WORKDIR}
 
 src_install() {
   udev_dorules "${FILESDIR}/udev/10-vchiq-permissions.rules"
-#  udev_dorules "${FILESDIR}/udev/50-media.rules"
+  udev_dorules "${FILESDIR}/udev/50-media.rules"
   insinto /etc/init
   doins "${FILESDIR}/bt/bluetooth_uart.conf"
   doins "${FILESDIR}/bt/console-ttyAMA0.override"

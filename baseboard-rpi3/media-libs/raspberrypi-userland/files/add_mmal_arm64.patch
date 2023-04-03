@@ -1,0 +1,136 @@
+Index: rpi-userland/CMakeLists.txt
+===================================================================
+--- rpi-userland.orig/CMakeLists.txt
++++ rpi-userland/CMakeLists.txt
+@@ -9,7 +9,7 @@ SET(PROJECT_VER "${PROJECT_VER_MAJOR}.${
+ SET(PROJECT_APIVER "${PROJECT_VER}")
+ 
+ if(ARM64)
+-   set(BUILD_MMAL FALSE)
++   set(BUILD_MMAL TRUE)
+    set(BUILD_MMAL_APPS FALSE)
+ else()
+    set(BUILD_MMAL TRUE)
+Index: rpi-userland/interface/mmal/vc/mmal_vc_msgs.h
+===================================================================
+--- rpi-userland.orig/interface/mmal/vc/mmal_vc_msgs.h
++++ rpi-userland/interface/mmal/vc/mmal_vc_msgs.h
+@@ -58,7 +58,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBI
+ /** A MMAL_CONTROL_SERVICE_T gets space for a single message. This
+   * is the space allocated for these messages.
+   */
+-#define MMAL_WORKER_MSG_LEN  28
++#define MMAL_WORKER_MSG_LEN  36
+ 
+ /** Maximum size of the format extradata.
+  * FIXME: should probably be made bigger and maybe be passed separately from the info.
+Index: rpi-userland/interface/mmal/client/brcmjpeg/brcmjpeg.h
+===================================================================
+--- rpi-userland.orig/interface/mmal/client/brcmjpeg/brcmjpeg.h
++++ rpi-userland/interface/mmal/client/brcmjpeg/brcmjpeg.h
+@@ -78,8 +78,11 @@ typedef struct
+    /** Actual size of the input data */
+    unsigned int input_size;
+    /** Handle to input buffer containing input data */
++#ifdef __aarch64__
++   unsigned long input_handle;
++#else
+    unsigned int input_handle;
+-
++#endif
+    /** Pointer to the buffer used for the output data
+      * A client should set output OR output_handle, but not both. */
+    unsigned char *output;
+@@ -88,8 +91,11 @@ typedef struct
+    /** Actual size of the output data (this is an output parameter) */
+    unsigned int output_size;
+    /** Handle to the buffer used for the output data */
++ #ifdef __aarch64__
++   unsigned long output_handle;
++ #else
+    unsigned int output_handle;
+-
++ #endif
+    /** Width of the raw frame (this is an input parameter for encode) */
+    unsigned int width;
+    /** Height of the raw frame (this is an input parameter for encode) */
+Index: rpi-userland/interface/mmal/client/brcmjpeg/brcmjpeg.c
+===================================================================
+--- rpi-userland.orig/interface/mmal/client/brcmjpeg/brcmjpeg.c
++++ rpi-userland/interface/mmal/client/brcmjpeg/brcmjpeg.c
+@@ -202,7 +202,11 @@ BRCMJPEG_STATUS_T brcmjpeg_process(BRCMJ
+    if ((req->input && req->input_handle) ||
+        (req->output && req->output_handle))
+    {
++  #ifdef __aarch64__
++      LOG_ERROR("buffer pointer and handle both set (%p/%lu %p/%lu)",
++  #else
+       LOG_ERROR("buffer pointer and handle both set (%p/%u %p/%u)",
++  #endif
+             req->input, req->input_handle, req->output, req->output_handle);
+       return BRCMJPEG_ERROR_REQUEST;
+    }
+Index: rpi-userland/interface/mmal/client/brcmjpeg/brcmjpeg_test.c
+===================================================================
+--- rpi-userland.orig/interface/mmal/client/brcmjpeg/brcmjpeg_test.c
++++ rpi-userland/interface/mmal/client/brcmjpeg/brcmjpeg_test.c
+@@ -182,8 +182,11 @@ int main(int argc, char **argv)
+                 fprintf(stderr, "could not decode %s\n", argv[i]);
+                 break;
+             }
+-
++#ifdef __aarch64__
++            fprintf(stderr, "decoded %ix%i(%ix%i), %i bytes in %ldus\n",
++#else
+             fprintf(stderr, "decoded %ix%i(%ix%i), %i bytes in %lldus\n",
++#endif
+                     dec_request.width, dec_request.height,
+                     dec_request.buffer_width, dec_request.buffer_height,
+                     dec_request.input_size, stop - start);
+@@ -202,8 +205,11 @@ int main(int argc, char **argv)
+                 fprintf(stderr, "could not encode %s\n", outFileName);
+                 break;
+             }
+-
++#ifdef __aarch64__
++            fprintf(stderr, "encoded %ix%i(%ix%i), %i bytes in %ldus\n",
++#else
+             fprintf(stderr, "encoded %ix%i(%ix%i), %i bytes in %lldus\n",
++#endif
+                     enc_request.width, enc_request.height,
+                     enc_request.buffer_width, enc_request.buffer_height,
+                     enc_request.output_size, stop - start);
+@@ -216,10 +222,17 @@ int main(int argc, char **argv)
+         fwrite(enc_request.output, 1, enc_request.output_size, file_out);
+         fclose(file_out);
+         fclose(file_in);
+-
++#ifdef __aarch64__
++        fprintf(stderr, "decode times %ldus (%ldus per run)\n",
++#else
+         fprintf(stderr, "decode times %lldus (%lldus per run)\n",
++#endif
+                 time_dec, time_dec / count);
++#ifdef __aarch64__
++        fprintf(stderr, "encode times %ldus (%ldus per run)\n",
++#else
+         fprintf(stderr, "encode times %lldus (%lldus per run)\n",
++#endif
+                 time_enc, time_enc / count);
+     }
+ 
+Index: rpi-userland/host_applications/linux/CMakeLists.txt
+===================================================================
+--- rpi-userland.orig/host_applications/linux/CMakeLists.txt
++++ rpi-userland/host_applications/linux/CMakeLists.txt
+@@ -6,9 +6,9 @@ add_subdirectory(apps/tvservice)
+ add_subdirectory(apps/vcmailbox)
+ if(NOT ARM64)
+    add_subdirectory(apps/raspicam)
+-   add_subdirectory(libs/sm)
+    add_subdirectory(apps/smem)
+ endif()
++add_subdirectory(libs/sm)
+ add_subdirectory(libs/debug_sym)
+ add_subdirectory(apps/dtoverlay)
+ add_subdirectory(apps/dtmerge)

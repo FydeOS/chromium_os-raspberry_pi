@@ -1,8 +1,8 @@
-Index: kernel-rpi/fs/exec.c
+Index: rpi4-kernel/fs/exec.c
 ===================================================================
---- kernel-rpi.orig/fs/exec.c
-+++ kernel-rpi/fs/exec.c
-@@ -69,6 +69,7 @@
+--- rpi4-kernel.orig/fs/exec.c
++++ rpi4-kernel/fs/exec.c
+@@ -70,6 +70,7 @@
  #include <asm/mmu_context.h>
  #include <asm/tlb.h>
  
@@ -22,20 +22,30 @@ Index: kernel-rpi/fs/exec.c
  
  out:
  	return file;
-Index: kernel-rpi/fs/open.c
+Index: rpi4-kernel/fs/open.c
 ===================================================================
---- kernel-rpi.orig/fs/open.c
-+++ kernel-rpi/fs/open.c
-@@ -32,6 +32,8 @@
- #include <linux/ima.h>
- #include <linux/dnotify.h>
- #include <linux/compat.h>
-+#define CREATE_TRACE_POINTS
-+#include <trace/events/fs.h>
+--- rpi4-kernel.orig/fs/open.c
++++ rpi4-kernel/fs/open.c
+@@ -36,6 +36,9 @@
  
  #include "internal.h"
  
-@@ -1184,6 +1186,7 @@ static long do_sys_openat2(int dfd, cons
++#define CREATE_TRACE_POINTS
++#include <trace/events/fs.h>
++
+ int do_truncate(struct user_namespace *mnt_userns, struct dentry *dentry,
+ 		loff_t length, unsigned int time_attrs, struct file *filp)
+ {
+@@ -1171,7 +1174,7 @@ struct file *filp_open(const char *filen
+ {
+ 	struct filename *name = getname_kernel(filename);
+ 	struct file *file = ERR_CAST(name);
+-	
++
+ 	if (!IS_ERR(name)) {
+ 		file = file_open_name(name, flags, mode);
+ 		putname(name);
+@@ -1215,6 +1218,7 @@ static long do_sys_openat2(int dfd, cons
  		} else {
  			fsnotify_open(f);
  			fd_install(fd, f);
@@ -43,10 +53,10 @@ Index: kernel-rpi/fs/open.c
  		}
  	}
  	putname(tmp);
-Index: kernel-rpi/include/trace/events/fs.h
+Index: rpi4-kernel/include/trace/events/fs.h
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/include/trace/events/fs.h
++++ rpi4-kernel/include/trace/events/fs.h
 @@ -0,0 +1,53 @@
 +#undef TRACE_SYSTEM
 +#define TRACE_SYSTEM fs

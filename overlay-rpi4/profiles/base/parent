@@ -1,4 +1,4 @@
-chromiumos:default/linux/arm/10.0/chromeos
-#chromiumos:default/linux/arm64/10.0/chromeos/little-endian
+#chromiumos:default/linux/arm/10.0/chromeos
+chromiumos:default/linux/arm64/10.0/chromeos/little-endian
 baseboard-rpi3:base
 cros-pi:base

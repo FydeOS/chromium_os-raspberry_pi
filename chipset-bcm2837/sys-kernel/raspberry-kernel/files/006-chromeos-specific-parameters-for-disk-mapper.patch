@@ -1,7 +1,7 @@
-Index: rpi-linux-kernel/drivers/md/dm-verity-target.c
+Index: rpi4-kernel/drivers/md/dm-verity-target.c
 ===================================================================
---- rpi-linux-kernel.orig/drivers/md/dm-verity-target.c
-+++ rpi-linux-kernel/drivers/md/dm-verity-target.c
+--- rpi4-kernel.orig/drivers/md/dm-verity-target.c
++++ rpi4-kernel/drivers/md/dm-verity-target.c
 @@ -33,8 +33,9 @@
  #define DM_VERITY_OPT_PANIC		"panic_on_corruption"
  #define DM_VERITY_OPT_IGN_ZEROES	"ignore_zero_blocks"
@@ -53,7 +53,7 @@ Index: rpi-linux-kernel/drivers/md/dm-verity-target.c
  /*
   * Auxiliary structure appended to each dm-bufio buffer. If the value
   * hash_verified is nonzero, hash of the block has been verified.
-@@ -942,6 +976,21 @@ static int verity_parse_opt_args(struct
+@@ -1012,6 +1046,21 @@ static int verity_parse_opt_args(struct
  				return r;
  			continue;
  
@@ -75,7 +75,7 @@ Index: rpi-linux-kernel/drivers/md/dm-verity-target.c
  		} else if (verity_is_fec_opt_arg(arg_name)) {
  			r = verity_fec_parse_opt_args(as, v, &argc, arg_name);
  			if (r)
-@@ -964,6 +1013,110 @@ static int verity_parse_opt_args(struct
+@@ -1034,6 +1083,110 @@ static int verity_parse_opt_args(struct
  	return r;
  }
  
@@ -186,7 +186,7 @@ Index: rpi-linux-kernel/drivers/md/dm-verity-target.c
  /*
   * Target parameters:
   *	<version>	The current format is version 1.
-@@ -990,6 +1143,14 @@ static int verity_ctr(struct dm_target *
+@@ -1060,6 +1213,14 @@ static int verity_ctr(struct dm_target *
  	sector_t hash_position;
  	char dummy;
  	char *root_hash_digest_to_validate;
@@ -201,7 +201,7 @@ Index: rpi-linux-kernel/drivers/md/dm-verity-target.c
  
  	v = kzalloc(sizeof(struct dm_verity), GFP_KERNEL);
  	if (!v) {
-@@ -1229,6 +1390,7 @@ static int verity_ctr(struct dm_target *
+@@ -1299,6 +1460,7 @@ static int verity_ctr(struct dm_target *
  				       __alignof__(struct dm_verity_io));
  
  	verity_verify_sig_opts_cleanup(&verify_args);
@@ -209,7 +209,7 @@ Index: rpi-linux-kernel/drivers/md/dm-verity-target.c
  
  	return 0;
  
-@@ -1236,7 +1398,7 @@ bad:
+@@ -1306,7 +1468,7 @@ bad:
  
  	verity_verify_sig_opts_cleanup(&verify_args);
  	verity_dtr(ti);
@@ -218,10 +218,10 @@ Index: rpi-linux-kernel/drivers/md/dm-verity-target.c
  	return r;
  }
  
-Index: rpi-linux-kernel/drivers/md/dm-verity.h
+Index: rpi4-kernel/drivers/md/dm-verity.h
 ===================================================================
---- rpi-linux-kernel.orig/drivers/md/dm-verity.h
-+++ rpi-linux-kernel/drivers/md/dm-verity.h
+--- rpi4-kernel.orig/drivers/md/dm-verity.h
++++ rpi4-kernel/drivers/md/dm-verity.h
 @@ -56,6 +56,7 @@ struct dm_verity {
  	int hash_failed;	/* set to 1 if hash of any block failed */
  	enum verity_mode mode;	/* mode for handling verification errors */

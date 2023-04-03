@@ -1,5 +1,1 @@
-anholt@chromium.org
-chadversary@chromium.org
-ihf@chromium.org
-hoegsberg@chromium.org
-marcheu@chromium.org
+include chromiumos/platform/graphics:/OWNERS.mesa_freedreno

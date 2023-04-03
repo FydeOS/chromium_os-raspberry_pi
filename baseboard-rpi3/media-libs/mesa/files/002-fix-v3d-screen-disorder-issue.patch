@@ -1,0 +1,23 @@
+Index: mesa-freedreno/src/gallium/drivers/v3d/v3d_resource.c
+===================================================================
+--- mesa-freedreno.orig/src/gallium/drivers/v3d/v3d_resource.c
++++ mesa-freedreno/src/gallium/drivers/v3d/v3d_resource.c
+@@ -879,7 +879,6 @@ v3d_resource_from_handle(struct pipe_scr
+ 
+         if (!rsc)
+                 return NULL;
+-
+         switch (whandle->modifier) {
+         case DRM_FORMAT_MOD_LINEAR:
+                 rsc->tiled = false;
+@@ -910,6 +909,10 @@ v3d_resource_from_handle(struct pipe_scr
+                 rsc->bo = v3d_bo_open_name(screen, whandle->handle);
+                 break;
+         case WINSYS_HANDLE_TYPE_FD:
++                if (usage == PIPE_HANDLE_USAGE_FRAMEBUFFER_WRITE) {
++                  whandle->modifier = DRM_FORMAT_MOD_LINEAR;
++                  rsc->tiled = false;
++                }
+                 rsc->bo = v3d_bo_open_dmabuf(screen, whandle->handle);
+                 break;
+         default:
