@@ -1,2 +1,1 @@
-chromeos-base/chromeos-chrome::chromiumos
 virtual/linux-sources::chromiumos

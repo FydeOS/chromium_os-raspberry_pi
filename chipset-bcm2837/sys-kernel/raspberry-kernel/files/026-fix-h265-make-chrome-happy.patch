@@ -1,0 +1,28 @@
+Index: kernel-rpi/drivers/staging/media/rpivid/rpivid.c
+===================================================================
+--- kernel-rpi.orig/drivers/staging/media/rpivid/rpivid.c
++++ kernel-rpi/drivers/staging/media/rpivid/rpivid.c
+@@ -87,6 +87,23 @@ static const struct rpivid_control rpivi
+ 		},
+ 		.required	= false,
+ 	},
++  {
++    .cfg = {
++      .id = V4L2_CID_MPEG_VIDEO_HEVC_PROFILE,
++      .min = V4L2_MPEG_VIDEO_HEVC_PROFILE_MAIN,
++      .max = V4L2_MPEG_VIDEO_HEVC_PROFILE_MAIN_10,
++      .def = V4L2_MPEG_VIDEO_HEVC_PROFILE_MAIN,
++    },
++    .required = false,
++  },
++  {
++    .cfg = {
++      .id = V4L2_CID_MPEG_VIDEO_HEVC_LEVEL,
++      .min = V4L2_MPEG_VIDEO_HEVC_LEVEL_1,
++      .max = V4L2_MPEG_VIDEO_HEVC_LEVEL_5_1,
++    },
++    .required = false,
++  },
+ };
+ 
+ #define rpivid_ctrls_COUNT	ARRAY_SIZE(rpivid_ctrls)
