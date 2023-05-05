@@ -14,7 +14,7 @@ DESCRIPTION="Google A/V Daemon"
 HOMEPAGE="https://chromium.googlesource.com/chromiumos/third_party/adhd/"
 SRC_URI=""
 LICENSE="BSD-Google"
-KEYWORDS="~*"
+KEYWORDS="*"
 IUSE="asan +cras-apm cras-ml dlc featured fuzzer selinux systemd"
 
 COMMON_DEPEND="
