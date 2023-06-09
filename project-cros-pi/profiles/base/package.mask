@@ -1,4 +1,3 @@
 chromeos-base/vpd::chromiumos
-chromeos-base/chromeos-chrome::openfyde-patches
 chromeos-base/vpd::patches
 chromeos-base/vpd::openfyde-patches
