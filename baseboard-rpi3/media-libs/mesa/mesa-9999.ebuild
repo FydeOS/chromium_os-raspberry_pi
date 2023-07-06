@@ -9,7 +9,7 @@ CROS_WORKON_EGIT_BRANCH="chromeos-freedreno"
 
 KEYWORDS="~*"
 
-inherit base meson flag-o-matic cros-workon
+inherit meson flag-o-matic cros-workon
 
 DESCRIPTION="The Mesa 3D Graphics Library"
 HOMEPAGE="http://mesa3d.org/"

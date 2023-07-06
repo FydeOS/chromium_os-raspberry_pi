@@ -1,8 +1,13 @@
+# Copyright (c) 2022 Fyde Innovations Limited and the openFyde Authors.
+# Distributed under the license specified in the root directory of this project.
+
 # Copyright 2012 The ChromiumOS Authors
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
 EAPI=7
+CROS_WORKON_COMMIT="4cb0c5189686d5a55f37f222c53127b160d10686"
+CROS_WORKON_TREE="3ca74efc0023ad04ad93e88bc50e7009703d03f3"
 CROS_WORKON_INCREMENTAL_BUILD=1
 CROS_WORKON_PROJECT="chromiumos/third_party/adhd"
 CROS_WORKON_LOCALNAME="adhd"
@@ -36,7 +41,7 @@ bazel_external_uris="
 "
 SRC_URI="${bazel_external_uris}"
 LICENSE="BSD-Google"
-KEYWORDS="~*"
+KEYWORDS="*"
 IUSE="asan +cras-apm cras-debug cras-ml dlc featured fuzzer selinux systemd"
 
 COMMON_DEPEND="
@@ -88,6 +93,7 @@ src_unpack() {
 }
 
 src_prepare() {
+	eapply $FILESDIR/*.patch
 	export JAVA_HOME=$(ROOT="${BROOT}" java-config --jdk-home)
 	sanitizers-setup-env
 	default
@@ -258,6 +264,9 @@ src_install() {
 		fuzzer_install "${S}/OWNERS.fuzz" "${T}/dist/fuzzer"/cras_fl_media_fuzzer \
 			--comp "${fuzzer_component_id}"
 	fi
+
+	insinto /etc/init
+	doins $FILESDIR/cras_monitor.conf
 }
 
 pkg_preinst() {

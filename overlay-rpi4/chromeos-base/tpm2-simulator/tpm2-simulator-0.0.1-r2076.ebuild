@@ -6,8 +6,8 @@
 
 EAPI=7
 
-CROS_WORKON_COMMIT="95cba42c3e39999a02c3534e6924cdd5b8cdc775"
-CROS_WORKON_TREE=("79cdd007ff69259efcaad08803ef2d1498374ec4" "68018baddc5c233cc66ed952b38c268a4db7b136" "53484d9a746662594836a32e203068e89c9eae63" "f91b6afd5f2ae04ee9a2c19109a3a4a36f7659e6")
+CROS_WORKON_COMMIT="635ba60101db69c49eee7ba1d90c812f2a7eb858"
+CROS_WORKON_TREE=("c5a3f846afdfb5f37be5520c63a756807a6b31c4" "035e5f57815742ad6e80d8821e81f18e0fcaa4f7" "bdc2fe06e72f494e59d3000e9c660943df59f82c" "f91b6afd5f2ae04ee9a2c19109a3a4a36f7659e6")
 CROS_WORKON_LOCALNAME="platform2"
 CROS_WORKON_PROJECT="chromiumos/platform2"
 CROS_WORKON_OUTOFTREE_BUILD=1
@@ -15,7 +15,7 @@ CROS_WORKON_SUBTREE="common-mk tpm2-simulator libhwsec-foundation .gn"
 
 PLATFORM_SUBDIR="tpm2-simulator"
 
-inherit cros-workon platform user
+inherit cros-workon platform tmpfiles user
 
 DESCRIPTION="TPM 2.0 Simulator"
 HOMEPAGE="https://chromium.googlesource.com/chromiumos/platform2/+/HEAD/tpm2-simulator/"
@@ -58,4 +58,10 @@ PATCHES=(
 pkg_preinst() {
 	enewuser tpm2-simulator
 	enewgroup tpm2-simulator
+}
+
+src_install() {
+	platform_src_install
+
+	dotmpfiles tmpfiles.d/*.conf
 }

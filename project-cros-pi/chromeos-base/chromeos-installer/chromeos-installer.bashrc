@@ -13,6 +13,6 @@ cros_post_src_install_openfyde_cros_pi_hook() {
 }
 
 cros_pre_src_prepare_openfyde_cros_pi_patches() {
-  epatch ${OPENFYDE_CROS_PI_BASHRC_FILESDIR}/chromeos-install.patch
-  epatch ${OPENFYDE_CROS_PI_BASHRC_FILESDIR}/postinst.patch
+  eapply -p2 ${OPENFYDE_CROS_PI_BASHRC_FILESDIR}/chromeos-install.patch
+  eapply -p2 ${OPENFYDE_CROS_PI_BASHRC_FILESDIR}/postinst.patch
 }

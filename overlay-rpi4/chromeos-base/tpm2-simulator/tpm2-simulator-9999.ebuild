@@ -10,7 +10,7 @@ CROS_WORKON_SUBTREE="common-mk tpm2-simulator libhwsec-foundation .gn"
 
 PLATFORM_SUBDIR="tpm2-simulator"
 
-inherit cros-workon platform user
+inherit cros-workon platform tmpfiles user
 
 DESCRIPTION="TPM 2.0 Simulator"
 HOMEPAGE="https://chromium.googlesource.com/chromiumos/platform2/+/HEAD/tpm2-simulator/"
@@ -48,4 +48,10 @@ DEPEND="${COMMON_DEPEND}"
 pkg_preinst() {
 	enewuser tpm2-simulator
 	enewgroup tpm2-simulator
+}
+
+src_install() {
+	platform_src_install
+
+	dotmpfiles tmpfiles.d/*.conf
 }

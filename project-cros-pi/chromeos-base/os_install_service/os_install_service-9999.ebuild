@@ -18,16 +18,8 @@ IUSE="test"
 DEPEND="
 	dev-rust/third-party-crates-src:=
 	chromeos-base/system_api:=
-	=dev-rust/anyhow-1.0*
-	=dev-rust/chrono-0.4*
-	=dev-rust/crossbeam-channel-0.5*
-	=dev-rust/dbus-0.8*
 	dev-rust/libchromeos:=
-	=dev-rust/log-0.4*
-	=dev-rust/nix-0.23*
-	=dev-rust/serde_json-1.0*
-	dev-rust/sys_util:=
-	=dev-rust/tempfile-3*
+	sys-apps/dbus:=
 "
 
 RDEPEND="

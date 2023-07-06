@@ -1,53 +1,53 @@
-Index: adhd/cras/src/server/cras_alsa_io.c
-===================================================================
---- adhd.orig/cras/src/server/cras_alsa_io.c
-+++ adhd/cras/src/server/cras_alsa_io.c
-@@ -284,6 +284,11 @@ static const struct {
- 		.type = CRAS_NODE_TYPE_ALSA_LOOPBACK,
- 		.position = NODE_POSITION_INTERNAL,
- 	},
-+  {
-+    .name = "vc4-hdmi",
-+    .type = CRAS_NODE_TYPE_HDMI,
-+    .position = NODE_POSITION_EXTERNAL,
-+  },
+--- a/cras/src/server/cras_alsa_io.c
++++ b/cras/src/server/cras_alsa_io.c
+@@ -256,6 +256,11 @@
+         .type = CRAS_NODE_TYPE_ALSA_LOOPBACK,
+         .position = NODE_POSITION_INTERNAL,
+     },
++    {
++      .name = "vc4-hdmi",
++      .type = CRAS_NODE_TYPE_HDMI,
++      .position = NODE_POSITION_EXTERNAL,
++    },
  };
  
- static int set_hwparams(struct cras_iodev *iodev)
-@@ -639,15 +644,17 @@ static int flush_buffer(struct cras_iode
- static struct cras_ionode *first_plugged_node(struct cras_iodev *iodev)
- {
- 	struct cras_ionode *n;
+ static int set_hwparams(struct cras_iodev* iodev) {
+@@ -928,6 +933,7 @@
+ 
+   node->volume = 100;
+   node->type = CRAS_NODE_TYPE_UNKNOWN;
++  syslog(LOG_INFO, "test node:%s", node->name);
+   // Go through the known names
+   for (i = 0; i < ARRAY_SIZE(node_defaults); i++) {
+     if (!strncmp(node->name, node_defaults[i].name,
+@@ -2373,7 +2379,7 @@
+       !no_create_default_output_node(aio)) {
+     if (first_internal_device(aio) && !has_node(aio, INTERNAL_SPEAKER) &&
+         !has_node(aio, HDMI)) {
+-      if (strstr(aio->base.info.name, HDMI)) {
++			if (strstr(aio->base.info.name, HDMI) || strstr(aio->base.info.name, "hdmi")) {
+         new_output(aio, NULL, HDMI);
+       } else {
+         new_output(aio, NULL, INTERNAL_SPEAKER);
+--- a/cras/src/server/cras_alsa_io_common.c
++++ b/cras/src/server/cras_alsa_io_common.c
+@@ -14,16 +14,17 @@
+ 
+ struct cras_ionode* first_plugged_node(struct cras_iodev* iodev) {
+   struct cras_ionode* n;
 +	struct cras_ionode *result = NULL;
  
- 	/* When this is called at iodev creation, none of the nodes
- 	 * are selected. Just pick the first plugged one and let Chrome
- 	 * choose it later. */
- 	DL_FOREACH (iodev->nodes, n) {
- 		if (n->plugged)
--			return n;
-+		    result = n;
-+		//	return n;
- 	}
--	return iodev->nodes;
-+	return result? result : iodev->nodes;
+   /* When this is called at iodev creation, none of the nodes
+    * are selected. Just pick the first plugged one and let Chrome
+    * choose it later. */
+   DL_FOREACH (iodev->nodes, n) {
+     if (n->plugged) {
+-      return n;
++      result = n;
+     }
+   }
+-  return iodev->nodes;
++	return result ? result : iodev->nodes;
  }
  
- static void update_active_node(struct cras_iodev *iodev, unsigned node_idx,
-@@ -998,6 +1005,7 @@ static void set_node_initial_state(struc
- 	node->volume = 100;
- 	node->type = CRAS_NODE_TYPE_UNKNOWN;
- 	/* Go through the known names */
-+  syslog(LOG_INFO, "test node:%s", node->name);
- 	for (i = 0; i < ARRAY_SIZE(node_defaults); i++)
- 		if (!strncmp(node->name, node_defaults[i].name,
- 			     strlen(node_defaults[i].name))) {
-@@ -2300,7 +2308,7 @@ int alsa_iodev_legacy_complete_init(stru
- 	    !no_create_default_output_node(aio)) {
- 		if (first_internal_device(aio) &&
- 		    !has_node(aio, INTERNAL_SPEAKER) && !has_node(aio, HDMI)) {
--			if (strstr(aio->base.info.name, HDMI))
-+			if (strstr(aio->base.info.name, HDMI) || strstr(aio->base.info.name, "hdmi"))
- 				new_output(aio, NULL, HDMI);
- 			else
- 				new_output(aio, NULL, INTERNAL_SPEAKER);
+ /* Returns true if the corresponding node_info of the specified input node has

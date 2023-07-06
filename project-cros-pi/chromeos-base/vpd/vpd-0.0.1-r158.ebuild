@@ -5,8 +5,8 @@
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=7
-CROS_WORKON_COMMIT="256955cdec97e1fc3b99e8af1723e033690526f4"
-CROS_WORKON_TREE="ff0591721691e9ba0edff18d4fbf54a709187e30"
+CROS_WORKON_COMMIT="227ffbb1e22dc5ff99ff96ef243f13eb482cc6da"
+CROS_WORKON_TREE="c732df6077377143c7d5590e1b7c91c705c2ecd2"
 CROS_WORKON_PROJECT="chromiumos/platform/vpd"
 CROS_WORKON_LOCALNAME="platform/vpd"
 
@@ -41,7 +41,7 @@ src_install() {
 	# This target list should be architecture specific
 	# (no ACPI stuff on ARM for instance)
 	dosbin vpd vpd_s
-	dosbin util/check_rw_vpd util/dump_vpd_log util/update_rw_vpd
+	dosbin util/dump_vpd_log util/update_rw_vpd
 	dosbin util/vpd_get_value util/vpd_icc
 
 	# install the init script
@@ -50,7 +50,6 @@ src_install() {
 		systemd_enable_service boot-services.target vpd-log.service
 	else
 		insinto /etc/init
-		doins init/check-rw-vpd.conf
 		doins init/vpd-icc.conf
 		doins init/vpd-log.conf
     doins ${FILESDIR}/check_serial_number.conf
