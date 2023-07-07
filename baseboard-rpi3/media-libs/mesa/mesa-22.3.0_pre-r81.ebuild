@@ -57,7 +57,7 @@ src_configure() {
 		-Dgles2=enabled
 		-Dshared-glapi=enabled
 		-Ddri-drivers=
-		-Dgallium-drivers=v3d
+		-Dgallium-drivers=v3d,vc4,kmsro
 		-Dgallium-vdpau=disabled
 		-Dgallium-xa=disabled
 		-Dperfetto=$(usex perfetto true false)

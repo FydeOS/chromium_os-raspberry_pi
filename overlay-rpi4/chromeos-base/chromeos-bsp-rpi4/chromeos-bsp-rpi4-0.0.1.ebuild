@@ -14,6 +14,7 @@ IUSE=""
 RDEPEND="
     chromeos-base/device-appid
     chromeos-base/bluetooth-input-fix
+    x11-libs/libva
 "
 
 DEPEND="${RDEPEND}"

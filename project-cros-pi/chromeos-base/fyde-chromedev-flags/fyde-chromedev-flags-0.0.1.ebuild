@@ -1,7 +1,7 @@
 # Copyright (c) 2022 Fyde Innovations Limited and the openFyde Authors.
 # Distributed under the license specified in the root directory of this project.
 
-EAPI="4"
+EAPI="7"
 inherit chrome-dev-flag 
 DESCRIPTION="append chrome commandline flags"
 HOMEPAGE="https://fydeos.io"

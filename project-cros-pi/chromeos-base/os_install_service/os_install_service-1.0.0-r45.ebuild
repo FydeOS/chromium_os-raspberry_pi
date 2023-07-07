@@ -15,8 +15,6 @@ CROS_WORKON_SUBTREE="os_install_service"
 
 inherit cros-workon cros-rust tmpfiles
 
-RESTRICT="arm? ( binchecks )"
-
 LICENSE="BSD-Google"
 SLOT="0/${PVR}"
 KEYWORDS="*"

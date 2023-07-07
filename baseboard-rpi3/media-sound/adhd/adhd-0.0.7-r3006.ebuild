@@ -1,6 +1,3 @@
-# Copyright (c) 2022 Fyde Innovations Limited and the openFyde Authors.
-# Distributed under the license specified in the root directory of this project.
-
 # Copyright 2012 The ChromiumOS Authors
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -93,8 +90,8 @@ src_unpack() {
 }
 
 src_prepare() {
-	eapply $FILESDIR/*.patch
 	export JAVA_HOME=$(ROOT="${BROOT}" java-config --jdk-home)
+  eapply $FILESDIR/*.patch
 	sanitizers-setup-env
 	default
 }
@@ -264,9 +261,6 @@ src_install() {
 		fuzzer_install "${S}/OWNERS.fuzz" "${T}/dist/fuzzer"/cras_fl_media_fuzzer \
 			--comp "${fuzzer_component_id}"
 	fi
-
-	insinto /etc/init
-	doins $FILESDIR/cras_monitor.conf
 }
 
 pkg_preinst() {

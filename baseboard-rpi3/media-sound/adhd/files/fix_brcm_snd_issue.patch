@@ -1,18 +1,22 @@
---- a/cras/src/server/audio_thread.c
-+++ b/cras/src/server/audio_thread.c
-@@ -905,6 +905,9 @@
+Index: adhd/cras/src/server/audio_thread.c
+===================================================================
+--- adhd.orig/cras/src/server/audio_thread.c
++++ adhd/cras/src/server/audio_thread.c
+@@ -905,6 +905,9 @@ static void* audio_io_thread(void* arg)
        check_busyloop(wait_ts);
      }
  
-+		if (wait_ts && wait_ts->tv_sec == 0 && wait_ts->tv_nsec == 0) {
-+			wait_ts->tv_sec = 1;
-+    }
++    if (wait_ts && wait_ts->tv_sec == 0 && wait_ts->tv_nsec == 0)
++      wait_ts->tv_sec = 1;
++
      // Sync atlog with shared memory.
      __sync_synchronize();
      atlog->sync_write_pos = atlog->write_pos;
---- a/cras/src/tools/cras_monitor/cras_monitor.c
-+++ b/cras/src/tools/cras_monitor/cras_monitor.c
-@@ -154,11 +154,19 @@
+Index: adhd/cras/src/tools/cras_monitor/cras_monitor.c
+===================================================================
+--- adhd.orig/cras/src/tools/cras_monitor/cras_monitor.c
++++ adhd/cras/src/tools/cras_monitor/cras_monitor.c
+@@ -154,11 +154,19 @@ static void input_node_gain_changed(void
    free((void*)node_name);
  }
  
@@ -20,23 +24,23 @@
  static void num_active_streams_changed(void* context,
                                         enum CRAS_STREAM_DIRECTION dir,
                                         uint32_t num_active_streams) {
-+	struct cras_client *client = (struct cras_client *)context;
++  struct cras_client *client = (struct cras_client *)context;
    printf("num active %s streams: %u\n", string_for_direction(dir),
           num_active_streams);
-+	if (last_active_streams == 0 && num_active_streams == 1) {
-+		cras_client_set_suspend(client, 1);
-+		usleep(5000);
-+		cras_client_set_suspend(client, 0);
-+	}
-+	last_active_streams = num_active_streams;
++  if (last_active_streams == 0 && num_active_streams == 1) {
++    cras_client_set_suspend(client, 1);
++    usleep(5000);
++    cras_client_set_suspend(client, 0);
++  }
++  last_active_streams = num_active_streams;
  }
  
  static void server_connection_callback(struct cras_client* client,
-@@ -289,6 +297,7 @@
+@@ -289,6 +297,7 @@ int main(int argc, char** argv) {
      if (rc < 0 || c == 'q') {
        return 0;
      }
-+		sleep(1);
++    sleep(1);
    }
  
  destroy_exit:

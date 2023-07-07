@@ -11,6 +11,6 @@ USE="${USE} hardfp kernel-5_10 boot_dts_device_tree transparent_hugepage -acpi_a
 USE="${USE} mosys_eventlog neon -opengl opengles"
 USE="${USE} watchdog direncription_allow_v2"
 
-# enabled by default in chromiumos-overlay/profiles/targets/chromeos/make.defaults
+# `secagentd` enabled by default in chromiumos-overlay/profiles/targets/chromeos/make.defaults
 # but secagentd can't be built for rpi currently
-USE="${USE} -secagent"
+USE="${USE} -diagnostics-minidiag -os_install_service -secagent"

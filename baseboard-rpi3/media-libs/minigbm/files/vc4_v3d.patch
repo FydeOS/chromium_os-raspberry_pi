@@ -1,5 +1,7 @@
---- a/drv.c
-+++ b/drv.c
+Index: minigbm/drv.c
+===================================================================
+--- minigbm.orig/drv.c
++++ minigbm/drv.c
 @@ -14,7 +14,6 @@
  #include <sys/types.h>
  #include <unistd.h>
@@ -8,7 +10,7 @@
  #ifdef __ANDROID__
  #include <cutils/log.h>
  #include <libgen.h>
-@@ -36,6 +35,9 @@
+@@ -36,6 +35,9 @@ extern const struct backend backend_msm;
  #ifdef DRV_VC4
  extern const struct backend backend_vc4;
  #endif
@@ -18,7 +20,7 @@
  
  // Dumb / generic drivers
  extern const struct backend backend_evdi;
-@@ -65,6 +67,9 @@
+@@ -65,6 +67,9 @@ static const struct backend *drv_backend
  #ifdef DRV_VC4
  	&backend_vc4,
  #endif
@@ -28,7 +30,7 @@
  	&backend_evdi,	    &backend_komeda,	&backend_marvell, &backend_mediatek,
  	&backend_meson,	    &backend_nouveau,	&backend_radeon,  &backend_rockchip,
  	&backend_sun4i_drm, &backend_synaptics, &backend_udl,	  &backend_virtgpu,
-@@ -95,6 +100,9 @@
+@@ -95,6 +100,9 @@ static const struct backend *drv_get_bac
  		const struct backend *b = drv_backend_list[i];
  		if (!strcmp(drm_version->name, b->name)) {
  			drmFreeVersion(drm_version);
@@ -38,7 +40,7 @@
  			return b;
  		}
  	}
-@@ -205,7 +213,12 @@
+@@ -205,7 +213,12 @@ struct combination *drv_get_combination(
  			if (!best || best->metadata.priority < curr->metadata.priority)
  				best = curr;
  	}
@@ -52,7 +54,7 @@
  	return best;
  }
  
-@@ -482,7 +495,6 @@
+@@ -482,7 +495,6 @@ void *drv_bo_map(struct bo *bo, const st
  
  	if (bo->is_test_buffer)
  		return MAP_FAILED;
@@ -60,7 +62,7 @@
  	mapping.rect = *rect;
  	mapping.refcount = 1;
  
-@@ -516,6 +528,7 @@
+@@ -516,6 +528,7 @@ void *drv_bo_map(struct bo *bo, const st
  	if (!mapping.vma) {
  		*map_data = NULL;
  		pthread_mutex_unlock(&drv->mappings_lock);
@@ -68,7 +70,7 @@
  		return MAP_FAILED;
  	}
  
-@@ -525,6 +538,7 @@
+@@ -525,6 +538,7 @@ void *drv_bo_map(struct bo *bo, const st
  		*map_data = NULL;
  		free(mapping.vma);
  		pthread_mutex_unlock(&drv->mappings_lock);
@@ -76,9 +78,11 @@
  		return MAP_FAILED;
  	}
  
---- a/drv_helpers.c
-+++ b/drv_helpers.c
-@@ -611,3 +611,113 @@
+Index: minigbm/drv_helpers.c
+===================================================================
+--- minigbm.orig/drv_helpers.c
++++ minigbm/drv_helpers.c
+@@ -611,3 +611,113 @@ void drv_resolve_format_and_use_flags_he
  		break;
  	}
  }
@@ -192,17 +196,21 @@
 +    }
 +    return "Unknown format";
 +}
---- a/drv_helpers.h
-+++ b/drv_helpers.h
-@@ -50,5 +50,5 @@
+Index: minigbm/drv_helpers.h
+===================================================================
+--- minigbm.orig/drv_helpers.h
++++ minigbm/drv_helpers.h
+@@ -50,5 +50,5 @@ bool drv_has_modifier(const uint64_t *li
  void drv_resolve_format_and_use_flags_helper(struct driver *drv, uint32_t format,
  					     uint64_t use_flags, uint32_t *out_format,
  					     uint64_t *out_use_flags);
 -
 +char *getDrmFormatString(uint32_t drmFormat);
  #endif
+Index: minigbm/external/v3d_drm.h
+===================================================================
 --- /dev/null
-+++ b/external/v3d_drm.h
++++ minigbm/external/v3d_drm.h
 @@ -0,0 +1,267 @@
 +/*
 + * Copyright © 2014-2018 Broadcom
@@ -471,9 +479,11 @@
 +#endif
 +
 +#endif /* _V3D_DRM_H_ */
+Index: minigbm/v3d.c
+===================================================================
 --- /dev/null
-+++ b/v3d.c
-@@ -0,0 +1,138 @@
++++ minigbm/v3d.c
+@@ -0,0 +1,137 @@
 +/*
 + * Copyright 2019 The FydeOS Authors. All rights reserved.
 + * Use of this source code is governed by a BSD-style license that can be
@@ -569,7 +579,6 @@
 +  }
 +
 +  bo->handle.u32 = bo_create.handle;
-+
 +#ifdef DEBUG
 + drv_logv("create bo handler:0x%x, size:%zu, format:%s, width:%u, height:%u, use_flags:0x%llx\n",
 +   bo_create.handle, bo->meta.total_size, getDrmFormatString(format), width, height, use_flags & (BO_USE_SW_MASK | BO_USE_SCANOUT));
@@ -577,7 +586,7 @@
 +  return 0;
 +}
 +
-+static void *v3d_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags) {
++static void *v3d_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags) {
 +  int ret;
 +  struct drm_v3d_mmap_bo bo_map;
 +  void *addr = NULL;
@@ -612,8 +621,10 @@
 +};
 +
 +#endif // DEV_V3D
---- a/vc4.c
-+++ b/vc4.c
+Index: minigbm/vc4.c
+===================================================================
+--- minigbm.orig/vc4.c
++++ minigbm/vc4.c
 @@ -3,9 +3,7 @@
   * Use of this source code is governed by a BSD-style license that can be
   * found in the LICENSE file.
@@ -699,26 +710,16 @@
  	stride = drv_stride_from_format(format, width, 0);
  	stride = ALIGN(stride, 64);
  	drv_bo_from_format(bo, stride, 1, height, format);
-@@ -70,12 +61,17 @@
+@@ -70,7 +61,7 @@ static int vc4_bo_create_for_modifier(st
  
  	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VC4_CREATE_BO, &bo_create);
  	if (ret) {
 -		drv_loge("DRM_IOCTL_VC4_CREATE_BO failed (size=%zu)\n", bo->meta.total_size);
-+		drv_loge("DRM_IOCTL_VC4_CREATE_BO failed (size=%zu), ret: %d\n", bo->meta.total_size, ret);
++		drv_loge("DRM_IOCTL_VC4_CREATE_BO failed (size=%zu), ret=%d\n", bo->meta.total_size, ret);
  		return -errno;
  	}
  
- 	bo->handle.u32 = bo_create.handle;
- 
-+#ifdef DEBUG
-+	drv_logd("create bo handler:0x%x, size:%zu, format:%s, width:%u, height:%u\n",
-+		bo_create.handle, bo->meta.total_size, getDrmFormatString(format), width, height);
-+#endif
-+
- 	return 0;
- }
- 
-@@ -117,7 +113,7 @@
+@@ -117,7 +108,7 @@ static void *vc4_bo_map(struct bo *bo, s
  	}
  
  	vma->length = bo->meta.total_size;
