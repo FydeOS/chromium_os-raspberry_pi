@@ -1,6 +1,8 @@
+diff --git a/installer/chromeos-postinst b/installer/chromeos-postinst
+index 875a85b4f6..b8699e8476 100755
 --- a/installer/chromeos-postinst
 +++ b/installer/chromeos-postinst
-@@ -37,6 +37,21 @@
+@@ -37,6 +37,28 @@ cleanup() {
    done
  }
  
@@ -19,10 +21,17 @@
 +  echo ${version#*=}
 +}
 +
++repair_cgpt() {
++  local dev="$1"
++  if cgpt show "$dev" 2>&1 | grep -q -e "WARNING: .*invalid"; then
++    cgpt repair "$dev" || true
++  fi
++}
++
  main() {
    cd "${INSTALL_ROOT}" || exit 1
  
-@@ -48,7 +63,14 @@
+@@ -48,7 +70,15 @@ main() {
      mount --make-slave "./${d}"
    done
  
@@ -34,6 +43,7 @@
 +    chroot . /usr/sbin/mark_clean_overlay.sh $target_part_num $root_dev
 +  fi
 +  chroot . /usr/sbin/switch_root.sh $target_part_num $root_dev
++  repair_cgpt "$root_dev"
    shift
    chroot . /usr/bin/cros_installer --type="postinst" \
           --install_dev="${install_dev}" --install_dir="/" "$@"
