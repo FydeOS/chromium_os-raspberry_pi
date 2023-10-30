@@ -1,0 +1,8 @@
+# Copyright 2017 The ChromiumOS Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+on early-init
+    # Advertise opengles version 2.0.
+    setprop ro.opengles.version 131072
+    setprop ro.hardware.egl mesa

@@ -61,3 +61,7 @@ spurconfig=0x3
 #i.e using glitich statistcs as critria to change crsmin
 glitch_based_crsmin=1
 
+# Improved Bluetooth coexistence parameters
+btc_mode=1
+btc_params8=0x4e20
+btc_params1=0x7530

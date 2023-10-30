@@ -1,0 +1,36 @@
+From 80b0bae5d0dc55fa737c25efc844eda7ce300c14 Mon Sep 17 00:00:00 2001
+From: Lepton Wu <lepton@chromium.org>
+Date: Tue, 21 Feb 2023 17:48:31 -0800
+Subject: [PATCH] CHROMIUM: Disable vulkan for roblox
+
+---
+ src/virtio/vulkan/vn_physical_device.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/src/virtio/vulkan/vn_physical_device.c b/src/virtio/vulkan/vn_physical_device.c
+index c5bb4f3e3d3..9d497cd7ef7 100644
+--- a/src/virtio/vulkan/vn_physical_device.c
++++ b/src/virtio/vulkan/vn_physical_device.c
+@@ -14,6 +14,7 @@
+ 
+ #include "git_sha1.h"
+ #include "util/mesa-sha1.h"
++#include "util/u_process.h"
+ #include "venus-protocol/vn_protocol_driver_device.h"
+ 
+ #include "vn_android.h"
+@@ -1546,6 +1547,11 @@ vn_instance_enumerate_physical_devices_and_groups(struct vn_instance *instance)
+       goto unlock;
+    instance->physical_device.initialized = true;
+ 
++   if (!strcmp(util_get_process_name(), "com.roblox.client")) {
++      vn_log(NULL, "App workaround: disable vulkan");
++      goto unlock;
++   }
++
+    result = enumerate_physical_devices(instance, &physical_devs, &count);
+    if (result != VK_SUCCESS)
+       goto unlock;
+-- 
+2.39.2.637.g21b0678d19-goog
+

@@ -1,0 +1,115 @@
+Index: raspberry-kernel/fs/exec.c
+===================================================================
+--- raspberry-kernel.orig/fs/exec.c
++++ raspberry-kernel/fs/exec.c
+@@ -69,6 +69,7 @@
+ #include <asm/mmu_context.h>
+ #include <asm/tlb.h>
+ 
++#include <trace/events/fs_trace.h>
+ #include <trace/events/task.h>
+ #include "internal.h"
+ 
+@@ -941,8 +942,10 @@ static struct file *do_open_execat(int f
+ 	if (err)
+ 		goto exit;
+ 
+-	if (name->name[0] != '\0')
++	if (name->name[0] != '\0') {
+ 		fsnotify_open(file);
++    trace_open_exec(name->name);
++  }
+ 
+ out:
+ 	return file;
+Index: raspberry-kernel/fs/open.c
+===================================================================
+--- raspberry-kernel.orig/fs/open.c
++++ raspberry-kernel/fs/open.c
+@@ -36,6 +36,9 @@
+ 
+ #include "internal.h"
+ 
++#define CREATE_TRACE_POINTS
++#include <trace/events/fs_trace.h>
++
+ int do_truncate(struct user_namespace *mnt_userns, struct dentry *dentry,
+ 		loff_t length, unsigned int time_attrs, struct file *filp)
+ {
+@@ -1278,7 +1281,7 @@ struct file *filp_open(const char *filen
+ {
+ 	struct filename *name = getname_kernel(filename);
+ 	struct file *file = ERR_CAST(name);
+-	
++
+ 	if (!IS_ERR(name)) {
+ 		file = file_open_name(name, flags, mode);
+ 		putname(name);
+@@ -1322,6 +1325,7 @@ static long do_sys_openat2(int dfd, cons
+ 		} else {
+ 			fsnotify_open(f);
+ 			fd_install(fd, f);
++      trace_do_sys_open(tmp->name, how->flags, how->mode);
+ 		}
+ 	}
+ 	putname(tmp);
+Index: raspberry-kernel/include/trace/events/fs_trace.h
+===================================================================
+--- /dev/null
++++ raspberry-kernel/include/trace/events/fs_trace.h
+@@ -0,0 +1,55 @@
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM fs
++#undef TRACE_INCLUDE_FILE
++#define TRACE_INCLUDE_FILE fs_trace
++
++#if !defined(_TRACE_FS_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_FS_H
++
++#include <linux/fs.h>
++#include <linux/tracepoint.h>
++
++TRACE_EVENT(do_sys_open,
++
++	TP_PROTO(const char *filename, int flags, int mode),
++
++	TP_ARGS(filename, flags, mode),
++
++	TP_STRUCT__entry(
++		__string(	filename, filename		)
++		__field(	int, flags			)
++		__field(	int, mode			)
++	),
++
++	TP_fast_assign(
++		__assign_str(filename, filename);
++		__entry->flags = flags;
++		__entry->mode = mode;
++	),
++
++	TP_printk("\"%s\" %x %o",
++		  __get_str(filename), __entry->flags, __entry->mode)
++);
++
++TRACE_EVENT(open_exec,
++
++	TP_PROTO(const char *filename),
++
++	TP_ARGS(filename),
++
++	TP_STRUCT__entry(
++		__string(	filename, filename		)
++	),
++
++	TP_fast_assign(
++		__assign_str(filename, filename);
++	),
++
++	TP_printk("\"%s\"",
++		  __get_str(filename))
++);
++
++#endif /* _TRACE_FS_H */
++
++/* This part must be outside protection */
++#include <trace/define_trace.h>

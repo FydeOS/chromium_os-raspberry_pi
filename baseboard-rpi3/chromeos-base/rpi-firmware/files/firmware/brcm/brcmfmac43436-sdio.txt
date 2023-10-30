@@ -87,3 +87,7 @@ edoffthd20ul=-68
 edonthd20l_adj=2
 edoffthd20ul_adj=2
 
+# Improved Bluetooth coexistence parameters
+btc_mode=1
+btc_params8=0x4e20
+btc_params1=0x7530

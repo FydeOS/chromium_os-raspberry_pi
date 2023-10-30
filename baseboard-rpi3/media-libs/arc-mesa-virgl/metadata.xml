@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "http://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+  <use>
+      <flag name="android_aep">Advertise feature android.hardware.opengles.aep (Android Extension Pack).</flag>
+      <flag name="android_gles2">Limit OpenGL ES to 2.0.</flag>
+      <flag name="android_gles30">Limit OpenGL ES to 3.0.</flag>
+      <flag name="android_gles31">Limit OpenGL ES to 3.1.</flag>
+      <flag name="android_gles32">Limit OpenGL ES to 3.2.</flag>
+      <flag name="android_vulkan_compute_0">Advertise feature android.hardware.vulkan.compute=0. Valid for Android >= Oreo.</flag>
+  </use>
+</pkgmetadata>

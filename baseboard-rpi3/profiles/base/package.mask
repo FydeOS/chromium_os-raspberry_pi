@@ -6,3 +6,4 @@ media-libs/arc-mesa::arc-plus
 =media-libs/arc-mesai-9999::arc-plus
 media-libs/arc-cros-gralloc::chromiumos
 media-libs/libcamera::chromiumos
+#net-wireless/wpa_supplicant-cros::chromiumos

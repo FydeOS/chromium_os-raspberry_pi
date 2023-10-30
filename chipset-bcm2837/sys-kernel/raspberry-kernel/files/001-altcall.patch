@@ -1,8 +1,8 @@
-Index: rpi4-kernel/arch/arm64/Kconfig
+Index: raspberry-kernel/arch/arm64/Kconfig
 ===================================================================
---- rpi4-kernel.orig/arch/arm64/Kconfig
-+++ rpi4-kernel/arch/arm64/Kconfig
-@@ -21,6 +21,7 @@ config ARM64
+--- raspberry-kernel.orig/arch/arm64/Kconfig
++++ raspberry-kernel/arch/arm64/Kconfig
+@@ -24,6 +24,7 @@ config ARM64
  	select ARCH_HAS_DEBUG_VM_PGTABLE
  	select ARCH_HAS_DMA_PREP_COHERENT
  	select ARCH_HAS_ACPI_TABLE_UPGRADE if ACPI
@@ -10,10 +10,10 @@ Index: rpi4-kernel/arch/arm64/Kconfig
  	select ARCH_HAS_FAST_MULTIPLIER
  	select ARCH_HAS_FORTIFY_SOURCE
  	select ARCH_HAS_GCOV_PROFILE_ALL
-Index: rpi4-kernel/arch/arm64/include/asm/thread_info.h
+Index: raspberry-kernel/arch/arm64/include/asm/thread_info.h
 ===================================================================
---- rpi4-kernel.orig/arch/arm64/include/asm/thread_info.h
-+++ rpi4-kernel/arch/arm64/include/asm/thread_info.h
+--- raspberry-kernel.orig/arch/arm64/include/asm/thread_info.h
++++ raspberry-kernel/arch/arm64/include/asm/thread_info.h
 @@ -17,6 +17,7 @@ struct task_struct;
  #include <asm/memory.h>
  #include <asm/stack_pointer.h>
@@ -22,10 +22,10 @@ Index: rpi4-kernel/arch/arm64/include/asm/thread_info.h
  
  /*
   * low level task data that entry.S needs immediate access to.
-@@ -42,8 +43,32 @@ struct thread_info {
- 	void			*scs_base;
+@@ -43,8 +44,32 @@ struct thread_info {
  	void			*scs_sp;
  #endif
+ 	u32			cpu;
 +#ifdef CONFIG_ALT_SYSCALL
 +  unsigned int    nr_syscalls;
 +  const void    *sys_call_table;
@@ -55,19 +55,19 @@ Index: rpi4-kernel/arch/arm64/include/asm/thread_info.h
  #define thread_saved_pc(tsk)	\
  	((unsigned long)(tsk->thread.cpu_context.pc))
  #define thread_saved_sp(tsk)	\
-@@ -120,6 +145,7 @@ int arch_dup_task_struct(struct task_str
+@@ -123,6 +148,7 @@ int arch_dup_task_struct(struct task_str
  	.flags		= _TIF_FOREIGN_FPSTATE,				\
  	.preempt_count	= INIT_PREEMPT_COUNT,				\
  	INIT_SCS							\
-+  INIT_THREAD_INFO_SYSCALL          \
++  INIT_THREAD_INFO_SYSCALL					\
  }
  
  #endif /* __ASM_THREAD_INFO_H */
-Index: rpi4-kernel/arch/arm64/include/asm/unistd.h
+Index: raspberry-kernel/arch/arm64/include/asm/unistd.h
 ===================================================================
---- rpi4-kernel.orig/arch/arm64/include/asm/unistd.h
-+++ rpi4-kernel/arch/arm64/include/asm/unistd.h
-@@ -20,13 +20,349 @@
+--- raspberry-kernel.orig/arch/arm64/include/asm/unistd.h
++++ raspberry-kernel/arch/arm64/include/asm/unistd.h
+@@ -21,13 +21,349 @@
   */
  #define __NR_compat_restart_syscall	0
  #define __NR_compat_exit		1
@@ -417,17 +417,17 @@ Index: rpi4-kernel/arch/arm64/include/asm/unistd.h
  #define __NR_compat_clock_gettime64	403
  #define __NR_compat_clock_getres_time64	406
  
-Index: rpi4-kernel/arch/arm64/kernel/syscall.c
+Index: raspberry-kernel/arch/arm64/kernel/syscall.c
 ===================================================================
---- rpi4-kernel.orig/arch/arm64/kernel/syscall.c
-+++ rpi4-kernel/arch/arm64/kernel/syscall.c
-@@ -177,14 +177,28 @@ static inline void sve_user_discard(void
+--- raspberry-kernel.orig/arch/arm64/kernel/syscall.c
++++ raspberry-kernel/arch/arm64/kernel/syscall.c
+@@ -202,14 +202,28 @@ static inline void fp_user_discard(void)
  
  void do_el0_svc(struct pt_regs *regs)
  {
 +	struct thread_info __maybe_unused *ti;
 +
- 	sve_user_discard();
+ 	fp_user_discard();
 +#ifdef CONFIG_ALT_SYSCALL
 +	ti = current_thread_info();
 +	el0_svc_common(regs, regs->regs[8], ti->nr_syscalls,
@@ -450,10 +450,10 @@ Index: rpi4-kernel/arch/arm64/kernel/syscall.c
 +#endif
  }
  #endif
-Index: rpi4-kernel/include/linux/alt-syscall.h
+Index: raspberry-kernel/include/linux/alt-syscall.h
 ===================================================================
 --- /dev/null
-+++ rpi4-kernel/include/linux/alt-syscall.h
++++ raspberry-kernel/include/linux/alt-syscall.h
 @@ -0,0 +1,60 @@
 +#ifndef _ALT_SYSCALL_H
 +#define _ALT_SYSCALL_H
@@ -515,10 +515,10 @@ Index: rpi4-kernel/include/linux/alt-syscall.h
 +#endif
 +
 +#endif /* _ALT_SYSCALL_H */
-Index: rpi4-kernel/include/linux/android_aid.h
+Index: raspberry-kernel/include/linux/android_aid.h
 ===================================================================
 --- /dev/null
-+++ rpi4-kernel/include/linux/android_aid.h
++++ raspberry-kernel/include/linux/android_aid.h
 @@ -0,0 +1,28 @@
 +/* include/linux/android_aid.h
 + *
@@ -548,23 +548,23 @@ Index: rpi4-kernel/include/linux/android_aid.h
 +#define AID_NET_BW_ACCT  (3007)  /* change bandwidth statistics accounting */
 +
 +#endif
-Index: rpi4-kernel/include/net/netns/core.h
+Index: raspberry-kernel/include/net/netns/core.h
 ===================================================================
---- rpi4-kernel.orig/include/net/netns/core.h
-+++ rpi4-kernel/include/net/netns/core.h
-@@ -10,6 +10,7 @@ struct netns_core {
+--- raspberry-kernel.orig/include/net/netns/core.h
++++ raspberry-kernel/include/net/netns/core.h
+@@ -12,6 +12,7 @@ struct netns_core {
  	struct ctl_table_header	*sysctl_hdr;
  
  	int	sysctl_somaxconn;
-+  int sysctl_android_paranoid;
++	int	sysctl_android_paranoid;
+ 	u8	sysctl_txrehash;
  
  #ifdef CONFIG_PROC_FS
- 	int __percpu *sock_inuse;
-Index: rpi4-kernel/include/net/sock.h
+Index: raspberry-kernel/include/net/sock.h
 ===================================================================
---- rpi4-kernel.orig/include/net/sock.h
-+++ rpi4-kernel/include/net/sock.h
-@@ -2765,6 +2765,8 @@ bool sk_ns_capable(const struct sock *sk
+--- raspberry-kernel.orig/include/net/sock.h
++++ raspberry-kernel/include/net/sock.h
+@@ -2916,6 +2916,8 @@ bool sk_ns_capable(const struct sock *sk
  		   struct user_namespace *user_ns, int cap);
  bool sk_capable(const struct sock *sk, int cap);
  bool sk_net_capable(const struct sock *sk, int cap);
@@ -573,10 +573,10 @@ Index: rpi4-kernel/include/net/sock.h
  
  void sk_get_meminfo(const struct sock *sk, u32 *meminfo);
  
-Index: rpi4-kernel/net/core/sock.c
+Index: raspberry-kernel/net/core/sock.c
 ===================================================================
---- rpi4-kernel.orig/net/core/sock.c
-+++ rpi4-kernel/net/core/sock.c
+--- raspberry-kernel.orig/net/core/sock.c
++++ raspberry-kernel/net/core/sock.c
 @@ -114,6 +114,9 @@
  #include <linux/memcontrol.h>
  #include <linux/prefetch.h>
@@ -587,48 +587,48 @@ Index: rpi4-kernel/net/core/sock.c
  
  #include <linux/uaccess.h>
  
-@@ -194,6 +197,40 @@ bool sk_net_capable(const struct sock *s
+@@ -197,6 +200,40 @@ bool sk_net_capable(const struct sock *s
  }
  EXPORT_SYMBOL(sk_net_capable);
  
 +static bool in_android_group(struct user_namespace *user, gid_t gid)
 +{
-+  kgid_t kgid = make_kgid(user, gid);
++       kgid_t kgid = make_kgid(user, gid);
 +
-+  if (!gid_valid(kgid))
-+    return false;
-+  return in_egroup_p(kgid);
++       if (!gid_valid(kgid))
++               return false;
++       return in_egroup_p(kgid);
 +}
 +
 +bool inet_sk_allowed(struct net *net, gid_t gid)
 +{
-+  if (!net->core.sysctl_android_paranoid ||
-+      ns_capable(net->user_ns, CAP_NET_RAW))
-+    return true;
-+  return in_android_group(net->user_ns, gid);
++       if (!net->core.sysctl_android_paranoid ||
++           ns_capable(net->user_ns, CAP_NET_RAW))
++               return true;
++       return in_android_group(net->user_ns, gid);
 +}
 +EXPORT_SYMBOL(inet_sk_allowed);
 +
 +bool android_ns_capable(struct net *net, int cap)
 +{
-+  if (ns_capable(net->user_ns, cap))
-+    return true;
-+  if (!net->core.sysctl_android_paranoid)
-+    return false;
-+  if (cap == CAP_NET_RAW &&
-+      in_android_group(net->user_ns, AID_NET_RAW))
-+    return true;
-+  if (cap == CAP_NET_ADMIN &&
-+      in_android_group(net->user_ns, AID_NET_ADMIN))
-+    return true;
-+  return false;
++       if (ns_capable(net->user_ns, cap))
++               return true;
++       if (!net->core.sysctl_android_paranoid)
++               return false;
++       if (cap == CAP_NET_RAW &&
++           in_android_group(net->user_ns, AID_NET_RAW))
++               return true;
++       if (cap == CAP_NET_ADMIN &&
++           in_android_group(net->user_ns, AID_NET_ADMIN))
++               return true;
++       return false;
 +}
 +EXPORT_SYMBOL(android_ns_capable);
 +
  /*
   * Each address family might have different locking rules, so we have
   * one slock key per address family and separate keys for internal and
-@@ -591,7 +628,7 @@ static int sock_bindtoindex_locked(struc
+@@ -630,7 +667,7 @@ static int sock_bindtoindex_locked(struc
  
  	/* Sorry... */
  	ret = -EPERM;
@@ -637,20 +637,31 @@ Index: rpi4-kernel/net/core/sock.c
  		goto out;
  
  	ret = -EINVAL;
-Index: rpi4-kernel/net/ipv4/af_inet.c
+@@ -1359,6 +1396,11 @@ set_sndbuf:
+ 		__sock_set_mark(sk, val);
+ 		break;
+ 	case SO_RCVMARK:
++    if (!sockopt_ns_capable(sock_net(sk)->user_ns, CAP_NET_RAW) &&
++        !sockopt_ns_capable(sock_net(sk)->user_ns, CAP_NET_ADMIN)) {
++            ret = -EPERM;
++            break;
++    }
+ 		sock_valbool_flag(sk, SOCK_RCVMARK, valbool);
+ 		break;
+ 
+Index: raspberry-kernel/net/ipv4/af_inet.c
 ===================================================================
---- rpi4-kernel.orig/net/ipv4/af_inet.c
-+++ rpi4-kernel/net/ipv4/af_inet.c
-@@ -85,6 +85,8 @@
+--- raspberry-kernel.orig/net/ipv4/af_inet.c
++++ raspberry-kernel/net/ipv4/af_inet.c
+@@ -85,6 +85,7 @@
  #include <linux/netfilter_ipv4.h>
  #include <linux/random.h>
  #include <linux/slab.h>
-+#include <linux/netfilter/xt_qtaguid.h>
 +#include <linux/android_aid.h>
  
  #include <linux/uaccess.h>
  
-@@ -259,6 +261,9 @@ static int inet_create(struct net *net,
+@@ -256,6 +257,9 @@ static int inet_create(struct net *net,
  	if (protocol < 0 || protocol >= IPPROTO_MAX)
  		return -EINVAL;
  
@@ -660,7 +671,7 @@ Index: rpi4-kernel/net/ipv4/af_inet.c
  	sock->state = SS_UNCONNECTED;
  
  	/* Look for the requested type/protocol pair. */
-@@ -308,7 +313,7 @@ lookup_protocol:
+@@ -305,7 +309,7 @@ lookup_protocol:
  
  	err = -EPERM;
  	if (sock->type == SOCK_RAW && !kern &&
@@ -669,11 +680,11 @@ Index: rpi4-kernel/net/ipv4/af_inet.c
  		goto out_rcu_unlock;
  
  	sock->ops = answer->ops;
-Index: rpi4-kernel/net/socket.c
+Index: raspberry-kernel/net/socket.c
 ===================================================================
---- rpi4-kernel.orig/net/socket.c
-+++ rpi4-kernel/net/socket.c
-@@ -364,7 +364,7 @@ static const struct dentry_operations so
+--- raspberry-kernel.orig/net/socket.c
++++ raspberry-kernel/net/socket.c
+@@ -365,7 +365,7 @@ static const struct dentry_operations so
  
  static int sockfs_xattr_get(const struct xattr_handler *handler,
  			    struct dentry *dentry, struct inode *inode,
@@ -682,11 +693,11 @@ Index: rpi4-kernel/net/socket.c
  {
  	if (value) {
  		if (dentry->d_name.len + 1 > size)
-Index: rpi4-kernel/security/Kconfig
+Index: raspberry-kernel/security/Kconfig
 ===================================================================
---- rpi4-kernel.orig/security/Kconfig
-+++ rpi4-kernel/security/Kconfig
-@@ -231,6 +231,7 @@ source "security/yama/Kconfig"
+--- raspberry-kernel.orig/security/Kconfig
++++ raspberry-kernel/security/Kconfig
+@@ -207,11 +207,13 @@ source "security/yama/Kconfig"
  source "security/safesetid/Kconfig"
  source "security/lockdown/Kconfig"
  source "security/landlock/Kconfig"
@@ -694,37 +705,49 @@ Index: rpi4-kernel/security/Kconfig
  
  source "security/integrity/Kconfig"
  
-@@ -284,5 +285,14 @@ config LSM
+ choice
+ 	prompt "First legacy 'major LSM' to be initialized"
++	default DEFAULT_SECURITY_CHROMIUMOS if SECURITY_CHROMIUMOS
+ 	default DEFAULT_SECURITY_SELINUX if SECURITY_SELINUX
+ 	default DEFAULT_SECURITY_SMACK if SECURITY_SMACK
+ 	default DEFAULT_SECURITY_TOMOYO if SECURITY_TOMOYO
+@@ -227,6 +229,9 @@ choice
+ 	  Selects the legacy "major security module" that will be
+ 	  initialized first. Overridden by non-default CONFIG_LSM.
+ 
++	config DEFAULT_SECURITY_CHROMIUMOS
++		bool "Chromium OS" if SECURITY_CHROMIUMOS=y
++
+ 	config DEFAULT_SECURITY_SELINUX
+ 		bool "SELinux" if SECURITY_SELINUX=y
+ 
+@@ -250,6 +255,7 @@ config LSM
+ 	default "landlock,lockdown,yama,loadpin,safesetid,integrity,apparmor,selinux,smack,tomoyo,bpf" if DEFAULT_SECURITY_APPARMOR
+ 	default "landlock,lockdown,yama,loadpin,safesetid,integrity,tomoyo,bpf" if DEFAULT_SECURITY_TOMOYO
+ 	default "landlock,lockdown,yama,loadpin,safesetid,integrity,bpf" if DEFAULT_SECURITY_DAC
++	default "landlock,lockdown,yama,loadpin,safesetid,integrity,chromiumos,selinux,bpf" if DEFAULT_SECURITY_CHROMIUMOS
+ 	default "landlock,lockdown,yama,loadpin,safesetid,integrity,selinux,smack,tomoyo,apparmor,bpf"
+ 	help
+ 	  A comma-separated list of LSMs, in initialization order.
+@@ -260,5 +266,13 @@ config LSM
  
  source "security/Kconfig.hardening"
  
+-endmenu
 +config ARCH_HAS_ALT_SYSCALL
-+  def_bool n
-+
-+config ALT_SYSCALL
-+  bool "Alternate syscall table support"
-+  depends on ARCH_HAS_ALT_SYSCALL
-+  help
-+    Allow syscall table to be swapped on a running process.
-+
- endmenu
++	def_bool n
  
-Index: rpi4-kernel/security/Makefile
++config ALT_SYSCALL
++	bool "Alternate syscall table support"
++	depends on ARCH_HAS_ALT_SYSCALL
++	help
++	  Allow syscall table to be swapped on a running process.
++
++endmenu
+Index: raspberry-kernel/fs/ecryptfs/inode.c
 ===================================================================
---- rpi4-kernel.orig/security/Makefile
-+++ rpi4-kernel/security/Makefile
-@@ -12,6 +12,7 @@ obj-$(CONFIG_MMU)			+= min_addr.o
- # Object file lists
- obj-$(CONFIG_SECURITY)			+= security.o
- obj-$(CONFIG_SECURITYFS)		+= inode.o
-+obj-$(CONFIG_SECURITY_CHROMIUMOS) += chromiumos/
- obj-$(CONFIG_SECURITY_SELINUX)		+= selinux/
- obj-$(CONFIG_SECURITY_SMACK)		+= smack/
- obj-$(CONFIG_SECURITY)			+= lsm_audit.o
-Index: rpi4-kernel/fs/ecryptfs/inode.c
-===================================================================
---- rpi4-kernel.orig/fs/ecryptfs/inode.c
-+++ rpi4-kernel/fs/ecryptfs/inode.c
+--- raspberry-kernel.orig/fs/ecryptfs/inode.c
++++ raspberry-kernel/fs/ecryptfs/inode.c
 @@ -382,39 +382,54 @@ static struct dentry *ecryptfs_lookup(st
  				      unsigned int flags)
  {
@@ -832,24 +855,39 @@ Index: rpi4-kernel/fs/ecryptfs/inode.c
  {
  	return ecryptfs_getxattr(dentry, inode, name, buffer, size);
  }
-Index: rpi4-kernel/fs/ecryptfs/mmap.c
+Index: raspberry-kernel/security/Makefile
 ===================================================================
---- rpi4-kernel.orig/fs/ecryptfs/mmap.c
-+++ rpi4-kernel/fs/ecryptfs/mmap.c
-@@ -423,7 +423,7 @@ static int ecryptfs_write_inode_size_to_
+--- raspberry-kernel.orig/security/Makefile
++++ raspberry-kernel/security/Makefile
+@@ -12,6 +12,7 @@ obj-$(CONFIG_MMU)			+= min_addr.o
+ # Object file lists
+ obj-$(CONFIG_SECURITY)			+= security.o
+ obj-$(CONFIG_SECURITYFS)		+= inode.o
++obj-$(CONFIG_SECURITY_CHROMIUMOS)	+= chromiumos/
+ obj-$(CONFIG_SECURITY_SELINUX)		+= selinux/
+ obj-$(CONFIG_SECURITY_SMACK)		+= smack/
+ obj-$(CONFIG_SECURITY)			+= lsm_audit.o
+Index: raspberry-kernel/fs/ecryptfs/mmap.c
+===================================================================
+--- raspberry-kernel.orig/fs/ecryptfs/mmap.c
++++ raspberry-kernel/fs/ecryptfs/mmap.c
+@@ -423,8 +423,9 @@ static int ecryptfs_write_inode_size_to_
+ 		goto out;
  	}
  	inode_lock(lower_inode);
- 	size = __vfs_getxattr(lower_dentry, lower_inode, ECRYPTFS_XATTR_NAME,
+-	size = __vfs_getxattr(lower_dentry, lower_inode, ECRYPTFS_XATTR_NAME,
 -			      xattr_virt, PAGE_SIZE);
-+			      xattr_virt, PAGE_SIZE, XATTR_NOSECURITY);
++	size = __vfs_getxattr(&init_user_ns, lower_dentry, lower_inode,
++			      ECRYPTFS_XATTR_NAME, xattr_virt, PAGE_SIZE,
++			      XATTR_NOSECURITY);
  	if (size < 0)
  		size = 8;
  	put_unaligned_be64(i_size_read(ecryptfs_inode), xattr_virt);
-Index: rpi4-kernel/fs/xattr.c
+Index: raspberry-kernel/fs/xattr.c
 ===================================================================
---- rpi4-kernel.orig/fs/xattr.c
-+++ rpi4-kernel/fs/xattr.c
-@@ -371,7 +371,7 @@ vfs_getxattr_alloc(struct user_namespace
+--- raspberry-kernel.orig/fs/xattr.c
++++ raspberry-kernel/fs/xattr.c
+@@ -377,7 +377,7 @@ vfs_getxattr_alloc(struct user_namespace
  		return PTR_ERR(handler);
  	if (!handler->get)
  		return -EOPNOTSUPP;
@@ -858,7 +896,7 @@ Index: rpi4-kernel/fs/xattr.c
  	if (error < 0)
  		return error;
  
-@@ -382,33 +382,21 @@ vfs_getxattr_alloc(struct user_namespace
+@@ -388,33 +388,21 @@ vfs_getxattr_alloc(struct user_namespace
  		memset(value, 0, error + 1);
  	}
  
@@ -872,8 +910,8 @@ Index: rpi4-kernel/fs/xattr.c
 -__vfs_getxattr(struct dentry *dentry, struct inode *inode, const char *name,
 -	       void *value, size_t size)
 +__vfs_getxattr(struct user_namespace *mnt_userns, struct dentry *dentry,
-+	       struct inode *inode,const char *name, void *value, size_t size,
-+         int flags)
++	       struct inode *inode, const char *name, void *value, size_t size,
++	       int flags)
  {
  	const struct xattr_handler *handler;
 -
@@ -893,16 +931,19 @@ Index: rpi4-kernel/fs/xattr.c
 -	struct inode *inode = dentry->d_inode;
  	int error;
  
-+  if (flags & XATTR_NOSECURITY)
-+    goto nolsm;
++	if (flags & XATTR_NOSECURITY)
++		goto nolsm;
  	error = xattr_permission(mnt_userns, inode, name, MAY_READ);
  	if (error)
  		return error;
-@@ -431,7 +419,20 @@ vfs_getxattr(struct user_namespace *mnt_
+@@ -437,10 +425,20 @@ vfs_getxattr(struct user_namespace *mnt_
  		return ret;
  	}
  nolsm:
--	return __vfs_getxattr(dentry, inode, name, value, size);
+-	error = __vfs_getxattr(dentry, inode, name, value, size);
+-	if (error > 0 && is_posix_acl_xattr(name))
+-		posix_acl_getxattr_idmapped_mnt(mnt_userns, inode, value, size);
+-	return error;
 +	handler = xattr_resolve_name(inode, &name);
 +	if (IS_ERR(handler))
 +		return PTR_ERR(handler);
@@ -920,33 +961,42 @@ Index: rpi4-kernel/fs/xattr.c
  }
  EXPORT_SYMBOL_GPL(vfs_getxattr);
  
-Index: rpi4-kernel/include/uapi/linux/xattr.h
+Index: raspberry-kernel/include/uapi/linux/xattr.h
 ===================================================================
---- rpi4-kernel.orig/include/uapi/linux/xattr.h
-+++ rpi4-kernel/include/uapi/linux/xattr.h
+--- raspberry-kernel.orig/include/uapi/linux/xattr.h
++++ raspberry-kernel/include/uapi/linux/xattr.h
 @@ -20,6 +20,9 @@
  
  #define XATTR_CREATE	0x1	/* set value, fail if attr already exists */
  #define XATTR_REPLACE	0x2	/* set value, fail if attr does not exist */
 +#ifdef __KERNEL__ /* following is kernel internal, colocated for maintenance */
-+#define XATTR_NOSECURITY 0x4  /* get value, do not involve security check */
++#define XATTR_NOSECURITY 0x4   /* get value, do not involve security check */
 +#endif
  #endif
  
  /* Namespaces */
-Index: rpi4-kernel/net/ipv6/af_inet6.c
+Index: raspberry-kernel/net/ipv6/af_inet6.c
 ===================================================================
---- rpi4-kernel.orig/net/ipv6/af_inet6.c
-+++ rpi4-kernel/net/ipv6/af_inet6.c
-@@ -34,6 +34,7 @@
- #include <linux/stat.h>
- #include <linux/init.h>
- #include <linux/slab.h>
+--- raspberry-kernel.orig/net/ipv6/af_inet6.c
++++ raspberry-kernel/net/ipv6/af_inet6.c
+@@ -39,6 +39,7 @@
+ #include <linux/netdevice.h>
+ #include <linux/icmpv6.h>
+ #include <linux/netfilter_ipv6.h>
 +#include <linux/android_aid.h>
  
- #include <linux/inet.h>
- #include <linux/netdevice.h>
-@@ -170,7 +171,7 @@ lookup_protocol:
+ #include <net/ip.h>
+ #include <net/ipv6.h>
+@@ -131,6 +132,8 @@ static int inet6_create(struct net *net,
+ 	if (protocol < 0 || protocol >= IPPROTO_MAX)
+ 		return -EINVAL;
+ 
++  if (!inet_sk_allowed(net, AID_INET))
++    return -EACCES;
+ 	/* Look for the requested type/protocol pair. */
+ lookup_protocol:
+ 	err = -ESOCKTNOSUPPORT;
+@@ -178,7 +181,7 @@ lookup_protocol:
  
  	err = -EPERM;
  	if (sock->type == SOCK_RAW && !kern &&
@@ -955,304 +1005,396 @@ Index: rpi4-kernel/net/ipv6/af_inet6.c
  		goto out_rcu_unlock;
  
  	sock->ops = answer->ops;
-Index: rpi4-kernel/security/commoncap.c
+Index: raspberry-kernel/security/commoncap.c
 ===================================================================
---- rpi4-kernel.orig/security/commoncap.c
-+++ rpi4-kernel/security/commoncap.c
+--- raspberry-kernel.orig/security/commoncap.c
++++ raspberry-kernel/security/commoncap.c
 @@ -298,7 +298,8 @@ int cap_inode_need_killpriv(struct dentr
  	struct inode *inode = d_backing_inode(dentry);
  	int error;
  
 -	error = __vfs_getxattr(dentry, inode, XATTR_NAME_CAPS, NULL, 0);
-+	error = __vfs_getxattr(dentry, inode, XATTR_NAME_CAPS, NULL, 0,
-+            XATTR_NOSECURITY);
++	error = __vfs_getxattr(&init_user_ns, dentry, inode, XATTR_NAME_CAPS,
++			       NULL, 0, XATTR_NOSECURITY);
  	return error > 0;
  }
  
-@@ -666,7 +667,8 @@ int get_vfs_caps_from_disk(struct user_n
+@@ -665,8 +666,9 @@ int get_vfs_caps_from_disk(struct user_n
+ 		return -ENODATA;
  
  	fs_ns = inode->i_sb->s_user_ns;
- 	size = __vfs_getxattr((struct dentry *)dentry, inode,
+-	size = __vfs_getxattr((struct dentry *)dentry, inode,
 -			      XATTR_NAME_CAPS, &data, XATTR_CAPS_SZ);
++	size = __vfs_getxattr(&init_user_ns, (struct dentry *)dentry, inode,
 +			      XATTR_NAME_CAPS, &data, XATTR_CAPS_SZ,
-+            XATTR_NOSECURITY);
++			      XATTR_NOSECURITY);
  	if (size == -ENODATA || size == -EOPNOTSUPP)
  		/* no data, that's ok */
  		return -ENODATA;
-Index: rpi4-kernel/security/integrity/evm/evm_main.c
+Index: raspberry-kernel/security/integrity/evm/evm_main.c
 ===================================================================
---- rpi4-kernel.orig/security/integrity/evm/evm_main.c
-+++ rpi4-kernel/security/integrity/evm/evm_main.c
-@@ -145,7 +145,7 @@ static int evm_find_protected_xattrs(str
+--- raspberry-kernel.orig/security/integrity/evm/evm_main.c
++++ raspberry-kernel/security/integrity/evm/evm_main.c
+@@ -139,7 +139,7 @@ static int evm_find_protected_xattrs(str
  		return -EOPNOTSUPP;
  
  	list_for_each_entry_lockless(xattr, &evm_config_xattrnames, list) {
 -		error = __vfs_getxattr(dentry, inode, xattr->name, NULL, 0);
-+		error = __vfs_getxattr(dentry, inode, xattr->name, NULL, 0, XATTR_NOSECURITY);
++		error = __vfs_getxattr(&init_user_ns, dentry, inode, xattr->name, NULL, 0, XATTR_NOSECURITY);
  		if (error < 0) {
  			if (error == -ENODATA)
  				continue;
-Index: rpi4-kernel/security/selinux/Kconfig
-===================================================================
---- rpi4-kernel.orig/security/selinux/Kconfig
-+++ rpi4-kernel/security/selinux/Kconfig
-@@ -93,6 +93,16 @@ config SECURITY_SELINUX_CHECKREQPROT_VAL
+@@ -336,8 +336,8 @@ int evm_read_protected_xattrs(struct den
+ 	int rc, size, total_size = 0;
  
- 	  If you are unsure how to answer this question, answer 0.
+ 	list_for_each_entry_lockless(xattr, &evm_config_xattrnames, list) {
+-		rc = __vfs_getxattr(dentry, d_backing_inode(dentry),
+-				    xattr->name, NULL, 0);
++		rc = __vfs_getxattr(&init_user_ns, dentry, d_backing_inode(dentry),
++				    xattr->name, NULL, 0, 0);
+ 		if (rc < 0 && rc == -ENODATA)
+ 			continue;
+ 		else if (rc < 0)
+@@ -365,10 +365,10 @@ int evm_read_protected_xattrs(struct den
+ 		case 'v':
+ 			size = rc;
+ 			if (buffer) {
+-				rc = __vfs_getxattr(dentry,
++				rc = __vfs_getxattr(&init_user_ns, dentry,
+ 					d_backing_inode(dentry), xattr->name,
+ 					buffer + total_size,
+-					buffer_size - total_size);
++					buffer_size - total_size, 0);
+ 				if (rc < 0)
+ 					return rc;
+ 			}
+Index: raspberry-kernel/security/selinux/Kconfig
+===================================================================
+--- raspberry-kernel.orig/security/selinux/Kconfig
++++ raspberry-kernel/security/selinux/Kconfig
+@@ -61,6 +61,16 @@ config SECURITY_SELINUX_DEVELOP
+ 	  permissive mode (if permitted by the policy) via
+ 	  /sys/fs/selinux/enforce.
  
 +config SECURITY_SELINUX_PERMISSIVE_DONTAUDIT
-+  bool "NSA SELinux don't audit permissive"
-+  depends on SECURITY_SELINUX
-+  default n
-+  help
-+    This prevents logging when permissive=1.  If unsure, say N.  With
-+    this option enabled, any avc logs that would occur on a permissive
-+    domain won't be logged.  This can prevent a significant amount of
-+    logspam
++	bool "NSA SELinux don't audit permissive"
++	depends on SECURITY_SELINUX
++	default n
++	help
++	  This prevents logging when permissive=1.  If unsure, say N.  With
++	  this option enabled, any avc logs that would occur on a permissive
++	  domain won't be logged.  This can prevent a significant amount of
++	  logspam.
 +
- config SECURITY_SELINUX_SIDTAB_HASH_BITS
- 	int "NSA SELinux sidtab hashtable size"
+ config SECURITY_SELINUX_AVC_STATS
+ 	bool "NSA SELinux AVC Statistics"
  	depends on SECURITY_SELINUX
-Index: rpi4-kernel/security/selinux/avc.c
+Index: raspberry-kernel/security/selinux/avc.c
 ===================================================================
---- rpi4-kernel.orig/security/selinux/avc.c
-+++ rpi4-kernel/security/selinux/avc.c
-@@ -772,6 +772,11 @@ noinline int slow_avc_audit(struct selin
- 	struct common_audit_data stack_data;
- 	struct selinux_audit_data sad;
- 
-+  if (IS_ENABLED(CONFIG_SECURITY_SELINUX_PERMISSIVE_DONTAUDIT) && denied
-+      && !result) {
-+    return 0;
-+  }
-+
+--- raspberry-kernel.orig/security/selinux/avc.c
++++ raspberry-kernel/security/selinux/avc.c
+@@ -777,6 +777,15 @@ noinline int slow_avc_audit(struct selin
  	if (WARN_ON(!tclass || tclass >= ARRAY_SIZE(secclass_map)))
  		return -EINVAL;
  
-Index: rpi4-kernel/security/selinux/hooks.c
++	/*
++	 * Avoid logging permissive=1 messages for
++	 * SECURITY_SELINUX_PERMISSIVE_DONTAUDIT.
++	 */
++	if (IS_ENABLED(CONFIG_SECURITY_SELINUX_PERMISSIVE_DONTAUDIT) && denied
++	    && !result) {
++		return 0;
++	}
++
+ 	if (!a) {
+ 		a = &stack_data;
+ 		a->type = LSM_AUDIT_DATA_NONE;
+Index: raspberry-kernel/security/selinux/hooks.c
 ===================================================================
---- rpi4-kernel.orig/security/selinux/hooks.c
-+++ rpi4-kernel/security/selinux/hooks.c
-@@ -515,7 +515,8 @@ static int sb_check_xattr_support(struct
+--- raspberry-kernel.orig/security/selinux/hooks.c
++++ raspberry-kernel/security/selinux/hooks.c
+@@ -495,7 +495,7 @@ static int sb_check_xattr_support(struct
  		goto fallback;
  	}
  
 -	rc = __vfs_getxattr(root, root_inode, XATTR_NAME_SELINUX, NULL, 0);
-+	rc = __vfs_getxattr(&init_user_ns, root, root_inode,
-+			    XATTR_NAME_SELINUX, NULL, 0, XATTR_NOSECURITY);
++	rc = __vfs_getxattr(&init_user_ns, root, root_inode, XATTR_NAME_SELINUX, NULL, 0, XATTR_NOSECURITY);
  	if (rc < 0 && rc != -ENODATA) {
  		if (rc == -EOPNOTSUPP) {
  			pr_warn("SELinux: (dev %s, type %s) has no security xattr handler\n",
-@@ -1390,12 +1391,16 @@ static int inode_doinit_use_xattr(struct
+@@ -1318,12 +1318,12 @@ static int inode_doinit_use_xattr(struct
  		return -ENOMEM;
  
  	context[len] = '\0';
 -	rc = __vfs_getxattr(dentry, inode, XATTR_NAME_SELINUX, context, len);
-+	rc = __vfs_getxattr(&init_user_ns, dentry, inode,
-+			    XATTR_NAME_SELINUX, context, len,
-+			    XATTR_NOSECURITY);
++	rc = __vfs_getxattr(&init_user_ns, dentry, inode, XATTR_NAME_SELINUX, context, len, XATTR_NOSECURITY);
  	if (rc == -ERANGE) {
  		kfree(context);
  
  		/* Need a larger buffer.  Query for the right size. */
 -		rc = __vfs_getxattr(dentry, inode, XATTR_NAME_SELINUX, NULL, 0);
-+		rc = __vfs_getxattr(&init_user_ns, dentry, inode,
-+				    XATTR_NAME_SELINUX, NULL, 0,
-+				    XATTR_NOSECURITY);
++		rc = __vfs_getxattr(&init_user_ns, dentry, inode, XATTR_NAME_SELINUX, NULL, 0, XATTR_NOSECURITY);
  		if (rc < 0)
  			return rc;
  
-@@ -1405,8 +1410,9 @@ static int inode_doinit_use_xattr(struct
+@@ -1333,8 +1333,8 @@ static int inode_doinit_use_xattr(struct
  			return -ENOMEM;
  
  		context[len] = '\0';
 -		rc = __vfs_getxattr(dentry, inode, XATTR_NAME_SELINUX,
 -				    context, len);
-+		rc = __vfs_getxattr(&init_user_ns, dentry, inode,
-+				    XATTR_NAME_SELINUX, context, len,
-+				    XATTR_NOSECURITY);
++		rc = __vfs_getxattr(&init_user_ns, dentry, inode, XATTR_NAME_SELINUX,
++				    context, len, XATTR_NOSECURITY);
  	}
  	if (rc < 0) {
  		kfree(context);
-Index: rpi4-kernel/security/selinux/include/classmap.h
+Index: raspberry-kernel/security/selinux/include/classmap.h
 ===================================================================
---- rpi4-kernel.orig/security/selinux/include/classmap.h
-+++ rpi4-kernel/security/selinux/include/classmap.h
-@@ -117,7 +117,7 @@ struct security_class_mapping secclass_m
+--- raspberry-kernel.orig/security/selinux/include/classmap.h
++++ raspberry-kernel/security/selinux/include/classmap.h
+@@ -117,7 +117,8 @@ const struct security_class_mapping secc
  	  { COMMON_IPC_PERMS, NULL } },
  	{ "netlink_route_socket",
  	  { COMMON_SOCK_PERMS,
 -	    "nlmsg_read", "nlmsg_write", NULL } },
-+	    "nlmsg_read", "nlmsg_write", "nlmsg_readpriv", NULL } },
++	    "nlmsg_read", "nlmsg_write", "nlmsg_readpriv", "nlmsg_getneigh",
++	    NULL } },
  	{ "netlink_tcpdiag_socket",
  	  { COMMON_SOCK_PERMS,
  	    "nlmsg_read", "nlmsg_write", NULL } },
-Index: rpi4-kernel/security/selinux/include/security.h
+Index: raspberry-kernel/security/selinux/include/security.h
 ===================================================================
---- rpi4-kernel.orig/security/selinux/include/security.h
-+++ rpi4-kernel/security/selinux/include/security.h
-@@ -97,6 +97,7 @@ struct selinux_state {
+--- raspberry-kernel.orig/security/selinux/include/security.h
++++ raspberry-kernel/security/selinux/include/security.h
+@@ -99,6 +99,8 @@ struct selinux_state {
  	bool checkreqprot;
  	bool initialized;
- 	bool policycap[__POLICYDB_CAPABILITY_MAX];
-+  bool android_netlink_route;
+ 	bool policycap[__POLICYDB_CAP_MAX];
++	bool android_netlink_route;
++	bool android_netlink_getneigh;
  
  	struct page *status_page;
  	struct mutex status_lock;
-@@ -226,6 +227,13 @@ static inline bool selinux_policycap_ioc
- 	return READ_ONCE(state->policycap[POLICYDB_CAPABILITY_IOCTL_SKIP_CLOEXEC]);
+@@ -223,6 +225,13 @@ static inline bool selinux_policycap_gen
+ 	return READ_ONCE(state->policycap[POLICYDB_CAP_GENFS_SECLABEL_SYMLINKS]);
  }
  
 +static inline bool selinux_android_nlroute_getlink(void)
 +{
-+  struct selinux_state *state = &selinux_state;
++	struct selinux_state *state = &selinux_state;
 +
-+  return state->android_netlink_route;
++	return state->android_netlink_route;
++}
++
+ static inline bool selinux_policycap_ioctl_skip_cloexec(void)
+ {
+ 	struct selinux_state *state = &selinux_state;
+@@ -230,6 +239,13 @@ static inline bool selinux_policycap_ioc
+ 	return READ_ONCE(state->policycap[POLICYDB_CAP_IOCTL_SKIP_CLOEXEC]);
+ }
+ 
++static inline bool selinux_android_nlroute_getneigh(void)
++{
++	struct selinux_state *state = &selinux_state;
++
++	return state->android_netlink_getneigh;
 +}
 +
  struct selinux_policy_convert_data;
  
  struct selinux_load_state {
-@@ -459,5 +467,6 @@ extern void avtab_cache_init(void);
+@@ -463,5 +479,6 @@ extern void avtab_cache_init(void);
  extern void ebitmap_cache_init(void);
  extern void hashtab_cache_init(void);
  extern int security_sidtab_hash_stats(struct selinux_state *state, char *page);
 +extern void selinux_nlmsg_init(void);
  
  #endif /* _SELINUX_SECURITY_H_ */
-Index: rpi4-kernel/security/selinux/nlmsgtab.c
+Index: raspberry-kernel/security/selinux/nlmsgtab.c
 ===================================================================
---- rpi4-kernel.orig/security/selinux/nlmsgtab.c
-+++ rpi4-kernel/security/selinux/nlmsgtab.c
-@@ -25,7 +25,7 @@ struct nlmsg_perm {
+--- raspberry-kernel.orig/security/selinux/nlmsgtab.c
++++ raspberry-kernel/security/selinux/nlmsgtab.c
+@@ -25,7 +25,8 @@ struct nlmsg_perm {
  	u32	perm;
  };
  
--static const struct nlmsg_perm nlmsg_route_perms[] =
+-static const struct nlmsg_perm nlmsg_route_perms[] = {
 +static struct nlmsg_perm nlmsg_route_perms[] =
- {
++{
  	{ RTM_NEWLINK,		NETLINK_ROUTE_SOCKET__NLMSG_WRITE },
  	{ RTM_DELLINK,		NETLINK_ROUTE_SOCKET__NLMSG_WRITE },
-@@ -216,3 +216,27 @@ int selinux_nlmsg_lookup(u16 sclass, u16
+ 	{ RTM_GETLINK,		NETLINK_ROUTE_SOCKET__NLMSG_READ  },
+@@ -216,3 +217,43 @@ int selinux_nlmsg_lookup(u16 sclass, u16
  
  	return err;
  }
 +
-+static void nlmsg_set_getlink_perm(u32 perm)
++static void nlmsg_set_perm_for_type(u32 perm, u16 type)
 +{
-+  int i;
++	int i;
 +
-+  for (i = 0; i < ARRAY_SIZE(nlmsg_route_perms); i++) {
-+    if (nlmsg_route_perms[i].nlmsg_type == RTM_GETLINK) {
-+      nlmsg_route_perms[i].perm = perm;
-+      break;
-+    }
-+  }
++	for (i = 0; i < ARRAY_SIZE(nlmsg_route_perms); i++) {
++		if (nlmsg_route_perms[i].nlmsg_type == type) {
++			nlmsg_route_perms[i].perm = perm;
++			break;
++		}
++	}
 +}
 +
-+/**
++/*
 + * Use nlmsg_readpriv as the permission for RTM_GETLINK messages if the
 + * netlink_route_getlink policy capability is set. Otherwise use nlmsg_read.
++ * Similarly, use nlmsg_getneigh for RTM_GETNEIGH and RTM_GETNEIGHTBL if the
++ * netlink_route_getneigh policy capability is set. Otherwise use nlmsg_read.
 + */
 +void selinux_nlmsg_init(void)
 +{
-+  if (selinux_android_nlroute_getlink())
-+    nlmsg_set_getlink_perm(NETLINK_ROUTE_SOCKET__NLMSG_READPRIV);
-+  else
-+    nlmsg_set_getlink_perm(NETLINK_ROUTE_SOCKET__NLMSG_READ);
++	if (selinux_android_nlroute_getlink())
++		nlmsg_set_perm_for_type(NETLINK_ROUTE_SOCKET__NLMSG_READPRIV,
++					RTM_GETLINK);
++	else
++		nlmsg_set_perm_for_type(NETLINK_ROUTE_SOCKET__NLMSG_READ,
++					RTM_GETLINK);
++
++	if (selinux_android_nlroute_getneigh()) {
++		nlmsg_set_perm_for_type(NETLINK_ROUTE_SOCKET__NLMSG_GETNEIGH,
++					RTM_GETNEIGH);
++		nlmsg_set_perm_for_type(NETLINK_ROUTE_SOCKET__NLMSG_GETNEIGH,
++					RTM_GETNEIGHTBL);
++	} else {
++		nlmsg_set_perm_for_type(NETLINK_ROUTE_SOCKET__NLMSG_READ,
++					RTM_GETNEIGH);
++		nlmsg_set_perm_for_type(NETLINK_ROUTE_SOCKET__NLMSG_READ,
++					RTM_GETNEIGHTBL);
++	}
 +}
-Index: rpi4-kernel/security/selinux/ss/policydb.c
+Index: raspberry-kernel/security/selinux/ss/policydb.c
 ===================================================================
---- rpi4-kernel.orig/security/selinux/ss/policydb.c
-+++ rpi4-kernel/security/selinux/ss/policydb.c
-@@ -2491,6 +2491,10 @@ int policydb_read(struct policydb *p, vo
+--- raspberry-kernel.orig/security/selinux/ss/policydb.c
++++ raspberry-kernel/security/selinux/ss/policydb.c
+@@ -2005,7 +2005,6 @@ static int filename_trans_read_helper(st
+ 		if (!datum)
+ 			goto out;
+ 
+-		datum->next = NULL;
+ 		*dst = datum;
+ 
+ 		/* ebitmap_read() will at least init the bitmap */
+@@ -2018,6 +2017,7 @@ static int filename_trans_read_helper(st
+ 			goto out;
+ 
+ 		datum->otype = le32_to_cpu(buf[0]);
++		datum->next = NULL;
+ 
+ 		dst = &datum->next;
+ 	}
+@@ -2485,6 +2485,14 @@ int policydb_read(struct policydb *p, vo
  	p->reject_unknown = !!(le32_to_cpu(buf[1]) & REJECT_UNKNOWN);
  	p->allow_unknown = !!(le32_to_cpu(buf[1]) & ALLOW_UNKNOWN);
  
-+  if ((le32_to_cpu(buf[1]) & POLICYDB_CONFIG_ANDROID_NETLINK_ROUTE)) {
-+    p->android_netlink_route = 1;
-+  }
++	if ((le32_to_cpu(buf[1]) & POLICYDB_CONFIG_ANDROID_NETLINK_ROUTE)) {
++		p->android_netlink_route = 1;
++	}
++
++	if ((le32_to_cpu(buf[1]) & POLICYDB_CONFIG_ANDROID_NETLINK_GETNEIGH)) {
++		p->android_netlink_getneigh = 1;
++	}
 +
  	if (p->policyvers >= POLICYDB_VERSION_POLCAP) {
  		rc = ebitmap_read(&p->policycaps, fp);
  		if (rc)
-Index: rpi4-kernel/security/selinux/ss/policydb.h
+Index: raspberry-kernel/security/selinux/ss/policydb.h
 ===================================================================
---- rpi4-kernel.orig/security/selinux/ss/policydb.h
-+++ rpi4-kernel/security/selinux/ss/policydb.h
-@@ -238,6 +238,7 @@ struct genfs {
+--- raspberry-kernel.orig/security/selinux/ss/policydb.h
++++ raspberry-kernel/security/selinux/ss/policydb.h
+@@ -238,6 +238,8 @@ struct genfs {
  /* The policy database */
  struct policydb {
  	int mls_enabled;
-+  int android_netlink_route;
++	int android_netlink_route;
++	int android_netlink_getneigh;
  
  	/* symbol tables */
  	struct symtab symtab[SYM_NUM];
-@@ -334,6 +335,7 @@ extern struct role_trans_datum *policydb
+@@ -334,6 +336,8 @@ extern struct role_trans_datum *policydb
  	struct policydb *p, struct role_trans_key *key);
  
  #define POLICYDB_CONFIG_MLS    1
 +#define POLICYDB_CONFIG_ANDROID_NETLINK_ROUTE    (1 << 31)
++#define POLICYDB_CONFIG_ANDROID_NETLINK_GETNEIGH (1 << 30)
  
  /* the config flags related to unknown classes/perms are bits 2 and 3 */
  #define REJECT_UNKNOWN	0x00000002
-Index: rpi4-kernel/security/selinux/ss/services.c
+Index: raspberry-kernel/security/selinux/ss/services.c
 ===================================================================
---- rpi4-kernel.orig/security/selinux/ss/services.c
-+++ rpi4-kernel/security/selinux/ss/services.c
-@@ -2165,6 +2165,9 @@ static void security_load_policycaps(str
+--- raspberry-kernel.orig/security/selinux/ss/services.c
++++ raspberry-kernel/security/selinux/ss/services.c
+@@ -2166,6 +2166,10 @@ static void security_load_policycaps(str
  			pr_info("SELinux:  unknown policy capability %u\n",
  				i);
  	}
 +
-+  state->android_netlink_route = p->android_netlink_route;
-+  selinux_nlmsg_init();
++	state->android_netlink_route = p->android_netlink_route;
++	state->android_netlink_getneigh = p->android_netlink_getneigh;
++	selinux_nlmsg_init();
  }
  
  static int security_preserve_bools(struct selinux_policy *oldpolicy,
-Index: rpi4-kernel/security/smack/smack_lsm.c
+Index: raspberry-kernel/security/smack/smack_lsm.c
 ===================================================================
---- rpi4-kernel.orig/security/smack/smack_lsm.c
-+++ rpi4-kernel/security/smack/smack_lsm.c
-@@ -289,7 +289,7 @@ static struct smack_known *smk_fetch(con
+--- raspberry-kernel.orig/security/smack/smack_lsm.c
++++ raspberry-kernel/security/smack/smack_lsm.c
+@@ -292,7 +292,7 @@ static struct smack_known *smk_fetch(con
  	if (buffer == NULL)
  		return ERR_PTR(-ENOMEM);
  
 -	rc = __vfs_getxattr(dp, ip, name, buffer, SMK_LONGLABEL);
-+	rc = __vfs_getxattr(dp, ip, name, buffer, SMK_LONGLABEL, XATTR_NOSECURITY);
++	rc = __vfs_getxattr(&init_user_ns, dp, ip, name, buffer, SMK_LONGLABEL, XATTR_NOSECURITY);
  	if (rc < 0)
  		skp = ERR_PTR(rc);
  	else if (rc == 0)
-@@ -3431,7 +3431,7 @@ static void smack_d_instantiate(struct d
+@@ -3494,9 +3494,9 @@ static void smack_d_instantiate(struct d
+ 					TRANS_TRUE, TRANS_TRUE_SIZE,
+ 					0);
  			} else {
- 				rc = __vfs_getxattr(dp, inode,
+-				rc = __vfs_getxattr(dp, inode,
++				rc = __vfs_getxattr(&init_user_ns, dp, inode,
  					XATTR_NAME_SMACKTRANSMUTE, trattr,
 -					TRANS_TRUE_SIZE);
 +					TRANS_TRUE_SIZE, XATTR_NOSECURITY);
  				if (rc >= 0 && strncmp(trattr, TRANS_TRUE,
  						       TRANS_TRUE_SIZE) != 0)
  					rc = -EINVAL;
-Index: rpi4-kernel/drivers/net/tun.c
+Index: raspberry-kernel/drivers/net/tun.c
 ===================================================================
---- rpi4-kernel.orig/drivers/net/tun.c
-+++ rpi4-kernel/drivers/net/tun.c
-@@ -3020,6 +3020,12 @@ static long __tun_chr_ioctl(struct file
+--- raspberry-kernel.orig/drivers/net/tun.c
++++ raspberry-kernel/drivers/net/tun.c
+@@ -3066,6 +3066,12 @@ static long __tun_chr_ioctl(struct file
  	int ret;
  	bool do_notify = false;
  
 +  if (current->nsproxy->net_ns->core.sysctl_android_paranoid &&
 +      cmd != TUNGETIFF &&
 +      !ns_capable(sock_net(&tfile->sk)->user_ns, CAP_NET_ADMIN)) {
-+    return -EPERM;
++          return -EPERM;
 +  }
 +
  	if (cmd == TUNSETIFF || cmd == TUNSETQUEUE ||
  	    (_IOC_TYPE(cmd) == SOCK_IOC_TYPE && cmd != SIOCGSKNS)) {
  		if (copy_from_user(&ifr, argp, ifreq_len))
-Index: rpi4-kernel/fs/ext4/xattr_security.c
+@@ -3457,7 +3463,7 @@ static int tun_chr_open(struct inode *in
+ 	tfile->socket.file = file;
+ 	tfile->socket.ops = &tun_socket_ops;
+ 
+-	sock_init_data_uid(&tfile->socket, &tfile->sk, current_fsuid());
++	sock_init_data_uid(&tfile->socket, &tfile->sk, inode->i_uid);
+ 
+ 	tfile->sk.sk_write_space = tun_sock_write_space;
+ 	tfile->sk.sk_sndbuf = INT_MAX;
+Index: raspberry-kernel/fs/ext4/xattr_security.c
 ===================================================================
---- rpi4-kernel.orig/fs/ext4/xattr_security.c
-+++ rpi4-kernel/fs/ext4/xattr_security.c
+--- raspberry-kernel.orig/fs/ext4/xattr_security.c
++++ raspberry-kernel/fs/ext4/xattr_security.c
 @@ -15,7 +15,7 @@
  static int
  ext4_xattr_security_get(const struct xattr_handler *handler,
@@ -1262,11 +1404,11 @@ Index: rpi4-kernel/fs/ext4/xattr_security.c
  {
  	return ext4_xattr_get(inode, EXT4_XATTR_INDEX_SECURITY,
  			      name, buffer, size);
-Index: rpi4-kernel/fs/fuse/xattr.c
+Index: raspberry-kernel/fs/fuse/xattr.c
 ===================================================================
---- rpi4-kernel.orig/fs/fuse/xattr.c
-+++ rpi4-kernel/fs/fuse/xattr.c
-@@ -182,7 +182,7 @@ int fuse_removexattr(struct inode *inode
+--- raspberry-kernel.orig/fs/fuse/xattr.c
++++ raspberry-kernel/fs/fuse/xattr.c
+@@ -180,7 +180,7 @@ int fuse_removexattr(struct inode *inode
  
  static int fuse_xattr_get(const struct xattr_handler *handler,
  			 struct dentry *dentry, struct inode *inode,
@@ -1275,7 +1417,7 @@ Index: rpi4-kernel/fs/fuse/xattr.c
  {
  	if (fuse_is_bad(inode))
  		return -EIO;
-@@ -212,7 +212,7 @@ static bool no_xattr_list(struct dentry
+@@ -210,7 +210,7 @@ static bool no_xattr_list(struct dentry
  
  static int no_xattr_get(const struct xattr_handler *handler,
  			struct dentry *dentry, struct inode *inode,
@@ -1284,11 +1426,11 @@ Index: rpi4-kernel/fs/fuse/xattr.c
  {
  	return -EOPNOTSUPP;
  }
-Index: rpi4-kernel/fs/overlayfs/inode.c
+Index: raspberry-kernel/fs/overlayfs/inode.c
 ===================================================================
---- rpi4-kernel.orig/fs/overlayfs/inode.c
-+++ rpi4-kernel/fs/overlayfs/inode.c
-@@ -386,7 +386,7 @@ out:
+--- raspberry-kernel.orig/fs/overlayfs/inode.c
++++ raspberry-kernel/fs/overlayfs/inode.c
+@@ -392,7 +392,7 @@ out:
  }
  
  int ovl_xattr_get(struct dentry *dentry, struct inode *inode, const char *name,
@@ -1297,97 +1439,11 @@ Index: rpi4-kernel/fs/overlayfs/inode.c
  {
  	ssize_t res;
  	const struct cred *old_cred;
-@@ -394,7 +394,8 @@ int ovl_xattr_get(struct dentry *dentry,
- 		ovl_i_dentry_upper(inode) ?: ovl_dentry_lower(dentry);
- 
- 	old_cred = ovl_override_creds(dentry->d_sb);
--	res = vfs_getxattr(&init_user_ns, realdentry, name, value, size);
-+	res = __vfs_getxattr(&init_user_ns, realdentry, d_inode(realdentry), name,
-+          value, size, flags);
- 	revert_creds(old_cred);
- 	return res;
- }
-Index: rpi4-kernel/fs/overlayfs/util.c
+Index: raspberry-kernel/fs/posix_acl.c
 ===================================================================
---- rpi4-kernel.orig/fs/overlayfs/util.c
-+++ rpi4-kernel/fs/overlayfs/util.c
-@@ -38,9 +38,17 @@ const struct cred *ovl_override_creds(st
- {
- 	struct ovl_fs *ofs = sb->s_fs_info;
- 
-+	if (!ofs->config.override_creds)
-+		return NULL;
- 	return override_creds(ofs->creator_cred);
- }
- 
-+void ovl_revert_creds(struct super_block *sb, const struct cred *old_cred)
-+{
-+	if (old_cred)
-+		revert_creds(old_cred);
-+}
-+
- /*
-  * Check if underlying fs supports file handles and try to determine encoding
-  * type, in order to deduce maximum inode number used by fs.
-@@ -565,7 +573,7 @@ void ovl_copy_up_end(struct dentry *dent
- 
- bool ovl_check_origin_xattr(struct ovl_fs *ofs, struct dentry *dentry)
- {
--	int res;
-+	ssize_t res;
- 
- 	res = ovl_do_getxattr(ofs, dentry, OVL_XATTR_ORIGIN, NULL, 0);
- 
-@@ -579,7 +587,7 @@ bool ovl_check_origin_xattr(struct ovl_f
- bool ovl_check_dir_xattr(struct super_block *sb, struct dentry *dentry,
- 			 enum ovl_xattr ox)
- {
--	int res;
-+	ssize_t res;
- 	char val;
- 
- 	if (!d_is_dir(dentry))
-@@ -912,7 +920,7 @@ int ovl_nlink_start(struct dentry *dentr
- 	 * value relative to the upper inode nlink in an upper inode xattr.
- 	 */
- 	err = ovl_set_nlink_upper(dentry);
--	revert_creds(old_cred);
-+	ovl_revert_creds(dentry->d_sb, old_cred);
- 
- out:
- 	if (err)
-@@ -930,7 +938,7 @@ void ovl_nlink_end(struct dentry *dentry
- 
- 		old_cred = ovl_override_creds(dentry->d_sb);
- 		ovl_cleanup_index(dentry);
--		revert_creds(old_cred);
-+		ovl_revert_creds(dentry->d_sb, old_cred);
- 	}
- 
- 	ovl_inode_unlock(inode);
-@@ -958,7 +966,7 @@ err:
- /* err < 0, 0 if no metacopy xattr, 1 if metacopy xattr found */
- int ovl_check_metacopy_xattr(struct ovl_fs *ofs, struct dentry *dentry)
- {
--	int res;
-+	ssize_t res;
- 
- 	/* Only regular files can have metacopy xattr */
- 	if (!S_ISREG(d_inode(dentry)->i_mode))
-@@ -980,7 +988,7 @@ int ovl_check_metacopy_xattr(struct ovl_
- 
- 	return 1;
- out:
--	pr_warn_ratelimited("failed to get metacopy (%i)\n", res);
-+	pr_warn_ratelimited("failed to get metacopy (%zi)\n", res);
- 	return res;
- }
- 
-Index: rpi4-kernel/fs/posix_acl.c
-===================================================================
---- rpi4-kernel.orig/fs/posix_acl.c
-+++ rpi4-kernel/fs/posix_acl.c
-@@ -903,7 +903,7 @@ EXPORT_SYMBOL (posix_acl_to_xattr);
+--- raspberry-kernel.orig/fs/posix_acl.c
++++ raspberry-kernel/fs/posix_acl.c
+@@ -1116,7 +1116,7 @@ EXPORT_SYMBOL (posix_acl_to_xattr);
  static int
  posix_acl_xattr_get(const struct xattr_handler *handler,
  		    struct dentry *unused, struct inode *inode,
@@ -1396,10 +1452,10 @@ Index: rpi4-kernel/fs/posix_acl.c
  {
  	struct posix_acl *acl;
  	int error;
-Index: rpi4-kernel/fs/squashfs/xattr.c
+Index: raspberry-kernel/fs/squashfs/xattr.c
 ===================================================================
---- rpi4-kernel.orig/fs/squashfs/xattr.c
-+++ rpi4-kernel/fs/squashfs/xattr.c
+--- raspberry-kernel.orig/fs/squashfs/xattr.c
++++ raspberry-kernel/fs/squashfs/xattr.c
 @@ -204,7 +204,7 @@ static int squashfs_xattr_handler_get(co
  				      struct dentry *unused,
  				      struct inode *inode,
@@ -1409,10 +1465,10 @@ Index: rpi4-kernel/fs/squashfs/xattr.c
  {
  	return squashfs_xattr_get(inode, handler->flags, name,
  		buffer, size);
-Index: rpi4-kernel/net/ipv4/devinet.c
+Index: raspberry-kernel/net/ipv4/devinet.c
 ===================================================================
---- rpi4-kernel.orig/net/ipv4/devinet.c
-+++ rpi4-kernel/net/ipv4/devinet.c
+--- raspberry-kernel.orig/net/ipv4/devinet.c
++++ raspberry-kernel/net/ipv4/devinet.c
 @@ -61,6 +61,7 @@
  #include <net/rtnetlink.h>
  #include <net/net_namespace.h>
@@ -1421,7 +1477,7 @@ Index: rpi4-kernel/net/ipv4/devinet.c
  
  #define IPV6ONLY_FLAGS	\
  		(IFA_F_NODAD | IFA_F_OPTIMISTIC | IFA_F_DADFAILED | \
-@@ -1044,7 +1045,7 @@ int devinet_ioctl(struct net *net, unsig
+@@ -1048,7 +1049,7 @@ int devinet_ioctl(struct net *net, unsig
  
  	case SIOCSIFFLAGS:
  		ret = -EPERM;
@@ -1430,7 +1486,7 @@ Index: rpi4-kernel/net/ipv4/devinet.c
  			goto out;
  		break;
  	case SIOCSIFADDR:	/* Set interface address (and family) */
-@@ -1052,7 +1053,7 @@ int devinet_ioctl(struct net *net, unsig
+@@ -1056,7 +1057,7 @@ int devinet_ioctl(struct net *net, unsig
  	case SIOCSIFDSTADDR:	/* Set the destination address */
  	case SIOCSIFNETMASK: 	/* Set the netmask for the interface */
  		ret = -EPERM;
@@ -1439,10 +1495,10 @@ Index: rpi4-kernel/net/ipv4/devinet.c
  			goto out;
  		ret = -EINVAL;
  		if (sin->sin_family != AF_INET)
-Index: rpi4-kernel/security/chromiumos/Kconfig
+Index: raspberry-kernel/security/chromiumos/Kconfig
 ===================================================================
 --- /dev/null
-+++ rpi4-kernel/security/chromiumos/Kconfig
++++ raspberry-kernel/security/chromiumos/Kconfig
 @@ -0,0 +1,45 @@
 +config SECURITY_CHROMIUMOS
 +	bool "Chromium OS Security Module"
@@ -1489,21 +1545,21 @@ Index: rpi4-kernel/security/chromiumos/Kconfig
 +	  When enabled, attempts to open /proc/self/mem for write access
 +	  will always fail.  Write access to this file allows bypassing
 +	  of memory map permissions (such as modifying read-only code).
-Index: rpi4-kernel/security/chromiumos/Makefile
+Index: raspberry-kernel/security/chromiumos/Makefile
 ===================================================================
 --- /dev/null
-+++ rpi4-kernel/security/chromiumos/Makefile
++++ raspberry-kernel/security/chromiumos/Makefile
 @@ -0,0 +1,5 @@
 +obj-$(CONFIG_SECURITY_CHROMIUMOS) := chromiumos_lsm.o
 +
 +chromiumos_lsm-y := inode_mark.o lsm.o securityfs.o utils.o
 +
 +obj-$(CONFIG_ALT_SYSCALL_CHROMIUMOS) += alt-syscall.o
-Index: rpi4-kernel/security/chromiumos/alt-syscall.c
+Index: raspberry-kernel/security/chromiumos/alt-syscall.c
 ===================================================================
 --- /dev/null
-+++ rpi4-kernel/security/chromiumos/alt-syscall.c
-@@ -0,0 +1,538 @@
++++ raspberry-kernel/security/chromiumos/alt-syscall.c
+@@ -0,0 +1,558 @@
 +/*
 + * Chromium OS alt-syscall tables
 + *
@@ -1519,6 +1575,7 @@ Index: rpi4-kernel/security/chromiumos/alt-syscall.c
 +#include <linux/fs.h>
 +#include <linux/init.h>
 +#include <linux/kernel.h>
++#include <linux/kcmp.h>
 +#include <linux/module.h>
 +#include <linux/prctl.h>
 +#include <linux/sched/types.h>
@@ -1657,6 +1714,27 @@ Index: rpi4-kernel/security/chromiumos/alt-syscall.c
 +	return -EACCES;
 +}
 +
++#ifdef CONFIG_KCMP
++static asmlinkage long android_kcmp(struct pt_regs *regs)
++{
++	struct task_struct *task = current;
++	unsigned long args[6];
++	pid_t pid1, pid2;
++	int type;
++	unsigned long idx1, idx2;
++
++	syscall_get_arguments(task, regs, args);
++	type = args[2];
++	if (type == KCMP_SYSVSEM)
++		return -ENOSYS;
++
++	pid1 = args[0];
++	pid2 = args[1];
++	idx1 = args[3];
++	idx2 = args[4];
++	return ksys_kcmp(pid1, pid2, type, idx1, idx2);
++}
++#endif
 +
 +static asmlinkage long android_setpriority(struct pt_regs *regs)
 +{
@@ -1898,7 +1976,7 @@ Index: rpi4-kernel/security/chromiumos/alt-syscall.c
 +}
 +#endif /* CONFIG_COMPAT */
 +
-+static struct syscall_whitelist whitelists[] = {
++static const struct syscall_whitelist whitelists[] __initconst = {
 +	SYSCALL_WHITELIST(read_write_test),
 +	SYSCALL_WHITELIST(android),
 +	PERMISSIVE_SYSCALL_WHITELIST(android),
@@ -1908,8 +1986,8 @@ Index: rpi4-kernel/security/chromiumos/alt-syscall.c
 +	PERMISSIVE_SYSCALL_WHITELIST(complete)
 +};
 +
-+static int alt_syscall_apply_whitelist(const struct syscall_whitelist *wl,
-+				       struct alt_sys_call_table *t)
++static int __init alt_syscall_apply_whitelist(const struct syscall_whitelist *wl,
++					      struct alt_sys_call_table *t)
 +{
 +	unsigned int i;
 +	unsigned long *whitelist = kcalloc(BITS_TO_LONGS(t->size),
@@ -1943,7 +2021,7 @@ Index: rpi4-kernel/security/chromiumos/alt-syscall.c
 +}
 +
 +#ifdef CONFIG_COMPAT
-+static int
++static int __init
 +alt_syscall_apply_compat_whitelist(const struct syscall_whitelist *wl,
 +				   struct alt_sys_call_table *t)
 +{
@@ -1978,7 +2056,7 @@ Index: rpi4-kernel/security/chromiumos/alt-syscall.c
 +	return 0;
 +}
 +#else
-+static inline int
++static inline int __init
 +alt_syscall_apply_compat_whitelist(const struct syscall_whitelist *wl,
 +				   struct alt_sys_call_table *t)
 +{
@@ -1986,7 +2064,7 @@ Index: rpi4-kernel/security/chromiumos/alt-syscall.c
 +}
 +#endif /* CONFIG_COMPAT */
 +
-+static int alt_syscall_init_one(const struct syscall_whitelist *wl)
++static int __init alt_syscall_init_one(const struct syscall_whitelist *wl)
 +{
 +	struct alt_sys_call_table *t;
 +	int err;
@@ -2014,10 +2092,8 @@ Index: rpi4-kernel/security/chromiumos/alt-syscall.c
 + * Register an alternate syscall table for each whitelist.  Note that the
 + * lack of a module_exit() is intentional - once a syscall table is registered
 + * it cannot be unregistered.
-+ *
-+ * TODO(abrestic) Support unregistering syscall tables?
 + */
-+static int chromiumos_alt_syscall_init(void)
++static int __init chromiumos_alt_syscall_init(void)
 +{
 +	unsigned int i;
 +	int err;
@@ -2042,10 +2118,10 @@ Index: rpi4-kernel/security/chromiumos/alt-syscall.c
 +	return 0;
 +}
 +module_init(chromiumos_alt_syscall_init);
-Index: rpi4-kernel/security/chromiumos/alt-syscall.h
+Index: raspberry-kernel/security/chromiumos/alt-syscall.h
 ===================================================================
 --- /dev/null
-+++ rpi4-kernel/security/chromiumos/alt-syscall.h
++++ raspberry-kernel/security/chromiumos/alt-syscall.h
 @@ -0,0 +1,385 @@
 +/*
 + * Linux Security Module for Chromium OS
@@ -2432,11 +2508,11 @@ Index: rpi4-kernel/security/chromiumos/alt-syscall.h
 +#endif
 +
 +#endif /* ALT_SYSCALL_H */
-Index: rpi4-kernel/security/chromiumos/android_whitelists.h
+Index: raspberry-kernel/security/chromiumos/android_whitelists.h
 ===================================================================
 --- /dev/null
-+++ rpi4-kernel/security/chromiumos/android_whitelists.h
-@@ -0,0 +1,639 @@
++++ raspberry-kernel/security/chromiumos/android_whitelists.h
+@@ -0,0 +1,651 @@
 +/*
 + * Linux Security Module for Chromium OS
 + *
@@ -2478,6 +2554,10 @@ Index: rpi4-kernel/security/chromiumos/android_whitelists.h
 +static asmlinkage long android_getpriority(struct pt_regs *regs);
 +/* Android does not get to call keyctl. */
 +static asmlinkage long android_keyctl(struct pt_regs *regs);
++#ifdef CONFIG_KCMP
++/* Android does not get to call kcmp with type==KCMP_SYSVEM. */
++static asmlinkage long android_kcmp(struct pt_regs *regs);
++#endif
 +/* Make sure nothing sets a nice value more favorable than -10. */
 +static asmlinkage long android_setpriority(struct pt_regs *regs);
 +static asmlinkage long android_sched_setscheduler(struct pt_regs *regs);
@@ -2492,7 +2572,7 @@ Index: rpi4-kernel/security/chromiumos/android_whitelists.h
 +static asmlinkage long android_compat_clock_adjtime(struct pt_regs *regs);
 +#endif /* CONFIG_COMPAT */
 +
-+static struct syscall_whitelist_entry android_whitelist[] = {
++static const struct syscall_whitelist_entry android_whitelist[] __initconst = {
 +	SYSCALL_ENTRY(accept),
 +	SYSCALL_ENTRY(accept4),
 +	SYSCALL_ENTRY_ALT(adjtimex, android_adjtimex),
@@ -2564,7 +2644,11 @@ Index: rpi4-kernel/security/chromiumos/android_whitelists.h
 +        SYSCALL_ENTRY(io_submit),
 +	SYSCALL_ENTRY(ioprio_set),
 +        SYSCALL_ENTRY_ALT(keyctl, android_keyctl),
++#ifdef CONFIG_KCMP
++	SYSCALL_ENTRY_ALT(kcmp, android_kcmp),
++#else
 +	SYSCALL_ENTRY(kcmp),
++#endif
 +	SYSCALL_ENTRY(kill),
 +	SYSCALL_ENTRY(lgetxattr),
 +	SYSCALL_ENTRY(linkat),
@@ -2765,7 +2849,7 @@ Index: rpi4-kernel/security/chromiumos/android_whitelists.h
 +}; /* end android_whitelist */
 +
 +#ifdef CONFIG_COMPAT
-+static struct syscall_whitelist_entry android_compat_whitelist[] = {
++static const struct syscall_whitelist_entry android_compat_whitelist[] __initconst = {
 +	COMPAT_SYSCALL_ENTRY(access),
 +	COMPAT_SYSCALL_ENTRY_ALT(adjtimex, android_compat_adjtimex),
 +	COMPAT_SYSCALL_ENTRY(brk),
@@ -2840,7 +2924,11 @@ Index: rpi4-kernel/security/chromiumos/android_whitelists.h
 +        COMPAT_SYSCALL_ENTRY(io_submit),
 +	COMPAT_SYSCALL_ENTRY(ioprio_set),
 +        COMPAT_SYSCALL_ENTRY_ALT(keyctl, android_keyctl),
++#ifdef CONFIG_KCMP
++	COMPAT_SYSCALL_ENTRY_ALT(kcmp, android_kcmp),
++#else
 +	COMPAT_SYSCALL_ENTRY(kcmp),
++#endif
 +	COMPAT_SYSCALL_ENTRY(kill),
 +	COMPAT_SYSCALL_ENTRY(lgetxattr),
 +	COMPAT_SYSCALL_ENTRY(link),
@@ -3076,10 +3164,10 @@ Index: rpi4-kernel/security/chromiumos/android_whitelists.h
 +#endif /* CONFIG_COMPAT */
 +
 +#endif /* ANDROID_WHITELISTS_H */
-Index: rpi4-kernel/security/chromiumos/complete_whitelists.h
+Index: raspberry-kernel/security/chromiumos/complete_whitelists.h
 ===================================================================
 --- /dev/null
-+++ rpi4-kernel/security/chromiumos/complete_whitelists.h
++++ raspberry-kernel/security/chromiumos/complete_whitelists.h
 @@ -0,0 +1,373 @@
 +/*
 + * Linux Security Module for Chromium OS
@@ -3110,7 +3198,7 @@ Index: rpi4-kernel/security/chromiumos/complete_whitelists.h
 +
 +#include "alt-syscall.h"
 +
-+static struct syscall_whitelist_entry complete_whitelist[] = {
++static const struct syscall_whitelist_entry complete_whitelist[] __initconst = {
 +	/* Syscalls wired up on ARM32/ARM64 and x86_64. */
 +	SYSCALL_ENTRY(accept),
 +	SYSCALL_ENTRY(accept4),
@@ -3450,14 +3538,14 @@ Index: rpi4-kernel/security/chromiumos/complete_whitelists.h
 + * block_syscall() (unless the permissive mode is used in which case the call
 + * will be redirected to warn_compat_syscall()).
 + */
-+static struct syscall_whitelist_entry complete_compat_whitelist[] = {};
++static const struct syscall_whitelist_entry complete_compat_whitelist[] __initconst = {};
 +#endif /* CONFIG_COMPAT */
 +
 +#endif /* COMPLETE_WHITELISTS_H */
-Index: rpi4-kernel/security/chromiumos/inode_mark.c
+Index: raspberry-kernel/security/chromiumos/inode_mark.c
 ===================================================================
 --- /dev/null
-+++ rpi4-kernel/security/chromiumos/inode_mark.c
++++ raspberry-kernel/security/chromiumos/inode_mark.c
 @@ -0,0 +1,353 @@
 +/*
 + * Linux Security Module for Chromium OS
@@ -3621,7 +3709,7 @@ Index: rpi4-kernel/security/chromiumos/inode_mark.c
 +
 +	atomic_set(&sbm->refcnt, 1);
 +	sbm->sb = sb;
-+	sbm->fsn_group = fsnotify_alloc_group(&chromiumos_fsn_ops);
++	sbm->fsn_group = fsnotify_alloc_group(&chromiumos_fsn_ops, 0);
 +	if (IS_ERR(sbm->fsn_group)) {
 +		int ret = PTR_ERR(sbm->fsn_group);
 +
@@ -3754,7 +3842,7 @@ Index: rpi4-kernel/security/chromiumos/inode_mark.c
 +	sbm = chromiumos_super_block_lookup(sb);
 +	if (sbm) {
 +		fsnotify_clear_marks_by_group(sbm->fsn_group,
-+					      FSNOTIFY_OBJ_ALL_TYPES_MASK);
++					      FSNOTIFY_OBJ_TYPE_ANY);
 +		chromiumos_super_block_put(sbm);
 +	}
 +
@@ -3812,10 +3900,10 @@ Index: rpi4-kernel/security/chromiumos/inode_mark.c
 +
 +	return policy;
 +}
-Index: rpi4-kernel/security/chromiumos/inode_mark.h
+Index: raspberry-kernel/security/chromiumos/inode_mark.h
 ===================================================================
 --- /dev/null
-+++ rpi4-kernel/security/chromiumos/inode_mark.h
++++ raspberry-kernel/security/chromiumos/inode_mark.h
 @@ -0,0 +1,47 @@
 +/*
 + * Linux Security Module for Chromium OS
@@ -3864,11 +3952,11 @@ Index: rpi4-kernel/security/chromiumos/inode_mark.h
 +chromiumos_get_inode_security_policy(
 +	struct dentry *dentry, struct inode *inode,
 +	enum chromiumos_inode_security_policy_type type);
-Index: rpi4-kernel/security/chromiumos/lsm.c
+Index: raspberry-kernel/security/chromiumos/lsm.c
 ===================================================================
 --- /dev/null
-+++ rpi4-kernel/security/chromiumos/lsm.c
-@@ -0,0 +1,274 @@
++++ raspberry-kernel/security/chromiumos/lsm.c
+@@ -0,0 +1,341 @@
 +/*
 + * Linux Security Module for Chromium OS
 + *
@@ -3891,11 +3979,14 @@ Index: rpi4-kernel/security/chromiumos/lsm.c
 +#define pr_fmt(fmt) "Chromium OS LSM: " fmt
 +
 +#include <asm/syscall.h>
++#include <linux/audit.h>
++#include <linux/binfmts.h>
 +#include <linux/cred.h>
 +#include <linux/fs.h>
 +#include <linux/fs_parser.h>
 +#include <linux/fs_struct.h>
 +#include <linux/lsm_hooks.h>
++#include <linux/mm.h>
 +#include <linux/module.h>
 +#include <linux/mount.h>
 +#include <linux/namei.h>	/* for nameidata_get_total_link_count */
@@ -3904,6 +3995,7 @@ Index: rpi4-kernel/security/chromiumos/lsm.c
 +#include <linux/sched/task_stack.h>
 +#include <linux/sched.h>	/* current and other task related stuff */
 +#include <linux/security.h>
++#include <linux/shmem_fs.h>
 +#include <uapi/linux/mount.h>
 +
 +#include "inode_mark.h"
@@ -4079,7 +4171,7 @@ Index: rpi4-kernel/security/chromiumos/lsm.c
 +	return policy == CHROMIUMOS_INODE_POLICY_BLOCK ? -EACCES : 0;
 +}
 +
-+int chromiumos_sb_eat_lsm_opts(char *options, void **mnt_opts)
++static int chromiumos_sb_eat_lsm_opts(char *options, void **mnt_opts)
 +{
 +	char *from = options, *to = options;
 +	bool found = false;
@@ -4123,11 +4215,74 @@ Index: rpi4-kernel/security/chromiumos/lsm.c
 +	return 0;
 +}
 +
++static int chromiumos_bprm_creds_for_exec(struct linux_binprm *bprm)
++{
++	struct file *file = bprm->file;
++
++	if (shmem_file(file)) {
++		char *cmdline = printable_cmdline(current);
++
++		audit_log(
++			audit_context(),
++			GFP_ATOMIC,
++			AUDIT_AVC,
++			"ChromeOS LSM: memfd execution attempt, cmd=%s, pid=%d",
++			cmdline ? cmdline : "(null)",
++			task_pid_nr(current));
++		kfree(cmdline);
++
++		pr_notice_ratelimited("memfd execution blocked\n");
++		return -EACCES;
++	}
++	return 0;
++}
++
++static int chromiumos_locked_down(enum lockdown_reason what)
++{
++	if (what == LOCKDOWN_BPF_WRITE_USER) {
++		pr_notice_ratelimited("BPF_WRITE_USER blocked\n");
++		return -EACCES;
++	}
++
++	return 0;
++}
++
++#ifdef CONFIG_BPF_SYSCALL
++
++static const char secagentd[] = "/usr/sbin/secagentd";
++
++static int chromiumos_bpf(int cmd, union bpf_attr *attr, unsigned int size)
++{
++	char buf[128];
++	int res;
++	int len;
++
++	len = strlen(secagentd);
++	res = get_cmdline(current, buf, sizeof(buf));
++	if (res > 0 && buf[res - 1] == '\0') {
++		// null terminated.
++		res = res - 1;
++	}
++
++	if (res < len || strncmp(buf, secagentd, len)) {
++		pr_notice_ratelimited("bpf syscall blocked\n");
++		return -EACCES;
++	}
++
++	return 0;
++}
++#endif
++
 +static struct security_hook_list chromiumos_security_hooks[] = {
 +	LSM_HOOK_INIT(sb_mount, chromiumos_security_sb_mount),
 +	LSM_HOOK_INIT(inode_follow_link, chromiumos_security_inode_follow_link),
 +	LSM_HOOK_INIT(file_open, chromiumos_security_file_open),
 +	LSM_HOOK_INIT(sb_eat_lsm_opts, chromiumos_sb_eat_lsm_opts),
++	LSM_HOOK_INIT(bprm_creds_for_exec, chromiumos_bprm_creds_for_exec),
++	LSM_HOOK_INIT(locked_down, chromiumos_locked_down),
++#ifdef CONFIG_BPF_SYSCALL
++	LSM_HOOK_INIT(bpf, chromiumos_bpf),
++#endif
 +};
 +
 +static int __init chromiumos_security_init(void)
@@ -4143,10 +4298,10 @@ Index: rpi4-kernel/security/chromiumos/lsm.c
 +	.name = "chromiumos",
 +	.init = chromiumos_security_init
 +};
-Index: rpi4-kernel/security/chromiumos/read_write_test_whitelists.h
+Index: raspberry-kernel/security/chromiumos/read_write_test_whitelists.h
 ===================================================================
 --- /dev/null
-+++ rpi4-kernel/security/chromiumos/read_write_test_whitelists.h
++++ raspberry-kernel/security/chromiumos/read_write_test_whitelists.h
 @@ -0,0 +1,56 @@
 +/*
 + * Linux Security Module for Chromium OS
@@ -4177,7 +4332,7 @@ Index: rpi4-kernel/security/chromiumos/read_write_test_whitelists.h
 +
 +#include "alt-syscall.h"
 +
-+static struct syscall_whitelist_entry read_write_test_whitelist[] = {
++static const struct syscall_whitelist_entry read_write_test_whitelist[] __initconst = {
 +	SYSCALL_ENTRY(exit),
 +	SYSCALL_ENTRY(openat),
 +	SYSCALL_ENTRY(close),
@@ -4192,7 +4347,7 @@ Index: rpi4-kernel/security/chromiumos/read_write_test_whitelists.h
 +}; /* end read_write_test_whitelist */
 +
 +#ifdef CONFIG_COMPAT
-+static struct syscall_whitelist_entry read_write_test_compat_whitelist[] = {
++static const struct syscall_whitelist_entry read_write_test_compat_whitelist[] __initconst = {
 +	COMPAT_SYSCALL_ENTRY(exit),
 +	COMPAT_SYSCALL_ENTRY(open),
 +	COMPAT_SYSCALL_ENTRY(openat),
@@ -4204,10 +4359,10 @@ Index: rpi4-kernel/security/chromiumos/read_write_test_whitelists.h
 +#endif /* CONFIG_COMPAT */
 +
 +#endif /* READ_WRITE_TESTS_WHITELISTS_H */
-Index: rpi4-kernel/security/chromiumos/securityfs.c
+Index: raspberry-kernel/security/chromiumos/securityfs.c
 ===================================================================
 --- /dev/null
-+++ rpi4-kernel/security/chromiumos/securityfs.c
++++ raspberry-kernel/security/chromiumos/securityfs.c
 @@ -0,0 +1,241 @@
 +/*
 + * Linux Security Module for Chromium OS
@@ -4450,10 +4605,10 @@ Index: rpi4-kernel/security/chromiumos/securityfs.c
 +	return ret;
 +}
 +fs_initcall(chromiumos_init_securityfs);
-Index: rpi4-kernel/security/chromiumos/third_party_whitelists.h
+Index: raspberry-kernel/security/chromiumos/third_party_whitelists.h
 ===================================================================
 --- /dev/null
-+++ rpi4-kernel/security/chromiumos/third_party_whitelists.h
++++ raspberry-kernel/security/chromiumos/third_party_whitelists.h
 @@ -0,0 +1,252 @@
 +/*
 + * Linux Security Module for Chromium OS
@@ -4484,7 +4639,7 @@ Index: rpi4-kernel/security/chromiumos/third_party_whitelists.h
 +
 +#include "alt-syscall.h"
 +
-+static struct syscall_whitelist_entry third_party_whitelist[] = {
++static const struct syscall_whitelist_entry third_party_whitelist[] __initconst = {
 +	SYSCALL_ENTRY(accept),
 +	SYSCALL_ENTRY(bind),
 +	SYSCALL_ENTRY(brk),
@@ -4599,7 +4754,7 @@ Index: rpi4-kernel/security/chromiumos/third_party_whitelists.h
 +}; /* end third_party_whitelist */
 +
 +#ifdef CONFIG_COMPAT
-+static struct syscall_whitelist_entry third_party_compat_whitelist[] = {
++static const struct syscall_whitelist_entry third_party_compat_whitelist[] __initconst = {
 +	COMPAT_SYSCALL_ENTRY(access),
 +	COMPAT_SYSCALL_ENTRY(brk),
 +	COMPAT_SYSCALL_ENTRY(chdir),
@@ -4707,10 +4862,10 @@ Index: rpi4-kernel/security/chromiumos/third_party_whitelists.h
 +#endif /* CONFIG_COMPAT */
 +
 +#endif /* THIRD_PARTY_WHITELISTS_H */
-Index: rpi4-kernel/security/chromiumos/utils.c
+Index: raspberry-kernel/security/chromiumos/utils.c
 ===================================================================
 --- /dev/null
-+++ rpi4-kernel/security/chromiumos/utils.c
++++ raspberry-kernel/security/chromiumos/utils.c
 @@ -0,0 +1,157 @@
 +/*
 + * Utilities for the Linux Security Module for Chromium OS
@@ -4869,10 +5024,10 @@ Index: rpi4-kernel/security/chromiumos/utils.c
 +out:
 +	return buffer;
 +}
-Index: rpi4-kernel/security/chromiumos/utils.h
+Index: raspberry-kernel/security/chromiumos/utils.h
 ===================================================================
 --- /dev/null
-+++ rpi4-kernel/security/chromiumos/utils.h
++++ raspberry-kernel/security/chromiumos/utils.h
 @@ -0,0 +1,30 @@
 +/*
 + * Utilities for the Linux Security Module for Chromium OS
@@ -4904,71 +5059,80 @@ Index: rpi4-kernel/security/chromiumos/utils.h
 +char *printable_cmdline(struct task_struct *task);
 +
 +#endif /* _SECURITY_CHROMIUMOS_UTILS_H */
-Index: rpi4-kernel/net/core/sysctl_net_core.c
+Index: raspberry-kernel/net/core/sysctl_net_core.c
 ===================================================================
---- rpi4-kernel.orig/net/core/sysctl_net_core.c
-+++ rpi4-kernel/net/core/sysctl_net_core.c
-@@ -587,6 +587,15 @@ static struct ctl_table net_core_table[]
- };
+--- raspberry-kernel.orig/net/core/sysctl_net_core.c
++++ raspberry-kernel/net/core/sysctl_net_core.c
+@@ -599,6 +599,15 @@ static struct ctl_table net_core_table[]
  
  static struct ctl_table netns_core_table[] = {
-+  {
-+    .procname = "android_paranoid",
-+    .data   = &init_net.core.sysctl_android_paranoid,
-+    .maxlen   = sizeof(int),
-+    .mode   = 0644,
-+    .extra1   = SYSCTL_ZERO,
-+    .extra2   = SYSCTL_ONE,
-+    .proc_handler = proc_dointvec_minmax
-+  },
  	{
++		.procname	= "android_paranoid",
++		.data		= &init_net.core.sysctl_android_paranoid,
++		.maxlen		= sizeof(int),
++		.mode		= 0644,
++		.extra1		= SYSCTL_ZERO,
++		.extra2		= SYSCTL_ONE,
++		.proc_handler	= proc_dointvec_minmax
++	},
++	{
  		.procname	= "somaxconn",
  		.data		= &init_net.core.sysctl_somaxconn,
-@@ -621,11 +630,12 @@ static __net_init int sysctl_core_net_in
- 		if (tbl == NULL)
- 			goto err_dup;
+ 		.maxlen		= sizeof(int),
+@@ -635,6 +644,8 @@ static __net_init int sysctl_core_net_in
+ {
+ 	struct ctl_table *tbl, *tmp;
  
--		tbl[0].data = &net->core.sysctl_somaxconn;
-+    tbl[0].data = &net->core.sysctl_android_paranoid;
-+		tbl[1].data = &net->core.sysctl_somaxconn;
++	net->core.sysctl_android_paranoid = 0;
++
+ 	tbl = netns_core_table;
+ 	if (!net_eq(net, &init_net)) {
+ 		tbl = kmemdup(tbl, sizeof(netns_core_table), GFP_KERNEL);
+@@ -644,9 +655,12 @@ static __net_init int sysctl_core_net_in
+ 		for (tmp = tbl; tmp->procname; tmp++)
+ 			tmp->data += (char *)net - (char *)&init_net;
  
- 		/* Don't export any sysctls to unprivileged users */
+-		/* Don't export any sysctls to unprivileged users */
++		/* Don't export sysctls other than android_paranoid
++		 * to unprivileged users
++		 */
  		if (net->user_ns != &init_user_ns) {
 -			tbl[0].procname = NULL;
 +			tbl[1].procname = NULL;
++			tbl[2].procname = NULL;
  		}
  	}
  
-Index: rpi4-kernel/arch/arm64/include/asm/syscall.h
+Index: raspberry-kernel/arch/arm64/include/asm/syscall.h
 ===================================================================
---- rpi4-kernel.orig/arch/arm64/include/asm/syscall.h
-+++ rpi4-kernel/arch/arm64/include/asm/syscall.h
+--- raspberry-kernel.orig/arch/arm64/include/asm/syscall.h
++++ raspberry-kernel/arch/arm64/include/asm/syscall.h
 @@ -17,6 +17,8 @@ extern const syscall_fn_t sys_call_table
  extern const syscall_fn_t compat_sys_call_table[];
  #endif
  
-+#define sys_call_ptr_t syscall_fn_t /* Needed for alt-syscall */
++#define sys_call_ptr_t syscall_fn_t	/* Needed for alt-syscall	*/
 +
  static inline int syscall_get_nr(struct task_struct *task,
  				 struct pt_regs *regs)
  {
-Index: rpi4-kernel/arch/arm64/kernel/Makefile
+Index: raspberry-kernel/arch/arm64/kernel/Makefile
 ===================================================================
---- rpi4-kernel.orig/arch/arm64/kernel/Makefile
-+++ rpi4-kernel/arch/arm64/kernel/Makefile
-@@ -78,6 +78,8 @@ obj-$(CONFIG_COMPAT_VDSO)		+= vdso32-wra
+--- raspberry-kernel.orig/arch/arm64/kernel/Makefile
++++ raspberry-kernel/arch/arm64/kernel/Makefile
+@@ -85,6 +85,8 @@ obj-$(CONFIG_COMPAT_VDSO)		+= vdso32-wra
  $(obj)/vdso-wrap.o: $(obj)/vdso/vdso.so
  $(obj)/vdso32-wrap.o: $(obj)/vdso32/vdso.so
  
-+obj-$(CONFIG_ALT_SYSCALL)   += alt-syscall.o
++obj-$(CONFIG_ALT_SYSCALL)		+= alt-syscall.o
 +
  obj-y					+= probes/
- head-y					:= head.o
- extra-y					+= $(head-y) vmlinux.lds
-Index: rpi4-kernel/arch/arm64/kernel/alt-syscall.c
+ obj-y					+= head.o
+ extra-y					+= vmlinux.lds
+Index: raspberry-kernel/arch/arm64/kernel/alt-syscall.c
 ===================================================================
 --- /dev/null
-+++ rpi4-kernel/arch/arm64/kernel/alt-syscall.c
++++ raspberry-kernel/arch/arm64/kernel/alt-syscall.c
 @@ -0,0 +1,78 @@
 +/*
 + * AArch64 alt-syscall implementation
@@ -4987,7 +5151,7 @@ Index: rpi4-kernel/arch/arm64/kernel/alt-syscall.c
 +
 +#include <asm/syscall.h>
 +
-+int arch_dup_sys_call_table(struct alt_sys_call_table *entry)
++int __init arch_dup_sys_call_table(struct alt_sys_call_table *entry)
 +{
 +	int err;
 +
@@ -5048,56 +5212,14 @@ Index: rpi4-kernel/arch/arm64/kernel/alt-syscall.c
 +
 +	return 0;
 +}
-Index: rpi4-kernel/arch/arm64/kernel/vdso32/Makefile
+Index: raspberry-kernel/include/linux/syscalls.h
 ===================================================================
---- rpi4-kernel.orig/arch/arm64/kernel/vdso32/Makefile
-+++ rpi4-kernel/arch/arm64/kernel/vdso32/Makefile
-@@ -10,17 +10,20 @@ include $(srctree)/lib/vdso/Makefile
- 
- # Same as cc-*option, but using CC_COMPAT instead of CC
- ifeq ($(CONFIG_CC_IS_CLANG), y)
-+CC_COMPAT_CLANG_FLAGS := --target=$(notdir $(CROSS_COMPILE_COMPAT:%-=%))
-+
- CC_COMPAT ?= $(CC)
--CC_COMPAT += --target=arm-linux-gnueabi
--else
--CC_COMPAT ?= $(CROSS_COMPILE_COMPAT)gcc
--endif
-+CC_COMPAT += $(CC_COMPAT_CLANG_FLAGS)
- 
--ifeq ($(CONFIG_LD_IS_LLD), y)
-+ifneq ($(LLVM),)
- LD_COMPAT ?= $(LD)
- else
- LD_COMPAT ?= $(CROSS_COMPILE_COMPAT)ld
- endif
-+else
-+CC_COMPAT ?= $(CROSS_COMPILE_COMPAT)gcc
-+LD_COMPAT ?= $(CROSS_COMPILE_COMPAT)ld
-+endif
- 
- cc32-option = $(call try-run,\
-         $(CC_COMPAT) $(1) -c -x c /dev/null -o "$$TMP",$(1),$(2))
-@@ -44,6 +47,9 @@ VDSO_CPPFLAGS += $(LINUXINCLUDE)
- # Common C and assembly flags
- # From top-level Makefile
- VDSO_CAFLAGS := $(VDSO_CPPFLAGS)
-+ifneq ($(shell $(CC_COMPAT) --version 2>&1 | head -n 1 | grep clang),)
-+VDSO_CAFLAGS += --target=$(notdir $(CROSS_COMPILE_COMPAT:%-=%))
-+endif
- VDSO_CAFLAGS += $(call cc32-option,-fno-PIE)
- ifdef CONFIG_DEBUG_INFO
- VDSO_CAFLAGS += -g
-Index: rpi4-kernel/include/linux/syscalls.h
-===================================================================
---- rpi4-kernel.orig/include/linux/syscalls.h
-+++ rpi4-kernel/include/linux/syscalls.h
-@@ -1381,4 +1381,25 @@ int __sys_getsockopt(int fd, int level,
+--- raspberry-kernel.orig/include/linux/syscalls.h
++++ raspberry-kernel/include/linux/syscalls.h
+@@ -1385,4 +1385,24 @@ int __sys_getsockopt(int fd, int level,
  		int __user *optlen);
  int __sys_setsockopt(int fd, int level, int optname, char __user *optval,
  		int optlen);
-+
-+#ifdef CONFIG_ALT_SYSCALL
 +
 +/* Only used with ALT_SYSCALL enabled */
 +
@@ -5108,6 +5230,8 @@ Index: rpi4-kernel/include/linux/syscalls.h
 +int ksys_perf_event_open(
 +		struct perf_event_attr __user *attr_uptr,
 +		pid_t pid, int cpu, int group_fd, unsigned long flags);
++int ksys_kcmp(pid_t pid1, pid_t pid2, int type,
++		unsigned long idx1, unsigned long idx2);
 +int ksys_clock_adjtime(const clockid_t which_clock, struct __kernel_timex __user * utx);
 +int ksys_adjtimex(struct __kernel_timex __user *txc_p);
 +int ksys_getcpu(unsigned __user *cpu, unsigned __user *node,
@@ -5115,13 +5239,12 @@ Index: rpi4-kernel/include/linux/syscalls.h
 +int ksys_clock_adjtime32(clockid_t which_clock,
 +			 struct old_timex32 __user *utp);
 +int ksys_adjtimex_time32(struct old_timex32 __user *utp);
-+#endif /* CONFIG_ALT_SYSCALL */
 +
  #endif
-Index: rpi4-kernel/include/uapi/linux/prctl.h
+Index: raspberry-kernel/include/uapi/linux/prctl.h
 ===================================================================
---- rpi4-kernel.orig/include/uapi/linux/prctl.h
-+++ rpi4-kernel/include/uapi/linux/prctl.h
+--- raspberry-kernel.orig/include/uapi/linux/prctl.h
++++ raspberry-kernel/include/uapi/linux/prctl.h
 @@ -155,6 +155,9 @@ struct prctl_mm_map {
  #define PR_SET_PTRACER 0x59616d61
  # define PR_SET_PTRACER_ANY ((unsigned long)-1)
@@ -5132,32 +5255,24 @@ Index: rpi4-kernel/include/uapi/linux/prctl.h
  #define PR_SET_CHILD_SUBREAPER	36
  #define PR_GET_CHILD_SUBREAPER	37
  
-@@ -269,4 +272,7 @@ struct prctl_mm_map {
- # define PR_SCHED_CORE_SHARE_FROM	3 /* pull core_sched cookie to pid */
- # define PR_SCHED_CORE_MAX		4
- 
-+#define PR_SET_VMA    0x53564d41
-+# define PR_SET_VMA_ANON_NAME   0
-+
- #endif /* _LINUX_PRCTL_H */
-Index: rpi4-kernel/kernel/Makefile
+Index: raspberry-kernel/kernel/Makefile
 ===================================================================
---- rpi4-kernel.orig/kernel/Makefile
-+++ rpi4-kernel/kernel/Makefile
-@@ -54,6 +54,8 @@ obj-y += livepatch/
- obj-y += dma/
+--- raspberry-kernel.orig/kernel/Makefile
++++ raspberry-kernel/kernel/Makefile
+@@ -52,6 +52,8 @@ obj-y += dma/
  obj-y += entry/
+ obj-$(CONFIG_MODULES) += module/
  
 +obj-$(CONFIG_ALT_SYSCALL) += alt-syscall.o
 +
  obj-$(CONFIG_KCMP) += kcmp.o
  obj-$(CONFIG_FREEZER) += freezer.o
  obj-$(CONFIG_PROFILING) += profile.o
-Index: rpi4-kernel/kernel/alt-syscall.c
+Index: raspberry-kernel/kernel/alt-syscall.c
 ===================================================================
 --- /dev/null
-+++ rpi4-kernel/kernel/alt-syscall.c
-@@ -0,0 +1,66 @@
++++ raspberry-kernel/kernel/alt-syscall.c
+@@ -0,0 +1,65 @@
 +/*
 + * Alternate Syscall Table Infrastructure
 + *
@@ -5188,8 +5303,7 @@ Index: rpi4-kernel/kernel/alt-syscall.c
 +static LIST_HEAD(alt_sys_call_tables);
 +static DEFINE_SPINLOCK(alt_sys_call_tables_lock);
 +
-+/* XXX: there is no "unregister" yet. */
-+int register_alt_sys_call_table(struct alt_sys_call_table *entry)
++int __init register_alt_sys_call_table(struct alt_sys_call_table *entry)
 +{
 +	if (!entry)
 +		return -EINVAL;
@@ -5224,16 +5338,11 @@ Index: rpi4-kernel/kernel/alt-syscall.c
 +
 +	return -ENOENT;
 +}
-Index: rpi4-kernel/kernel/sys.c
+Index: raspberry-kernel/kernel/sys.c
 ===================================================================
---- rpi4-kernel.orig/kernel/sys.c
-+++ rpi4-kernel/kernel/sys.c
-@@ -42,9 +42,12 @@
- #include <linux/version.h>
- #include <linux/ctype.h>
- #include <linux/syscall_user_dispatch.h>
-+#include <linux/mm.h>
-+#include <linux/mempolicy.h>
+--- raspberry-kernel.orig/kernel/sys.c
++++ raspberry-kernel/kernel/sys.c
+@@ -47,6 +47,7 @@
  
  #include <linux/compat.h>
  #include <linux/syscalls.h>
@@ -5241,7 +5350,7 @@ Index: rpi4-kernel/kernel/sys.c
  #include <linux/kprobes.h>
  #include <linux/user_namespace.h>
  #include <linux/time_namespace.h>
-@@ -200,7 +203,7 @@ out:
+@@ -208,7 +209,7 @@ out:
  	return error;
  }
  
@@ -5250,7 +5359,7 @@ Index: rpi4-kernel/kernel/sys.c
  {
  	struct task_struct *g, *p;
  	struct user_struct *user;
-@@ -264,13 +267,18 @@ out:
+@@ -272,13 +273,18 @@ out:
  	return error;
  }
  
@@ -5270,7 +5379,7 @@ Index: rpi4-kernel/kernel/sys.c
  {
  	struct task_struct *g, *p;
  	struct user_struct *user;
-@@ -335,6 +343,11 @@ out_unlock:
+@@ -343,6 +349,11 @@ out_unlock:
  	return retval;
  }
  
@@ -5282,167 +5391,113 @@ Index: rpi4-kernel/kernel/sys.c
  /*
   * Unprivileged users may change the real gid to the effective gid
   * or vice versa.  (BSD-style)
-@@ -1575,8 +1588,6 @@ int do_prlimit(struct task_struct *tsk,
+@@ -664,7 +675,6 @@ long __sys_setresuid(uid_t ruid, uid_t e
+ 	struct cred *new;
+ 	int retval;
+ 	kuid_t kruid, keuid, ksuid;
+-	bool ruid_new, euid_new, suid_new;
  
- 	if (resource >= RLIM_NLIMITS)
+ 	kruid = make_kuid(ns, ruid);
+ 	keuid = make_kuid(ns, euid);
+@@ -679,29 +689,25 @@ long __sys_setresuid(uid_t ruid, uid_t e
+ 	if ((suid != (uid_t) -1) && !uid_valid(ksuid))
  		return -EINVAL;
--	resource = array_index_nospec(resource, RLIM_NLIMITS);
--
- 	if (new_rlim) {
- 		if (new_rlim->rlim_cur > new_rlim->rlim_max)
- 			return -EINVAL;
-@@ -2269,10 +2280,157 @@ int __weak arch_prctl_spec_ctrl_set(stru
- 	return -EINVAL;
- }
  
-+#ifdef CONFIG_MMU
-+static int prctl_update_vma_anon_name(struct vm_area_struct *vma,
-+		struct vm_area_struct **prev,
-+		unsigned long start, unsigned long end,
-+		const char __user *name_addr)
-+{
-+	struct mm_struct *mm = vma->vm_mm;
-+	int error = 0;
-+	pgoff_t pgoff;
+-	old = current_cred();
+-
+-	/* check for no-op */
+-	if ((ruid == (uid_t) -1 || uid_eq(kruid, old->uid)) &&
+-	    (euid == (uid_t) -1 || (uid_eq(keuid, old->euid) &&
+-				    uid_eq(keuid, old->fsuid))) &&
+-	    (suid == (uid_t) -1 || uid_eq(ksuid, old->suid)))
+-		return 0;
+-
+-	ruid_new = ruid != (uid_t) -1        && !uid_eq(kruid, old->uid) &&
+-		   !uid_eq(kruid, old->euid) && !uid_eq(kruid, old->suid);
+-	euid_new = euid != (uid_t) -1        && !uid_eq(keuid, old->uid) &&
+-		   !uid_eq(keuid, old->euid) && !uid_eq(keuid, old->suid);
+-	suid_new = suid != (uid_t) -1        && !uid_eq(ksuid, old->uid) &&
+-		   !uid_eq(ksuid, old->euid) && !uid_eq(ksuid, old->suid);
+-	if ((ruid_new || euid_new || suid_new) &&
+-	    !ns_capable_setid(old->user_ns, CAP_SETUID))
+-		return -EPERM;
+-
+ 	new = prepare_creds();
+ 	if (!new)
+ 		return -ENOMEM;
+ 
++	old = current_cred();
 +
-+	if (name_addr == vma_get_anon_name(vma)) {
-+		*prev = vma;
-+		goto out;
++	retval = -EPERM;
++	if (!ns_capable_setid(old->user_ns, CAP_SETUID)) {
++		if (ruid != (uid_t) -1        && !uid_eq(kruid, old->uid) &&
++		    !uid_eq(kruid, old->euid) && !uid_eq(kruid, old->suid))
++			goto error;
++		if (euid != (uid_t) -1        && !uid_eq(keuid, old->uid) &&
++		    !uid_eq(keuid, old->euid) && !uid_eq(keuid, old->suid))
++			goto error;
++		if (suid != (uid_t) -1        && !uid_eq(ksuid, old->uid) &&
++		    !uid_eq(ksuid, old->euid) && !uid_eq(ksuid, old->suid))
++			goto error;
 +	}
 +
-+	pgoff = vma->vm_pgoff + ((start - vma->vm_start) >> PAGE_SHIFT);
-+	*prev = vma_merge(mm, *prev, start, end, vma->vm_flags, vma->anon_vma,
-+				vma->vm_file, pgoff, vma_policy(vma),
-+				vma->vm_userfaultfd_ctx, name_addr);
-+	if (*prev) {
-+		vma = *prev;
-+		goto success;
+ 	if (ruid != (uid_t) -1) {
+ 		new->uid = kruid;
+ 		if (!uid_eq(kruid, old->uid)) {
+@@ -766,7 +772,6 @@ long __sys_setresgid(gid_t rgid, gid_t e
+ 	struct cred *new;
+ 	int retval;
+ 	kgid_t krgid, kegid, ksgid;
+-	bool rgid_new, egid_new, sgid_new;
+ 
+ 	krgid = make_kgid(ns, rgid);
+ 	kegid = make_kgid(ns, egid);
+@@ -779,28 +784,23 @@ long __sys_setresgid(gid_t rgid, gid_t e
+ 	if ((sgid != (gid_t) -1) && !gid_valid(ksgid))
+ 		return -EINVAL;
+ 
+-	old = current_cred();
+-
+-	/* check for no-op */
+-	if ((rgid == (gid_t) -1 || gid_eq(krgid, old->gid)) &&
+-	    (egid == (gid_t) -1 || (gid_eq(kegid, old->egid) &&
+-				    gid_eq(kegid, old->fsgid))) &&
+-	    (sgid == (gid_t) -1 || gid_eq(ksgid, old->sgid)))
+-		return 0;
+-
+-	rgid_new = rgid != (gid_t) -1        && !gid_eq(krgid, old->gid) &&
+-		   !gid_eq(krgid, old->egid) && !gid_eq(krgid, old->sgid);
+-	egid_new = egid != (gid_t) -1        && !gid_eq(kegid, old->gid) &&
+-		   !gid_eq(kegid, old->egid) && !gid_eq(kegid, old->sgid);
+-	sgid_new = sgid != (gid_t) -1        && !gid_eq(ksgid, old->gid) &&
+-		   !gid_eq(ksgid, old->egid) && !gid_eq(ksgid, old->sgid);
+-	if ((rgid_new || egid_new || sgid_new) &&
+-	    !ns_capable_setid(old->user_ns, CAP_SETGID))
+-		return -EPERM;
+-
+ 	new = prepare_creds();
+ 	if (!new)
+ 		return -ENOMEM;
++	old = current_cred();
++
++	retval = -EPERM;
++	if (!ns_capable_setid(old->user_ns, CAP_SETGID)) {
++		if (rgid != (gid_t) -1        && !gid_eq(krgid, old->gid) &&
++		    !gid_eq(krgid, old->egid) && !gid_eq(krgid, old->sgid))
++			goto error;
++		if (egid != (gid_t) -1        && !gid_eq(kegid, old->gid) &&
++		    !gid_eq(kegid, old->egid) && !gid_eq(kegid, old->sgid))
++			goto error;
++		if (sgid != (gid_t) -1        && !gid_eq(ksgid, old->gid) &&
++		    !gid_eq(ksgid, old->egid) && !gid_eq(ksgid, old->sgid))
++			goto error;
 +	}
-+
-+	*prev = vma;
-+
-+	if (start != vma->vm_start) {
-+		error = split_vma(mm, vma, start, 1);
-+		if (error)
-+			goto out;
-+	}
-+
-+	if (end != vma->vm_end) {
-+		error = split_vma(mm, vma, end, 0);
-+		if (error)
-+			goto out;
-+	}
-+
-+success:
-+	if (!vma->vm_file)
-+		vma->anon_name = name_addr;
-+
-+out:
-+	if (error == -ENOMEM)
-+		error = -EAGAIN;
-+	return error;
-+}
-+
-+static int prctl_set_vma_anon_name(unsigned long start, unsigned long end,
-+			unsigned long arg)
-+{
-+	unsigned long tmp;
-+	struct vm_area_struct *vma, *prev;
-+	int unmapped_error = 0;
-+	int error = -EINVAL;
-+
-+	/*
-+	 * If the interval [start,end) covers some unmapped address
-+	 * ranges, just ignore them, but return -ENOMEM at the end.
-+	 * - this matches the handling in madvise.
-+	 */
-+	vma = find_vma_prev(current->mm, start, &prev);
-+	if (vma && start > vma->vm_start)
-+		prev = vma;
-+
-+	for (;;) {
-+		/* Still start < end. */
-+		error = -ENOMEM;
-+		if (!vma)
-+			return error;
-+
-+		/* Here start < (end|vma->vm_end). */
-+		if (start < vma->vm_start) {
-+			unmapped_error = -ENOMEM;
-+			start = vma->vm_start;
-+			if (start >= end)
-+				return error;
-+		}
-+
-+		/* Here vma->vm_start <= start < (end|vma->vm_end) */
-+		tmp = vma->vm_end;
-+		if (end < tmp)
-+			tmp = end;
-+
-+		/* Here vma->vm_start <= start < tmp <= (end|vma->vm_end). */
-+		error = prctl_update_vma_anon_name(vma, &prev, start, tmp,
-+				(const char __user *)arg);
-+		if (error)
-+			return error;
-+		start = tmp;
-+		if (prev && start < prev->vm_end)
-+			start = prev->vm_end;
-+		error = unmapped_error;
-+		if (start >= end)
-+			return error;
-+		if (prev)
-+			vma = prev->vm_next;
-+		else	/* madvise_remove dropped mmap_lock */
-+			vma = find_vma(current->mm, start);
-+	}
-+}
-+
-+static int prctl_set_vma(unsigned long opt, unsigned long start,
-+		unsigned long len_in, unsigned long arg)
-+{
-+	struct mm_struct *mm = current->mm;
-+	int error;
-+	unsigned long len;
-+	unsigned long end;
-+
-+	if (start & ~PAGE_MASK)
-+		return -EINVAL;
-+	len = (len_in + ~PAGE_MASK) & PAGE_MASK;
-+
-+	/* Check to see whether len was rounded up from small -ve to zero */
-+	if (len_in && !len)
-+		return -EINVAL;
-+
-+	end = start + len;
-+	if (end < start)
-+		return -EINVAL;
-+
-+	if (end == start)
-+		return 0;
-+
-+	mmap_write_lock(mm);
-+
-+	switch (opt) {
-+	case PR_SET_VMA_ANON_NAME:
-+		error = prctl_set_vma_anon_name(start, end, arg);
-+		break;
-+	default:
-+		error = -EINVAL;
-+	}
-+
-+	mmap_write_unlock(mm);
-+
-+	return error;
-+}
-+#else /* CONFIG_MMU */
-+static int prctl_set_vma(unsigned long opt, unsigned long start,
-+		unsigned long len_in, unsigned long arg)
-+{
-+	return -EINVAL;
-+}
-+#endif
-+
- #define PR_IO_FLUSHER (PF_MEMALLOC_NOIO | PF_LOCAL_THROTTLE)
+ 
+ 	if (rgid != (gid_t) -1)
+ 		new->gid = krgid;
+@@ -2361,8 +2361,8 @@ static int prctl_set_vma(unsigned long o
+ }
+ #endif /* CONFIG_ANON_VMA_NAME */
  
 -SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
 -		unsigned long, arg4, unsigned long, arg5)
@@ -5451,7 +5506,7 @@ Index: rpi4-kernel/kernel/sys.c
  {
  	struct task_struct *me = current;
  	unsigned char comm[sizeof(me->comm)];
-@@ -2355,6 +2513,12 @@ SYSCALL_DEFINE5(prctl, int, option, unsi
+@@ -2445,6 +2445,12 @@ SYSCALL_DEFINE5(prctl, int, option, unsi
  	case PR_SET_SECCOMP:
  		error = prctl_set_seccomp(arg2, (char __user *)arg3);
  		break;
@@ -5464,17 +5519,7 @@ Index: rpi4-kernel/kernel/sys.c
  	case PR_GET_TSC:
  		error = GET_TSC_CTL(arg2);
  		break;
-@@ -2483,6 +2647,9 @@ SYSCALL_DEFINE5(prctl, int, option, unsi
- 			return -EINVAL;
- 		error = arch_prctl_spec_ctrl_set(me, arg2, arg3);
- 		break;
-+	case PR_SET_VMA:
-+		error = prctl_set_vma(arg2, arg3, arg4, arg5);
-+		break;
- 	case PR_PAC_RESET_KEYS:
- 		if (arg3 || arg4 || arg5)
- 			return -EINVAL;
-@@ -2547,8 +2714,14 @@ SYSCALL_DEFINE5(prctl, int, option, unsi
+@@ -2646,8 +2652,14 @@ SYSCALL_DEFINE5(prctl, int, option, unsi
  	return error;
  }
  
@@ -5491,7 +5536,7 @@ Index: rpi4-kernel/kernel/sys.c
  {
  	int err = 0;
  	int cpu = raw_smp_processor_id();
-@@ -2560,6 +2733,12 @@ SYSCALL_DEFINE3(getcpu, unsigned __user
+@@ -2659,6 +2671,12 @@ SYSCALL_DEFINE3(getcpu, unsigned __user
  	return err ? -EFAULT : 0;
  }
  
@@ -5504,69 +5549,11 @@ Index: rpi4-kernel/kernel/sys.c
  /**
   * do_sysinfo - fill in sysinfo struct
   * @info: pointer to buffer to fill
-Index: rpi4-kernel/include/linux/lsm_hook_defs.h
+Index: raspberry-kernel/security/security.c
 ===================================================================
---- rpi4-kernel.orig/include/linux/lsm_hook_defs.h
-+++ rpi4-kernel/include/linux/lsm_hook_defs.h
-@@ -26,13 +26,13 @@
-  *   #undef LSM_HOOK
-  * };
-  */
--LSM_HOOK(int, 0, binder_set_context_mgr, const struct cred *mgr)
--LSM_HOOK(int, 0, binder_transaction, const struct cred *from,
--	 const struct cred *to)
--LSM_HOOK(int, 0, binder_transfer_binder, const struct cred *from,
--	 const struct cred *to)
--LSM_HOOK(int, 0, binder_transfer_file, const struct cred *from,
--	 const struct cred *to, struct file *file)
-+LSM_HOOK(int, 0, binder_set_context_mgr, struct task_struct *mgr)
-+LSM_HOOK(int, 0, binder_transaction, struct task_struct *from,
-+	 struct task_struct *to)
-+LSM_HOOK(int, 0, binder_transfer_binder, struct task_struct *from,
-+	 struct task_struct *to)
-+LSM_HOOK(int, 0, binder_transfer_file, struct task_struct *from,
-+	 struct task_struct *to, struct file *file)
- LSM_HOOK(int, 0, ptrace_access_check, struct task_struct *child,
- 	 unsigned int mode)
- LSM_HOOK(int, 0, ptrace_traceme, struct task_struct *parent)
-Index: rpi4-kernel/security/security.c
-===================================================================
---- rpi4-kernel.orig/security/security.c
-+++ rpi4-kernel/security/security.c
-@@ -749,25 +749,25 @@ static int lsm_superblock_alloc(struct s
- 
- /* Security operations */
- 
--int security_binder_set_context_mgr(const struct cred *mgr)
-+int security_binder_set_context_mgr(struct task_struct *mgr)
- {
- 	return call_int_hook(binder_set_context_mgr, 0, mgr);
- }
- 
--int security_binder_transaction(const struct cred *from,
--				const struct cred *to)
-+int security_binder_transaction(struct task_struct *from,
-+				struct task_struct *to)
- {
- 	return call_int_hook(binder_transaction, 0, from, to);
- }
- 
--int security_binder_transfer_binder(const struct cred *from,
--				    const struct cred *to)
-+int security_binder_transfer_binder(struct task_struct *from,
-+				    struct task_struct *to)
- {
- 	return call_int_hook(binder_transfer_binder, 0, from, to);
- }
- 
--int security_binder_transfer_file(const struct cred *from,
--				  const struct cred *to, struct file *file)
-+int security_binder_transfer_file(struct task_struct *from,
-+				  struct task_struct *to, struct file *file)
- {
- 	return call_int_hook(binder_transfer_file, 0, from, to, file);
- }
-@@ -1227,6 +1227,7 @@ int security_path_chown(const struct pat
+--- raspberry-kernel.orig/security/security.c
++++ raspberry-kernel/security/security.c
+@@ -1239,6 +1239,7 @@ int security_path_chown(const struct pat
  		return 0;
  	return call_int_hook(path_chown, 0, path, uid, gid);
  }
@@ -5574,10 +5561,10 @@ Index: rpi4-kernel/security/security.c
  
  int security_path_chroot(const struct path *path)
  {
-Index: rpi4-kernel/kernel/time/time.c
+Index: raspberry-kernel/kernel/time/time.c
 ===================================================================
---- rpi4-kernel.orig/kernel/time/time.c
-+++ rpi4-kernel/kernel/time/time.c
+--- raspberry-kernel.orig/kernel/time/time.c
++++ raspberry-kernel/kernel/time/time.c
 @@ -266,7 +266,7 @@ COMPAT_SYSCALL_DEFINE2(settimeofday, str
  #endif
  
@@ -5621,35 +5608,35 @@ Index: rpi4-kernel/kernel/time/time.c
  #endif
  
  /*
-Index: rpi4-kernel/kernel/time/posix-timers.c
+Index: raspberry-kernel/kernel/time/posix-timers.c
 ===================================================================
---- rpi4-kernel.orig/kernel/time/posix-timers.c
-+++ rpi4-kernel/kernel/time/posix-timers.c
-@@ -1118,8 +1118,8 @@ int do_clock_adjtime(const clockid_t whi
+--- raspberry-kernel.orig/kernel/time/posix-timers.c
++++ raspberry-kernel/kernel/time/posix-timers.c
+@@ -1149,8 +1149,8 @@ int do_clock_adjtime(const clockid_t whi
  	return kc->clock_adj(which_clock, ktx);
  }
  
 -SYSCALL_DEFINE2(clock_adjtime, const clockid_t, which_clock,
 -		struct __kernel_timex __user *, utx)
 +int ksys_clock_adjtime(const clockid_t which_clock,
-+		       struct __kernel_timex __user * utx)
++                      struct __kernel_timex __user * utx)
  {
  	struct __kernel_timex ktx;
  	int err;
-@@ -1135,6 +1135,12 @@ SYSCALL_DEFINE2(clock_adjtime, const clo
+@@ -1166,6 +1166,12 @@ SYSCALL_DEFINE2(clock_adjtime, const clo
  	return err;
  }
  
 +SYSCALL_DEFINE2(clock_adjtime, const clockid_t, which_clock,
 +		struct __kernel_timex __user *, utx)
 +{
-+	return ksys_clock_adjtime(which_clock, utx);
++  return ksys_clock_adjtime(which_clock, utx);
 +}
 +
  SYSCALL_DEFINE2(clock_getres, const clockid_t, which_clock,
  		struct __kernel_timespec __user *, tp)
  {
-@@ -1188,8 +1194,7 @@ SYSCALL_DEFINE2(clock_gettime32, clockid
+@@ -1219,8 +1225,7 @@ SYSCALL_DEFINE2(clock_gettime32, clockid
  	return err;
  }
  
@@ -5659,64 +5646,82 @@ Index: rpi4-kernel/kernel/time/posix-timers.c
  {
  	struct __kernel_timex ktx;
  	int err;
-@@ -1206,6 +1211,12 @@ SYSCALL_DEFINE2(clock_adjtime32, clockid
+@@ -1237,6 +1242,12 @@ SYSCALL_DEFINE2(clock_adjtime32, clockid
  	return err;
  }
  
 +SYSCALL_DEFINE2(clock_adjtime32, clockid_t, which_clock,
 +		struct old_timex32 __user *, utp)
 +{
-+	return ksys_clock_adjtime32(which_clock, utp);
++  return ksys_clock_adjtime32(which_clock, utp);
 +}
 +
  SYSCALL_DEFINE2(clock_getres_time32, clockid_t, which_clock,
  		struct old_timespec32 __user *, tp)
  {
-Index: rpi4-kernel/fs/overlayfs/overlayfs.h
+Index: raspberry-kernel/fs/overlayfs/overlayfs.h
 ===================================================================
---- rpi4-kernel.orig/fs/overlayfs/overlayfs.h
-+++ rpi4-kernel/fs/overlayfs/overlayfs.h
-@@ -498,7 +498,7 @@ int ovl_permission(struct user_namespace
+--- raspberry-kernel.orig/fs/overlayfs/overlayfs.h
++++ raspberry-kernel/fs/overlayfs/overlayfs.h
+@@ -211,12 +211,13 @@ static inline int ovl_do_symlink(struct
+ static inline ssize_t ovl_do_getxattr(const struct path *path, const char *name,
+ 				      void *value, size_t size)
+ {
++  struct inode *ip = d_inode(path->dentry);
+ 	int err, len;
+ 
+ 	WARN_ON(path->dentry->d_sb != path->mnt->mnt_sb);
+ 
+-	err = vfs_getxattr(mnt_user_ns(path->mnt), path->dentry,
+-			       name, value, size);
++	err = __vfs_getxattr(mnt_user_ns(path->mnt), path->dentry, ip,
++			       name, value, size, XATTR_NOSECURITY);
+ 	len = (value && err > 0) ? err : 0;
+ 
+ 	pr_debug("getxattr(%pd2, \"%s\", \"%*pE\", %zu, 0) = %i\n",
+@@ -592,7 +593,7 @@ int ovl_permission(struct user_namespace
  int ovl_xattr_set(struct dentry *dentry, struct inode *inode, const char *name,
  		  const void *value, size_t size, int flags);
  int ovl_xattr_get(struct dentry *dentry, struct inode *inode, const char *name,
 -		  void *value, size_t size);
 +		  void *value, size_t size, int flags);
  ssize_t ovl_listxattr(struct dentry *dentry, char *list, size_t size);
- struct posix_acl *ovl_get_acl(struct inode *inode, int type, bool rcu);
- int ovl_update_time(struct inode *inode, struct timespec64 *ts, int flags);
-Index: rpi4-kernel/fs/overlayfs/ovl_entry.h
-===================================================================
---- rpi4-kernel.orig/fs/overlayfs/ovl_entry.h
-+++ rpi4-kernel/fs/overlayfs/ovl_entry.h
-@@ -20,6 +20,7 @@ struct ovl_config {
- 	bool metacopy;
- 	bool userxattr;
- 	bool ovl_volatile;
-+  bool override_creds;
- };
  
- struct ovl_sb {
-Index: rpi4-kernel/include/linux/xattr.h
+ #ifdef CONFIG_FS_POSIX_ACL
+Index: raspberry-kernel/include/linux/xattr.h
 ===================================================================
---- rpi4-kernel.orig/include/linux/xattr.h
-+++ rpi4-kernel/include/linux/xattr.h
+--- raspberry-kernel.orig/include/linux/xattr.h
++++ raspberry-kernel/include/linux/xattr.h
+@@ -32,10 +32,10 @@ struct xattr_handler {
+ 	const char *prefix;
+ 	int flags;      /* fs private flags */
+ 	bool (*list)(struct dentry *dentry);
+-	int (*get)(const struct xattr_handler *, struct dentry *dentry,
++	int (*get)(const struct xattr_handler *handler, struct dentry *dentry,
+ 		   struct inode *inode, const char *name, void *buffer,
+-		   size_t size);
+-	int (*set)(const struct xattr_handler *,
++		   size_t size, int flags);
++	int (*set)(const struct xattr_handler *handler,
+ 		   struct user_namespace *mnt_userns, struct dentry *dentry,
+ 		   struct inode *inode, const char *name, const void *buffer,
+ 		   size_t size, int flags);
 @@ -49,7 +49,9 @@ struct xattr {
  	size_t value_len;
  };
  
 -ssize_t __vfs_getxattr(struct dentry *, struct inode *, const char *, void *, size_t);
 +ssize_t __vfs_getxattr(struct user_namespace *mnt_userns,
-+           struct dentry *dentry, struct inode *inode,
-+           const char *name, void *buffer, size_t size, int flags);
++		       struct dentry *dentry, struct inode *inode,
++		       const char *name, void *buffer, size_t size, int flags);
  ssize_t vfs_getxattr(struct user_namespace *, struct dentry *, const char *,
  		     void *, size_t);
  ssize_t vfs_listxattr(struct dentry *d, char *list, size_t size);
-Index: rpi4-kernel/fs/overlayfs/super.c
+Index: raspberry-kernel/fs/overlayfs/super.c
 ===================================================================
---- rpi4-kernel.orig/fs/overlayfs/super.c
-+++ rpi4-kernel/fs/overlayfs/super.c
-@@ -1010,9 +1010,9 @@ static unsigned int ovl_split_lowerdirs(
+--- raspberry-kernel.orig/fs/overlayfs/super.c
++++ raspberry-kernel/fs/overlayfs/super.c
+@@ -1009,9 +1009,9 @@ static unsigned int ovl_split_lowerdirs(
  static int __maybe_unused
  ovl_posix_acl_xattr_get(const struct xattr_handler *handler,
  			struct dentry *dentry, struct inode *inode,
@@ -5724,11 +5729,20 @@ Index: rpi4-kernel/fs/overlayfs/super.c
 +			const char *name, void *buffer, size_t size, int flags)
  {
 -	return ovl_xattr_get(dentry, inode, handler->name, buffer, size);
-+	return ovl_xattr_get(dentry, inode, handler->name, buffer, size, int flags);
++	return ovl_xattr_get(dentry, inode, handler->name, buffer, size, flags);
  }
  
  static int __maybe_unused
-@@ -1089,9 +1089,9 @@ static int ovl_own_xattr_set(const struc
+@@ -1085,7 +1085,7 @@ out_acl_release:
+ 
+ static int ovl_own_xattr_get(const struct xattr_handler *handler,
+ 			     struct dentry *dentry, struct inode *inode,
+-			     const char *name, void *buffer, size_t size)
++			     const char *name, void *buffer, size_t size, int flags)
+ {
+ 	return -EOPNOTSUPP;
+ }
+@@ -1101,9 +1101,9 @@ static int ovl_own_xattr_set(const struc
  
  static int ovl_other_xattr_get(const struct xattr_handler *handler,
  			       struct dentry *dentry, struct inode *inode,
@@ -5736,7 +5750,173 @@ Index: rpi4-kernel/fs/overlayfs/super.c
 +			       const char *name, void *buffer, size_t size, int flags)
  {
 -	return ovl_xattr_get(dentry, inode, name, buffer, size);
-+	return ovl_xattr_get(dentry, inode, name, buffer, size, int flags);
++	return ovl_xattr_get(dentry, inode, name, buffer, size, flags);
  }
  
  static int ovl_other_xattr_set(const struct xattr_handler *handler,
+Index: raspberry-kernel/fs/kernfs/inode.c
+===================================================================
+--- raspberry-kernel.orig/fs/kernfs/inode.c
++++ raspberry-kernel/fs/kernfs/inode.c
+@@ -319,7 +319,8 @@ int kernfs_xattr_set(struct kernfs_node
+ 
+ static int kernfs_vfs_xattr_get(const struct xattr_handler *handler,
+ 				struct dentry *unused, struct inode *inode,
+-				const char *suffix, void *value, size_t size)
++				const char *suffix, void *value, size_t size,
++				int flags)
+ {
+ 	const char *name = xattr_full_name(handler, suffix);
+ 	struct kernfs_node *kn = inode->i_private;
+Index: raspberry-kernel/fs/ext4/xattr_trusted.c
+===================================================================
+--- raspberry-kernel.orig/fs/ext4/xattr_trusted.c
++++ raspberry-kernel/fs/ext4/xattr_trusted.c
+@@ -22,7 +22,7 @@ ext4_xattr_trusted_list(struct dentry *d
+ static int
+ ext4_xattr_trusted_get(const struct xattr_handler *handler,
+ 		       struct dentry *unused, struct inode *inode,
+-		       const char *name, void *buffer, size_t size)
++		       const char *name, void *buffer, size_t size, int flags)
+ {
+ 	return ext4_xattr_get(inode, EXT4_XATTR_INDEX_TRUSTED,
+ 			      name, buffer, size);
+Index: raspberry-kernel/fs/ext4/xattr_user.c
+===================================================================
+--- raspberry-kernel.orig/fs/ext4/xattr_user.c
++++ raspberry-kernel/fs/ext4/xattr_user.c
+@@ -21,7 +21,7 @@ ext4_xattr_user_list(struct dentry *dent
+ static int
+ ext4_xattr_user_get(const struct xattr_handler *handler,
+ 		    struct dentry *unused, struct inode *inode,
+-		    const char *name, void *buffer, size_t size)
++		    const char *name, void *buffer, size_t size, int flags)
+ {
+ 	if (!test_opt(inode->i_sb, XATTR_USER))
+ 		return -EOPNOTSUPP;
+Index: raspberry-kernel/fs/ecryptfs/ecryptfs_kernel.h
+===================================================================
+--- raspberry-kernel.orig/fs/ecryptfs/ecryptfs_kernel.h
++++ raspberry-kernel/fs/ecryptfs/ecryptfs_kernel.h
+@@ -662,6 +662,7 @@ int ecryptfs_read_lower_page_segment(str
+ 				     pgoff_t page_index,
+ 				     size_t offset_in_page, size_t size,
+ 				     struct inode *ecryptfs_inode);
++int ecryptfs_fsync_lower(struct inode *ecryptfs_inode, int datasync);
+ struct page *ecryptfs_get_locked_page(struct inode *inode, loff_t index);
+ int ecryptfs_parse_packet_length(unsigned char *data, size_t *size,
+ 				 size_t *length_size);
+Index: raspberry-kernel/fs/ecryptfs/read_write.c
+===================================================================
+--- raspberry-kernel.orig/fs/ecryptfs/read_write.c
++++ raspberry-kernel/fs/ecryptfs/read_write.c
+@@ -261,3 +261,25 @@ int ecryptfs_read_lower_page_segment(str
+ 	flush_dcache_page(page_for_ecryptfs);
+ 	return rc;
+ }
++
++/**
++ * ecryptfs_fsync_lower
++ * @ecryptfs_inode: The eCryptfs inode
++ * @datasync: Only perform a fdatasync operation
++ *
++ * Write back data and metadata for the lower file to disk.  If @datasync is
++ * set only metadata needed to access modified file data is written.
++ *
++ * Returns 0 on success; less than zero on error
++ */
++int ecryptfs_fsync_lower(struct inode *ecryptfs_inode, int datasync)
++{
++	struct file *lower_file;
++
++	lower_file = ecryptfs_inode_to_private(ecryptfs_inode)->lower_file;
++	if (!lower_file)
++		return -EIO;
++	if (!lower_file->f_op->fsync)
++		return 0;
++	return vfs_fsync(lower_file, datasync);
++}
+Index: raspberry-kernel/fs/ext4/xattr_hurd.c
+===================================================================
+--- raspberry-kernel.orig/fs/ext4/xattr_hurd.c
++++ raspberry-kernel/fs/ext4/xattr_hurd.c
+@@ -21,7 +21,8 @@ ext4_xattr_hurd_list(struct dentry *dent
+ static int
+ ext4_xattr_hurd_get(const struct xattr_handler *handler,
+ 		    struct dentry *unused, struct inode *inode,
+-		    const char *name, void *buffer, size_t size)
++		    const char *name, void *buffer, size_t size,
++		    int flags)
+ {
+ 	if (!test_opt(inode->i_sb, XATTR_USER))
+ 		return -EOPNOTSUPP;
+Index: raspberry-kernel/mm/shmem.c
+===================================================================
+--- raspberry-kernel.orig/mm/shmem.c
++++ raspberry-kernel/mm/shmem.c
+@@ -3291,7 +3291,7 @@ static int shmem_initxattrs(struct inode
+ 
+ static int shmem_xattr_handler_get(const struct xattr_handler *handler,
+ 				   struct dentry *unused, struct inode *inode,
+-				   const char *name, void *buffer, size_t size)
++				   const char *name, void *buffer, size_t size, int flags)
+ {
+ 	struct shmem_inode_info *info = SHMEM_I(inode);
+ 
+Index: raspberry-kernel/kernel/events/core.c
+===================================================================
+--- raspberry-kernel.orig/kernel/events/core.c
++++ raspberry-kernel/kernel/events/core.c
+@@ -12213,9 +12213,8 @@ perf_check_permission(struct perf_event_
+  * @group_fd:		group leader event fd
+  * @flags:		perf event open flags
+  */
+-SYSCALL_DEFINE5(perf_event_open,
+-		struct perf_event_attr __user *, attr_uptr,
+-		pid_t, pid, int, cpu, int, group_fd, unsigned long, flags)
++int ksys_perf_event_open(struct perf_event_attr __user * attr_uptr, pid_t pid,
++                        int cpu, int group_fd, unsigned long flags)
+ {
+ 	struct perf_event *group_leader = NULL, *output_event = NULL;
+ 	struct perf_event *event, *sibling;
+@@ -12674,6 +12673,12 @@ err_fd:
+ 	return err;
+ }
+ 
++SYSCALL_DEFINE5(perf_event_open,
++		struct perf_event_attr __user *, attr_uptr,
++		pid_t, pid, int, cpu, int, group_fd, unsigned long, flags)
++{
++  return ksys_perf_event_open(attr_uptr, pid, cpu, group_fd, flags);
++}
+ /**
+  * perf_event_create_kernel_counter
+  *
+Index: raspberry-kernel/kernel/kcmp.c
+===================================================================
+--- raspberry-kernel.orig/kernel/kcmp.c
++++ raspberry-kernel/kernel/kcmp.c
+@@ -132,8 +132,8 @@ static int kcmp_epoll_target(struct task
+ }
+ #endif
+ 
+-SYSCALL_DEFINE5(kcmp, pid_t, pid1, pid_t, pid2, int, type,
+-		unsigned long, idx1, unsigned long, idx2)
++int ksys_kcmp(pid_t pid1, pid_t pid2, int type,
++		unsigned long idx1, unsigned long idx2)
+ {
+ 	struct task_struct *task1, *task2;
+ 	int ret;
+@@ -225,6 +225,12 @@ err_no_task:
+ 	return -ESRCH;
+ }
+ 
++SYSCALL_DEFINE5(kcmp, pid_t, pid1, pid_t, pid2, int, type,
++		unsigned long, idx1, unsigned long, idx2)
++{
++	return ksys_kcmp(pid1, pid2, type, idx1, idx2);
++}
++
+ static __init int kcmp_cookies_init(void)
+ {
+ 	int i;

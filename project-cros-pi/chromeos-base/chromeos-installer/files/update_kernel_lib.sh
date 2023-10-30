@@ -33,7 +33,7 @@ config_kernel() {
   local configfile=$2
   local kernel=$(get_target_kernel $root_part_num)
   log "modify boot kernel to :${kernel}"
-  sed -i "s/kernel=.*$/kernel=${kernel}/g" $configfile 
+  sed -i "s/kernel=.*$/kernel=${kernel}/g" $configfile
 }
 
 find_kernel() {
@@ -49,7 +49,7 @@ switch_kernel() {
   local tgt_knl=${efi_mount_point}/$(get_target_kernel $part_num)
   if need_update $src_knl $tgt_knl; then
     log "replace old kernel by $src_knl"
-    cp $src_knl $tgt_knl
+    gzip -9 -c $src_knl > $tgt_knl
     sync $tgt_knl
   fi
   config_kernel $part_num ${efi_mount_point}/${CONFIG}

@@ -47,25 +47,25 @@ install_raspberrypi_bootloader() {
     kernel_img=$(ls "${ROOT}/boot/Image"*)
     target_img="${efi_dir}/kernel8_a.img"
   fi
-  sudo mount -o "${mount_opts}"  "$1" "${efi_dir}"
+  mount -o "${mount_opts}"  "$1" "${efi_dir}"
 
   info "Installing firmware, kernel and overlays"
-  sudo cp -r "${ROOT}/firmware/rpi/"* "${efi_dir}/"
+  cp -r "${ROOT}/firmware/rpi/"* "${efi_dir}/"
   modify_root $1 ${efi_dir}/cmdline.txt
   if [ -d ${ROOT}/usr/src/linux/arch/arm/boot/dts ]; then
-    sudo cp ${ROOT}/usr/src/linux/arch/arm/boot/dts/*.dtb "${efi_dir}/"
-    sudo cp -r ${ROOT}/usr/src/linux/arch/arm/boot/dts/overlays "${efi_dir}/"
+    cp ${ROOT}/usr/src/linux/arch/arm/boot/dts/*.dtb "${efi_dir}/"
+    cp -r ${ROOT}/usr/src/linux/arch/arm/boot/dts/overlays "${efi_dir}/"
   else
-    sudo cp ${ROOT}/usr/src/linux/arch/arm64/boot/dts/broadcom/*.dtb "${efi_dir}/"
-    sudo cp -r ${ROOT}/usr/src/linux/arch/arm64/boot/dts/overlays "${efi_dir}/"
+    cp ${ROOT}/usr/src/linux/arch/arm64/boot/dts/broadcom/*.dtb "${efi_dir}/"
+    cp -r ${ROOT}/usr/src/linux/arch/arm64/boot/dts/overlays "${efi_dir}/"
   fi
-  sudo cp ${kernel_img} ${target_img}
-  sudo umount "${efi_dir}"
+  gzip -9 -c ${kernel_img} > ${target_img}
+  umount "${efi_dir}"
   rmdir "${efi_dir}"
 }
 
 board_setup() {
-  install_raspberrypi_bootloader "$1" 
+  sudo install_raspberrypi_bootloader "$1"
   install_hybrid_mbr "$1"
 }
 

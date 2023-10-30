@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: GPL-2.0+
+# (C) Copyright 2018 Linaro Ltd
+# NVRAM config file for the Murata 1DX 43430 WiFi/BT module
+aa2g=1
+ag0=0
+AvVmid_c0=0x0,0xc8
+boardflags=0x00404201
+boardflags3=0x08000000
+boardnum=22
+boardrev=0x1202
+boardtype=0x0726
+# btc_params is not set
+cckbw202gpo=0x0
+cckpwroffset0=2
+ccode=ALL
+# cldo_pwm is not set
+# deadman_to is not set
+devid=0x43e2
+extpagain2g=0
+il0macaddr=00:90:4c:c5:12:38
+legofdmbw202gpo=0x88888888
+macaddr=00:90:4c:c5:12:38
+manfid=0x2d0
+maxp2ga0=74
+mcsbw202gpo=0xaaaaaaaa
+muxenab=0x10
+nocrc=1
+ofdmdigfilttype=18
+ofdmdigfilttypebe=18
+# pa0itssit is not set
+pa2ga0=-145,6667,-751
+pacalidx2g=48
+papdendidx=58
+papdepsoffset=-22
+papdmode=1
+papdvalidtest=1
+prodid=0x0726
+propbw202gpo=0xdd
+# spurconfig is not set
+sromrev=11
+# txpwrbckof is not set
+vendid=0x14e4
+wl0id=0x431b
+xtalfreq=37400
