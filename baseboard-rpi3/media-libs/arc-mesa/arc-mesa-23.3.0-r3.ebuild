@@ -2,13 +2,13 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-EAPI=6
+EAPI=7
 
-CROS_WORKON_COMMIT="234c4b61a4ee0b838291d042668ec077862547d3"
-CROS_WORKON_TREE="902a4e41f0eff180d5e0194d3c73759c06ac22bb"
+CROS_WORKON_COMMIT="65109bc8ac33e24af77c1b28b712dae414111ebb"
+CROS_WORKON_TREE="58e3a387b9a0237a9272e0812b071bc7a74109b3"
 CROS_WORKON_PROJECT="chromiumos/third_party/mesa"
-CROS_WORKON_LOCALNAME="mesa-freedreno"
-CROS_WORKON_EGIT_BRANCH="chromeos-freedreno"
+CROS_WORKON_LOCALNAME="mesa"
+CROS_WORKON_EGIT_BRANCH="upstream/mesa-23.3.0-rc3"
 
 inherit meson multilib-minimal flag-o-matic toolchain-funcs cros-workon arc-build
 
@@ -45,7 +45,7 @@ RDEPEND="${DEPEND}"
 
 src_configure() {
 	arc-build-select-clang
-  append-lfs-flags
+
 	multilib-minimal_src_configure
 }
 
@@ -53,20 +53,20 @@ multilib_src_configure() {
 	tc-getPROG PKG_CONFIG pkg-config
 
 	arc-build-create-cross-file
+
 	emesonargs+=(
 		--prefix="${ARC_PREFIX}/vendor"
 		--sysconfdir="/system/vendor/etc"
 		-Ddri-search-path="/system/$(get_libdir)/dri:/system/vendor/$(get_libdir)/dri"
 		-Dllvm=disabled
 		-Ddri3=disabled
-		-Dshader-cache=disabled
+		-Dshader-cache=enabled
 		-Dglx=disabled
 		-Degl=enabled
 		-Dgbm=disabled
 		-Dgles1=enabled
 		-Dgles2=enabled
 		-Dshared-glapi=enabled
-		-Ddri-drivers=
 		-Dgallium-drivers=v3d
 		-Dgallium-vdpau=disabled
 		-Dgallium-xa=disabled
@@ -78,7 +78,9 @@ multilib_src_configure() {
 		-Dvulkan-drivers=$(usex vulkan broadcom '')
 		--cross-file="${ARC_CROSS_FILE}"
 	)
-
+  if [ "$ABI" == "arm" ]; then
+    append-lfs-flags
+  fi
 	meson_src_configure
 }
 
@@ -115,7 +117,7 @@ multilib_src_install_all() {
 
 	# Install init files to advertise supported API versions.
 	insinto "${ARC_PREFIX}/vendor/etc/init"
-	doins "${FILESDIR}/init.gpu.rc"
+  doins "${FILESDIR}/init.gpu.rc"
 
 	# Install vulkan files
 	if use vulkan; then
@@ -145,4 +147,5 @@ multilib_src_install_all() {
 PATCHES=(
   "${FILESDIR}/001-fix-v3d-screen-cache.patch"
   "${FILESDIR}/002-fix-v3d-screen-disorder-issue.patch"
+  "${FILESDIR}/003-fix-vulkan-chromeos.patch"
 )

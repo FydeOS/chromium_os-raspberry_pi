@@ -1,0 +1,3 @@
+script
+logger -t "${UPSTART_JOB}" "pretent boot splashing"
+end script

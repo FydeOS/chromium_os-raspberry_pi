@@ -145,6 +145,6 @@ multilib_src_install_all() {
 }
 
 PATCHES=(
-  "${FILESDIR}/001-fix-v3d-screen-cache.patch"
-  "${FILESDIR}/002-fix-v3d-screen-disorder-issue.patch"
+  "${FILESDIR}/23.2.0/001-fix-v3d-screen-cache.patch"
+  "${FILESDIR}/23.2.0/002-fix-v3d-screen-disorder-issue.patch"
 )

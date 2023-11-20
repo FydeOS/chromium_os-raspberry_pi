@@ -139,7 +139,7 @@ Index: raspberry-kernel/drivers/gpu/drm/v3d/v3d_vc4_bind.c
 +    DRM_ERROR("Borrow bo from vc4 size:%uk, vc4 handle:%u, fd:%d, v3d handle:%u, ret:%d\n",
 +      (u32) (unaligned_size / 1024), vc4_handle, prime_fd, *handle, ret);
 +  else
-+    DRM_INFO("Borrow bo from vc4 size:%uk, vc4 handle:%u, fd:%d, v3d handle:%u, ret:%d\n",
++    DRM_DEBUG("Borrow bo from vc4 size:%uk, vc4 handle:%u, fd:%d, v3d handle:%u, ret:%d\n",
 +      (u32) (unaligned_size / 1024), vc4_handle, prime_fd, *handle, ret);
 +  return ret;
 +}
@@ -564,16 +564,17 @@ Index: raspberry-kernel/drivers/gpu/drm/vc4/vc4_drv.c
  	kfree(vc4file);
  }
  
-@@ -226,6 +244,8 @@ const struct drm_driver vc4_drm_driver =
+@@ -226,13 +244,21 @@ const struct drm_driver vc4_drm_driver =
  };
  
  const struct drm_driver vc5_drm_driver = {
 +  .open = vc4_open,
 +  .postclose = vc4_close,
  	.driver_features = (DRIVER_MODESET |
- 			    DRIVER_ATOMIC |
+-			    DRIVER_ATOMIC |
++//			    DRIVER_ATOMIC |
  			    DRIVER_GEM),
-@@ -233,6 +253,12 @@ const struct drm_driver vc5_drm_driver =
+ 
  #if defined(CONFIG_DEBUG_FS)
  	.debugfs_init = vc4_debugfs_init,
  #endif
@@ -641,17 +642,18 @@ Index: raspberry-kernel/drivers/gpu/drm/vc4/vc4_drv.h
 ===================================================================
 --- raspberry-kernel.orig/drivers/gpu/drm/vc4/vc4_drv.h
 +++ raspberry-kernel/drivers/gpu/drm/vc4/vc4_drv.h
-@@ -25,6 +25,9 @@
+@@ -25,6 +25,10 @@
  #include "uapi/drm/vc4_drm.h"
  #include "vc4_regs.h"
  
 +#define CURSOR_TIMEOUT_MSEC 20
 +#define V3D_BIND (1<<7)
++#define CONFIG_DRM_V3D 1
 +
  struct drm_device;
  struct drm_gem_object;
  
-@@ -46,6 +49,7 @@ enum vc4_kernel_bo_type {
+@@ -46,6 +50,7 @@ enum vc4_kernel_bo_type {
  	VC4_BO_TYPE_RCL,
  	VC4_BO_TYPE_BCL,
  	VC4_BO_TYPE_KERNEL_CACHE,
@@ -659,7 +661,35 @@ Index: raspberry-kernel/drivers/gpu/drm/vc4/vc4_drv.h
  	VC4_BO_TYPE_COUNT
  };
  
-@@ -988,7 +992,7 @@ struct vc4_bo *vc4_bo_create(struct drm_
+@@ -719,7 +724,7 @@ to_vc4_crtc_state(const struct drm_crtc_
+ {
+ 	return container_of(crtc_state, struct vc4_crtc_state, base);
+ }
+-
++#ifndef CONFIG_DRM_V3D
+ #define V3D_READ(offset)								\
+ 	({										\
+ 		kunit_fail_current_test("Accessing a register in a unit test!\n");	\
+@@ -731,6 +736,18 @@ to_vc4_crtc_state(const struct drm_crtc_
+ 		kunit_fail_current_test("Accessing a register in a unit test!\n");	\
+ 		writel(val, vc4->v3d->regs + (offset));					\
+ 	} while (0)
++#else //!CONFIG_DRM_V3D
++#define V3D_READ(offset)                \
++  ({                    \
++    kunit_fail_current_test("Accessing a register in a unit test!\n");  \
++    readl(NULL);  \
++  })
++
++#define V3D_WRITE(offset, val)                \
++  do {                    \
++    kunit_fail_current_test("Accessing a register in a unit test!\n");  \
++  } while (0)
++#endif //!CONFIG_DRM_V3D
+ 
+ #define HVS_READ(offset)								\
+ 	({										\
+@@ -988,7 +1005,7 @@ struct vc4_bo *vc4_bo_create(struct drm_
  int vc4_bo_dumb_create(struct drm_file *file_priv,
  		       struct drm_device *dev,
  		       struct drm_mode_create_dumb *args);
@@ -668,7 +698,7 @@ Index: raspberry-kernel/drivers/gpu/drm/vc4/vc4_drv.h
  			struct drm_file *file_priv);
  int vc4_create_shader_bo_ioctl(struct drm_device *dev, void *data,
  			       struct drm_file *file_priv);
-@@ -1139,6 +1143,7 @@ void vc4_hvs_dump_state(struct vc4_hvs *
+@@ -1139,6 +1156,7 @@ void vc4_hvs_dump_state(struct vc4_hvs *
  void vc4_hvs_unmask_underrun(struct vc4_hvs *hvs, int channel);
  void vc4_hvs_mask_underrun(struct vc4_hvs *hvs, int channel);
  int vc4_hvs_debugfs_init(struct drm_minor *minor);
@@ -680,6 +710,15 @@ Index: raspberry-kernel/drivers/gpu/drm/vc4/vc4_gem.c
 ===================================================================
 --- raspberry-kernel.orig/drivers/gpu/drm/vc4/vc4_gem.c
 +++ raspberry-kernel/drivers/gpu/drm/vc4/vc4_gem.c
+@@ -293,7 +293,7 @@ vc4_reset(struct drm_device *dev)
+ 	DRM_INFO("Resetting GPU.\n");
+ 
+ 	mutex_lock(&vc4->power_lock);
+-	if (vc4->power_refcount) {
++	if (vc4->power_refcount && vc4->v3d) {
+ 		/* Power the device off and back on the by dropping the
+ 		 * reference on runtime PM.
+ 		 */
 @@ -1310,6 +1310,7 @@ int vc4_gem_init(struct drm_device *dev)
  	struct vc4_dev *vc4 = to_vc4_dev(dev);
  	int ret;

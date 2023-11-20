@@ -1,0 +1,86 @@
+Index: mesa/src/broadcom/vulkan/v3dv_device.c
+===================================================================
+--- mesa.orig/src/broadcom/vulkan/v3dv_device.c
++++ mesa/src/broadcom/vulkan/v3dv_device.c
+@@ -808,7 +808,7 @@ create_physical_device(struct v3dv_insta
+    if (drm_primary_device)
+       primary_path = drm_primary_device->nodes[DRM_NODE_PRIMARY];
+    else
+-      primary_path = NULL;
++      primary_path = drm_render_device->nodes[DRM_NODE_PRIMARY];
+ #else
+    primary_path = drm_render_device->nodes[DRM_NODE_PRIMARY];
+ #endif
+@@ -1052,6 +1052,7 @@ enumerate_devices(struct vk_instance *vk
+          while (*compat) {
+             if (strncmp(*compat, "brcm,2711-v3d", 13) == 0) {
+                v3d_idx = i;
++               mesa_logi("find render:%s\n", devices[i]->businfo.platform->fullname);
+                break;
+             }
+             compat++;
+@@ -1061,6 +1062,7 @@ enumerate_devices(struct vk_instance *vk
+          while (*compat) {
+             if (strncmp(*compat, "brcm,bcm2711-vc5", 16) == 0 ||
+                 strncmp(*compat, "brcm,bcm2835-vc4", 16) == 0 ) {
++               mesa_logi("find primary:%s\n", devices[i]->businfo.platform->fullname);
+                vc4_idx = i;
+                break;
+             }
+@@ -1074,6 +1076,9 @@ enumerate_devices(struct vk_instance *vk
+    if (v3d_idx != -1 && vc4_idx != -1) {
+       result =
+          create_physical_device(instance, devices[v3d_idx], devices[vc4_idx]);
++   }else if (v3d_idx != -1) {
++     mesa_logi("find v3d_idx :%d, vc4_idx :%d\n", v3d_idx, vc4_idx);
++     result = create_physical_device(instance, devices[v3d_idx], NULL);
+    }
+ #endif
+ 
+@@ -1091,7 +1096,7 @@ v3dv_GetPhysicalDeviceFeatures2(VkPhysic
+    struct vk_features features = {
+       /* Vulkan 1.0 */
+       .robustBufferAccess = true, /* This feature is mandatory */
+-      .fullDrawIndexUint32 = false, /* Only available since V3D 4.4.9.1 */
++      .fullDrawIndexUint32 = true, /* Only available since V3D 4.4.9.1 */
+       .imageCubeArray = true,
+       .independentBlend = true,
+       .geometryShader = true,
+@@ -3079,9 +3084,9 @@ vk_icdNegotiateLoaderICDInterfaceVersion
+     *
+     *    - Loader interface v4 differs from v3 in:
+     *        - The ICD must implement vk_icdGetPhysicalDeviceProcAddr().
+-    * 
++    *
+     *    - Loader interface v5 differs from v4 in:
+-    *        - The ICD must support Vulkan API version 1.1 and must not return 
++    *        - The ICD must support Vulkan API version 1.1 and must not return
+     *          VK_ERROR_INCOMPATIBLE_DRIVER from vkCreateInstance() unless a
+     *          Vulkan Loader with interface v4 or smaller is being used and the
+     *          application provides an API version that is greater than 1.0.
+Index: mesa/src/broadcom/common/v3d_limits.h
+===================================================================
+--- mesa.orig/src/broadcom/common/v3d_limits.h
++++ mesa/src/broadcom/common/v3d_limits.h
+@@ -58,7 +58,7 @@
+ /* Minimum alignment for texel buffers */
+ #define V3D_TMU_TEXEL_ALIGN 64
+ 
+-#define V3D_MAX_IMAGE_DIMENSION 4096
++#define V3D_MAX_IMAGE_DIMENSION 8192
+ 
+ /* The HW can do 16384 (15), but we run into hangs when we expose that. Also,
+  * since we are only exposing images up to 4096 pixels per dimension 13 is
+Index: mesa/src/broadcom/vulkan/v3dv_limits.h
+===================================================================
+--- mesa.orig/src/broadcom/vulkan/v3dv_limits.h
++++ mesa/src/broadcom/vulkan/v3dv_limits.h
+@@ -50,7 +50,7 @@
+ #define MAX_DYNAMIC_BUFFERS (MAX_DYNAMIC_UNIFORM_BUFFERS + \
+                              MAX_DYNAMIC_STORAGE_BUFFERS)
+ 
+-#define MAX_RENDER_TARGETS 4
++#define MAX_RENDER_TARGETS 8
+ 
+ #define MAX_MULTIVIEW_VIEW_COUNT 16
+ 

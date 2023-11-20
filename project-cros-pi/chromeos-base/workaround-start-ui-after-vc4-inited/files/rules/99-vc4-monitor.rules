@@ -1,0 +1,1 @@
+ACTION=="add", KERNEL=="card[0-9]", DRIVERS=="vc4-drm", RUN+="/sbin/start splash"

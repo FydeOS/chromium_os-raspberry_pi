@@ -3,11 +3,11 @@
 
 EAPI=7
 
-CROS_WORKON_COMMIT="758715ce4c448f6824160a0e904aa966c9b951d8"
+CROS_WORKON_COMMIT="65109bc8ac33e24af77c1b28b712dae414111ebb"
 CROS_WORKON_TREE="58e3a387b9a0237a9272e0812b071bc7a74109b3"
 CROS_WORKON_PROJECT="chromiumos/third_party/mesa"
-CROS_WORKON_LOCALNAME="mesa-freedreno"
-CROS_WORKON_EGIT_BRANCH="chromeos-freedreno"
+CROS_WORKON_LOCALNAME="mesa"
+CROS_WORKON_EGIT_BRANCH="upstream/mesa-23.3.0-rc3"
 
 KEYWORDS="*"
 
@@ -34,6 +34,7 @@ RDEPEND="${COMMON_DEPEND}
 "
 
 DEPEND="${COMMON_DEPEND}
+  >=dev-libs/wayland-protocols-1.8
 	perfetto? ( >=chromeos-base/perfetto-29.0 )
 "
 
@@ -56,15 +57,16 @@ src_configure() {
 		-Dgles1=disabled
 		-Dgles2=enabled
 		-Dshared-glapi=enabled
-		-Dgallium-drivers=v3d
+		-Dgallium-drivers=v3d,vc4
 		-Dgallium-vdpau=disabled
 		-Dgallium-xa=disabled
 		-Dperfetto=$(usex perfetto true false)
 		$(meson_feature zstd)
-		-Dplatforms=
+		-Dplatforms=wayland
 		-Dtools=
 		--buildtype $(usex debug debug release)
 		-Dvulkan-drivers=$(usex vulkan broadcom '')
+    -Dvulkan-beta=true
 	)
 
 	meson_src_configure

@@ -1,8 +1,8 @@
-Index: mesa/src/gallium/drivers/v3d/v3d_resource.c
+Index: mesa-freedreno/src/gallium/drivers/v3d/v3d_resource.c
 ===================================================================
---- mesa.orig/src/gallium/drivers/v3d/v3d_resource.c
-+++ mesa/src/gallium/drivers/v3d/v3d_resource.c
-@@ -921,7 +921,6 @@ v3d_resource_from_handle(struct pipe_scr
+--- mesa-freedreno.orig/src/gallium/drivers/v3d/v3d_resource.c
++++ mesa-freedreno/src/gallium/drivers/v3d/v3d_resource.c
+@@ -879,7 +879,6 @@ v3d_resource_from_handle(struct pipe_scr
  
          if (!rsc)
                  return NULL;
@@ -10,7 +10,7 @@ Index: mesa/src/gallium/drivers/v3d/v3d_resource.c
          switch (whandle->modifier) {
          case DRM_FORMAT_MOD_LINEAR:
                  rsc->tiled = false;
-@@ -952,6 +951,10 @@ v3d_resource_from_handle(struct pipe_scr
+@@ -910,6 +909,10 @@ v3d_resource_from_handle(struct pipe_scr
                  rsc->bo = v3d_bo_open_name(screen, whandle->handle);
                  break;
          case WINSYS_HANDLE_TYPE_FD:
