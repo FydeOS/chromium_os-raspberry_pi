@@ -43,7 +43,9 @@ DEPEND="${RDEPEND}
 	)"
 
 src_prepare() {
-  eapply "${FILESDIR}/vc4_v3d.patch"
+  if use video_cards_v3d; then
+    eapply "${FILESDIR}/vc4_v3d.patch"
+  fi
 	default
 	sanitizers-setup-env
 	cros-common.mk_src_prepare

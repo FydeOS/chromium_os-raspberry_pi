@@ -1,0 +1,81 @@
+Index: raspberry-kernel/security/selinux/hooks.c
+===================================================================
+--- raspberry-kernel.orig/security/selinux/hooks.c
++++ raspberry-kernel/security/selinux/hooks.c
+@@ -103,6 +103,9 @@
+ #include "netlabel.h"
+ #include "audit.h"
+ #include "avc_ss.h"
++#ifdef CONFIG_OVERLAY_FS
++#include "../../fs/overlayfs/ovl_entry.h"
++#endif
+ 
+ struct selinux_state selinux_state;
+ 
+@@ -446,10 +449,31 @@ static int selinux_is_genfs_special_hand
+ 		  !strcmp(sb->s_type->name, "cgroup2")));
+ }
+ 
++static bool is_overlay_sb(struct super_block *sb)
++{
++  const char* fstype = sb->s_type->name;
++  return strcmp(fstype, "overlay") == 0;
++}
++
++static bool is_overlay_inode(struct inode *inode)
++{
++  return is_overlay_sb(inode->i_sb);
++}
++
++#ifdef CONFIG_OVERLAY_FS
++static struct inode *get_real_inode_from_ovl(struct inode *inode) {
++  struct ovl_inode *oi = OVL_I(inode);
++  struct dentry *upperdentry = ovl_upperdentry_dereference(oi);
++  return upperdentry ? d_inode(upperdentry) : d_inode(oi->lowerpath.dentry);
++}
++#endif
++
+ static int selinux_is_sblabel_mnt(struct super_block *sb)
+ {
+ 	struct superblock_security_struct *sbsec = selinux_superblock(sb);
+ 
++	if(is_overlay_sb(sb))
++		return 1;
+ 	/*
+ 	 * IMPORTANT: Double-check logic in this function when adding a new
+ 	 * SECURITY_FS_USE_* definition!
+@@ -3417,7 +3441,14 @@ static int selinux_inode_getsecurity(str
+ 	 * and lack of permission just means that we fall back to the
+ 	 * in-core context value, not a denial.
+ 	 */
++#ifdef CONFIG_OVERLAY_FS
++	if (is_overlay_inode(inode))
++		isec = inode_security(get_real_inode_from_ovl(inode));
++	else
++		isec = inode_security(inode);
++#else
+ 	isec = inode_security(inode);
++#endif
+ 	if (has_cap_mac_admin(false))
+ 		error = security_sid_to_context_force(&selinux_state,
+ 						      isec->sid, &context,
+@@ -3447,8 +3478,18 @@ static int selinux_inode_setsecurity(str
+ 
+ 	if (strcmp(name, XATTR_SELINUX_SUFFIX))
+ 		return -EOPNOTSUPP;
+-
++#ifdef CONFIG_OVERLAY_FS
++	if (is_overlay_inode(inode)) {
++		struct inode *ovl_inode;
++		ovl_inode = get_real_inode_from_ovl(inode);
++		isec = inode_security_novalidate(ovl_inode);
++		sbsec = selinux_superblock(ovl_inode->i_sb);
++	} else {
++		sbsec = selinux_superblock(inode->i_sb);
++	}
++#else
+ 	sbsec = selinux_superblock(inode->i_sb);
++#endif
+ 	if (!(sbsec->flags & SBLABEL_MNT))
+ 		return -EOPNOTSUPP;
+ 

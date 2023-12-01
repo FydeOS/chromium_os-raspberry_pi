@@ -1,0 +1,49 @@
+Index: raspberry-kernel/drivers/gpu/drm/drm_auth.c
+===================================================================
+--- raspberry-kernel.orig/drivers/gpu/drm/drm_auth.c
++++ raspberry-kernel/drivers/gpu/drm/drm_auth.c
+@@ -235,7 +235,7 @@ static int drm_new_set_master(struct drm
+ static int
+ drm_master_check_perm(struct drm_device *dev, struct drm_file *file_priv)
+ {
+-	if (file_priv->pid == task_pid(current) && file_priv->was_master)
++	if ((drm_master_relax || file_priv->pid == task_pid(current)) && file_priv->was_master)
+ 		return 0;
+ 
+ 	if (!capable(CAP_SYS_ADMIN))
+Index: raspberry-kernel/drivers/gpu/drm/drm_drv.c
+===================================================================
+--- raspberry-kernel.orig/drivers/gpu/drm/drm_drv.c
++++ raspberry-kernel/drivers/gpu/drm/drm_drv.c
+@@ -1025,6 +1025,8 @@ out:
+ 	return err;
+ }
+ 
++bool drm_master_relax;
++
+ static const struct file_operations drm_stub_fops = {
+ 	.owner = THIS_MODULE,
+ 	.open = drm_stub_open,
+@@ -1057,6 +1059,9 @@ static int __init drm_core_init(void)
+ 
+ 	drm_debugfs_root = debugfs_create_dir("dri", NULL);
+ 
++  debugfs_create_bool("drm_master_relax", S_IRUSR | S_IWUSR,
++          drm_debugfs_root, &drm_master_relax);
++
+ 	ret = register_chrdev(DRM_MAJOR, "drm", &drm_stub_fops);
+ 	if (ret < 0)
+ 		goto error;
+Index: raspberry-kernel/include/drm/drm_drv.h
+===================================================================
+--- raspberry-kernel.orig/include/drm/drm_drv.h
++++ raspberry-kernel/include/drm/drm_drv.h
+@@ -483,6 +483,8 @@ void *__devm_drm_dev_alloc(struct device
+ 			   const struct drm_driver *driver,
+ 			   size_t size, size_t offset);
+ 
++extern bool drm_master_relax;
++
+ /**
+  * devm_drm_dev_alloc - Resource managed allocation of a &drm_device instance
+  * @parent: Parent device object

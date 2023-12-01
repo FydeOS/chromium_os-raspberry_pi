@@ -1,0 +1,16 @@
+Index: raspberry-kernel/mm/mprotect.c
+===================================================================
+--- raspberry-kernel.orig/mm/mprotect.c
++++ raspberry-kernel/mm/mprotect.c
+@@ -816,7 +816,10 @@ out:
+ SYSCALL_DEFINE3(mprotect, unsigned long, start, size_t, len,
+ 		unsigned long, prot)
+ {
+-	return do_mprotect_pkey(start, len, prot, -1);
++  int ret = do_mprotect_pkey(start, len, prot, -1);
++  if (ret)
++    pr_info("mprotect: start:0x%lx, len:%lu,prot:0x%lx, ret:%d\n", start, len, prot, ret);
++	return ret;
+ }
+ 
+ #ifdef CONFIG_ARCH_HAS_PKEYS

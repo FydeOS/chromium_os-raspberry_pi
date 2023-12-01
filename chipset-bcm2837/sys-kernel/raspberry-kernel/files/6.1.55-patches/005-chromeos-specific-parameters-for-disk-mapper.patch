@@ -1,0 +1,770 @@
+Index: raspberry-kernel/drivers/md/dm-verity-target.c
+===================================================================
+--- raspberry-kernel.orig/drivers/md/dm-verity-target.c
++++ raspberry-kernel/drivers/md/dm-verity-target.c
+@@ -16,8 +16,10 @@
+ #include "dm-verity.h"
+ #include "dm-verity-fec.h"
+ #include "dm-verity-verify-sig.h"
++#include <linux/delay.h>
+ #include <linux/module.h>
+ #include <linux/reboot.h>
++#include <crypto/hash.h>
+ #include <linux/scatterlist.h>
+ #include <linux/string.h>
+ #include <linux/jump_label.h>
+@@ -37,8 +39,9 @@
+ #define DM_VERITY_OPT_IGN_ZEROES	"ignore_zero_blocks"
+ #define DM_VERITY_OPT_AT_MOST_ONCE	"check_at_most_once"
+ #define DM_VERITY_OPT_TASKLET_VERIFY	"try_verify_in_tasklet"
++#define DM_VERITY_OPT_ERROR_BEHAVIOR	"error_behavior"
+ 
+-#define DM_VERITY_OPTS_MAX		(4 + DM_VERITY_OPTS_FEC + \
++#define DM_VERITY_OPTS_MAX		(5 + DM_VERITY_OPTS_FEC + \
+ 					 DM_VERITY_ROOT_HASH_VERIFICATION_OPTS)
+ 
+ static unsigned int dm_verity_prefetch_cluster = DM_VERITY_DEFAULT_PREFETCH_SIZE;
+@@ -54,6 +57,122 @@ struct dm_verity_prefetch_work {
+ 	unsigned int n_blocks;
+ };
+ 
++/* Provide a lightweight means of specifying the global default for
++ * error behavior: eio, reboot, or none
++ * Legacy support for 0 = eio, 1 = reboot/panic, 2 = none, 3 = notify.
++ * This is matched to the enum in dm-verity.h.
++ */
++static char *error_behavior_istring[] = { "0", "1", "2", "3" };
++static const char *allowed_error_behaviors[] = { "eio", "panic", "none",
++						 "notify", NULL };
++static char *error_behavior = "eio";
++module_param(error_behavior, charp, 0644);
++MODULE_PARM_DESC(error_behavior, "Behavior on error "
++				 "(eio, panic, none, notify)");
++
++/* Controls whether verity_get_device will wait forever for a device. */
++static int dev_wait;
++module_param(dev_wait, int, 0444);
++MODULE_PARM_DESC(dev_wait, "Wait forever for a backing device");
++
++static BLOCKING_NOTIFIER_HEAD(verity_error_notifier);
++
++int dm_verity_register_error_notifier(struct notifier_block *nb)
++{
++	return blocking_notifier_chain_register(&verity_error_notifier, nb);
++}
++EXPORT_SYMBOL_GPL(dm_verity_register_error_notifier);
++
++int dm_verity_unregister_error_notifier(struct notifier_block *nb)
++{
++	return blocking_notifier_chain_unregister(&verity_error_notifier, nb);
++}
++EXPORT_SYMBOL_GPL(dm_verity_unregister_error_notifier);
++
++/* If the request is not successful, this handler takes action.
++ * TODO make this call a registered handler.
++ */
++static void verity_error(struct dm_verity *v, struct dm_verity_io *io,
++			 blk_status_t status)
++{
++	const char *message = v->hash_failed ? "integrity" : "block";
++	int error_behavior = DM_VERITY_ERROR_BEHAVIOR_PANIC;
++	dev_t devt = 0;
++	u64 block = ~0;
++	struct dm_verity_error_state error_state;
++	/* If the hash did not fail, then this is likely transient. */
++	int transient = !v->hash_failed;
++
++	devt = v->data_dev->bdev->bd_dev;
++	error_behavior = v->error_behavior;
++	if (io)
++		block = io->block;
++
++	DMERR_LIMIT("verification failure occurred: %s failure%s", message,
++		    transient ? " (transient)" : "");
++
++	if (error_behavior == DM_VERITY_ERROR_BEHAVIOR_NOTIFY) {
++		error_state.code = status;
++		error_state.transient = transient;
++		error_state.block = block;
++		error_state.message = message;
++		error_state.dev_start = v->data_start;
++		error_state.dev_len = v->data_blocks;
++		error_state.dev = v->data_dev->bdev;
++		error_state.hash_dev_start = v->hash_start;
++		error_state.hash_dev_len = v->hash_blocks;
++		error_state.hash_dev = v->hash_dev->bdev;
++
++		/* Set default fallthrough behavior. */
++		error_state.behavior = DM_VERITY_ERROR_BEHAVIOR_PANIC;
++		error_behavior = DM_VERITY_ERROR_BEHAVIOR_PANIC;
++
++		if (!blocking_notifier_call_chain(
++		    &verity_error_notifier, transient, &error_state)) {
++			error_behavior = error_state.behavior;
++		}
++	}
++
++	switch (error_behavior) {
++	case DM_VERITY_ERROR_BEHAVIOR_EIO:
++		break;
++	case DM_VERITY_ERROR_BEHAVIOR_NONE:
++		break;
++	default:
++		goto do_panic;
++	}
++	return;
++
++do_panic:
++	panic("dm-verity failure: "
++	      "device:%u:%u status:%d block:%llu message:%s",
++	      MAJOR(devt), MINOR(devt), status, (u64)block, message);
++}
++
++/**
++ * verity_parse_error_behavior - parse a behavior charp to the enum
++ * @behavior:	NUL-terminated char array
++ *
++ * Checks if the behavior is valid either as text or as an index digit
++ * and returns the proper enum value in string form or ERR_PTR(-EINVAL)
++ * on error.
++ */
++static char *verity_parse_error_behavior(const char *behavior)
++{
++	const char **allowed = allowed_error_behaviors;
++	int index;
++
++	for (index = 0; *allowed; allowed++, index++)
++		if (!strcmp(*allowed, behavior) || behavior[0] == index + '0')
++			break;
++
++	if (!*allowed)
++		return ERR_PTR(-EINVAL);
++
++	/* Convert to the integer index matching the enum. */
++	return error_behavior_istring[index];
++}
++
+ /*
+  * Auxiliary structure appended to each dm-bufio buffer. If the value
+  * hash_verified is nonzero, hash of the block has been verified.
+@@ -523,7 +642,7 @@ static int verity_verify_io(struct dm_ve
+ 		sector_t cur_block = io->block + b;
+ 		struct ahash_request *req = verity_io_hash_req(v, io);
+ 
+-		if (v->validated_blocks && bio->bi_status == BLK_STS_OK &&
++		if (v->validated_blocks &&
+ 		    likely(test_bit(cur_block, v->validated_blocks))) {
+ 			verity_bv_skip_block(v, io, iter);
+ 			continue;
+@@ -615,6 +734,8 @@ static void verity_finish_io(struct dm_v
+ 	struct dm_verity *v = io->v;
+ 	struct bio *bio = dm_bio_from_per_bio_data(io, v->ti->per_io_data_size);
+ 
++	if (status && !verity_fec_is_enabled(io->v))
++		verity_error(v, io, status);
+ 	bio->bi_end_io = io->orig_bi_end_io;
+ 	bio->bi_status = status;
+ 
+@@ -1106,6 +1227,22 @@ static int verity_parse_opt_args(struct
+ 			static_branch_inc(&use_tasklet_enabled);
+ 			continue;
+ 
++		} else if (!strcasecmp(arg_name, DM_VERITY_OPT_ERROR_BEHAVIOR)) {
++			int behavior;
++
++			if (!argc) {
++				ti->error = "Missing error behavior parameter";
++				return -EINVAL;
++			}
++			if (kstrtoint(dm_shift_arg(as), 0, &behavior) ||
++			    behavior < 0) {
++				ti->error = "Bad error behavior parameter";
++				return -EINVAL;
++			}
++			v->error_behavior = behavior;
++			argc--;
++			continue;
++
+ 		} else if (verity_is_fec_opt_arg(arg_name)) {
+ 			if (only_modifier_opts)
+ 				continue;
+@@ -1142,6 +1279,135 @@ static int verity_parse_opt_args(struct
+ 	return r;
+ }
+ 
++static int verity_get_device(struct dm_target *ti, const char *devname,
++			     struct dm_dev **dm_dev)
++{
++	do {
++		/* Try the normal path first since if everything is ready, it
++		 * will be the fastest.
++		 */
++		if (!dm_get_device(ti, devname,
++				   dm_table_get_mode(ti->table), dm_dev))
++			return 0;
++
++		if (!dev_wait)
++			break;
++
++		/* This delay directly affects boot time if code reaches here.
++		 * So keep it small.
++		 */
++		msleep(5);
++	} while (dev_wait && (driver_probe_done() != 0 || *dm_dev == NULL));
++	return -1;
++}
++
++static void splitarg(char *arg, char **key, char **val)
++{
++	*key = strsep(&arg, "=");
++	*val = strsep(&arg, "");
++}
++
++/* Convert Chrome OS arguments into standard arguments */
++
++static char *chromeos_args(unsigned *pargc, char ***pargv)
++{
++	char *hashstart = NULL;
++	char **argv = *pargv;
++	int argc = *pargc;
++	char *key, *val;
++	int nargc = 13;
++	char **nargv;
++	char *errstr;
++	int i;
++
++	nargv = kcalloc(14, sizeof(char *), GFP_KERNEL);
++	if (!nargv)
++		return "Failed to allocate memory";
++
++	nargv[0] = "0";		/* version */
++	nargv[3] = "4096";	/* hash block size */
++	nargv[4] = "4096";	/* data block size */
++	nargv[9] = "-";		/* salt (optional) */
++	nargv[10] = "2";
++	nargv[11] = DM_VERITY_OPT_ERROR_BEHAVIOR;
++	nargv[12] = verity_parse_error_behavior(error_behavior);
++
++	for (i = 0; i < argc; ++i) {
++		DMDEBUG("Argument %d: '%s'", i, argv[i]);
++		splitarg(argv[i], &key, &val);
++		if (!key) {
++			DMWARN("Bad argument %d: missing key?", i);
++			errstr = "Bad argument: missing key";
++			goto err;
++		}
++		if (!val) {
++			DMWARN("Bad argument %d='%s': missing value", i, key);
++			errstr = "Bad argument: missing value";
++			goto err;
++		}
++		if (!strcmp(key, "alg")) {
++			nargv[7] = val;
++		} else if (!strcmp(key, "payload")) {
++			nargv[1] = val;
++		} else if (!strcmp(key, "hashtree")) {
++			nargv[2] = val;
++		} else if (!strcmp(key, "root_hexdigest")) {
++			nargv[8] = val;
++		} else if (!strcmp(key, "hashstart")) {
++			unsigned long num;
++
++			if (kstrtoul(val, 10, &num)) {
++				errstr = "Invalid hashstart";
++				goto err;
++			}
++			num >>= (12 - SECTOR_SHIFT);
++			hashstart = kmalloc(24, GFP_KERNEL);
++			if (!hashstart) {
++				errstr = "Failed to allocate memory";
++				goto err;
++			}
++			scnprintf(hashstart, sizeof(hashstart), "%lu", num);
++			nargv[5] = hashstart;
++			nargv[6] = hashstart;
++		} else if (!strcmp(key, "salt")) {
++			nargv[9] = val;
++		} else if (!strcmp(key, DM_VERITY_OPT_ERROR_BEHAVIOR)) {
++			char *behavior = verity_parse_error_behavior(val);
++
++			nargv[12] = behavior;
++		}
++	}
++
++	if (!nargv[1] || !nargv[2] || !nargv[5] || !nargv[7] || !nargv[8]) {
++		errstr = "Missing argument";
++		goto err;
++	}
++
++	if (IS_ERR(nargv[12])) {
++		errstr = "Invalid error behavior";
++		goto err;
++	}
++
++	*pargc = nargc;
++	*pargv = nargv;
++	return NULL;
++
++err:
++	kfree(nargv);
++	kfree(hashstart);
++	return errstr;
++}
++
++/* Release memory allocated for Chrome OS parameter conversion */
++
++static void free_chromeos_argv(char **argv)
++{
++	if (argv) {
++		kfree(argv[5]);
++		kfree(argv);
++	}
++}
++
+ /*
+  * Target parameters:
+  *	<version>	The current format is version 1.
+@@ -1169,10 +1435,19 @@ static int verity_ctr(struct dm_target *
+ 	sector_t hash_position;
+ 	char dummy;
+ 	char *root_hash_digest_to_validate;
++	char **chromeos_argv = NULL;
++
++	if (argc < 10) {
++		ti->error = chromeos_args(&argc, &argv);
++		if (ti->error)
++			return -EINVAL;
++		chromeos_argv = argv;
++	}
+ 
+ 	v = kzalloc(sizeof(struct dm_verity), GFP_KERNEL);
+ 	if (!v) {
+ 		ti->error = "Cannot allocate verity structure";
++		free_chromeos_argv(chromeos_argv);
+ 		return -ENOMEM;
+ 	}
+ 	ti->private = v;
+@@ -1211,13 +1486,13 @@ static int verity_ctr(struct dm_target *
+ 	}
+ 	v->version = num;
+ 
+-	r = dm_get_device(ti, argv[1], FMODE_READ, &v->data_dev);
++	r = verity_get_device(ti, argv[1], &v->data_dev);
+ 	if (r) {
+ 		ti->error = "Data device lookup failed";
+ 		goto bad;
+ 	}
+ 
+-	r = dm_get_device(ti, argv[2], FMODE_READ, &v->hash_dev);
++	r = verity_get_device(ti, argv[2], &v->hash_dev);
+ 	if (r) {
+ 		ti->error = "Hash device lookup failed";
+ 		goto bad;
+@@ -1429,14 +1704,14 @@ static int verity_ctr(struct dm_target *
+ 				       __alignof__(struct dm_verity_io));
+ 
+ 	verity_verify_sig_opts_cleanup(&verify_args);
+-
++	free_chromeos_argv(chromeos_argv);
+ 	return 0;
+ 
+ bad:
+ 
+ 	verity_verify_sig_opts_cleanup(&verify_args);
+ 	verity_dtr(ti);
+-
++	free_chromeos_argv(chromeos_argv);
+ 	return r;
+ }
+ 
+Index: raspberry-kernel/drivers/md/dm-verity.h
+===================================================================
+--- raspberry-kernel.orig/drivers/md/dm-verity.h
++++ raspberry-kernel/drivers/md/dm-verity.h
+@@ -15,6 +15,7 @@
+ #include <linux/device-mapper.h>
+ #include <linux/interrupt.h>
+ #include <crypto/hash.h>
++#include <linux/notifier.h>
+ 
+ #define DM_VERITY_MAX_LEVELS		63
+ 
+@@ -58,6 +59,7 @@ struct dm_verity {
+ 	unsigned int ahash_reqsize;/* the size of temporary space for crypto */
+ 	enum verity_mode mode;	/* mode for handling verification errors */
+ 	unsigned int corrupted_errs;/* Number of errors for corrupted blocks */
++	int error_behavior;	/* selects error behavior on io errors */
+ 
+ 	struct workqueue_struct *verify_wq;
+ 
+@@ -97,6 +99,40 @@ struct dm_verity_io {
+ 	 */
+ };
+ 
++struct verity_result {
++	struct completion completion;
++	int err;
++};
++
++struct dm_verity_error_state {
++	int code;
++	int transient;  /* Likely to not happen after a reboot */
++	u64 block;
++	const char *message;
++
++	sector_t dev_start;
++	sector_t dev_len;
++	struct block_device *dev;
++
++	sector_t hash_dev_start;
++	sector_t hash_dev_len;
++	struct block_device *hash_dev;
++
++	/* Final behavior after all notifications are completed. */
++	int behavior;
++};
++
++/* This enum must be matched to allowed_error_behaviors in dm-verity.c */
++enum dm_verity_error_behavior {
++	DM_VERITY_ERROR_BEHAVIOR_EIO = 0,
++	DM_VERITY_ERROR_BEHAVIOR_PANIC,
++	DM_VERITY_ERROR_BEHAVIOR_NONE,
++	DM_VERITY_ERROR_BEHAVIOR_NOTIFY
++};
++
++int dm_verity_register_error_notifier(struct notifier_block *nb);
++int dm_verity_unregister_error_notifier(struct notifier_block *nb);
++
+ static inline struct ahash_request *verity_io_hash_req(struct dm_verity *v,
+ 						     struct dm_verity_io *io)
+ {
+Index: raspberry-kernel/drivers/md/dm-verity-chromeos.c
+===================================================================
+--- /dev/null
++++ raspberry-kernel/drivers/md/dm-verity-chromeos.c
+@@ -0,0 +1,292 @@
++/*
++ * Copyright (C) 2010 The Chromium OS Authors <chromium-os-dev@chromium.org>
++ *                    All Rights Reserved.
++ *
++ * This file is released under the GPL.
++ */
++/*
++ * Implements a Chrome OS platform specific error handler.
++ * When verity detects an invalid block, this error handling will
++ * attempt to corrupt the kernel boot image. On reboot, the bios will
++ * detect the kernel corruption and switch to the alternate kernel
++ * and root file system partitions.
++ *
++ * Assumptions:
++ * 1. Partitions are specified on the command line using uuid.
++ * 2. The kernel partition is the partition number is one less
++ *    than the root partition number.
++ */
++#include <linux/bio.h>
++#include <linux/blkdev.h>
++#include <linux/device.h>
++#include <linux/device-mapper.h>
++#include <linux/err.h>
++#include <linux/kernel.h>
++#include <linux/mm.h>
++#include <linux/module.h>
++#include <linux/mount.h>
++#include <linux/notifier.h>
++#include <linux/string.h>
++#include <asm/page.h>
++
++#include "dm-verity.h"
++
++#define DM_MSG_PREFIX "verity-chromeos"
++#define DMVERROR "DMVERROR"
++
++static void chromeos_invalidate_kernel_endio(struct bio *bio)
++{
++	if (bio->bi_status) {
++		DMERR("%s: bio operation failed (status=0x%x)", __func__,
++		      bio->bi_status);
++	}
++	complete(bio->bi_private);
++}
++
++static int chromeos_invalidate_kernel_submit(struct bio *bio,
++					     struct block_device *bdev,
++					     unsigned int op,
++					     unsigned int op_flags,
++					     struct page *page)
++{
++	DECLARE_COMPLETION_ONSTACK(wait);
++	unsigned int block_size = bdev_logical_block_size(bdev);
++
++	if (block_size > page_size(page))
++		panic("dm-verity failed to override signature");
++
++	bio->bi_private = &wait;
++	bio->bi_end_io = chromeos_invalidate_kernel_endio;
++	bio_set_dev(bio, bdev);
++
++	bio->bi_iter.bi_sector = 0;
++	bio->bi_vcnt = 1;
++	bio->bi_iter.bi_idx = 0;
++	bio->bi_iter.bi_size = block_size;
++	bio->bi_iter.bi_bvec_done = 0;
++	bio_set_op_attrs(bio, op, op_flags);
++	bio->bi_io_vec[0].bv_page = page;
++	bio->bi_io_vec[0].bv_len = block_size;
++	bio->bi_io_vec[0].bv_offset = 0;
++
++	submit_bio(bio);
++	/* Wait up to 2 seconds for completion or fail. */
++	if (!wait_for_completion_timeout(&wait, msecs_to_jiffies(2000)))
++		return -1;
++	return 0;
++}
++
++static dev_t get_boot_dev_from_root_dev(struct block_device *root_bdev)
++{
++	/* Very basic sanity checking. This should be better. */
++	if (!root_bdev || MAJOR(root_bdev->bd_dev) == 254 ||
++	    root_bdev->bd_partno <= 1) {
++		return 0;
++	}
++	return MKDEV(MAJOR(root_bdev->bd_dev), MINOR(root_bdev->bd_dev) - 1);
++}
++
++static char kern_guid[48];
++
++/* get_boot_dev is bassed on dm_get_device_by_uuid in dm_bootcache. */
++static dev_t get_boot_dev(void)
++{
++	const char partuuid[] = "PARTUUID=";
++	char uuid[sizeof(partuuid) + 36];
++	char *uuid_str;
++	dev_t devt = 0;
++
++	if (!strlen(kern_guid)) {
++		DMERR("Couldn't get uuid, try root dev");
++		return 0;
++	}
++
++	if (strncmp(kern_guid, partuuid, strlen(partuuid))) {
++		/* Not prefixed with "PARTUUID=", so add it */
++		strcpy(uuid, partuuid);
++		strlcat(uuid, kern_guid, sizeof(uuid));
++		uuid_str = uuid;
++	} else {
++		uuid_str = kern_guid;
++	}
++	devt = name_to_dev_t(uuid_str);
++	if (!devt)
++		goto found_nothing;
++	return devt;
++
++found_nothing:
++	DMDEBUG("No matching partition for GUID: %s", uuid_str);
++	return 0;
++}
++
++/*
++ * Invalidate the kernel which corresponds to the root block device.
++ *
++ * This function stamps DMVERROR on the beginning of the kernel partition.
++ *
++ * The kernel_guid commandline parameter is used to find the kernel partition
++ *  number.
++ * If that fails, the kernel partition is found by subtracting 1 from
++ *  the root partition.
++ * The DMVERROR string is stamped over only the CHROMEOS string at the
++ *  beginning of the kernel blob, leaving the rest of it intact.
++ */
++static int chromeos_invalidate_kernel_bio(struct block_device *root_bdev)
++{
++	int ret = 0;
++	struct block_device *bdev;
++	struct bio *bio;
++	struct page *page;
++	dev_t devt;
++	fmode_t dev_mode;
++
++	devt = get_boot_dev();
++	if (!devt) {
++		devt = get_boot_dev_from_root_dev(root_bdev);
++		if (!devt)
++			return -EINVAL;
++	}
++
++	/* First we open the device for reading. */
++	dev_mode = FMODE_READ | FMODE_EXCL;
++	bdev = blkdev_get_by_dev(devt, dev_mode,
++				 chromeos_invalidate_kernel_bio);
++	if (IS_ERR(bdev)) {
++		DMERR("invalidate_kernel: could not open device for reading");
++		dev_mode = 0;
++		ret = -1;
++		goto failed_to_read;
++	}
++
++	bio = bio_alloc(NULL, 1, 0, GFP_NOIO);
++	if (!bio) {
++		ret = -1;
++		goto failed_bio_alloc;
++	}
++
++	page = alloc_page(GFP_NOIO);
++	if (!page) {
++		ret = -ENOMEM;
++		goto failed_to_alloc_page;
++	}
++
++	/*
++	 * Request read operation with REQ_PREFLUSH flag to ensure that the
++	 * cache of non-volatile storage device has been flushed before read is
++	 * started.
++	 */
++	if (chromeos_invalidate_kernel_submit(bio, bdev,
++					      REQ_OP_READ,
++					      REQ_SYNC | REQ_PREFLUSH,
++					      page)) {
++		ret = -1;
++		goto failed_to_submit_read;
++	}
++
++	/* We have a page. Let's make sure it looks right. */
++	if (memcmp("CHROMEOS", page_address(page), 8)) {
++		DMERR("invalidate_kernel called on non-kernel partition");
++		ret = -EINVAL;
++		goto invalid_header;
++	} else {
++		DMERR("invalidate_kernel: found CHROMEOS kernel partition");
++	}
++
++	/* Stamp it and rewrite */
++	memcpy(page_address(page), DMVERROR, strlen(DMVERROR));
++
++	/* The block dev was being changed on read. Let's reopen here. */
++	blkdev_put(bdev, dev_mode);
++	dev_mode = FMODE_WRITE | FMODE_EXCL;
++	bdev = blkdev_get_by_dev(devt, dev_mode,
++				 chromeos_invalidate_kernel_bio);
++	if (IS_ERR(bdev)) {
++		DMERR("invalidate_kernel: could not open device for writing");
++		dev_mode = 0;
++		ret = -1;
++		goto failed_to_write;
++	}
++
++	/* We re-use the same bio to do the write after the read. Need to reset
++	 * it to initialize bio->bi_remaining.
++	 */
++	bio_reset(bio, NULL, 0);
++
++	/*
++	 * Request write operation with REQ_FUA flag to ensure that I/O
++	 * completion for the write is signaled only after the data has been
++	 * committed to non-volatile storage.
++	 */
++	if (chromeos_invalidate_kernel_submit(bio, bdev, REQ_OP_WRITE,
++					      REQ_SYNC | REQ_FUA, page)) {
++		ret = -1;
++		goto failed_to_submit_write;
++	}
++
++	DMERR("invalidate_kernel: completed.");
++	ret = 0;
++failed_to_submit_write:
++failed_to_write:
++invalid_header:
++	__free_page(page);
++failed_to_submit_read:
++	/* Technically, we'll leak a page with the pending bio, but
++	 *  we're about to panic so it's safer to do the panic() we expect.
++	 */
++failed_to_alloc_page:
++	bio_put(bio);
++failed_bio_alloc:
++	if (dev_mode)
++		blkdev_put(bdev, dev_mode);
++failed_to_read:
++	return ret;
++}
++
++static int error_handler(struct notifier_block *nb, unsigned long transient,
++			 void *opaque_err)
++{
++	struct dm_verity_error_state *err =
++		(struct dm_verity_error_state *) opaque_err;
++	err->behavior = DM_VERITY_ERROR_BEHAVIOR_PANIC;
++	if (transient)
++		return 0;
++
++	/* Mark the kernel partition as invalid. */
++	chromeos_invalidate_kernel_bio(err->dev);
++	return 0;
++}
++
++static struct notifier_block chromeos_nb = {
++	.notifier_call = &error_handler,
++	.next = NULL,
++	.priority = 1,
++};
++
++static int __init dm_verity_chromeos_init(void)
++{
++	int r;
++
++	r = dm_verity_register_error_notifier(&chromeos_nb);
++	if (r < 0)
++		DMERR("failed to register handler: %d", r);
++	else
++		DMINFO("dm-verity-chromeos registered");
++	return r;
++}
++
++static void __exit dm_verity_chromeos_exit(void)
++{
++	dm_verity_unregister_error_notifier(&chromeos_nb);
++}
++
++module_init(dm_verity_chromeos_init);
++module_exit(dm_verity_chromeos_exit);
++
++MODULE_AUTHOR("Will Drewry <wad@chromium.org>");
++MODULE_DESCRIPTION("chromeos-specific error handler for dm-verity");
++MODULE_LICENSE("GPL");
++
++/* Declare parameter with no module prefix */
++#undef MODULE_PARAM_PREFIX
++#define MODULE_PARAM_PREFIX	""
++module_param_string(kern_guid, kern_guid, sizeof(kern_guid), 0);
+Index: raspberry-kernel/drivers/md/Makefile
+===================================================================
+--- raspberry-kernel.orig/drivers/md/Makefile
++++ raspberry-kernel/drivers/md/Makefile
+@@ -84,6 +84,7 @@ obj-$(CONFIG_DM_INTEGRITY)	+= dm-integri
+ obj-$(CONFIG_DM_ZONED)		+= dm-zoned.o
+ obj-$(CONFIG_DM_WRITECACHE)	+= dm-writecache.o
+ obj-$(CONFIG_SECURITY_LOADPIN_VERITY)	+= dm-verity-loadpin.o
++obj-$(CONFIG_DM_VERITY_CHROMEOS)	+= dm-verity-chromeos.o
+ 
+ ifeq ($(CONFIG_DM_INIT),y)
+ dm-mod-objs			+= dm-init.o
+Index: raspberry-kernel/drivers/md/Kconfig
+===================================================================
+--- raspberry-kernel.orig/drivers/md/Kconfig
++++ raspberry-kernel/drivers/md/Kconfig
+@@ -294,6 +294,16 @@ config DM_CRYPT
+ 
+ 	  If unsure, say N.
+ 
++config DM_VERITY_CHROMEOS
++	tristate "Support Chrome OS specific verity error behavior"
++	depends on DM_VERITY
++	help
++	  Enables Chrome OS platform-specific error behavior.  In particular,
++	  it will modify the partition preceding the verified block device
++	  when non-transient error occurs (followed by a panic).
++
++	  If unsure, say N.
++
+ config DM_SNAPSHOT
+        tristate "Snapshot target"
+        depends on BLK_DEV_DM
