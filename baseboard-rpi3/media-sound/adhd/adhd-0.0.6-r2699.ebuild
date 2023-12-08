@@ -52,7 +52,7 @@ DEPEND="
 "
 
 src_prepare() {
-	eapply $FILESDIR/*.patch
+#	eapply $FILESDIR/*.patch
 	cd cras || die
 	eautoreconf
 	default

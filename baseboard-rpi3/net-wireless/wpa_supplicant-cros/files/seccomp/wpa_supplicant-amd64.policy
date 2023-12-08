@@ -1,0 +1,95 @@
+# Copyright 2021 The ChromiumOS Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# rseq should be first due to frequency and purpose to decrease nptl latency
+rseq: 1
+
+clock_gettime: 1
+gettimeofday: 1
+sendmsg: 1
+select: 1
+pselect6: 1
+ioctl: arg1 == SIOCGIFADDR   || arg1 == SIOCGIFFLAGS || arg1 == SIOCGIFHWADDR || \
+       arg1 == SIOCGIFINDEX  || arg1 == SIOCGIFNAME  || arg1 == SIOCSIFFLAGS  || \
+       arg1 == SIOCSIFHWADDR || arg1 == TCGETS       || arg1 == TIOCOUTQ
+getsockopt: 1
+recvmsg: 1
+setsockopt: 1
+rt_sigprocmask: 1
+recvfrom: 1
+getpid: 1
+close: 1
+socket: arg0 == AF_INET || arg0 == AF_NETLINK || arg0 == AF_UNIX || arg0 == AF_PACKET
+gettid: 1
+tgkill: 1
+rt_sigreturn: 1
+mmap: arg2 in ~PROT_EXEC || arg2 in ~PROT_WRITE
+lstat: 1
+sendto: 1
+read: 1
+madvise: 1
+futex: 1
+openat: 1
+fstat: 1
+newfstatat: 1
+stat: 1
+mprotect: arg2 in ~PROT_EXEC || arg2 in ~PROT_WRITE
+bind: 1
+fcntl: 1
+poll: 1
+write: 1
+brk: 1
+rt_sigaction: 1
+getsockname: 1
+readlink: 1
+access: 1
+munmap: 1
+mlock: 1
+munlock: 1
+connect: 1
+getrandom: 1
+arch_prctl: 1
+faccessat: 1
+faccessat2: 1
+set_tid_address: 1
+set_robust_list: 1
+prlimit64: 1
+nanosleep: 1
+clock_nanosleep: 1
+clock_getres: 1
+getresuid: 1
+getresgid: 1
+geteuid: 1
+lseek: 1
+sysinfo: 1
+clone: 1
+setpriority: 1
+prctl: arg0 == PR_SET_NAME
+mkdir: 1
+chmod: 1
+pipe2: 1
+epoll_ctl: 1
+epoll_wait: 1
+restart_syscall: 1
+exit: 1
+exit_group: 1
+alarm: 1
+creat: 1
+epoll_create1: 1
+unlink: 1
+rmdir: 1
+wait4: 1
+flock: 1
+getuid: 1
+getgid: 1
+getegid: 1
+sched_yield: 1
+fstatfs: 1
+# TODO(b/172208472): Remove execve from allow list after the compatibility hack
+# mentioned in the bug has been retired.
+execve: 1
+mremap: 1
+# Necessary for openssl to exec metrics_client, which it does when
+# OPENSSL_CHROMIUM_SKIP_TRUSTED_PURPOSE_CHECK is set.
+pread64: 1

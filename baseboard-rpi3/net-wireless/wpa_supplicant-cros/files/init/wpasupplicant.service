@@ -1,0 +1,12 @@
+# Copyright 2020 The ChromiumOS Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+[Unit]
+Description=WPA Supplicant daemon
+Wants=shill.service
+After=boot-services.target
+[Service]
+Type=forking
+Restart=always
+ExecStart=/sbin/minijail0 -u wpa -g wpa -c 3000 -n -i -- /usr/sbin/wpa_supplicant -u -s -O/run/wpa_supplicant

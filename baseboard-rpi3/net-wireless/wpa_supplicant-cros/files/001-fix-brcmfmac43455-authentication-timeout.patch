@@ -1,0 +1,15 @@
+diff --git a/wpa_supplicant-cros/current/wpa_supplicant/events.c b/wpa_supplicant-cros/current/wpa_supplicant/events.c
+index af2cd73bf..0388f585f 100644
+--- a/wpa_supplicant-cros/current/wpa_supplicant/events.c
++++ b/wpa_supplicant-cros/current/wpa_supplicant/events.c
+@@ -3739,7 +3739,9 @@ static void wpa_supplicant_event_assoc(struct wpa_supplicant *wpa_s,
+ 		eapol_sm_notify_eap_success(wpa_s->eapol, true);
+ 	} else if ((wpa_s->drv_flags & WPA_DRIVER_FLAGS_4WAY_HANDSHAKE_PSK) &&
+ 		   wpa_key_mgmt_wpa_psk(wpa_s->key_mgmt)) {
+-		if (already_authorized) {
++ #define BRCMFMAC43455 1
++    wpa_msg(wpa_s, MSG_DEBUG, "We skip 4-way handshake for the sake of BRCMFMAC43455.");
++		if (already_authorized || BRCMFMAC43455) {
+ 			/*
+ 			 * We are done; the driver will take care of RSN 4-way
+ 			 * handshake.

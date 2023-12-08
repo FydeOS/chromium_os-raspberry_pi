@@ -1,19 +1,21 @@
-Index: adhd/cras/src/server/cras_alsa_card.c
-===================================================================
---- adhd.orig/cras/src/server/cras_alsa_card.c
-+++ adhd/cras/src/server/cras_alsa_card.c
-@@ -134,8 +134,18 @@ struct cras_iodev* create_iodev_for_devi
+--- a/cras/src/server/cras_alsa_card.c
++++ b/cras/src/server/cras_alsa_card.c
+@@ -132,10 +132,22 @@
+     return NULL;
+   }
  
++  syslog(LOG_ERR, "create pcm device for card:%s %s:%s:%s [%u]",
++          alsa_card->name, card_name, dev_name, dev_id, device_index);
++
    /* Append device index to card namem, ex: 'hw:0', for the PCM name of
     * target iodev. */
 -  snprintf(pcm_name, MAX_ALSA_PCM_NAME_LENGTH, "%s,%u", alsa_card->name,
 -           device_index);
-+  /*snprintf(pcm_name, MAX_ALSA_PCM_NAME_LENGTH, "%s,%u", alsa_card->name,
-+           device_index); */
-+  if (!strncmp(card_name, "vc4-hdmi-0",10)){
-+   snprintf(pcm_name, MAX_ALSA_PCM_NAME_LENGTH, "%s,%u", "iec958:0",
-+     device_index);
-+  } else if (!strncmp(card_name, "vc4-hdmi-1",10)) {
++
++  if (!strncmp(card_name, "vc4-hdmi-0", 10)) {
++    snprintf(pcm_name, MAX_ALSA_PCM_NAME_LENGTH, "%s,%u", "iec958:0",
++        device_index);
++  } else if (!strncmp(card_name, "vc4-hdmi-1", 10)) {
 +    snprintf(pcm_name, MAX_ALSA_PCM_NAME_LENGTH, "%s,%u", "iec958:1",
 +      device_index);
 +  } else {
