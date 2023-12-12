@@ -1,0 +1,11 @@
+ACTION!="add", GOTO="media_end"
+#KERNEL=="media1", SYMLINK+="media-dec0"
+SUBSYSTEM!="video4linux", GOTO="media_end"
+
+KERNEL=="video10", SYMLINK+="video-dec0"
+KERNEL=="video11", SYMLINK+="video-enc0"
+#KERNEL=="video12", SYMLINK+="image-proc0"
+#KERNEL=="video31", SYMLINK+="jpeg-enc0"
+#KERNEL=="video19", SYMLINK+="video-dec1"
+
+LABEL="media_end"

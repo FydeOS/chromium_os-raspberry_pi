@@ -1,0 +1,1 @@
+coherent_pool=6M smsc95xx.turbo_mode=N dwc_otg.lpm_enable=0 console=ttyAMA10,115200 earlyprintk=ttyAMA10,115200 log_level=7 root=/dev/mmcblk0p3 rootfstype=ext2 rootwait ro cros_debug cros_secure

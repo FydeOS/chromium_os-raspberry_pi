@@ -1,0 +1,57 @@
+# Chromium OS for Raspberry Pi
+# Copyright (c) 2021 Fyde Innovations. All rights reserved.
+
+# Use of this source code is governed by a BSD-style license
+# that can be found in the LICENSE file.
+
+# The Raspberry Pi uses a configuration file instead of the
+# BIOS you would expect to find on a conventional PC. The
+# system configuration parameters, which would traditionally
+# be edited and stored using a BIOS, are stored instead in
+# this optional text file. This is read by the GPU before the
+# ARM CPU and Linux are initialised.
+
+# For more info:
+# https://www.raspberrypi.com/documentation/computers/config_txt.html
+
+
+#hdmi_drive=2
+#config_hdmi_boost=7
+disable_overscan=1
+dtparam=audio=on
+cma_lwm=16
+cma_hwm=32
+gpu_mem=256
+
+arm_64bit=1
+max_framebuffers=2
+kernel=kernel8_a.img
+disable_splash=1
+
+
+# Display mode
+# Defaulting to "kms" mode for better graphics performance, it
+# requires an optional flag "fydeos-force-cursor-compositing"
+# in /etc/chrome_dev.conf.
+# Should you run into display issues, such as black-screen or
+# GUI graphics not being able to render properly, you can
+# toggle the display mode to "fkms" to enable a compatibility
+# mode, by commenting/uncommenting the corresponding lines.
+dtoverlay=vc4-kms-v3d-pi5,cma-512
+#dtoverlay=vc4-fkms-v3d
+
+
+# Uncomment the following lines to enable overclocking
+#over_voltage=8
+#arm_freq=2147
+
+# Supported MIPI Cameras
+# 1. Raspberry Pi Camera V2:
+#dtoverlay=imx219
+# 2. Others:
+#dtoverlay=imx290
+#dtoverlay=imx378
+#dtoverlay=imx477
+#dtoverlay=imx519
+#dtoverlay=ov5647
+#dtoverlay=ov9281

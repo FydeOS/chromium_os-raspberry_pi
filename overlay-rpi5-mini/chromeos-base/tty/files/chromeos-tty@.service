@@ -1,0 +1,25 @@
+# Copyright 2016 The ChromiumOS Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+[Unit]
+Description=Getty on %I
+After=systemd-user-sessions.service boot-services.target
+PartOf=boot-services.target
+
+[Service]
+ExecStart=/sbin/agetty 115200 %I linux
+Type=idle
+Restart=always
+RestartSec=0
+UtmpIdentifier=%I
+TTYPath=/dev/%I
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+KillMode=process
+IgnoreSIGPIPE=no
+SendSIGHUP=yes
+
+[Install]
+WantedBy=boot-services.target

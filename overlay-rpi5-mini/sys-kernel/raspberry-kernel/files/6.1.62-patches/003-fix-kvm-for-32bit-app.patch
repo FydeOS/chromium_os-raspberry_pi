@@ -1,0 +1,13 @@
+Index: raspberry-kernel/virt/kvm/Kconfig
+===================================================================
+--- raspberry-kernel.orig/virt/kvm/Kconfig
++++ raspberry-kernel/virt/kvm/Kconfig
+@@ -67,7 +67,7 @@ config KVM_GENERIC_DIRTYLOG_READ_PROTECT
+ 
+ config KVM_COMPAT
+        def_bool y
+-       depends on KVM && COMPAT && !(S390 || ARM64 || RISCV)
++       depends on KVM && COMPAT && !(S390 || RISCV)
+ 
+ config HAVE_KVM_IRQ_BYPASS
+        bool

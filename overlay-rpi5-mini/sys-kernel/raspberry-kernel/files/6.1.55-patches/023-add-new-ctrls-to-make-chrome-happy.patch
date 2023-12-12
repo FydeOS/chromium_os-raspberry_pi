@@ -1,0 +1,78 @@
+Index: raspberry-kernel/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
+===================================================================
+--- raspberry-kernel.orig/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
++++ raspberry-kernel/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
+@@ -2382,7 +2382,22 @@ static int bcm2835_codec_s_ctrl(struct v
+ 	case V4L2_CID_MPEG_VIDEO_B_FRAMES:
+ 		ret = 0;
+ 		break;
+-
++  case V4L2_CID_ROTATE: {
++    u32 u32_value;
++    if (!ctx->component)
++      break;
++    u32_value = ((ctrl->val % 360) / 90) * 90;
++    ret = vchiq_mmal_port_parameter_set(ctx->dev->instance,
++                &ctx->component->input[0],
++                MMAL_PARAMETER_ROTATION,
++                &u32_value,
++                sizeof(u32_value));
++    break;
++  }
++  case V4L2_CID_ALPHA_COMPONENT: {
++    ret = 0;
++    break;
++  }
+ 	case V4L2_CID_JPEG_COMPRESSION_QUALITY:
+ 		if (!ctx->component)
+ 			break;
+@@ -3466,7 +3481,7 @@ static int bcm2835_codec_open(struct fil
+ 	break;
+ 	case ISP:
+ 	{
+-		v4l2_ctrl_handler_init(hdl, 2);
++		v4l2_ctrl_handler_init(hdl, 4);
+ 
+ 		v4l2_ctrl_new_std(hdl, &bcm2835_codec_ctrl_ops,
+ 				  V4L2_CID_HFLIP,
+@@ -3474,6 +3489,12 @@ static int bcm2835_codec_open(struct fil
+ 		v4l2_ctrl_new_std(hdl, &bcm2835_codec_ctrl_ops,
+ 				  V4L2_CID_VFLIP,
+ 				  1, 0, 1, 0);
++    v4l2_ctrl_new_std(hdl, &bcm2835_codec_ctrl_ops,
++          V4L2_CID_ROTATE,
++          0, 360, 90, 0);
++    v4l2_ctrl_new_std(hdl, &bcm2835_codec_ctrl_ops,
++          V4L2_CID_ALPHA_COMPONENT,
++          0, 255, 1, 255);
+ 		if (hdl->error) {
+ 			rc = hdl->error;
+ 			goto free_ctrl_handler;
+Index: raspberry-kernel/drivers/staging/media/rpivid/rpivid.c
+===================================================================
+--- raspberry-kernel.orig/drivers/staging/media/rpivid/rpivid.c
++++ raspberry-kernel/drivers/staging/media/rpivid/rpivid.c
+@@ -89,6 +89,23 @@ static const struct rpivid_control rpivi
+ 		},
+ 		.required	= false,
+ 	},
++  {
++    .cfg = {
++      .id = V4L2_CID_MPEG_VIDEO_HEVC_PROFILE,
++      .min = V4L2_MPEG_VIDEO_HEVC_PROFILE_MAIN,
++      .max = V4L2_MPEG_VIDEO_HEVC_PROFILE_MAIN_10,
++      .def = V4L2_MPEG_VIDEO_HEVC_PROFILE_MAIN,
++    },
++    .required = false,
++  },
++  {
++    .cfg = {
++      .id = V4L2_CID_MPEG_VIDEO_HEVC_LEVEL,
++      .min = V4L2_MPEG_VIDEO_HEVC_LEVEL_1,
++      .max = V4L2_MPEG_VIDEO_HEVC_LEVEL_5_1,
++    },
++    .required = false,
++  },
+ };
+ 
+ #define rpivid_ctrls_COUNT	ARRAY_SIZE(rpivid_ctrls)

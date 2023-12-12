@@ -19,8 +19,8 @@ S=${WORKDIR}
 
 src_install() {
 	# Install upstart service
-        exeinto "/usr/sbin"
-        doexe ${FILESDIR}/expand-partition.sh	
+  exeinto "/usr/sbin"
+  doexe ${FILESDIR}/expand-partition.sh
 	insinto "/etc/init"
 	doins ${FILESDIR}/auto-expand-partition.conf
 }
