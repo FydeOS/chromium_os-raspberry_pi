@@ -98,9 +98,9 @@ The next question gives detailed differences between these confusing terms.
 
 # Introduction
 
-This document describes how to build and run Google [Chromium OS](https://www.chromium.org/chromium-os) on Raspberry Pi 3B, 3B+, 4B and the Pi 400 personal computer kit(Pi400 hereafter), from its source code and the board overlay hosted in this repository.
+This document describes how to build and run Google [Chromium OS](https://www.chromium.org/chromium-os) on Raspberry Pi 4B， Pi 400 personal computer kit(Pi400 hereafter) and the latest Raspberry Pi 5 released in 2023, from its source code and the board overlay hosted in this repository.
 
-These overlays and the document has been tested against Raspberry Pi 3B, 3B+, 4B and Pi400 by the FydeOS team. It **will not work** on an earlier version of the Raspberry Pi line-up.
+These overlays and the document have been tested against Raspberry Pi 3B, 3B+, 4B and Pi400 by the FydeOS team. It **will not work** on an earlier version of the Raspberry Pi line-up.
 
 ### Goal of this project
 
@@ -151,7 +151,7 @@ Shell Commands are shown with different labels to indicate whether they apply to
 * An x86_64 system to perform the build. 64-bit hardware and OS are a must. The Chromium OS is a very large project, building from the source from scratch usually takes hours to over 10 hours, depending on the system configuration.
   * CPU: we recommend using a 4-core or higher processor. The Chromium OS build process runs in parallel so more cores can help shorten build time dramatically.
 
-  * Memory: we recommend at least 16GB, plus enough swap space because for this project you will need to build Chromium from source code. Linking Chromium required between 8GB and 28GB of RAM as of March 2017, so you will run into massive swapping or OOM if you have less memory. However, if you are not building your copy of Chromium, the RAM requirements will be substantially lower at a cost of losing some of the key features provided by this project.
+  * Memory: we recommend at least 16GB, plus enough swap space because for this project you will need to build Chromium from source code. Linking Chromium required between 8GB and 28GB of RAM as of March 2017, so you will run into massive swapping or OOM if you have less memory. However, if you are not building your copy of Chromium, the RAM requirements will be substantially lower at the cost of losing some of the key features provided by this project.
 
   * Disk: at least 100GB of free space, 200GB or more is recommended. SSD could noticeably shorten the build time as there are many gigabytes of files that need to be written to and read from the disk.
 
