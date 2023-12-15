@@ -98,7 +98,7 @@ The next question gives detailed differences between these confusing terms.
 
 # Introduction
 
-This document describes how to build and run Google [Chromium OS](https://www.chromium.org/chromium-os) on Raspberry Pi 4B， Pi 400 personal computer kit(Pi400 hereafter) and the latest Raspberry Pi 5 released in 2023, from its source code and the board overlay hosted in this repository.
+This document describes how to build and run Google [Chromium OS](https://www.chromium.org/chromium-os) on Raspberry Pi 4B, Pi 400 personal computer kit (Pi400 hereafter) and the latest Raspberry Pi 5, from its source code and the board overlay hosted in this repository. Earlier models such as Raspberry Pi 3B and 3B+ were supported in earlier releases, but we have decided to drop support because of hardware performance limitations. 
 
 These overlays and the document have been tested against Raspberry Pi 3B, 3B+, 4B and Pi400 by the FydeOS team. It **will not work** on an earlier version of the Raspberry Pi line-up.
 
