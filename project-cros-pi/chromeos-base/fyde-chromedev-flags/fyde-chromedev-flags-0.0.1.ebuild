@@ -19,4 +19,5 @@ src_prepare() {
     if use kiosk_demo; then
       CHROME_DEV_FLAGS="${CHROME_DEV_FLAGS} --force-kiosk-mode"
     fi
+    default
 }
