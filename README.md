@@ -178,13 +178,13 @@ Git and curl as the essential tools that need to be installed in the host OS, yo
 (outside)
 sudo apt-get install git-core gitk git-gui curl lvm2 thin-provisioning-tools \
      python-pkg-resources python-virtualenv python-oauth2client xz-utils \
-     python3.6
+     python3.9
 
-# If Python 3.5 is the default, switch it to Python 3.6.
+# If Python 3.5 is the default, switch it to Python 3.9.
 python3 --version
 # If above version says 3.5, you'll need to run:
 sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.5 1
-sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.6 2
+sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.9 2
 sudo update-alternatives --config python3
 ```
 
