@@ -246,7 +246,7 @@ If you are building a different release, make sure you use the actual directory 
 
 First, you need to find out the reference name of the release you would like to build, by visiting this page [https://chromium.googlesource.com/chromiumos/manifest.git](https://chromium.googlesource.com/chromiumos/manifest.git):
 
-You will see a list of Git commit IDs and its name in the form of `refs/heads/release-Rxx-xxxx.B`. That `release-Rxx-XXXX.B` link is what you need for fetching the code of that specific Chromium OS release. For example, [release-R102-14695.B](https://chromium.googlesource.com/chromiumos/manifest.git/+/refs/heads/release-R102-14695.B) for release r102.
+You will see a list of Git commit IDs and its name in the form of `refs/heads/release-Rxx-xxxx.B`. That `release-Rxx-XXXX.B` link is what you need for fetching the code of that specific Chromium OS release. For example, [release-R102-14695.B](https://chromium.googlesource.com/chromiumos/manifest.git/+/refs/heads/release-R114-15437.B) for release r114.
 
 Now run these commands to fetch the source code. Find and use a different release name if you would like to build a different release.
 
@@ -255,7 +255,7 @@ Now run these commands to fetch the source code. Find and use a different releas
 #Assuming you understand what /path/to means. If not, replace it with '~'
 $ cd /path/to/cros-pi
 
-$ repo init -u https://chromium.googlesource.com/chromiumos/manifest.git --repo-url https://chromium.googlesource.com/external/repo.git -b release-R102-14695.B
+$ repo init -u https://chromium.googlesource.com/chromiumos/manifest.git --repo-url https://chromium.googlesource.com/external/repo.git -b release-R114-15437.B
 
 # Raise this number if you have a fast internet connection
 $ repo sync -j8
@@ -266,6 +266,8 @@ Fetching Chromium OS source code may take 20 to more than 40 minutes depending o
 
 
 ### Request for Google API key
+
+If you don't need to compile your modified version of Chromium, you can skip this step.
 
 If you would like to login into the Chromium OS GUI by using your Google account, you will need to request for Google API key and include them in the disk image you build. Since the only authentication mechanism included in Chromium OS is Google ID, you probably will need this or you will only be able to log in as a guest user.
 
@@ -308,6 +310,8 @@ By now, your `cros-pi/src/overlays` directory should have included symbolic link
 
 # Setup local chromium source
 
+If you don't need to compile your modified version of Chromium, you can skip this step.
+
 It's recommended to build Chromium browser on your local setup so that your Chromium OS for Raspberry Pi could benefit from the additional functionalities like kiosk mode, you will also have the option to incorporate your modifications. If you wish to do so, you need to prepare the necessary files before entering the cros_sdk.
 
 As far as this project is concerned, the chromium source that we use to build our releases can be found in the [chromium-raspberry_pi](https://github.com/FydeOS/chromium-raspberry_pi) project. You may also choose to use Google's vanilla chromium repository which can be found [here](https://chromium.googlesource.com/chromium/src.git/).
@@ -330,9 +334,6 @@ Now clone the desired chromium project:
 
 ```bash
 (outside)
-# use our chromium repo
-$ git clone git@github.com:FydeOS/chromium-raspberry_pi.git .
-
 # use google's vanilla chromium
 $ git clone https://chromium.googlesource.com/chromium/src.git . 
 ```
@@ -343,11 +344,8 @@ Then choose the correct branch/tag
 
 ```bash
 (outside)
-#with our chromium repo
-$ git checkout chromium-m102
-
 #with Google's repo and you wish to build for r102
-$ git checkout 102.0.5005.90
+$ git checkout 114.0.5735.337
 ```
 
 Now you need to create a config file known to gclient for syncing the chromium dependencies:
@@ -426,7 +424,7 @@ It may take 10 to over 30 minutes depending on your internet connection speed an
 
 ```
 (inside)
-(release-R102-14695.B/(xxxxxx...)) <user>@<host> ~/trunk/src/scripts $
+(release-R114-15437.B/(xxxxxx...)) <user>@<host> ~/trunk/src/scripts $
 ```
 
 The chroot environment is located under the `/path/to/cros-pi/chroot` directory.
@@ -546,8 +544,14 @@ Now it is time to build all software packages for the rpi4 board.
 
 ```bash
 (inside)
-$ ./build_packages --board=rpi4 --nowithautotest 
-# Append "--nowithautotest" to speed up the build process by skipping some tests
+build_packages --board=rpi4 --no-withautotest
+# Append "--no-withautotest" to speed up the build process by skipping some tests
+```
+If you wish to build your chromium, please append the `--no-use-any-chrome` argument to the build_packages command.
+
+```
+（inside)
+build_packages --board=rpi4 --no-withautotest --no-use-any-chrome
 ```
 
 It may take hours depending on your processor power, your memory size, your disk speed and the quality of your internet connection. Here are some examples for you to adjust your expectation: 
@@ -588,7 +592,7 @@ After the build_packages command is finished successfully, you can start buildin
 
 ```bash
 (inside)
-$ ./build_image --board=rpi4 --noenable_rootfs_verification
+$ build_image --board=rpi4 --noenable_rootfs_verification
 # Append --noenable_rootfs_verification flag to enable root file system read/write on the built image
 ```
 
