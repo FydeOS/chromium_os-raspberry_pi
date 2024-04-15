@@ -1,0 +1,24 @@
+# Metadata information for this directory.
+#
+# For more information on DIR_METADATA files, see:
+#   https://source.chromium.org/chromium/infra/infra/+/HEAD:go/src/infra/tools/dirmd/README.md
+#
+# For the schema of this file, see Metadata message:
+#   https://source.chromium.org/chromium/infra/infra/+/HEAD:go/src/infra/tools/dirmd/proto/dir_metadata.proto
+
+buganizer {
+  component_id: 885255  # ChromeOS > Platform > Graphics
+}
+team_email: "chromeos-gfx@google.com"
+
+chromeos {
+  cq {
+    source_test_plans {
+      test_plan_starlark_files {
+        host: "chrome-internal.googlesource.com"
+        project: "chromeos/config-internal"
+        path: "test/plans/v2/ctpv1_compatible/borealis.star"
+      }
+    }
+  }
+}

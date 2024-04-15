@@ -16,7 +16,7 @@ CROS_WORKON_MANUAL_UPREV=1
 EGIT_MASTER="rpi-5.15.y"
 
 # This must be inherited *after* EGIT/CROS_WORKON variables defined
-inherit cros-workon cros-kernel2
+inherit cros-workon cros-kernel
 
 HOMEPAGE="https://www.chromium.org/chromium-os/chromiumos-design-docs/chromium-os-kernel"
 DESCRIPTION="Chromium OS Linux kernel 5.15"

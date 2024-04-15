@@ -1,0 +1,13 @@
+Index: src/gpu/command_buffer/service/shared_image/ozone_image_backing_factory.cc
+===================================================================
+--- src.orig/gpu/command_buffer/service/shared_image/ozone_image_backing_factory.cc
++++ src/gpu/command_buffer/service/shared_image/ozone_image_backing_factory.cc
+@@ -325,7 +325,7 @@ bool OzoneImageBackingFactory::IsSupport
+       return false;
+     }
+ 
+-    if (used_by_gl && !gl::GLFence::IsGpuFenceSupported()) {
++    if (used_by_gl && !gl::GLFence::IsGpuFenceSupported() && !used_by_webgpu) {
+       return false;
+     }
+ 

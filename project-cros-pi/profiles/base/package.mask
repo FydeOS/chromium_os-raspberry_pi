@@ -1,3 +1,0 @@
-chromeos-base/vpd::chromiumos
-chromeos-base/vpd::patches
-chromeos-base/vpd::openfyde-patches

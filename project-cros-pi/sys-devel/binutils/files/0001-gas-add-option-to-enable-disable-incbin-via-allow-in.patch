@@ -1,0 +1,137 @@
+From 85ca492d25bab039e715b5de064eec487fd9b3f5 Mon Sep 17 00:00:00 2001
+From: Rahul Chaudhry <rahulchaudhry@google.com>
+Date: Thu, 16 Mar 2017 11:11:21 -0700
+Subject: [PATCH 01/14] gas: add option to enable/disable incbin via
+ --allow-incbin.
+
+This change is forward-port of google cl/80426738 and cl/80451836
+to binutils-2.35.1 branch with c/273909 squashed into it.
+
+[Adrian Ratiu: rebased from v2.27 to v2.39]
+
+Change-Id: I5dcfc2f3141cbe3db5de31a819ed49ab8ad8968c
+---
+ gas/as.c                            | 17 ++++++++++++++++-
+ gas/as.h                            |  3 +++
+ gas/doc/as.texi                     |  2 ++
+ gas/read.c                          |  6 ++++++
+ gas/testsuite/gas/aarch64/mapmisc.d |  2 +-
+ gas/testsuite/gas/all/incbin.d      |  2 +-
+ 6 files changed, 29 insertions(+), 3 deletions(-)
+
+diff --git a/gas/as.c b/gas/as.c
+index 0262a6fec98..56e6976ca0d 100644
+--- a/gas/as.c
++++ b/gas/as.c
+@@ -112,6 +112,9 @@
+ bool flag_generate_build_notes = DEFAULT_GENERATE_BUILD_NOTES;
+ #endif
+ 
++/* Enable incbin directive. */
++int allow_incbin_directive = 1;
++
+ segT reg_section;
+ segT expr_section;
+ segT text_section;
+@@ -508,7 +508,9 @@
+       OPTION_NOCOMPRESS_DEBUG,
+       OPTION_NO_PAD_SECTIONS,
+       OPTION_MULTIBYTE_HANDLING,  /* = STD_BASE + 40 */
+-      OPTION_SFRAME
++      OPTION_SFRAME,
++      OPTION_ALLOW_INCBIN,
++      OPTION_NOALLOW_INCBIN
+     /* When you add options here, check that they do
+        not collide with OPTION_MD_BASE.  See as.h.  */
+     };
+@@ -524,6 +529,8 @@ parse_args (int * pargc, char *** pargv)
+     ,{"al", optional_argument, NULL, OPTION_AL}
+     ,{"compress-debug-sections", optional_argument, NULL, OPTION_COMPRESS_DEBUG}
+     ,{"nocompress-debug-sections", no_argument, NULL, OPTION_NOCOMPRESS_DEBUG}
++    ,{"allow-incbin", optional_argument, NULL, OPTION_ALLOW_INCBIN}
++    ,{"noallow-incbin", optional_argument, NULL, OPTION_NOALLOW_INCBIN}
+     ,{"debug-prefix-map", required_argument, NULL, OPTION_DEBUG_PREFIX_MAP}
+     ,{"defsym", required_argument, NULL, OPTION_DEFSYM}
+     ,{"dump-config", no_argument, NULL, OPTION_DUMPCONFIG}
+@@ -765,6 +772,14 @@ This program has absolutely no warranty.\n"));
+ 	  flag_compress_debug = COMPRESS_DEBUG_NONE;
+ 	  break;
+ 
++	case OPTION_ALLOW_INCBIN:
++	  allow_incbin_directive = 1;
++	  break;
++
++	case OPTION_NOALLOW_INCBIN:
++	  allow_incbin_directive = 0;
++	  break;
++
+ 	case OPTION_DEBUG_PREFIX_MAP:
+ 	  add_debug_prefix_map (optarg);
+ 	  break;
+diff --git a/gas/as.h b/gas/as.h
+index 58b93bbc9be..c31da3adfdb 100644
+--- a/gas/as.h
++++ b/gas/as.h
+@@ -387,6 +387,9 @@ extern int verbose;
+ 
+ struct obstack;
+ 
++/* Enable incbin directive. */
++extern int allow_incbin_directive;
++
+ /* Obstack chunk size.  Keep large for efficient space use, make small to
+    increase malloc calls for monitoring memory allocation.  */
+ extern int chunksize;
+diff --git a/gas/doc/as.texi b/gas/doc/as.texi
+index 09b0ca5f565..95a81f851a7 100644
+--- a/gas/doc/as.texi
++++ b/gas/doc/as.texi
+@@ -5682,6 +5682,8 @@ following section of code if the two strings are not the same.
+ 
+ @cindex @code{incbin} directive
+ @cindex binary files, including
++The @code{incbin} directive can be used with @option{--allow-incbin}.
++
+ The @code{incbin} directive includes @var{file} verbatim at the current
+ location. You can control the search paths used with the @samp{-I} command-line
+ option (@pxref{Invoking,,Command-Line Options}).  Quotation marks are required
+diff --git a/gas/read.c b/gas/read.c
+index c6ce0345892..db1415b9100 100644
+--- a/gas/read.c
++++ b/gas/read.c
+@@ -5773,6 +5773,12 @@ s_incbin (int x ATTRIBUTE_UNUSED)
+   long   bytes;
+   int    len;
+ 
++  if (! allow_incbin_directive)
++    {
++      as_fatal (_("\'.incbin\' directive not allowed, use --allow-incbin flag"
++                  " to enable."));
++    }
++
+ #ifdef md_flush_pending_output
+   md_flush_pending_output ();
+ #endif
+diff --git a/gas/testsuite/gas/aarch64/mapmisc.d b/gas/testsuite/gas/aarch64/mapmisc.d
+index 1f2df6ea0d7..e0744f97bf7 100644
+--- a/gas/testsuite/gas/aarch64/mapmisc.d
++++ b/gas/testsuite/gas/aarch64/mapmisc.d
+@@ -1,4 +1,4 @@
+-#as: -EL -I$srcdir/$subdir --generate-missing-build-notes=no
++#as: -EL -I$srcdir/$subdir --generate-missing-build-notes=no --allow-incbin
+ #objdump: --syms --special-syms -d
+ #name: AArch64 Mapping Symbols for miscellaneous directives
+ #source: mapmisc.s
+diff --git a/gas/testsuite/gas/all/incbin.d b/gas/testsuite/gas/all/incbin.d
+index 62f6ae78103..e3b61630ada 100644
+--- a/gas/testsuite/gas/all/incbin.d
++++ b/gas/testsuite/gas/all/incbin.d
+@@ -1,4 +1,4 @@
+-#as: -I$srcdir/$subdir
++#as: -I$srcdir/$subdir --allow-incbin
+ #objdump: -s -j .text
+ #name: incbin
+ 
+-- 
+2.41.0
+

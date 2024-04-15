@@ -1,0 +1,50 @@
+From cd8adc4c58026678864af30a8fc00f306bd36f29 Mon Sep 17 00:00:00 2001
+From: Adrian Ratiu <adrian.ratiu@collabora.com>
+Date: Tue, 12 Jan 2021 00:46:33 +0200
+Subject: [PATCH 07/14] gold: dwp: fix null dereference on executable with no
+ refs
+
+A logic error on input validation causes an empty "files" list to
+be accepted when DWP is called with only an executable without dwo
+references, further causing the "dwo_files" vector creation loop
+to no-op then output_file.finalize() to segfault because this->fd_
+is NULL.
+
+Fix the input validation and also add an assertion in finalize().
+
+[Adrian Ratiu: rebased from v2.27 to v2.39]
+---
+ gold/dwp.cc | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/gold/dwp.cc b/gold/dwp.cc
+index 9f03cee8050..fe84f7b64b6 100644
+--- a/gold/dwp.cc
++++ b/gold/dwp.cc
+@@ -2025,6 +2025,8 @@ Dwp_output_file::finalize()
+ {
+   unsigned char* buf;
+ 
++  gold_assert(this->fd_ != NULL);
++
+   // Write the accumulated output sections.
+   for (unsigned int i = 0; i < this->sections_.size(); i++)
+     {
+@@ -2670,8 +2672,12 @@ main(int argc, char** argv)
+   for (int i = optind; i < argc; ++i)
+     files.push_back(Dwo_file_entry(0, argv[i]));
+ 
+-  if (exe_filename == NULL && files.empty())
+-    gold_fatal(_("no input files and no executable specified"));
++  if (files.empty())
++    if (exe_filename == NULL)
++	    gold_fatal(_("no input files were specified"));
++    else
++	    gold_fatal(_("specified exe '%s' has no .dwo refs"),
++			 exe_filename);
+ 
+   if (verify_only)
+     {
+-- 
+2.41.0
+

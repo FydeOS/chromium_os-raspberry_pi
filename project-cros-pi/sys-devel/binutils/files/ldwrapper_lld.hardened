@@ -1,0 +1,10 @@
+#!/bin/sh
+# Copyright 2019 The ChromiumOS Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# This files wraps lld.
+# Enable smallpie, now, relro and hash-style=gnu to match gold wrapper.
+# Enable norosegment to match gold wrapper, for symbolization. b/140622025
+# Pass --undefined-version (b/263147806).
+exec "$(dirname "$(readlink -f "$0")")"/ld.lld --pack-dyn-relocs=relr -z now -z relro --no-rosegment --undefined-version --hash-style=gnu -z nostart-stop-gc "$@"

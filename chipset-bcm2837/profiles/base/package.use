@@ -1,2 +1,2 @@
-sys-kernel/raspberry-kernel apply_patches -clang -lld -llvm_ias -llvm
+sys-kernel/raspberry-kernel clang lld llvm_ias -dt_compression
 >=sys-kernel/raspberry-kernel-9999 -apply_patches

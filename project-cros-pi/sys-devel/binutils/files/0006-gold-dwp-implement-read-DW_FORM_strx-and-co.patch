@@ -1,0 +1,343 @@
+From 3c1e524d433abaef16b84f1d8f03c995116327b7 Mon Sep 17 00:00:00 2001
+From: Caroline Tice <cmtice@google.com>
+Date: Fri, 18 Dec 2020 00:59:16 -0800
+Subject: [PATCH 06/14] gold: dwp: implement read DW_FORM_strx and co
+
+Apply additional patch by David Blaikie to update the gold dwp tool
+to handle DWARF v5.  This patch teaches dwp to read DW_FORM_strx (and
+its variations), so it can read and use the str_offsets_base value to
+read the .dwo file names out of the compilation unit DIEs.
+
+(see https://critique-ng.corp.google.com/cl/348045503 for original patch)
+(also see https://critique-ng.corp.google.com/cl/350363411)
+
+This patch created for Chrome OS by Caroline Tice.
+Date: 17-Dec-2020
+[Adrian Ratiu: rebased from v2.27 to v2.39]
+[Adrian Ratiu: regenerated as proper git format-patch.]
+
+Change-Id: I3bf5924bcd650123914297443323a9eb140f9272
+---
+ elfcpp/elfcpp_swap.h | 47 +++++++++++++++++++++++++
+ gold/dwarf_reader.cc | 81 +++++++++++++++++++++++++++++++++++++++++++-
+ gold/dwarf_reader.h  | 54 +++++++++++++++++++++++++++--
+ 3 files changed, 178 insertions(+), 4 deletions(-)
+
+diff --git a/elfcpp/elfcpp_swap.h b/elfcpp/elfcpp_swap.h
+index 2d1087a2578..a2ebaf9800d 100644
+--- a/elfcpp/elfcpp_swap.h
++++ b/elfcpp/elfcpp_swap.h
+@@ -131,6 +131,13 @@ struct Valtype_base<16>
+   typedef int16_t Signed_valtype;
+ };
+ 
++template<>
++struct Valtype_base<24>
++{
++  typedef uint32_t Valtype;
++  typedef int32_t Signed_valtype;
++};
++
+ template<>
+ struct Valtype_base<32>
+ {
+@@ -330,6 +337,46 @@ struct Swap_unaligned<16, true>
+   }
+ };
+ 
++template<>
++struct Swap_unaligned<24, false>
++{
++  typedef Valtype_base<24>::Valtype Valtype;
++
++  static inline Valtype
++  readval(const unsigned char* wv)
++  {
++    return (wv[2] << 16) | (wv[1] << 8) | wv[0];
++  }
++
++  static inline void
++  writeval(unsigned char* wv, Valtype v)
++  {
++    wv[0] = v >> 16;
++    wv[1] = v >> 8;
++    wv[2] = v;
++  }
++};
++
++template<>
++struct Swap_unaligned<24, true>
++{
++  typedef Valtype_base<24>::Valtype Valtype;
++
++  static inline Valtype
++  readval(const unsigned char* wv)
++  {
++    return (wv[0] << 16) | (wv[1] << 8) | wv[2];
++  }
++
++  static inline void
++  writeval(unsigned char* wv, Valtype v)
++  {
++    wv[0] = v >> 16;
++    wv[1] = v >> 8;
++    wv[2] = v;
++  }
++};
++
+ template<>
+ struct Swap_unaligned<32, false>
+ {
+diff --git a/gold/dwarf_reader.cc b/gold/dwarf_reader.cc
+index d6af5392791..c64dce474fd 100644
+--- a/gold/dwarf_reader.cc
++++ b/gold/dwarf_reader.cc
+@@ -34,6 +34,7 @@
+ #include "dwarf_reader.h"
+ #include "int_encoding.h"
+ #include "compressed_output.h"
++#include "../elfcpp/dwarf.h"
+ 
+ namespace gold {
+ 
+@@ -787,7 +788,7 @@ Dwarf_die::Dwarf_die(
+     child_offset_(0), sibling_offset_(0), abbrev_code_(NULL), attributes_(),
+     attributes_read_(false), name_(NULL), name_off_(-1), linkage_name_(NULL),
+     linkage_name_off_(-1), string_shndx_(0), specification_(0),
+-    abstract_origin_(0)
++    abstract_origin_(0), string_offsets_base_(0)
+ {
+   size_t len;
+   const unsigned char* pdie = dwinfo->buffer_at_offset(die_offset);
+@@ -1102,6 +1103,10 @@ Dwarf_die::read_attributes()
+ 	    if (ref_form)
+ 	      this->abstract_origin_ = attr_value.val.refval;
+ 	    break;
++	  case elfcpp::DW_AT_str_offsets_base:
++	    if (ref_form)
++	      this->string_offsets_base_ = attr_value.val.refval;
++	    break;
+ 	  case elfcpp::DW_AT_sibling:
+ 	    if (ref_form && attr_value.aux.shndx == 0)
+ 	      this->sibling_offset_ = attr_value.val.refval;
+@@ -1294,6 +1299,16 @@ Dwarf_die::string_attribute(unsigned int attr)
+     return NULL;
+   switch (attr_val->form)
+     {
++      case elfcpp::DW_FORM_strx:
++      case elfcpp::DW_FORM_strx1:
++      case elfcpp::DW_FORM_strx2:
++      case elfcpp::DW_FORM_strx3:
++      case elfcpp::DW_FORM_strx4:
++        {
++          unsigned int index = attr_val->val.uintval;
++          off_t offset = this->dwinfo_->get_string_offset(index, 0);
++          return this->dwinfo_->get_string(offset, 0);
++        }
+       case elfcpp::DW_FORM_string:
+         return attr_val->val.stringval;
+       case elfcpp::DW_FORM_strp:
+@@ -1599,6 +1614,7 @@ Dwarf_info_reader::do_parse()
+ 			 NULL);
+       if (root_die.tag() != 0)
+ 	{
++          this->string_offsets_base_ = root_die.string_offsets_base();
+ 	  // Visit the CU or TU.
+ 	  if (this->is_type_unit())
+ 	    this->visit_type_unit(section_offset + this->cu_offset_,
+@@ -1665,6 +1681,48 @@ Dwarf_info_reader::do_read_string_table(unsigned int string_shndx)
+   return true;
+ }
+ 
++
++// Read the string offsets table
++bool
++Dwarf_info_reader::do_read_string_offsets_table(unsigned int string_offsets_shndx)
++{
++  Relobj* object = this->object_;
++
++  if (string_offsets_shndx == 0)
++    {
++      for (unsigned int i = 1; i < this->object_->shnum(); ++i)
++	{
++	  std::string name = object->section_name(i);
++	  if (name == ".debug_str_offsets" || name == ".zdebug_str_offsets")
++	    {
++	      string_offsets_shndx = i;
++	      this->string_offsets_output_section_offset_ =
++		  object->output_section_offset(i);
++	      break;
++	    }
++	}
++      if (string_offsets_shndx == 0)
++	return false;
++    }
++
++  if (this->owns_string_offsets_buffer_ && this->string_offsets_buffer_ != NULL)
++    {
++      delete[] this->string_offsets_buffer_;
++      this->owns_string_offsets_buffer_ = false;
++    }
++
++  // Get the secton contents and decompress if necessary.
++  section_size_type buffer_size;
++  const unsigned char* buffer =
++      object->decompressed_section_contents(string_offsets_shndx,
++					    &buffer_size,
++					    &this->owns_string_offsets_buffer_);
++  this->string_offsets_buffer_ = buffer;
++  this->string_offsets_buffer_end_ = this->string_offsets_buffer_ + buffer_size;
++  this->string_offsets_shndx_ = string_offsets_shndx;
++  return true;
++}
++
+ // Read a possibly unaligned integer of SIZE.
+ template <int valsize>
+ inline typename elfcpp::Valtype_base<valsize>::Valtype
+@@ -1744,6 +1802,27 @@ Dwarf_info_reader::get_string(off_t str_off, unsigned int string_shndx)
+   return p;
+ }
+ 
++
++off_t //
++Dwarf_info_reader::get_string_offset(unsigned int index,
++    unsigned int string_offsets_shndx)
++{
++  if (!this->read_string_offsets_table(string_offsets_shndx))
++    return -1;
++
++  unsigned int offset_size = this->offset_size();
++
++  const unsigned char* offsets_start = this->string_offsets_buffer_ + this->string_offsets_base_;
++
++  if ((index + 1) * offset_size > (string_offsets_buffer_end_ - offsets_start))
++    return -1;
++
++  const unsigned char* offset = offsets_start + index * offset_size;
++
++  return offset_size == 4 ? this->read_from_pointer<32>(offset)
++                          : this->read_from_pointer<64>(offset);
++}
++
+ // The following are default, do-nothing, implementations of the
+ // hook methods normally provided by a derived class.  We provide
+ // default implementations rather than no implementation so that
+diff --git a/gold/dwarf_reader.h b/gold/dwarf_reader.h
+index 2cdfd83d8ea..58d9eb8c2fb 100644
+--- a/gold/dwarf_reader.h
++++ b/gold/dwarf_reader.h
+@@ -577,6 +577,15 @@ class Dwarf_die
+     return this->abstract_origin_;
+   }
+ 
++  // Return the value of the DW_AT_str_offsets_base attribute.
++  off_t
++  string_offsets_base()
++  {
++    if (!this->string_offsets_base_)
++      this->read_attributes();
++    return this->string_offsets_base_;
++  }
++
+   // Return the value of attribute ATTR as a string.
+   const char*
+   string_attribute(unsigned int attr);
+@@ -684,6 +693,8 @@ class Dwarf_die
+   off_t specification_;
+   // The value of a DW_AT_abstract_origin attribute.
+   off_t abstract_origin_;
++  // The value of DW_AT_str_offsets_base attribute.
++  off_t string_offsets_base_;
+ };
+ 
+ // This class is used to read the debug info from the .debug_info
+@@ -711,11 +722,13 @@ class Dwarf_info_reader
+     : object_(object), symtab_(symtab),
+       symtab_size_(symtab_size), shndx_(shndx), reloc_shndx_(reloc_shndx),
+       reloc_type_(reloc_type), abbrev_shndx_(0), string_shndx_(0),
+-      buffer_(NULL), buffer_end_(NULL), cu_offset_(0), cu_length_(0),
+-      offset_size_(0), address_size_(0), cu_version_(0),
++      string_offsets_shndx_(0), buffer_(NULL), buffer_end_(NULL), cu_offset_(0),
++      cu_length_(0), offset_size_(0), address_size_(0), cu_version_(0),
+       abbrev_table_(), ranges_table_(this),
+       reloc_mapper_(NULL), string_buffer_(NULL), string_buffer_end_(NULL),
+-      owns_string_buffer_(false), string_output_section_offset_(0)
++      owns_string_buffer_(false), string_output_section_offset_(0),
++      string_offsets_buffer_(NULL), string_offsets_buffer_end_(NULL),
++      owns_string_offsets_buffer_(false), string_offsets_output_section_offset_(0)
+   {
+     // For DWARF 4, we infer the unit type from the section name.
+     // For DWARF 5, we will read this from the unit header.
+@@ -730,6 +743,8 @@ class Dwarf_info_reader
+       delete this->reloc_mapper_;
+     if (this->owns_string_buffer_ && this->string_buffer_ != NULL)
+       delete[] this->string_buffer_;
++    if (this->owns_string_offsets_buffer_ && this->string_offsets_buffer_ != NULL)
++      delete[] this->string_offsets_buffer_;
+   }
+ 
+   bool
+@@ -782,6 +797,10 @@ class Dwarf_info_reader
+   const char*
+   get_string(off_t str_off, unsigned int string_shndx);
+ 
++  // Return a string index from the DWARF string offsets table..
++  off_t
++  get_string_offset(unsigned int index, unsigned int string_offsets_shndx);
++
+   // Return the size of a DWARF offset.
+   unsigned int
+   offset_size() const
+@@ -916,6 +935,23 @@ class Dwarf_info_reader
+ 
+   // The unit type (DW_UT_xxx).
+   unsigned int unit_type_;
++
++  // Read the DWARF string table.
++  bool
++  read_string_offsets_table(unsigned int string_offsets_shndx)
++  {
++    // If we've already read this string table, return immediately.
++    if (this->string_offsets_shndx_ > 0 &&
++	this->string_offsets_shndx_ == string_offsets_shndx)
++      return true;
++    if (string_offsets_shndx == 0 && this->string_offsets_shndx_ > 0)
++      return true;
++    return this->do_read_string_offsets_table(string_offsets_shndx);
++  }
++
++  bool
++  do_read_string_offsets_table(unsigned int string_shndx);
++
+   // The object containing the .debug_info or .debug_types input section.
+   Relobj* object_;
+   // The ELF symbol table.
+@@ -932,6 +968,8 @@ class Dwarf_info_reader
+   unsigned int abbrev_shndx_;
+   // Index of the .debug_str section.
+   unsigned int string_shndx_;
++ // Index of the .debug_str_offsets section.
++  unsigned int string_offsets_shndx_;
+   // The buffer for the debug info.
+   const unsigned char* buffer_;
+   const unsigned char* buffer_end_;
+@@ -961,6 +999,16 @@ class Dwarf_info_reader
+   // from relocated data will be relative to the output section, and need
+   // to be corrected before reading data from the input section.
+   uint64_t string_output_section_offset_;
++  const unsigned char* string_offsets_buffer_;
++  const unsigned char* string_offsets_buffer_end_;
++  unsigned int string_offsets_base_;
++  // True if this object owns the buffer and needs to delete it.
++  bool owns_string_offsets_buffer_;
++  // For incremental update links, this will hold the offset of the
++  // input .debug_str section within the output section.  Offsets read
++  // from relocated data will be relative to the output section, and need
++  // to be corrected before reading data from the input section.
++  uint64_t string_offsets_output_section_offset_;
+ };
+ 
+ // We can't do better than to keep the offsets in a sorted vector.
+-- 
+2.41.0
+

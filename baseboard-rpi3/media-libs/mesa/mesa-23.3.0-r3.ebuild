@@ -34,7 +34,6 @@ RDEPEND="${COMMON_DEPEND}
 "
 
 DEPEND="${COMMON_DEPEND}
-  >=dev-libs/wayland-protocols-1.8
 	perfetto? ( >=chromeos-base/perfetto-29.0 )
 "
 
@@ -62,7 +61,7 @@ src_configure() {
 		-Dgallium-xa=disabled
 		-Dperfetto=$(usex perfetto true false)
 		$(meson_feature zstd)
-		-Dplatforms=wayland
+		-Dplatforms=
 		-Dtools=
 		--buildtype $(usex debug debug release)
 		-Dvulkan-drivers=$(usex vulkan broadcom '')

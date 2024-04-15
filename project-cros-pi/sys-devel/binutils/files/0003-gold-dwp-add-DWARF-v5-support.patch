@@ -1,0 +1,1019 @@
+From d34d44fe41559b9b96425349f6c98ae4f01e2211 Mon Sep 17 00:00:00 2001
+From: Caroline Tice <cmtice@google.com>
+Date: Fri, 20 Nov 2020 11:05:19 -0800
+Subject: [PATCH 03/14] gold: dwp: add DWARF v5 support
+
+Apply basic patch by David Blaikie to update gold dwp tool to handle
+DWARF v5. This is the first of three patches for DWARF v5.
+
+This does the main work of updating dwp to handle DWARF v5.
+
+This patch created for Chrome OS by Caroline Tice.
+Date: 19-Nov-2020
+[Adrian Ratiu: rebased from v2.27 to v2.39]
+[Adrian Ratiu: regenerated as proper git format-patch.]
+
+Change-Id: I6e12e87747d0a005d8897eefd9639b50265e12d2
+---
+ binutils/dwarf.c     |  14 +-
+ elfcpp/dwarf.h       |  10 +-
+ gold/dwarf_reader.cc |  32 ++--
+ gold/dwarf_reader.h  |   7 +-
+ gold/dwp.cc          | 422 +++++++++++++++++++++++++++++++++----------
+ gold/gdb-index.cc    |   4 +-
+ include/dwarf2.h     |  41 ++---
+ 7 files changed, 385 insertions(+), 145 deletions(-)
+
+diff --git a/binutils/dwarf.c b/binutils/dwarf.c
+index fa5447a05fb..29220b0f337 100644
+--- a/binutils/dwarf.c
++++ b/binutils/dwarf.c
+@@ -1782,7 +1782,7 @@ find_cu_tu_set_v2 (dwarf_vma cu_offset, int do_types)
+     {
+       p = tu_sets;
+       nsets = tu_count;
+-      dw_sect = DW_SECT_TYPES;
++      dw_sect = LEGACY_DW_SECT_TYPES;
+     }
+   else
+     {
+@@ -2896,7 +2896,7 @@ read_and_display_attr_value (unsigned long           attribute,
+ 	      if (form == DW_FORM_loclistx)
+ 		uvalue = fetch_indexed_value (num, loclists, debug_info_p->loclists_base);
+ 	      else if (this_set != NULL)
+-		uvalue += this_set->section_offsets [DW_SECT_LOC];
++		uvalue += this_set->section_offsets [LEGACY_DW_SECT_LOC];
+ 
+ 	      debug_info_p->have_frame_base [num] = have_frame_base;
+ 	      if (attribute != DW_AT_GNU_locviews)
+@@ -3882,7 +3882,7 @@
+ 	      printf (_("    .debug_line.dwo:         %#" PRIx64 "  %#zx\n"),
+ 		      offsets[DW_SECT_LINE], sizes[DW_SECT_LINE]);
+ 	      printf (_("    .debug_loc.dwo:          %#" PRIx64 "  %#zx\n"),
+-		      offsets[DW_SECT_LOC], sizes[DW_SECT_LOC]);
++		      offsets[LEGACY_DW_SECT_LOC], sizes[LEGACY_DW_SECT_LOC]);
+ 	      printf (_("    .debug_str_offsets.dwo:  %#" PRIx64 "  %#zx\n"),
+ 		      offsets[DW_SECT_STR_OFFSETS], sizes[DW_SECT_STR_OFFSETS]);
+ 	    }
+@@ -10748,17 +10748,17 @@ get_DW_SECT_short_name (unsigned int dw_sect)
+     {
+       case DW_SECT_INFO:
+ 	return "info";
+-      case DW_SECT_TYPES:
++      case LEGACY_DW_SECT_TYPES:
+ 	return "types";
+       case DW_SECT_ABBREV:
+ 	return "abbrev";
+       case DW_SECT_LINE:
+ 	return "line";
+-      case DW_SECT_LOC:
++      case LEGACY_DW_SECT_LOC:
+ 	return "loc";
+       case DW_SECT_STR_OFFSETS:
+ 	return "str_off";
+-      case DW_SECT_MACINFO:
++      case LEGACY_DW_SECT_MACINFO:
+ 	return "macinfo";
+       case DW_SECT_MACRO:
+ 	return "macro";
+diff --git a/elfcpp/dwarf.h b/elfcpp/dwarf.h
+index fde307cf0cc..c51a120f23d 100644
+--- a/elfcpp/dwarf.h
++++ b/elfcpp/dwarf.h
+@@ -287,13 +287,13 @@ enum DW_SECT
+   DW_SECT_LINE        = 4,
+   DW_SECT_LOCLISTS    = 5,
+   DW_SECT_STR_OFFSETS = 6,
+-  DW_SECT_MACINFO     = 7,
++  DW_SECT_MACRO       = 7, // was MACINFO pre-v5
+   DW_SECT_RNGLISTS    = 8,
+-  DW_SECT_MAX = DW_SECT_RNGLISTS,
+   // These were used only for the experimental Fission support in DWARF 4.
+-  DW_SECT_TYPES       = 2,
+-  DW_SECT_LOC         = 5,
+-  DW_SECT_MACRO       = 8
++  LEGACY_DW_SECT_TYPES = 20,
++  LEGACY_DW_SECT_LOC = 21,
++  LEGACY_DW_SECT_MACINFO = 22,
++  DW_SECT_MAX = LEGACY_DW_SECT_MACINFO
+ };
+ 
+ } // End namespace elfcpp.
+diff --git a/gold/dwarf_reader.cc b/gold/dwarf_reader.cc
+index bda47bef43d..d6af5392791 100644
+--- a/gold/dwarf_reader.cc
++++ b/gold/dwarf_reader.cc
+@@ -1533,9 +1533,11 @@ Dwarf_info_reader::do_parse()
+       if (this->cu_version_ >= 5)
+ 	{
+ 	  this->unit_type_ = *pinfo++;
++
+ 	  this->address_size_ = *pinfo++;
+ 	}
+ 
++      // For type units, read the two extra fields.
+       // Read debug_abbrev_offset (4 or 8 bytes).
+       if (this->offset_size_ == 4)
+ 	abbrev_offset = elfcpp::Swap_unaligned<32, big_endian>::readval(pinfo);
+@@ -1563,23 +1565,28 @@ Dwarf_info_reader::do_parse()
+       // For type units, read the two extra fields.
+       uint64_t signature = 0;
+       off_t type_offset = 0;
+-      if (this->is_type_unit())
++      if (this->is_type_unit() || this->cu_version_ >= 5)
+         {
+-	  if (!this->check_buffer(pinfo + 8 + this->offset_size_))
++	  if (!this->check_buffer(pinfo + 8))
+ 	    break;
+ 
+ 	  // Read type_signature (8 bytes).
+ 	  signature = elfcpp::Swap_unaligned<64, big_endian>::readval(pinfo);
+ 	  pinfo += 8;
+ 
+-	  // Read type_offset (4 or 8 bytes).
+-	  if (this->offset_size_ == 4)
+-	    type_offset =
+-		elfcpp::Swap_unaligned<32, big_endian>::readval(pinfo);
+-	  else
+-	    type_offset =
+-		elfcpp::Swap_unaligned<64, big_endian>::readval(pinfo);
+-	  pinfo += this->offset_size_;
++	  if (this->is_type_unit())
++	    {
++	      if (!this->check_buffer(pinfo + this->offset_size_))
++		break;
++	      // Read type_offset (4 or 8 bytes).
++	      if (this->offset_size_ == 4)
++		type_offset
++		  = elfcpp::Swap_unaligned<32, big_endian>::readval(pinfo);
++	      else
++		type_offset
++		  = elfcpp::Swap_unaligned<64, big_endian>::readval(pinfo);
++	      pinfo += this->offset_size_;
++	    }
+ 	}
+ 
+       // Read the .debug_abbrev table.
+@@ -1599,7 +1606,8 @@ Dwarf_info_reader::do_parse()
+ 				  &root_die);
+ 	  else
+ 	    this->visit_compilation_unit(section_offset + this->cu_offset_,
+-					 cu_end - cu_start, &root_die);
++					 cu_end - cu_start, signature,
++					 &root_die);
+ 	}
+ 
+       // Advance to the next CU.
+@@ -1745,7 +1753,7 @@ Dwarf_info_reader::get_string(off_t str_off, unsigned int string_shndx)
+ // Process a compilation unit and parse its child DIE.
+ 
+ void
+-Dwarf_info_reader::visit_compilation_unit(off_t, off_t, Dwarf_die*)
++Dwarf_info_reader::visit_compilation_unit(off_t, off_t, uint64_t, Dwarf_die*)
+ {
+ }
+ 
+diff --git a/gold/dwarf_reader.h b/gold/dwarf_reader.h
+index d758e868218..2cdfd83d8ea 100644
+--- a/gold/dwarf_reader.h
++++ b/gold/dwarf_reader.h
+@@ -799,6 +799,10 @@ class Dwarf_info_reader
+   ref_addr_size() const
+   { return this->cu_version_ > 2 ? this->offset_size_ : this->address_size_; }
+ 
++  unsigned int
++  cu_version() const
++  { return this->cu_version_; }
++
+   // Set the section index of the .debug_abbrev section.
+   // We use this if there are no relocations for the .debug_info section.
+   // If not set, the code parse() routine will search for the section by name.
+@@ -835,7 +839,8 @@ class Dwarf_info_reader
+ 
+   // Visit a compilation unit.
+   virtual void
+-  visit_compilation_unit(off_t cu_offset, off_t cu_length, Dwarf_die* root_die);
++  visit_compilation_unit(off_t cu_offset, off_t cu_length, uint64_t signature,
++			 Dwarf_die* root_die);
+ 
+   // Visit a type unit.
+   virtual void
+diff --git a/gold/dwp.cc b/gold/dwp.cc
+index c8e5895a359..f5af837bc21 100644
+--- a/gold/dwp.cc
++++ b/gold/dwp.cc
+@@ -22,6 +22,7 @@
+ 
+ #include "dwp.h"
+ 
++#include <cassert>
+ #include <cstdarg>
+ #include <cstddef>
+ #include <cstdio>
+@@ -31,6 +32,7 @@
+ 
+ #include <vector>
+ #include <algorithm>
++#include <functional>
+ 
+ #include "getopt.h"
+ #include "libiberty.h"
+@@ -129,6 +131,11 @@ class Dwo_file
+   bool
+   verify(const File_list& files);
+ 
++  void
++  remap_str_offsets(
++    unsigned int cu_version, unsigned int offset_size,
++    const std::vector<std::pair<unsigned char*, section_size_type> >& str_offs);
++
+  private:
+   // Types for mapping input string offsets to output string offsets.
+   typedef std::pair<section_offset_type, section_offset_type>
+@@ -204,16 +211,23 @@ class Dwo_file
+ 
+   // Copy a section from the input file to the output file.
+   Section_bounds
+-  copy_section(Dwp_output_file* output_file, unsigned int shndx,
+-	       elfcpp::DW_SECT section_id);
++  copy_section(
++    Dwp_output_file* output_file, unsigned int shndx,
++    elfcpp::DW_SECT section_id,
++    std::vector<std::pair<unsigned char*, section_size_type> >& str_offs);
+ 
+   // Remap the string offsets in the .debug_str_offsets.dwo section.
+-  const unsigned char*
+-  remap_str_offsets(const unsigned char* contents, section_size_type len);
++  void
++  remap_str_offsets(unsigned char* contents, section_size_type len);
++
++  // void
++  //remap_str_offsets(
++  //  unsigned int cu_version, unsigned int offset_size,
++  //  const std::vector<std::pair<unsigned char*, section_size_type> >& str_offs);
+ 
+   template <bool big_endian>
+-  const unsigned char*
+-  sized_remap_str_offsets(const unsigned char* contents, section_size_type len);
++  void
++  sized_remap_str_offsets(unsigned char* contents, section_size_type len);
+ 
+   // Remap a single string offsets from an offset in the input string table
+   // to an offset in the output string table.
+@@ -452,7 +466,7 @@ class Dwp_output_file
+       abiversion_(0), fd_(NULL), next_file_offset_(0), shnum_(1), sections_(),
+       section_id_map_(), shoff_(0), shstrndx_(0), have_strings_(false),
+       stringpool_(), shstrtab_(), cu_index_(), tu_index_(), last_type_sig_(0),
+-      last_tu_slot_(0)
++      last_tu_slot_(0), index_version_(0)
+   {
+     this->section_id_map_.resize(elfcpp::DW_SECT_MAX + 1);
+     this->stringpool_.set_no_zero_null();
+@@ -484,6 +498,20 @@ class Dwp_output_file
+   void
+   add_tu_set(Unit_set* tu_set);
+ 
++  bool
++  update_index_version(unsigned int version)
++  {
++    // Translate the DWARF version to a Split DWARF index version.
++    if (version < 5)
++      version = 2;
++    if (version > 5)
++      gold_fatal(_("unsupported DWARF version"));
++    if (index_version_ != 0 && version != index_version_)
++      return false;
++    index_version_ = version;
++    return true;
++  }
++
+   // Finalize the file, write the string tables and index sections,
+   // and close the file.
+   void
+@@ -677,6 +705,7 @@ class Dwp_output_file
+   uint64_t last_type_sig_;
+   // Cache of the slot index for the last type signature.
+   unsigned int last_tu_slot_;
++  unsigned int index_version_;
+ };
+ 
+ // A specialization of Dwarf_info_reader, for reading dwo_names from
+@@ -704,22 +733,47 @@ class Dwo_name_info_reader : public Dwarf_info_reader
+  protected:
+   // Visit a compilation unit.
+   virtual void
+-  visit_compilation_unit(off_t cu_offset, off_t cu_length, Dwarf_die*);
++  visit_compilation_unit(off_t cu_offset, off_t cu_length, uint64_t signature,
++			 Dwarf_die*);
+ 
+  private:
+   // The list of files to populate.
+   File_list* files_;
+ };
+ 
++class remap_callback
++{
++  public:
++  
++  remap_callback(std::vector<std::pair<unsigned char*, section_size_type> > offsets, Dwo_file* dwo_file)
++    : str_offs_(offsets), dwo_file_(dwo_file)
++    { }
++  
++    void
++    run_remap(unsigned int cu_version, unsigned int offset_size)
++    {
++      dwo_file_->remap_str_offsets(cu_version, offset_size, str_offs_);
++    }
++  
++  virtual ~remap_callback()
++  { }
++
++  std::vector<std::pair<unsigned char*, section_size_type> > str_offs_;
++  Dwo_file *dwo_file_;
++};
++  
+ // A specialization of Dwarf_info_reader, for reading DWARF CUs and TUs
+ // and adding them to the output file.
+ 
+ class Unit_reader : public Dwarf_info_reader
+ {
+  public:
+-  Unit_reader(bool is_type_unit, Relobj* object, unsigned int shndx)
++  Unit_reader(bool is_type_unit, Relobj* object, unsigned int shndx,
++	      //    	      std::function<void(unsigned int, unsigned int)> remap_str_offsets)
++	          	      remap_callback* remap_str_offsets)
+     : Dwarf_info_reader(is_type_unit, object, NULL, 0, shndx, 0, 0),
+-      output_file_(NULL), sections_(NULL)
++      output_file_(NULL), sections_(NULL),
++      remap_str_offsets_(remap_str_offsets)
+   { }
+ 
+   ~Unit_reader()
+@@ -732,7 +786,8 @@ class Unit_reader : public Dwarf_info_reader
+  protected:
+   // Visit a compilation unit.
+   virtual void
+-  visit_compilation_unit(off_t cu_offset, off_t cu_length, Dwarf_die*);
++  visit_compilation_unit(off_t cu_offset, off_t cu_length, uint64_t signature,
++			 Dwarf_die*);
+ 
+   // Visit a type unit.
+   virtual void
+@@ -740,8 +795,13 @@ class Unit_reader : public Dwarf_info_reader
+ 		  uint64_t signature, Dwarf_die*);
+ 
+  private:
++  Unit_set*
++  make_unit(off_t cu_length, uint64_t signature);
++
+   Dwp_output_file* output_file_;
+   Section_bounds* sections_;
++  //std::function<void(unsigned int, unsigned int)> remap_str_offsets_;
++  remap_callback *remap_str_offsets_;
+ };
+ 
+ // Return the name of a DWARF .dwo section.
+@@ -750,15 +810,29 @@ static const char*
+ get_dwarf_section_name(elfcpp::DW_SECT section_id)
+ {
+   static const char* dwarf_section_names[] = {
+-    NULL, // unused
+-    ".debug_info.dwo",         // DW_SECT_INFO = 1
+-    ".debug_types.dwo",        // DW_SECT_TYPES = 2
+-    ".debug_abbrev.dwo",       // DW_SECT_ABBREV = 3
+-    ".debug_line.dwo",         // DW_SECT_LINE = 4
+-    ".debug_loc.dwo",          // DW_SECT_LOC = 5
+-    ".debug_str_offsets.dwo",  // DW_SECT_STR_OFFSETS = 6
+-    ".debug_macinfo.dwo",      // DW_SECT_MACINFO = 7
+-    ".debug_macro.dwo",        // DW_SECT_MACRO = 8
++    NULL,		      // unused
++    ".debug_info.dwo",	      // DW_SECT_INFO = 1
++    NULL,		      // unused
++    ".debug_abbrev.dwo",      // DW_SECT_ABBREV = 3
++    ".debug_line.dwo",	      // DW_SECT_LINE = 4
++    ".debug_loclists.dwo",    // DW_SECT_LOCLISTS = 5
++    ".debug_str_offsets.dwo", // DW_SECT_STR_OFFSETS = 6
++    ".debug_macro.dwo",	      // DW_SECT_MACRO = 7
++    ".debug_rnglists.dwo",    // DW_SECT_RNGLISTS = 8
++    NULL,		      // unused
++    NULL,		      // unused
++    NULL,		      // unused
++    NULL,		      // unused
++    NULL,		      // unused
++    NULL,		      // unused
++    NULL,		      // unused
++    NULL,		      // unused
++    NULL,		      // unused
++    NULL,		      // unused
++    NULL,		      // unused
++    ".debug_types.dwo",	      // LEGACY_DW_SECT_TYPES = 20
++    ".debug_loc.dwo",	      // LEGACY_DW_SECT_LOC = 21
++    ".debug_macinfo.dwo",     // LEGACY_DW_SECT_MACINFO = 22
+   };
+ 
+   gold_assert(section_id > 0 && section_id <= elfcpp::DW_SECT_MAX);
+@@ -925,16 +999,20 @@ Dwo_file::read(Dwp_output_file* output_file)
+ 	debug_shndx[elfcpp::DW_SECT_ABBREV] = i;
+       else if (strcmp(suffix, "line.dwo") == 0)
+ 	debug_shndx[elfcpp::DW_SECT_LINE] = i;
++      else if (strcmp(suffix, "loclists.dwo") == 0)
++	debug_shndx[elfcpp::DW_SECT_LOCLISTS] = i;
+       else if (strcmp(suffix, "loc.dwo") == 0)
+-	debug_shndx[elfcpp::DW_SECT_LOC] = i;
++	debug_shndx[elfcpp::LEGACY_DW_SECT_LOC] = i;
+       else if (strcmp(suffix, "str.dwo") == 0)
+ 	debug_str = i;
+       else if (strcmp(suffix, "str_offsets.dwo") == 0)
+ 	debug_shndx[elfcpp::DW_SECT_STR_OFFSETS] = i;
+-      else if (strcmp(suffix, "macinfo.dwo") == 0)
+-	debug_shndx[elfcpp::DW_SECT_MACINFO] = i;
+       else if (strcmp(suffix, "macro.dwo") == 0)
+ 	debug_shndx[elfcpp::DW_SECT_MACRO] = i;
++      else if (strcmp(suffix, "rnglists.dwo") == 0)
++	debug_shndx[elfcpp::DW_SECT_RNGLISTS] = i;
++      else if (strcmp(suffix, "macinfo.dwo") == 0)
++	debug_shndx[elfcpp::LEGACY_DW_SECT_MACINFO] = i;
+       else if (strcmp(suffix, "cu_index") == 0)
+ 	debug_cu_index = i;
+       else if (strcmp(suffix, "tu_index") == 0)
+@@ -956,9 +1034,9 @@ Dwo_file::read(Dwp_output_file* output_file)
+ 	    gold_fatal(_("%s: .dwp file must have no more than one "
+ 			 ".debug_types.dwo section"), this->name_);
+           if (debug_types.size() == 1)
+-            debug_shndx[elfcpp::DW_SECT_TYPES] = debug_types[0];
++            debug_shndx[elfcpp::LEGACY_DW_SECT_TYPES] = debug_types[0];
+           else
+-            debug_shndx[elfcpp::DW_SECT_TYPES] = 0;
++            debug_shndx[elfcpp::LEGACY_DW_SECT_TYPES] = 0;
+ 	  this->read_unit_index(debug_tu_index, debug_shndx, output_file, true);
+ 	}
+       return;
+@@ -973,7 +1051,7 @@ Dwo_file::read(Dwp_output_file* output_file)
+        tp != debug_types.end();
+        ++tp)
+     {
+-      debug_shndx[elfcpp::DW_SECT_TYPES] = *tp;
++      debug_shndx[elfcpp::LEGACY_DW_SECT_TYPES] = *tp;
+       this->add_unit_set(output_file, debug_shndx, true);
+     }
+ }
+@@ -1127,6 +1205,72 @@ Dwo_file::read_unit_index(unsigned int shndx, unsigned int *debug_shndx,
+ 				       is_tu_index);
+ }
+ 
++unsigned int
++get_unit_version(const unsigned char* unit_start, unsigned int unit_length,
++		 bool is_big_endian, unsigned int* offset_size)
++{
++  if (unit_length < 4)
++    return 0;
++
++  unsigned int length = elfcpp::Swap_unaligned<32, true>::readval(unit_start);
++  unsigned int version_offset = 4;
++  *offset_size = 4;
++  if (length == 0xffffffff)
++    {
++      version_offset += 8;
++      *offset_size = 8;
++    }
++  if (unit_length < version_offset + 2)
++    return 0;
++  unit_start += version_offset;
++  return is_big_endian ? elfcpp::Swap_unaligned<16, true>::readval(unit_start)
++		       : elfcpp::Swap_unaligned<16, false>::readval(unit_start);
++}
++
++unsigned int
++get_versioned_column_index(unsigned int index_version, unsigned int column)
++{
++  if (index_version == 5)
++    {
++      return column;
++    }
++  switch (column)
++    {
++      case elfcpp::LEGACY_DW_SECT_TYPES:
++	return 2;
++      case elfcpp::LEGACY_DW_SECT_LOC:
++	return 5;
++      case elfcpp::LEGACY_DW_SECT_MACINFO:
++	return 7;
++      case elfcpp::DW_SECT_MACRO:
++	return 8;
++      default:
++	return column;
++    }
++}
++
++unsigned int
++get_uniform_column_index(unsigned int index_version, unsigned int column)
++{
++  if (index_version == 5)
++    {
++      return column;
++    }
++  switch (column)
++    {
++      case 2:
++	return elfcpp::LEGACY_DW_SECT_TYPES;
++      case 5:
++	return elfcpp::LEGACY_DW_SECT_LOC;
++      case 7:
++	return elfcpp::LEGACY_DW_SECT_MACINFO;
++      case 8:
++	return elfcpp::DW_SECT_MACRO;
++      default:
++	return column;
++    }
++}
++
+ template <bool big_endian>
+ void
+ Dwo_file::sized_read_unit_index(unsigned int shndx,
+@@ -1134,11 +1278,6 @@ Dwo_file::sized_read_unit_index(unsigned int shndx,
+ 				Dwp_output_file* output_file,
+ 				bool is_tu_index)
+ {
+-  elfcpp::DW_SECT info_sect = (is_tu_index
+-			       ? elfcpp::DW_SECT_TYPES
+-			       : elfcpp::DW_SECT_INFO);
+-  unsigned int info_shndx = debug_shndx[info_sect];
+-
+   gold_assert(shndx > 0);
+ 
+   section_size_type index_len;
+@@ -1152,10 +1291,18 @@ Dwo_file::sized_read_unit_index(unsigned int shndx,
+   // We don't support version 1 anymore because it was experimental
+   // and because in normal use, dwp is not expected to read .dwp files
+   // produced by an earlier version of the tool.
+-  if (version != 2)
++  if (version != 2 && version != 5)
+     gold_fatal(_("%s: section %s has unsupported version number %d"),
+ 	       this->name_, this->section_name(shndx).c_str(), version);
+ 
++  elfcpp::DW_SECT info_sect
++    = (is_tu_index && version == 2 ? elfcpp::LEGACY_DW_SECT_TYPES
++				   : elfcpp::DW_SECT_INFO);
++  unsigned int info_shndx = debug_shndx[info_sect];
++
++  if (!output_file->update_index_version(version))
++    gold_fatal(_("mismatched unit version in index"));
++
+   unsigned int ncols =
+       elfcpp::Swap_unaligned<32, big_endian>::readval(contents
+ 						      + sizeof(uint32_t));
+@@ -1184,12 +1331,18 @@ Dwo_file::sized_read_unit_index(unsigned int shndx,
+ 
+   // Copy the related sections and track the section offsets and sizes.
+   Section_bounds sections[elfcpp::DW_SECT_MAX + 1];
+-  for (int i = elfcpp::DW_SECT_ABBREV; i <= elfcpp::DW_SECT_MAX; ++i)
++  std::vector<std::pair<unsigned char*, section_size_type> > str_offs;
++  for (int i = 1; i <= elfcpp::DW_SECT_MAX; ++i)
+     {
+-      if (debug_shndx[i] > 0)
+-	sections[i] = this->copy_section(output_file, debug_shndx[i],
+-					 static_cast<elfcpp::DW_SECT>(i));
++      if (i != elfcpp::DW_SECT_INFO && i != elfcpp::LEGACY_DW_SECT_TYPES
++	  && debug_shndx[i] > 0)
++	sections[i]
++	  = this->copy_section(output_file, debug_shndx[i],
++			       static_cast<elfcpp::DW_SECT>(i), str_offs);
+     }
++  if (str_offs.size() > 1)
++    gold_fatal(_("%s: contains more than one .debug_str_offsets.dwo section"),
++	       this->name_);
+ 
+   // Get the contents of the .debug_info.dwo or .debug_types.dwo section.
+   section_size_type info_len;
+@@ -1213,13 +1366,15 @@ Dwo_file::sized_read_unit_index(unsigned int shndx,
+ 	      poffsets + (index - 1) * ncols * sizeof(uint32_t);
+ 	  const unsigned char* psrow =
+ 	      psizes + (index - 1) * ncols * sizeof(uint32_t);
++	  std::vector<std::pair<unsigned char*, section_size_type> >
++	    str_off = str_offs;
+ 
+ 	  // Adjust the offset of each contribution within the input section
+ 	  // by the offset of the input section within the output section.
+-	  for (unsigned int j = 0; j <= ncols; j++)
++	  for (unsigned int j = 0; j < ncols; j++)
+ 	    {
+-	      unsigned int dw_sect =
+-		  elfcpp::Swap_unaligned<64, big_endian>::readval(pch);
++	      unsigned int dw_sect = get_uniform_column_index(
++		version, elfcpp::Swap_unaligned<64, big_endian>::readval(pch));
+ 	      unsigned int offset =
+ 		  elfcpp::Swap_unaligned<64, big_endian>::readval(porow);
+ 	      unsigned int size =
+@@ -1230,12 +1385,24 @@ Dwo_file::sized_read_unit_index(unsigned int shndx,
+ 	      pch += sizeof(uint32_t);
+ 	      porow += sizeof(uint32_t);
+ 	      psrow += sizeof(uint32_t);
++	      if (dw_sect == elfcpp::DW_SECT_STR_OFFSETS && !str_off.empty())
++		{
++		  str_off[0].first += offset;
++		  str_off[0].second = size;
++		}
+ 	    }
+ 
+ 	  const unsigned char* unit_start =
+ 	      info_contents + unit_set->sections[info_sect].offset;
+ 	  section_size_type unit_length = unit_set->sections[info_sect].size;
+ 
++	  unsigned int offset_size;
++	  if (!str_off.empty())
++	    if (unsigned int unit_version
++		= get_unit_version(unit_start, unit_length,
++				   this->obj_->is_big_endian(), &offset_size))
++	      remap_str_offsets(unit_version, offset_size, str_off);
++
+ 	  // Dwp_output_file::add_contribution writes the .debug_info.dwo
+ 	  // section directly to the output file, so we only need to
+ 	  // duplicate contributions for .debug_types.dwo section.
+@@ -1408,8 +1575,9 @@ Dwo_file::add_strings(Dwp_output_file* output_file, unsigned int debug_str)
+ // the string offsets for the output string table.
+ 
+ Section_bounds
+-Dwo_file::copy_section(Dwp_output_file* output_file, unsigned int shndx,
+-		       elfcpp::DW_SECT section_id)
++Dwo_file::copy_section(
++  Dwp_output_file* output_file, unsigned int shndx, elfcpp::DW_SECT section_id,
++  std::vector<std::pair<unsigned char*, section_size_type> >& str_offs)
+ {
+   // Some sections may be referenced from more than one set.
+   // Don't copy a section more than once.
+@@ -1424,20 +1592,19 @@ Dwo_file::copy_section(Dwp_output_file* output_file, unsigned int shndx,
+   bool is_new;
+   const unsigned char* contents = this->section_contents(shndx, &len, &is_new);
+ 
+-  if (section_id == elfcpp::DW_SECT_STR_OFFSETS)
+-    {
+-      const unsigned char* remapped = this->remap_str_offsets(contents, len);
+-      if (is_new)
+-	delete[] contents;
+-      contents = remapped;
+-    }
+-  else if (!is_new)
++  if (!is_new)
+     {
+       unsigned char* copy = new unsigned char[len];
+       memcpy(copy, contents, len);
+       contents = copy;
+     }
+ 
++  if (section_id == elfcpp::DW_SECT_STR_OFFSETS)
++    {
++      str_offs.push_back(
++	std::make_pair(const_cast<unsigned char*>(contents), len));
++    }
++
+   // Add the contents of the input section to the output section.
+   // The output file takes ownership of the memory pointed to by CONTENTS.
+   section_offset_type off = output_file->add_contribution(section_id, contents,
+@@ -1451,38 +1618,33 @@ Dwo_file::copy_section(Dwp_output_file* output_file, unsigned int shndx,
+ }
+ 
+ // Remap the 
+-const unsigned char*
+-Dwo_file::remap_str_offsets(const unsigned char* contents,
+-			    section_size_type len)
++void
++Dwo_file::remap_str_offsets(unsigned char* contents, section_size_type len)
+ {
+   if ((len & 3) != 0)
+     gold_fatal(_("%s: .debug_str_offsets.dwo section size not a multiple of 4"),
+ 	       this->name_);
+ 
+   if (this->obj_->is_big_endian())
+-    return this->sized_remap_str_offsets<true>(contents, len);
++    this->sized_remap_str_offsets<true>(contents, len);
+   else
+-    return this->sized_remap_str_offsets<false>(contents, len);
++    this->sized_remap_str_offsets<false>(contents, len);
+ }
+ 
+ template <bool big_endian>
+-const unsigned char*
+-Dwo_file::sized_remap_str_offsets(const unsigned char* contents,
++void
++Dwo_file::sized_remap_str_offsets(unsigned char* contents,
+ 				  section_size_type len)
+ {
+-  unsigned char* remapped = new unsigned char[len];
+-  const unsigned char* p = contents;
+-  unsigned char* q = remapped;
++  unsigned char* p = contents;
+   while (len > 0)
+     {
+       unsigned int val = elfcpp::Swap_unaligned<32, big_endian>::readval(p);
+       val = this->remap_str_offset(val);
+-      elfcpp::Swap_unaligned<32, big_endian>::writeval(q, val);
++      elfcpp::Swap_unaligned<32, big_endian>::writeval(p, val);
+       len -= 4;
+       p += 4;
+-      q += 4;
+     }
+-  return remapped;
+ }
+ 
+ unsigned int
+@@ -1491,10 +1653,10 @@ Dwo_file::remap_str_offset(section_offset_type val)
+   Str_offset_map_entry entry;
+   entry.first = val;
+ 
+-  Str_offset_map::const_iterator p =
+-      std::lower_bound(this->str_offset_map_.begin(),
+-		       this->str_offset_map_.end(),
+-		       entry, Offset_compare());
++  Str_offset_map::const_iterator p
++    = std::lower_bound(this->str_offset_map_.begin(),
++		       this->str_offset_map_.end(), entry,
++		       Offset_compare());
+ 
+   if (p == this->str_offset_map_.end() || p->first > val)
+     {
+@@ -1510,13 +1672,40 @@ Dwo_file::remap_str_offset(section_offset_type val)
+ // Add a set of .debug_info.dwo or .debug_types.dwo and related sections
+ // to OUTPUT_FILE.
+ 
++void
++Dwo_file::remap_str_offsets(
++  unsigned int cu_version, unsigned int offset_size,
++  const std::vector<std::pair<unsigned char*, section_size_type> >& str_offs)
++{
++  unsigned int header_size = 0;
++  if (cu_version >= 5)
++    {
++      // length field
++      if (offset_size == 4)
++	header_size = 4;
++      else
++	header_size = 12;
++      // version
++      header_size += 2;
++      // padding
++      header_size += 2;
++    }
++
++  std::pair<unsigned char*, section_size_type> p;
++  for (unsigned int i = 0; i < str_offs.size(); ++i)
++    {
++      p = str_offs[i];
++      this->remap_str_offsets(p.first + header_size, p.second - header_size);
++    }
++}
++
+ void
+ Dwo_file::add_unit_set(Dwp_output_file* output_file, unsigned int *debug_shndx,
+ 		       bool is_debug_types)
+ {
+-  unsigned int shndx = (is_debug_types
+-			? debug_shndx[elfcpp::DW_SECT_TYPES]
+-			: debug_shndx[elfcpp::DW_SECT_INFO]);
++  elfcpp::DW_SECT info_sect
++    = (is_debug_types ? elfcpp::LEGACY_DW_SECT_TYPES : elfcpp::DW_SECT_INFO);
++  unsigned int shndx = debug_shndx[info_sect];
+ 
+   gold_assert(shndx != 0);
+ 
+@@ -1525,17 +1714,24 @@ Dwo_file::add_unit_set(Dwp_output_file* output_file, unsigned int *debug_shndx,
+ 
+   // Copy the related sections and track the section offsets and sizes.
+   Section_bounds sections[elfcpp::DW_SECT_MAX + 1];
+-  for (int i = elfcpp::DW_SECT_ABBREV; i <= elfcpp::DW_SECT_MAX; ++i)
++  std::vector<std::pair<unsigned char*, section_size_type> > str_offs;
++  for (int i = 1; i <= elfcpp::DW_SECT_MAX; ++i)
+     {
+-      if (debug_shndx[i] > 0)
+-	sections[i] = this->copy_section(output_file, debug_shndx[i],
+-					 static_cast<elfcpp::DW_SECT>(i));
+-    }
++      if (debug_shndx[i] > 0 && i != info_sect)
++	sections[i]
++	  = this->copy_section(output_file, debug_shndx[i],
++			       static_cast<elfcpp::DW_SECT>(i), str_offs);
++     }
+ 
+   // Parse the .debug_info or .debug_types section and add each compilation
+   // or type unit to the output file, along with the contributions to the
+   // related sections.
+-  Unit_reader reader(is_debug_types, this->obj_, shndx);
++  remap_callback remap_str_offsets_callback(str_offs, this);
++  Unit_reader reader(is_debug_types, this->obj_, shndx,
++		     & remap_str_offsets_callback);
++		     // [&](unsigned int cu_version, unsigned int offset_size) {
++		     //  remap_str_offsets(cu_version, offset_size, str_offs);
++		     // });
+   reader.add_units(output_file, debug_shndx[elfcpp::DW_SECT_ABBREV], sections);
+ }
+ 
+@@ -1992,8 +2188,20 @@ Dwp_output_file::write_index(const char* sect_name, const Dwp_index& index)
+ 
+   // Write the section header: version number, padding,
+   // number of used slots and total number of slots.
+-  elfcpp::Swap_unaligned<32, big_endian>::writeval(p, 2);
+-  p += sizeof(uint32_t);
++  if (index_version_ == 2)
++    {
++      elfcpp::Swap_unaligned<32, big_endian>::writeval(p, index_version_);
++      p += sizeof(uint32_t);
++    }
++  else
++    {
++      assert(index_version_ == 5);
++      elfcpp::Swap_unaligned<16, big_endian>::writeval(p, index_version_);
++      p += sizeof(uint16_t);
++      // zero padding
++      *p++ = 0;
++      *p++ = 0;
++    }
+   elfcpp::Swap_unaligned<32, big_endian>::writeval(p, ncols);
+   p += sizeof(uint32_t);
+   elfcpp::Swap_unaligned<32, big_endian>::writeval(p, nused);
+@@ -2020,7 +2228,8 @@ Dwp_output_file::write_index(const char* sect_name, const Dwp_index& index)
+     {
+       if (column_mask & (1 << c))
+ 	{
+-	  elfcpp::Swap_unaligned<32, big_endian>::writeval(p, c);
++	  elfcpp::Swap_unaligned<32, big_endian>::writeval(
++	    p, get_versioned_column_index(index_version_, c));
+ 	  p += sizeof(uint32_t);
+ 	}
+     }
+@@ -2208,12 +2417,16 @@ Dwp_output_file::sized_write_shdr(const char* name, unsigned int type,
+ // Visit a compilation unit.
+ 
+ void
+-Dwo_name_info_reader::visit_compilation_unit(off_t, off_t, Dwarf_die* die)
++Dwo_name_info_reader::visit_compilation_unit(off_t, off_t, uint64_t signature,
++					     Dwarf_die* die)
+ {
+-  const char* dwo_name = die->string_attribute(elfcpp::DW_AT_GNU_dwo_name);
++  bool dwarf_5 = cu_version() >= 5;
++  const char* dwo_name = die->string_attribute(
++    dwarf_5 ? elfcpp::DW_AT_dwo_name : elfcpp::DW_AT_GNU_dwo_name);
+   if (dwo_name != NULL)
+     {
+-      uint64_t dwo_id = die->uint_attribute(elfcpp::DW_AT_GNU_dwo_id);
++      uint64_t dwo_id
++	= dwarf_5 ? signature : die->uint_attribute(elfcpp::DW_AT_GNU_dwo_id);
+       this->files_->push_back(Dwo_file_entry(dwo_id, dwo_name));
+     }
+ }
+@@ -2236,15 +2449,29 @@ Unit_reader::add_units(Dwp_output_file* output_file,
+ // Visit a compilation unit.
+ 
+ void
+-Unit_reader::visit_compilation_unit(off_t, off_t cu_length, Dwarf_die* die)
++Unit_reader::visit_compilation_unit(off_t, off_t cu_length, uint64_t signature,
++				    Dwarf_die* die)
+ {
+   if (cu_length == 0)
+     return;
+ 
++  this->remap_str_offsets_->run_remap(cu_version(), offset_size());
++
++  Unit_set* unit_set
++    = make_unit(cu_length, cu_version() >= 5
++			     ? signature
++			     : die->uint_attribute(elfcpp::DW_AT_GNU_dwo_id));
++  this->output_file_->add_cu_set(unit_set);
++}
++
++Unit_set*
++Unit_reader::make_unit(off_t cu_length, uint64_t signature)
++{
+   Unit_set* unit_set = new Unit_set();
+-  unit_set->signature = die->uint_attribute(elfcpp::DW_AT_GNU_dwo_id);
+-  for (unsigned int i = elfcpp::DW_SECT_ABBREV; i <= elfcpp::DW_SECT_MAX; ++i)
+-    unit_set->sections[i] = this->sections_[i];
++  unit_set->signature = signature;
++  for (unsigned int i = 1; i <= elfcpp::DW_SECT_MAX; ++i)
++    if (i != elfcpp::DW_SECT_INFO)
++      unit_set->sections[i] = this->sections_[i];
+ 
+   // Dwp_output_file::add_contribution writes the .debug_info.dwo section
+   // directly to the output file, so we do not need to duplicate the
+@@ -2255,7 +2482,9 @@ Unit_reader::visit_compilation_unit(off_t, off_t cu_length, Dwarf_die* die)
+ 					   cu_length, 1);
+   Section_bounds bounds(off, cu_length);
+   unit_set->sections[elfcpp::DW_SECT_INFO] = bounds;
+-  this->output_file_->add_cu_set(unit_set);
++  if (!this->output_file_->update_index_version(this->cu_version()))
++    gold_fatal(_("mismatched unit version in compilation unit"));
++  return unit_set;
+ }
+ 
+ // Visit a type unit.
+@@ -2268,20 +2497,29 @@ Unit_reader::visit_type_unit(off_t, off_t tu_length, off_t,
+     return;
+   if (this->output_file_->lookup_tu(signature))
+     return;
++  if (this->cu_version() >= 5)
++    {
++      Unit_set* unit_set = make_unit(tu_length, signature);
++      this->output_file_->add_tu_set(unit_set);
++      return;
++    }
+ 
+   Unit_set* unit_set = new Unit_set();
+   unit_set->signature = signature;
+-  for (unsigned int i = elfcpp::DW_SECT_ABBREV; i <= elfcpp::DW_SECT_MAX; ++i)
+-    unit_set->sections[i] = this->sections_[i];
++  for (unsigned int i = 1; i <= elfcpp::DW_SECT_MAX; ++i)
++    if (i != elfcpp::LEGACY_DW_SECT_TYPES)
++      unit_set->sections[i] = this->sections_[i];
+ 
+   unsigned char* contents = new unsigned char[tu_length];
+   memcpy(contents, this->buffer_at_offset(0), tu_length);
+-  section_offset_type off =
+-      this->output_file_->add_contribution(elfcpp::DW_SECT_TYPES, contents,
+-					   tu_length, 1);
++  elfcpp::DW_SECT section = elfcpp::LEGACY_DW_SECT_TYPES;
++  section_offset_type off
++    = this->output_file_->add_contribution(section, contents, tu_length, 1);
+   Section_bounds bounds(off, tu_length);
+-  unit_set->sections[elfcpp::DW_SECT_TYPES] = bounds;
++  unit_set->sections[section] = bounds;
+   this->output_file_->add_tu_set(unit_set);
++  if (!this->output_file_->update_index_version(this->cu_version()))
++    gold_fatal(_("mismatched unit version in type unit")); // FIXME: Untested
+ }
+ 
+ }; // End namespace gold
+diff --git a/gold/gdb-index.cc b/gold/gdb-index.cc
+index f73ccd2ad7e..30cc3756c16 100644
+--- a/gold/gdb-index.cc
++++ b/gold/gdb-index.cc
+@@ -199,7 +199,8 @@ class Gdb_index_info_reader : public Dwarf_info_reader
+  protected:
+   // Visit a compilation unit.
+   virtual void
+-  visit_compilation_unit(off_t cu_offset, off_t cu_length, Dwarf_die*);
++  visit_compilation_unit(off_t cu_offset, off_t cu_length, uint64_t signature,
++			 Dwarf_die*);
+ 
+   // Visit a type unit.
+   virtual void
+@@ -319,6 +320,7 @@ unsigned int Gdb_index_info_reader::dwarf_tu_nopubnames_count = 0;
+ 
+ void
+ Gdb_index_info_reader::visit_compilation_unit(off_t cu_offset, off_t cu_length,
++					      uint64_t signature,
+ 					      Dwarf_die* root_die)
+ {
+   ++Gdb_index_info_reader::dwarf_cu_count;
+diff --git a/include/dwarf2.h b/include/dwarf2.h
+index 40aa5a54f01..0a2cc0c662a 100644
+--- a/include/dwarf2.h
++++ b/include/dwarf2.h
+@@ -485,33 +485,20 @@ enum dwarf_range_list_entry
+    (From the pre-standard formats Extensions for Fission.
+    See http://gcc.gnu.org/wiki/DebugFissionDWP).  */
+ enum dwarf_sect
+-{
+-  DW_SECT_INFO = 1,
+-  DW_SECT_TYPES = 2,
+-  DW_SECT_ABBREV = 3,
+-  DW_SECT_LINE = 4,
+-  DW_SECT_LOC = 5,
+-  DW_SECT_STR_OFFSETS = 6,
+-  DW_SECT_MACINFO = 7,
+-  DW_SECT_MACRO = 8,
+-  DW_SECT_MAX = 8
+-};
+-
+-/* Codes for the debug sections in a dwarf package (.dwp) file.
+-   (From the official DWARF v5 spec.
+-   See http://dwarfstd.org/doc/DWARF5.pdf, section 7.3.5).  */
+-enum dwarf_sect_v5
+-{
+-  DW_SECT_INFO_V5 = 1,
+-  DW_SECT_RESERVED_V5 = 2,
+-  DW_SECT_ABBREV_V5 = 3,
+-  DW_SECT_LINE_V5 = 4,
+-  DW_SECT_LOCLISTS_V5 = 5,
+-  DW_SECT_STR_OFFSETS_V5 = 6,
+-  DW_SECT_MACRO_V5 = 7,
+-  DW_SECT_RNGLISTS_V5 = 8,
+-  DW_SECT_MAX_V5 = 8
+-};
++  {
++    DW_SECT_INFO = 1,
++    DW_SECT_TYPES = 2, // removed in v5
++    DW_SECT_ABBREV = 3,
++    DW_SECT_LINE = 4,
++    DW_SECT_LOCLISTS = 5, // was LOC pre-v5
++    DW_SECT_STR_OFFSETS = 6,
++    DW_SECT_MACRO = 7, // was MACINFO pre-v5
++    DW_SECT_RNGLISTS = 8, // was MACRO pre-v5
++    LEGACY_DW_SECT_TYPES = 20,
++    LEGACY_DW_SECT_LOC = 21,
++    LEGACY_DW_SECT_MACINFO = 22,
++    DW_SECT_MAX = LEGACY_DW_SECT_MACINFO
++  };
+ 
+ #ifdef __cplusplus
+ extern "C" {
+-- 
+2.41.0
+

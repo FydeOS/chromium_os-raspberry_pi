@@ -1,0 +1,9 @@
+#!/bin/sh
+# Copyright 2019 The ChromiumOS Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# This files wraps lld.
+# Pass --hash-style=gnu to match gold/bfd wrappers.
+# Pass --undefined-version (b/263147806).
+exec "$(dirname "$(readlink -f "$0")")"/ld.lld --hash-style=gnu --undefined-version -z nostart-stop-gc "$@"

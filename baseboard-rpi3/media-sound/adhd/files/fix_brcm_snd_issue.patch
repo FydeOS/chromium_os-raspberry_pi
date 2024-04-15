@@ -1,21 +1,25 @@
---- a/cras/src/server/audio_thread.c
-+++ b/cras/src/server/audio_thread.c
-@@ -905,6 +905,9 @@
+Index: adhd/cras/src/server/audio_thread.c
+===================================================================
+--- a/adhd/cras/src/server/audio_thread.c
++++ b/adhd/cras/src/server/audio_thread.c
+@@ -917,6 +917,9 @@ static void* audio_io_thread(void* arg)
        check_busyloop(wait_ts);
      }
- 
+
 +		if (wait_ts && wait_ts->tv_sec == 0 && wait_ts->tv_nsec == 0) {
 +			wait_ts->tv_sec = 1;
 +    }
      // Sync atlog with shared memory.
      __sync_synchronize();
      atlog->sync_write_pos = atlog->write_pos;
---- a/cras/src/tools/cras_monitor/cras_monitor.c
-+++ b/cras/src/tools/cras_monitor/cras_monitor.c
-@@ -154,11 +154,19 @@
+Index: adhd/cras/src/tools/cras_monitor/cras_monitor.c
+===================================================================
+--- a/adhd/cras/src/tools/cras_monitor/cras_monitor.c
++++ b/adhd/cras/src/tools/cras_monitor/cras_monitor.c
+@@ -152,11 +152,19 @@ static void input_node_gain_changed(void
    free((void*)node_name);
  }
- 
+
 +uint32_t last_active_streams = 0;
  static void num_active_streams_changed(void* context,
                                         enum CRAS_STREAM_DIRECTION dir,
@@ -30,13 +34,13 @@
 +	}
 +	last_active_streams = num_active_streams;
  }
- 
+
  static void server_connection_callback(struct cras_client* client,
-@@ -289,6 +297,7 @@
+@@ -287,6 +295,7 @@ int main(int argc, char** argv) {
      if (rc < 0 || c == 'q') {
        return 0;
      }
 +		sleep(1);
    }
- 
+
  destroy_exit:

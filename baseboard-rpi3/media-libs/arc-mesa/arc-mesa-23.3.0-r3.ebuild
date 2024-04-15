@@ -15,7 +15,7 @@ inherit meson multilib-minimal flag-o-matic toolchain-funcs cros-workon arc-buil
 DESCRIPTION="OpenGL-like graphic library for Linux"
 HOMEPAGE="http://mesa3d.sourceforge.net/"
 
-KEYWORDS="*"
+KEYWORDS="~*"
 
 # Most files are MIT/X11.
 # Some files in src/glx are SGI-B-2.0.

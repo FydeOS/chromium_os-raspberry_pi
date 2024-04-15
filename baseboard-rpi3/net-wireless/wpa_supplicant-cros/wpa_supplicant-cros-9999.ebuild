@@ -16,7 +16,7 @@ LICENSE="|| ( GPL-2 BSD )"
 
 SLOT="0"
 KEYWORDS="~*"
-IUSE="+ap bindist dbus debug eap-sim fuzzer +hs2-0 libressl +mbo mesh p2p ps3 qt5 readline +seccomp selinux smartcard supplicant-next systemd tdls uncommon-eap-types +wep wifi_hostap_test +wnm wps kernel_linux kernel_FreeBSD wimax"
+IUSE="+ap bindist dbus debug eap-sim fuzzer +hs2-0 libressl +mbo mesh +p2p ps3 qt5 readline +seccomp selinux smartcard supplicant-next systemd tdls uncommon-eap-types +wep wifi_hostap_test +wnm wps kernel_linux kernel_FreeBSD wimax"
 
 CDEPEND="
 	chromeos-base/minijail
@@ -36,7 +36,7 @@ CDEPEND="
 		sys-libs/ncurses:0
 		sys-libs/readline:0
 	)
-	!libressl? ( dev-libs/openssl:0=[bindist=] )
+	!libressl? ( dev-libs/openssl:0= )
 	libressl? ( dev-libs/libressl:0= )
 	smartcard? ( dev-libs/libp11 )
 "
@@ -48,6 +48,10 @@ RDEPEND="${CDEPEND}
 	!net-wireless/wpa_supplicant-2_8
 	!net-wireless/wpa_supplicant-2_9
 	selinux? ( sec-policy/selinux-networkmanager )
+"
+
+BDEPEND="
+	chromeos-base/minijail
 "
 
 # All the available fuzzers.
@@ -281,11 +285,9 @@ src_configure() {
 		# Kconfig_style_config DRIVER_HOSTAP
 		# Kconfig_style_config DRIVER_IPW
 		Kconfig_style_config DRIVER_NL80211
-		Kconfig_style_config DRIVER_NL80211_BRCM
 		# Kconfig_style_config DRIVER_RALINK
 		Kconfig_style_config DRIVER_WEXT
 		Kconfig_style_config DRIVER_WIRED
-		Kconfig_style_config FILS
 
 		if use ps3 ; then
 			Kconfig_style_config DRIVER_PS3
@@ -359,6 +361,12 @@ src_configure() {
 		eqmake5 wpa_gui.pro
 		popd > /dev/null || die
 	fi
+
+	# Hardcode libp11 paths
+	Kconfig_style_config NO_OPENSC_ENGINE_PATH
+	Kconfig_style_config PKCS11_ENGINE_PATH	"/usr/$(get_libdir)/engines-1.1/libpkcs11.so"
+	Kconfig_style_config PKCS11_MODULE_PATH	"/usr/$(get_libdir)/libchaps.so"
+	Kconfig_style_config NO_LOAD_DYNAMIC_EAP
 }
 
 src_compile() {

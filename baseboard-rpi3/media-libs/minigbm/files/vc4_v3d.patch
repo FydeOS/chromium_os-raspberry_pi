@@ -10,7 +10,7 @@ Index: minigbm/drv.c
  #ifdef __ANDROID__
  #include <cutils/log.h>
  #include <libgen.h>
-@@ -36,6 +35,9 @@ extern const struct backend backend_msm;
+@@ -39,6 +38,9 @@ extern const struct backend backend_msm;
  #ifdef DRV_VC4
  extern const struct backend backend_vc4;
  #endif
@@ -20,7 +20,7 @@ Index: minigbm/drv.c
  
  // Dumb / generic drivers
  extern const struct backend backend_evdi;
-@@ -65,6 +67,9 @@ static const struct backend *drv_backend
+@@ -68,6 +70,9 @@ static const struct backend *drv_backend
  #ifdef DRV_VC4
  	&backend_vc4,
  #endif
@@ -30,7 +30,7 @@ Index: minigbm/drv.c
  	&backend_evdi,	    &backend_komeda,	&backend_marvell, &backend_mediatek,
  	&backend_meson,	    &backend_nouveau,	&backend_radeon,  &backend_rockchip,
  	&backend_sun4i_drm, &backend_synaptics, &backend_udl,	  &backend_virtgpu,
-@@ -95,6 +100,9 @@ static const struct backend *drv_get_bac
+@@ -98,6 +103,9 @@ static const struct backend *drv_get_bac
  		const struct backend *b = drv_backend_list[i];
  		if (!strcmp(drm_version->name, b->name)) {
  			drmFreeVersion(drm_version);
@@ -40,7 +40,7 @@ Index: minigbm/drv.c
  			return b;
  		}
  	}
-@@ -205,7 +213,12 @@ struct combination *drv_get_combination(
+@@ -208,7 +216,12 @@ struct combination *drv_get_combination(
  			if (!best || best->metadata.priority < curr->metadata.priority)
  				best = curr;
  	}
@@ -54,7 +54,7 @@ Index: minigbm/drv.c
  	return best;
  }
  
-@@ -482,7 +495,6 @@ void *drv_bo_map(struct bo *bo, const st
+@@ -485,7 +498,6 @@ void *drv_bo_map(struct bo *bo, const st
  
  	if (bo->is_test_buffer)
  		return MAP_FAILED;
@@ -62,7 +62,7 @@ Index: minigbm/drv.c
  	mapping.rect = *rect;
  	mapping.refcount = 1;
  
-@@ -516,6 +528,7 @@ void *drv_bo_map(struct bo *bo, const st
+@@ -519,6 +531,7 @@ void *drv_bo_map(struct bo *bo, const st
  	if (!mapping.vma) {
  		*map_data = NULL;
  		pthread_mutex_unlock(&drv->mappings_lock);
@@ -70,7 +70,7 @@ Index: minigbm/drv.c
  		return MAP_FAILED;
  	}
  
-@@ -525,6 +538,7 @@ void *drv_bo_map(struct bo *bo, const st
+@@ -528,6 +541,7 @@ void *drv_bo_map(struct bo *bo, const st
  		*map_data = NULL;
  		free(mapping.vma);
  		pthread_mutex_unlock(&drv->mappings_lock);
@@ -82,9 +82,9 @@ Index: minigbm/drv_helpers.c
 ===================================================================
 --- minigbm.orig/drv_helpers.c
 +++ minigbm/drv_helpers.c
-@@ -611,3 +611,113 @@ void drv_resolve_format_and_use_flags_he
- 		break;
- 	}
+@@ -678,3 +678,113 @@ void lru_init(struct lru *lru, int max)
+ 	lru->count = 0;
+ 	lru->max = max;
  }
 +
 +char * getDrmFormatString(uint32_t drmFormat) {
@@ -200,13 +200,15 @@ Index: minigbm/drv_helpers.h
 ===================================================================
 --- minigbm.orig/drv_helpers.h
 +++ minigbm/drv_helpers.h
-@@ -50,5 +50,5 @@ bool drv_has_modifier(const uint64_t *li
+@@ -50,7 +50,7 @@ bool drv_has_modifier(const uint64_t *li
  void drv_resolve_format_and_use_flags_helper(struct driver *drv, uint32_t format,
  					     uint64_t use_flags, uint32_t *out_format,
  					     uint64_t *out_use_flags);
 -
 +char *getDrmFormatString(uint32_t drmFormat);
- #endif
+ /*
+  * Get an option. Should return NULL if specified option is not set.
+  */
 Index: minigbm/external/v3d_drm.h
 ===================================================================
 --- /dev/null

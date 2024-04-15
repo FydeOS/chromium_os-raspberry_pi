@@ -1,0 +1,96 @@
+From bb1feb57f0acf99b85539ceff94261fa54616739 Mon Sep 17 00:00:00 2001
+From: Rahul Chaudhry <rahulchaudhry@google.com>
+Date: Fri, 14 Jul 2017 13:16:08 -0700
+Subject: [PATCH 02/14] gas: enable -mshared by default.
+
+From gas help:
+  -mshared        disable branch optimization for shared code.
+
+The default behavior is to optimize out non-PLT relocations against
+defined non-weak global branch targets with default visibility. This
+optimization has been a source of many issues during testing of new
+binutils:
+  - https://bugs.chromium.org/p/chromium/issues/detail?id=738283
+  - https://bugs.chromium.org/p/chromium/issues/detail?id=723906
+
+[Adrian Ratiu: rebased from v2.27 to v2.39]
+
+Change-Id: Iced04054a7dfd18eef6b42c21f92c34286c215b4
+---
+ gas/config/tc-i386.c                    | 10 +++++++++-
+ gas/testsuite/gas/i386/relax-4.d        |  1 +
+ gas/testsuite/gas/i386/x86-64-relax-3.d |  1 +
+ 3 files changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/gas/config/tc-i386.c b/gas/config/tc-i386.c
+index 9cd33a91660..fa55416c27e 100644
+--- a/gas/config/tc-i386.c
++++ b/gas/config/tc-i386.c
+@@ -603,7 +603,7 @@
+ 
+ #if defined (OBJ_ELF) || defined (OBJ_MAYBE_ELF)
+ /* 1 if generating code for a shared library.  */
+-static int shared = 0;
++static int shared = 1;
+ 
+ unsigned int x86_sframe_cfa_sp_reg;
+ /* The other CFA base register for SFrame unwind info.  */
+@@ -13113,6 +13113,7 @@ const char *md_shortopts = "qnO::";
+ #define OPTION_MLFENCE_BEFORE_INDIRECT_BRANCH (OPTION_MD_BASE + 32)
+ #define OPTION_MLFENCE_BEFORE_RET (OPTION_MD_BASE + 33)
+ #define OPTION_MUSE_UNALIGNED_VECTOR_MOVE (OPTION_MD_BASE + 34)
++#define OPTION_MNO_SHARED (OPTION_MD_BASE + 35)
+ 
+ struct option md_longopts[] =
+ {
+@@ -13124,6 +13125,7 @@ struct option md_longopts[] =
+ #if defined (OBJ_ELF) || defined (OBJ_MAYBE_ELF)
+   {"x32", no_argument, NULL, OPTION_X32},
+   {"mshared", no_argument, NULL, OPTION_MSHARED},
++  {"mno-shared", no_argument, NULL, OPTION_MNO_SHARED},
+   {"mx86-used-note", required_argument, NULL, OPTION_X86_USED_NOTE},
+ #endif
+   {"divide", no_argument, NULL, OPTION_DIVIDE},
+@@ -13205,6 +13207,10 @@ md_parse_option (int c, const char *arg)
+       shared = 1;
+       break;
+ 
++    case OPTION_MNO_SHARED:
++      shared = 0;
++      break;
++
+     case OPTION_X86_USED_NOTE:
+       if (strcasecmp (arg, "yes") == 0)
+         x86_used_note = 1;
+@@ -13899,6 +13905,8 @@ md_show_usage (FILE *stream)
+   fprintf (stream, _("\
+   -mshared                disable branch optimization for shared code\n"));
+   fprintf (stream, _("\
++  -mno-shared             enable branch optimization\n"));
++  fprintf (stream, _("\
+   -mx86-used-note=[no|yes] "));
+   if (DEFAULT_X86_USED_NOTE)
+     fprintf (stream, _("(default: yes)\n"));
+diff --git a/gas/testsuite/gas/i386/relax-4.d b/gas/testsuite/gas/i386/relax-4.d
+index 6f2ae381e92..56f58a7db1e 100644
+--- a/gas/testsuite/gas/i386/relax-4.d
++++ b/gas/testsuite/gas/i386/relax-4.d
+@@ -1,4 +1,5 @@
+ #source: relax-3.s
++#as: -mno-shared
+ #objdump: -dwr
+ 
+ .*: +file format .*
+diff --git a/gas/testsuite/gas/i386/x86-64-relax-3.d b/gas/testsuite/gas/i386/x86-64-relax-3.d
+index 4c2361c8de0..dc393b76992 100644
+--- a/gas/testsuite/gas/i386/x86-64-relax-3.d
++++ b/gas/testsuite/gas/i386/x86-64-relax-3.d
+@@ -1,4 +1,5 @@
+ #source: relax-3.s
++#as: -mno-shared
+ #objdump: -dwr
+ #notarget: *-*-solaris*
+ 
+-- 
+2.41.0
+

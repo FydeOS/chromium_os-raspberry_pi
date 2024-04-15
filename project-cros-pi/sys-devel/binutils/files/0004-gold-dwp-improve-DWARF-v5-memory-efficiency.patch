@@ -1,0 +1,204 @@
+From 62b277922b1d154c7be12253b6b31480be784748 Mon Sep 17 00:00:00 2001
+From: Caroline Tice <cmtice@google.com>
+Date: Fri, 20 Nov 2020 11:05:19 -0800
+Subject: [PATCH 04/14] gold: dwp: improve DWARF v5 memory efficiency
+
+Apply basic patch by David Blaikie to update gold dwp tool to handle
+DWARF v5. This is the second of three patches for DWARF v5.
+
+This patch created for Chrome OS by Caroline Tice.
+Date: 20-Nov-2020
+[Adrian Ratiu: rebased from v2.27 to v2.39]
+[Adrian Ratiu: regenerated as proper git format-patch.]
+
+Change-Id: I1f6fb66478d8e9eb9848e9628e2d2976b8d5be1d
+---
+ gold/dwp.cc        | 54 +++++++++++++++++++++++++++++++++-------------
+ gold/stringpool.cc | 32 +++++++++++++++++++++++++++
+ gold/stringpool.h  |  6 ++++++
+ 3 files changed, 77 insertions(+), 15 deletions(-)
+
+diff --git a/gold/dwp.cc b/gold/dwp.cc
+index f5af837bc21..fe6d607370e 100644
+--- a/gold/dwp.cc
++++ b/gold/dwp.cc
+@@ -32,7 +32,7 @@
+ 
+ #include <vector>
+ #include <algorithm>
+-#include <functional>
++#include <memory>
+ 
+ #include "getopt.h"
+ #include "libiberty.h"
+@@ -633,6 +633,11 @@ class Dwp_output_file
+   unsigned int
+   add_output_section(const char* section_name, int align);
+ 
++  // Prepare to write a new section to the output file.
++  off_t
++  start_new_section(const char* section_name, section_size_type len,
++		    int align);
++
+   // Write a new section to the output file.
+   void
+   write_new_section(const char* section_name, const unsigned char* contents,
+@@ -1565,8 +1570,6 @@ Dwo_file::add_strings(Dwp_output_file* output_file, unsigned int debug_str)
+     }
+   new_offset = 0;
+   this->str_offset_map_.push_back(std::make_pair(i, new_offset));
+-  if (is_new)
+-    delete[] pdata;
+ }
+ 
+ // Copy a section from the input file to the output file.
+@@ -1781,7 +1784,7 @@ section_offset_type
+ Dwp_output_file::add_string(const char* str, size_t len)
+ {
+   Stringpool::Key key;
+-  this->stringpool_.add_with_length(str, len, true, &key);
++  this->stringpool_.add_with_length(str, len, false, &key);
+   this->have_strings_ = true;
+   // We aren't supposed to call get_offset() until after
+   // calling set_string_offsets(), but the offsets will
+@@ -2053,10 +2056,10 @@ Dwp_output_file::finalize()
+     {
+       this->stringpool_.set_string_offsets();
+       section_size_type len = this->stringpool_.get_strtab_size();
+-      buf = new unsigned char[len];
+-      this->stringpool_.write_to_buffer(buf, len);
+-      this->write_new_section(".debug_str.dwo", buf, len, 1);
+-      delete[] buf;
++      off_t file_offset = this->start_new_section(".debug_str.dwo", len, 1);
++      this->stringpool_.write_to_file(this->fd_, file_offset,
++				      this->name_, ".debug_str.dwo");
++      this->next_file_offset_ = file_offset + len;
+     }
+ 
+   // Write the CU and TU indexes.
+@@ -2138,11 +2141,10 @@ Dwp_output_file::write_contributions(const Section& sect)
+     }
+ }
+ 
+-// Write a new section to the output file.
++// Prepare to write a new section to the output file.
+ 
+-void
+-Dwp_output_file::write_new_section(const char* section_name,
+-				   const unsigned char* contents,
++off_t
++Dwp_output_file::start_new_section(const char* section_name,
+ 				   section_size_type len, int align)
+ {
+   section_name = this->shstrtab_.add_with_length(section_name,
+@@ -2155,7 +2157,18 @@ Dwp_output_file::write_new_section(const char* section_name,
+   section.offset = file_offset;
+   section.size = len;
+   ::fseek(this->fd_, file_offset, SEEK_SET);
+-  if (::fwrite(contents, 1, len, this->fd_) < len)
++  return file_offset;
++}
++
++// Write a new section to the output file.
++
++void
++Dwp_output_file::write_new_section(const char* section_name,
++				   const unsigned char* contents,
++				   section_size_type len, int align)
++{
++  off_t file_offset = this->start_new_section(section_name, len, align);
++   if (::fwrite(contents, 1, len, this->fd_) < len)
+     gold_fatal(_("%s: error writing section '%s'"), this->name_, section_name);
+   this->next_file_offset_ = file_offset + len;
+ }
+@@ -2676,14 +2689,25 @@ main(int argc, char** argv)
+ 
+   // Process each file, adding its contents to the output file.
+   Dwp_output_file output_file(output_filename.c_str());
++  std::vector<Dwo_file*> dwo_files;
+   for (File_list::const_iterator f = files.begin(); f != files.end(); ++f)
+     {
+       if (verbose)
+ 	fprintf(stderr, "%s\n", f->dwo_name.c_str());
+-      Dwo_file dwo_file(f->dwo_name.c_str());
+-      dwo_file.read(&output_file);
++      Dwo_file* dwo_file = new Dwo_file(f->dwo_name.c_str());
++      dwo_file->read(&output_file);
++      dwo_files.push_back(dwo_file);
+     }
+   output_file.finalize();
+ 
++  // Clean up dwo_files.
++  for (std::vector<Dwo_file*>::iterator i = dwo_files.begin(),
++	 e = dwo_files.end();
++       i != e;
++       ++i)
++    {
++      delete *i;
++    }
++
+   return EXIT_SUCCESS;
+ }
+diff --git a/gold/stringpool.cc b/gold/stringpool.cc
+index 95715a35e93..4cd83ed7c18 100644
+--- a/gold/stringpool.cc
++++ b/gold/stringpool.cc
+@@ -491,6 +491,38 @@ Stringpool_template<Stringpool_char>::write_to_buffer(
+     }
+ }
+ 
++// Write the ELF strtab into the file at the specified offset.
++
++template<typename Stringpool_char>
++void
++Stringpool_template<Stringpool_char>::write_to_file(
++    FILE* fd, off_t file_offset,
++    const char* name, const char* section_name)
++{
++  gold_assert(fd != NULL);
++  gold_assert(this->strtab_size_ != 0);
++  if (this->zero_null_)
++    {
++      char buf[] = {'\0'};
++      ::fseek(fd, file_offset, SEEK_SET);
++      if (::fwrite(buf, 1, 1, fd) < 1)
++        gold_fatal(_("%s: error writing section '%s'"), name, section_name);
++    }
++
++  for (typename String_set_type::const_iterator p = this->string_set_.begin();
++       p != this->string_set_.end();
++       ++p)
++    {
++      const unsigned int len = (p->first.length + 1) * sizeof(Stringpool_char);
++      const section_offset_type offset = this->key_to_offset_[p->second - 1];
++      gold_assert(static_cast<section_size_type>(offset) + len
++		  <= this->strtab_size_);
++      ::fseek(fd, file_offset + offset, SEEK_SET);
++      if (::fwrite(p->first.string, 1, len, fd) < len)
++        gold_fatal(_("%s: error writing section '%s'"), name, section_name);
++    }
++}
++
+ // Write the ELF strtab into the output file at the specified offset.
+ 
+ template<typename Stringpool_char>
+diff --git a/gold/stringpool.h b/gold/stringpool.h
+index 10ec4baab84..cca6680c00e 100644
+--- a/gold/stringpool.h
++++ b/gold/stringpool.h
+@@ -285,6 +285,12 @@ class Stringpool_template
+   void
+   write_to_buffer(unsigned char* buffer, section_size_type buffer_size);
+ 
++  // Write the string table into the specified file at the specified
++  // offset.
++  void
++  write_to_file(FILE *fd, off_t file_offset, const char *name,
++		const char *section_name);
++
+   // Dump statistical information to stderr.
+   void
+   print_stats(const char*) const;
+-- 
+2.41.0
+

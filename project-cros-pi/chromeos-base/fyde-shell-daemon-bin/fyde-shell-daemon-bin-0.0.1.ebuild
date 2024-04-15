@@ -1,7 +1,7 @@
 # Copyright (c) 2022 Fyde Innovations Limited and the openFyde Authors.
 # Distributed under the license specified in the root directory of this project.
 
-EAPI="5"
+EAPI="7"
 
 DESCRIPTION="Setup shell daemon helper to allow certain privileged extension to execute shell commands"
 HOMEPAGE="https://fydeos.io"

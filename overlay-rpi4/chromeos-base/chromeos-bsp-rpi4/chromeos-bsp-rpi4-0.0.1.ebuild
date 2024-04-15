@@ -1,7 +1,7 @@
 # Copyright (c) 2022 Fyde Innovations Limited and the openFyde Authors.
 # Distributed under the license specified in the root directory of this project.
 
-EAPI="5"
+EAPI="7"
 inherit udev
 DESCRIPTION="drivers, config files for Raspberry Pi 4"
 HOMEPAGE="https://fydeos.io"

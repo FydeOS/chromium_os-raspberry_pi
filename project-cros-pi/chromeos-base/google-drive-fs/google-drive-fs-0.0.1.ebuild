@@ -1,7 +1,7 @@
 # Copyright (c) 2022 Fyde Innovations Limited and the openFyde Authors.
 # Distributed under the license specified in the root directory of this project.
 
-EAPI="5"
+EAPI="7"
 
 DESCRIPTION="Google drive related files"
 HOMEPAGE="https://drive.google.com/"

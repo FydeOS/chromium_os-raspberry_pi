@@ -1,0 +1,90 @@
+From 34d5a4ce03c8308bb5f4770a3a0012f6d0612cdf Mon Sep 17 00:00:00 2001
+From: Caroline Tice <cmtice@google.com>
+Date: Fri, 20 Nov 2020 11:05:19 -0800
+Subject: [PATCH 05/14] gold: dwp: further improve DWARF v5 memory efficiency
+
+Apply basic patch by David Blaikie to update gold dwp tool to handle
+DWARF v5. This is the third of three patches for DWARF v5.
+
+This patch contains a few more efficiency improvements.
+
+This patch created for Chrome OS by Caroline Tice.
+Date: 20-Nov-2020
+[Adrian Ratiu: rebased from v2.27 to v2.39]
+[Adrian Ratiu: regenerated as proper git format-patch.]
+
+Change-Id: If45091e5590f7f71b45d58a861eb83bfeb9c5c26
+---
+ elfcpp/dwarf.h |  6 +++---
+ gold/dwp.cc    | 25 ++++++++++---------------
+ 2 files changed, 13 insertions(+), 18 deletions(-)
+
+diff --git a/elfcpp/dwarf.h b/elfcpp/dwarf.h
+index c51a120f23d..0c8c59ae1a4 100644
+--- a/elfcpp/dwarf.h
++++ b/elfcpp/dwarf.h
+@@ -290,9 +290,9 @@ enum DW_SECT
+   DW_SECT_MACRO       = 7, // was MACINFO pre-v5
+   DW_SECT_RNGLISTS    = 8,
+   // These were used only for the experimental Fission support in DWARF 4.
+-  LEGACY_DW_SECT_TYPES = 20,
+-  LEGACY_DW_SECT_LOC = 21,
+-  LEGACY_DW_SECT_MACINFO = 22,
++  LEGACY_DW_SECT_TYPES = 2,
++  LEGACY_DW_SECT_LOC = 9,
++  LEGACY_DW_SECT_MACINFO = 10,
+   DW_SECT_MAX = LEGACY_DW_SECT_MACINFO
+ };
+ 
+diff --git a/gold/dwp.cc b/gold/dwp.cc
+index fe6d607370e..9f03cee8050 100644
+--- a/gold/dwp.cc
++++ b/gold/dwp.cc
+@@ -817,27 +817,15 @@ get_dwarf_section_name(elfcpp::DW_SECT section_id)
+   static const char* dwarf_section_names[] = {
+     NULL,		      // unused
+     ".debug_info.dwo",	      // DW_SECT_INFO = 1
+-    NULL,		      // unused
++    ".debug_types.dwo",	      // LEGACY_DW_SECT_TYPES = 2
+     ".debug_abbrev.dwo",      // DW_SECT_ABBREV = 3
+     ".debug_line.dwo",	      // DW_SECT_LINE = 4
+     ".debug_loclists.dwo",    // DW_SECT_LOCLISTS = 5
+     ".debug_str_offsets.dwo", // DW_SECT_STR_OFFSETS = 6
+     ".debug_macro.dwo",	      // DW_SECT_MACRO = 7
+     ".debug_rnglists.dwo",    // DW_SECT_RNGLISTS = 8
+-    NULL,		      // unused
+-    NULL,		      // unused
+-    NULL,		      // unused
+-    NULL,		      // unused
+-    NULL,		      // unused
+-    NULL,		      // unused
+-    NULL,		      // unused
+-    NULL,		      // unused
+-    NULL,		      // unused
+-    NULL,		      // unused
+-    NULL,		      // unused
+-    ".debug_types.dwo",	      // LEGACY_DW_SECT_TYPES = 20
+-    ".debug_loc.dwo",	      // LEGACY_DW_SECT_LOC = 21
+-    ".debug_macinfo.dwo",     // LEGACY_DW_SECT_MACINFO = 22
++    ".debug_loc.dwo",	      // LEGACY_DW_SECT_LOC = 9
++    ".debug_macinfo.dwo",     // LEGACY_DW_SECT_MACINFO = 10
+   };
+ 
+   gold_assert(section_id > 0 && section_id <= elfcpp::DW_SECT_MAX);
+@@ -2183,6 +2171,13 @@ Dwp_output_file::write_index(const char* sect_name, const Dwp_index& index)
+   const unsigned int nused = index.hash_table_used_slots();
+   const unsigned int nrows = index.section_table_rows();
+ 
++  // If there is no contribution, don't create .debug_cu_index or
++  // .debug_ty_index. We can't assign a meaningful index version.  Assigning an
++  // arbitrary version is not great because an upper-level dwp may have to deal
++  // with mixed index versions.
++  if (nused == 0)
++    return;
++
+   int column_mask = index.section_table_cols();
+   unsigned int ncols = 0;
+   for (unsigned int c = 1; c <= elfcpp::DW_SECT_MAX; ++c)
+-- 
+2.41.0
+

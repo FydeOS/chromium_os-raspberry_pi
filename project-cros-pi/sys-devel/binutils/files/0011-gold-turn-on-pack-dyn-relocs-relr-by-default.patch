@@ -1,0 +1,30 @@
+From cba9f86c6f77ecd5625cd022db52b6d24ee119ca Mon Sep 17 00:00:00 2001
+From: Rahul Chaudhry <rahulchaudhry@google.com>
+Date: Sat, 17 Mar 2018 15:31:31 -0800
+Subject: [PATCH 11/14] gold: turn on --pack-dyn-relocs=relr by default.
+
+[Adrian Ratiu: rebased from v2.27 to v2.39]
+[Adrian Ratiu: regenerated as proper git format-patch.]
+[Adrian Ratiu: rebased on upstream patch submission.]
+
+Change-Id: I20cb32ebec8283017b8399d29fe8841a5c78aa0e
+---
+ gold/options.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/gold/options.h b/gold/options.h
+index 7071930df33..c333f0e4a66 100644
+--- a/gold/options.h
++++ b/gold/options.h
+@@ -1102,7 +1102,7 @@ class General_options
+   DEFINE_bool(p, options::ONE_DASH, 'p', false,
+ 	      N_("Ignored for ARM compatibility"), NULL);
+ 
+-  DEFINE_enum(pack_dyn_relocs, options::TWO_DASHES, '\0', "none",
++  DEFINE_enum(pack_dyn_relocs, options::TWO_DASHES, '\0', "relr",
+ 	     N_("Pack dynamic relocations in the given format"),
+ 	     N_("[=none,relr]"), true, {"none", "relr"});
+ 
+-- 
+2.41.0
+

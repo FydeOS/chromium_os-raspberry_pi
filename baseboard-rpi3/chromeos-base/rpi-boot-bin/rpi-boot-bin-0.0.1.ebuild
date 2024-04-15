@@ -1,7 +1,7 @@
 # Copyright (c) 2022 Fyde Innovations Limited and the openFyde Authors.
 # Distributed under the license specified in the root directory of this project.
 
-EAPI="5"
+EAPI="7"
 EGIT_REPO_URI="https://github.com/FydeOS/rpi-boot-bin.git"
 
 inherit git-r3

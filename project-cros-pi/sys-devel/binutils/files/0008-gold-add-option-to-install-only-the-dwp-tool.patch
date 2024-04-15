@@ -1,0 +1,212 @@
+From a016ce5b72c7e741331094f3605c3fb36d928d8f Mon Sep 17 00:00:00 2001
+From: Adrian Ratiu <adrian.ratiu@collabora.com>
+Date: Sat, 9 Jan 2021 04:06:08 +0200
+Subject: [PATCH 08/14] gold: add option to install only the dwp tool
+
+Distros/build-systems (ChromiumOS/portage, Yocto/bitbake...)
+can have buggy recipes which pick a wrong linker, upstream
+projects can hardcode or default to the wrong linker and other
+bugs like these make it prudent to have gold disabled if not
+necessary, hence the very useful existing --disable-gold flag.
+
+However there are cases where dwp is needed even though gold
+is not, so an option to enable only dwp in gold builds can be
+helpful as well to avoid project specific hacks like removing
+the gold linker in do_install() scripts just to have dwp.
+
+[Adrian Ratiu: rebased from v2.27 to v2.39]
+---
+ configure         |  4 +++-
+ configure.ac      |  4 +++-
+ gold/Makefile.am  |  2 ++
+ gold/Makefile.in  |  3 +++
+ gold/configure    |  4 ++++
+ gold/configure.ac | 10 ++++++++--
+ ld/configure      |  2 +-
+ ld/configure.ac   |  4 ++--
+ 8 files changed, 26 insertions(+), 7 deletions(-)
+
+diff --git a/configure b/configure
+index be433ef6d5d..75bdf91c80f 100755
+--- a/configure
++++ b/configure
+@@ -2997,6 +2997,8 @@ fi
+ #     Build both gold (installed as "ld.gold") and ld (installed as "ld"
+ #     and ld.bfd).
+ #     In other words, ld is default
++# --enable-gold=dwp
++#     Install only the DWP tool part of gold, not the linker itself
+ # --enable-gold=default --enable-ld=default
+ #     Error.
+ 
+@@ -3009,7 +3011,7 @@ else
+ fi
+ 
+ case "${ENABLE_GOLD}" in
+-  yes|default)
++  yes|default|dwp)
+     # Check for ELF target.
+     is_elf=no
+     case "${target}" in
+diff --git a/configure.ac b/configure.ac
+index 1651cbf3b02..b86dd4d59aa 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -319,6 +319,8 @@ AC_ARG_ENABLE(offload-targets,
+ #     Build both gold (installed as "ld.gold") and ld (installed as "ld"
+ #     and ld.bfd).
+ #     In other words, ld is default
++# --enable-gold=dwp
++#     Install only the DWP tool part of gold, not the linker itself
+ # --enable-gold=default --enable-ld=default
+ #     Error.
+ 
+@@ -329,7 +331,7 @@ AC_ARG_ENABLE(gold,
+ ENABLE_GOLD=$enableval,
+ ENABLE_GOLD=no)
+ case "${ENABLE_GOLD}" in
+-  yes|default)
++  yes|default|dwp)
+     # Check for ELF target.
+     is_elf=no
+     case "${target}" in
+diff --git a/gold/Makefile.am b/gold/Makefile.am
+index 2e406716f29..7d5e290cfe0 100644
+--- a/gold/Makefile.am
++++ b/gold/Makefile.am
+@@ -223,6 +223,7 @@ check: libgold.a
+ 
+ install-exec-local: ld-new$(EXEEXT)
+ 	$(mkinstalldirs) $(DESTDIR)$(bindir) $(DESTDIR)$(tooldir)/bin
++	if test "x$(install_only_dwp)" != "xyes"; then \
+ 	n=`echo $(installed_linker) | sed '$(transform)'`; \
+ 	$(INSTALL_PROGRAM_ENV) $(INSTALL_PROGRAM) \
+ 	  ld-new$(EXEEXT) $(DESTDIR)$(bindir)/$${n}$(EXEEXT); \
+@@ -241,6 +242,7 @@ install-exec-local: ld-new$(EXEEXT)
+ 	    ln $(DESTDIR)$(bindir)/$${n}$(EXEEXT) $(DESTDIR)$(tooldir)/bin/ld$(EXEEXT) >/dev/null 2>/dev/null \
+ 	    || $(INSTALL_PROGRAM_ENV) $(INSTALL_PROGRAM) ld-new$(EXEEXT) $(DESTDIR)$(tooldir)/bin/ld$(EXEEXT); \
+ 	  fi; \
++	fi; \
+ 	fi
+ 
+ POTFILES= $(CCFILES) $(HFILES) $(TARGETSOURCES)
+diff --git a/gold/Makefile.in b/gold/Makefile.in
+index 516eace5aa5..474596fa2f6 100644
+--- a/gold/Makefile.in
++++ b/gold/Makefile.in
+@@ -628,6 +628,7 @@ htmldir = @htmldir@
+ includedir = @includedir@
+ infodir = @infodir@
+ install_as_default = @install_as_default@
++install_only_dwp = @install_only_dwp@
+ install_sh = @install_sh@
+ installed_linker = @installed_linker@
+ libdir = @libdir@
+@@ -1584,6 +1585,7 @@ check: libgold.a
+ 
+ install-exec-local: ld-new$(EXEEXT)
+ 	$(mkinstalldirs) $(DESTDIR)$(bindir) $(DESTDIR)$(tooldir)/bin
++	if test "x$(install_only_dwp)" != "xyes"; then \
+ 	n=`echo $(installed_linker) | sed '$(transform)'`; \
+ 	$(INSTALL_PROGRAM_ENV) $(INSTALL_PROGRAM) \
+ 	  ld-new$(EXEEXT) $(DESTDIR)$(bindir)/$${n}$(EXEEXT); \
+@@ -1602,6 +1604,7 @@ install-exec-local: ld-new$(EXEEXT)
+ 	    ln $(DESTDIR)$(bindir)/$${n}$(EXEEXT) $(DESTDIR)$(tooldir)/bin/ld$(EXEEXT) >/dev/null 2>/dev/null \
+ 	    || $(INSTALL_PROGRAM_ENV) $(INSTALL_PROGRAM) ld-new$(EXEEXT) $(DESTDIR)$(tooldir)/bin/ld$(EXEEXT); \
+ 	  fi; \
++	fi; \
+ 	fi
+ 
+ po/POTFILES.in: @MAINT@ Makefile
+diff --git a/gold/configure b/gold/configure
+index 5f5b8c3602b..915443b322b 100755
+--- a/gold/configure
++++ b/gold/configure
+@@ -735,6 +735,7 @@ PLUGINS_FALSE
+ PLUGINS_TRUE
+ installed_linker
+ install_as_default
++install_only_dwp
+ EGREP
+ GREP
+ CPP
+@@ -5001,6 +5002,9 @@ if test "${enable_gold+set}" = set; then :
+      install_as_default=yes
+    fi
+    ;;
++ dwp)
++   install_only_dwp=yes
++   ;;
+  esac
+ else
+   install_as_default=no
+diff --git a/gold/configure.ac b/gold/configure.ac
+index 4f432809b37..87ba16eb6d0 100644
+--- a/gold/configure.ac
++++ b/gold/configure.ac
+@@ -68,10 +68,12 @@ AC_DEFINE_UNQUOTED(TARGET_SYSTEM_ROOT_RELOCATABLE, $sysroot_relocatable,
+ dnl "install_as_default" is true if the linker to be installed as the
+ dnl default linker, ld.
+ dnl "installed_linker" is the installed gold linker name.
++dnl "install_only_dwp" is true if only the DWP tool will be installed,
++dnl not the gold linker itself.
+ 
+ installed_linker=ld.gold
+ AC_ARG_ENABLE(gold,
+-[[  --enable-gold[=ARG]     build gold [ARG={default,yes,no}]]],
++[[  --enable-gold[=ARG]     build gold [ARG={default,dwp,yes,no}]]],
+ [case "${enableval}" in
+  default)
+    install_as_default=yes
+@@ -81,10 +83,14 @@ AC_ARG_ENABLE(gold,
+      install_as_default=yes
+    fi
+    ;;
+- esac],
++ dwp)
++   install_only_dwp=yes
++   ;;
++esac],
+ [install_as_default=no])
+ AC_SUBST(install_as_default)
+ AC_SUBST(installed_linker)
++AC_SUBST(install_only_dwp)
+ 
+ AC_PLUGINS
+ if test "$plugins" = "yes"; then
+diff --git a/ld/configure b/ld/configure
+index e2f66395af6..a74afd65605 100755
+--- a/ld/configure
++++ b/ld/configure
+@@ -15372,7 +15372,7 @@ if test "${enable_gold+set}" = set; then :
+    install_as_default=no
+    installed_linker=ld.bfd
+    ;;
+- yes|no)
++ yes|no|dwp)
+    install_as_default=yes
+    installed_linker=ld.bfd
+    ;;
+diff --git a/ld/configure.ac b/ld/configure.ac
+index e2976bc2926..af07892329f 100644
+--- a/ld/configure.ac
++++ b/ld/configure.ac
+@@ -116,13 +116,13 @@ dnl Use --enable-gold to decide if this linker should be the default.
+ dnl "install_as_default" is set to false if gold is the default linker.
+ dnl "installed_linker" is the installed BFD linker name.
+ AC_ARG_ENABLE(gold,
+-[[  --enable-gold[=ARG]     build gold [ARG={default,yes,no}]]],
++[[  --enable-gold[=ARG]     build gold [ARG={default,dwp,yes,no}]]],
+ [case "${enableval}" in
+  default)
+    install_as_default=no
+    installed_linker=ld.bfd
+    ;;
+- yes|no)
++ dwp|yes|no)
+    install_as_default=yes
+    installed_linker=ld.bfd
+    ;;
+-- 
+2.41.0
+

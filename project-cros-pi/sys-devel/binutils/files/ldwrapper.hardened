@@ -1,0 +1,14 @@
+#!/bin/sh
+
+# Copyright 2011 The ChromiumOS Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# This file wraps ld and ld.gold.
+# In addition, it inserts hardened flags (-z now and -z relro) to the linker
+# before invoking it.
+#
+# There is a similar wrapper around gcc that adds -fPIE, -fstack-protector-all,
+# -D_FORTIFY_SOURCE=2 and -pie to the compile command line.
+
+exec "$(readlink -f "${0}").real" -z now -z relro "$@"

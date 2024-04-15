@@ -1,0 +1,22 @@
+# Copyright 2023 The ChromiumOS Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# Metadata information for which CVEs do not affect ChromeOS or have been
+# patched in.
+#
+# For more information, see:
+#     http://go/third-party-package-remediation-playbook#special-case-back-ported-patches
+third_party {
+  security {
+    # CVE-2023-1579 was introduced in 31d6c13defeba7716ebc9d5c8f81f2f35fe39980 which
+    # ChromeOS does not contain.
+    mitigated_security_patch: "CVE-2023-1579"
+    # CVE-2021-3549 is not relevant to us as we do not enable or ship AVR anywhere.
+    mitigated_security_patch: "CVE-2021-3549"
+
+    # ChromeOS > Infra > Toolchain
+    tag: "vuln_reporting:buganizer_component:1034879"
+    tag: "vuln_reporting:contact_emails:crossecsheriff@google.com"
+  }
+}

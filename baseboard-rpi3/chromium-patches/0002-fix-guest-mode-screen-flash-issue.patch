@@ -1,0 +1,29 @@
+Index: src/chrome/browser/ash/login/chrome_restart_request.cc
+===================================================================
+--- src.orig/chrome/browser/ash/login/chrome_restart_request.cc
++++ src/chrome/browser/ash/login/chrome_restart_request.cc
+@@ -73,6 +73,11 @@ using ::content::BrowserThread;
+ 
+ // Increase logging level for Guest mode to avoid INFO messages in logs.
+ const char kGuestModeLoggingLevel[] = "1";
++const char kDisableBufferBwCompression[] = "disable-buffer-bw-compression";
++const char kFydeOSAccelConfig[] = "fydeos-accel-config";
++const char kFydeOSAccelRevertX[] = "fydeos-accel-revert-x";
++const char kFydeOSAccelRevertY[] = "fydeos-accel-revert-y";
++const char kFydeOSAccelRevertZ[] = "fydeos-accel-revert-z";
+ 
+ bool IsRunningTest() {
+   const base::CommandLine* current_command_line =
+@@ -161,6 +166,12 @@ void DeriveCommandLine(const GURL& start
+     ::switches::kDisableWebRtcHWDecoding,
+     ::switches::kDisableWebRtcHWEncoding,
+     ::switches::kOzonePlatform,
++    ::switches::kDisableExplicitDmaFences,
++    kDisableBufferBwCompression,
++    kFydeOSAccelConfig,
++    kFydeOSAccelRevertX,
++    kFydeOSAccelRevertY,
++    kFydeOSAccelRevertZ,
+     switches::kAshClearFastInkBuffer,
+     switches::kAshEnablePaletteOnAllDisplays,
+     switches::kAshEnableTabletMode,
