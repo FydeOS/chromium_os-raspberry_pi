@@ -1,7 +1,7 @@
-Index: kernel-rpi/mm/Kconfig
+Index: kernel-raspberry/mm/Kconfig
 ===================================================================
---- kernel-rpi.orig/mm/Kconfig
-+++ kernel-rpi/mm/Kconfig
+--- kernel-raspberry.orig/mm/Kconfig
++++ kernel-raspberry/mm/Kconfig
 @@ -125,7 +125,7 @@ config MEMORY_HOTPLUG
  	select MEMORY_ISOLATION
  	depends on SPARSEMEM || X86_64_ACPI_NUMA
@@ -118,10 +118,10 @@ Index: kernel-rpi/mm/Kconfig
 +source "mm/damon/Kconfig"
  
  endmenu
-Index: kernel-rpi/mm/compaction.c
+Index: kernel-raspberry/mm/compaction.c
 ===================================================================
---- kernel-rpi.orig/mm/compaction.c
-+++ kernel-rpi/mm/compaction.c
+--- kernel-raspberry.orig/mm/compaction.c
++++ kernel-raspberry/mm/compaction.c
 @@ -779,7 +779,7 @@ static bool too_many_isolated(pg_data_t
   * @cc:		Compaction control structure.
   * @low_pfn:	The first PFN to isolate
@@ -280,10 +280,10 @@ Index: kernel-rpi/mm/compaction.c
  	return low_pfn;
  }
  
-Index: kernel-rpi/mm/filemap.c
+Index: kernel-raspberry/mm/filemap.c
 ===================================================================
---- kernel-rpi.orig/mm/filemap.c
-+++ kernel-rpi/mm/filemap.c
+--- kernel-raspberry.orig/mm/filemap.c
++++ kernel-raspberry/mm/filemap.c
 @@ -3749,7 +3749,7 @@ ssize_t generic_perform_write(struct fil
  		unsigned long offset;	/* Offset into pagecache page */
  		unsigned long bytes;	/* Bytes to write to page */
@@ -293,10 +293,10 @@ Index: kernel-rpi/mm/filemap.c
  
  		offset = (pos & (PAGE_SIZE - 1));
  		bytes = min_t(unsigned long, PAGE_SIZE - offset,
-Index: kernel-rpi/mm/gup.c
+Index: kernel-raspberry/mm/gup.c
 ===================================================================
---- kernel-rpi.orig/mm/gup.c
-+++ kernel-rpi/mm/gup.c
+--- kernel-raspberry.orig/mm/gup.c
++++ kernel-raspberry/mm/gup.c
 @@ -509,18 +509,6 @@ static struct page *follow_page_pte(stru
  	if (WARN_ON_ONCE((flags & (FOLL_PIN | FOLL_GET)) ==
  			 (FOLL_PIN | FOLL_GET)))
@@ -334,10 +334,10 @@ Index: kernel-rpi/mm/gup.c
  			if (!gup_huge_pud(pud, pudp, addr, next, flags,
  					  pages, nr))
  				return 0;
-Index: kernel-rpi/mm/huge_memory.c
+Index: kernel-raspberry/mm/huge_memory.c
 ===================================================================
---- kernel-rpi.orig/mm/huge_memory.c
-+++ kernel-rpi/mm/huge_memory.c
+--- kernel-raspberry.orig/mm/huge_memory.c
++++ kernel-raspberry/mm/huge_memory.c
 @@ -2364,7 +2364,8 @@ static void __split_huge_page_tail(struc
  #ifdef CONFIG_64BIT
  			 (1L << PG_arch_2) |
@@ -348,10 +348,10 @@ Index: kernel-rpi/mm/huge_memory.c
  
  	/* ->mapping in first tail page is compound_mapcount */
  	VM_BUG_ON_PAGE(tail > 2 && page_tail->mapping != TAIL_MAPPING,
-Index: kernel-rpi/mm/hugetlb.c
+Index: kernel-raspberry/mm/hugetlb.c
 ===================================================================
---- kernel-rpi.orig/mm/hugetlb.c
-+++ kernel-rpi/mm/hugetlb.c
+--- kernel-raspberry.orig/mm/hugetlb.c
++++ kernel-raspberry/mm/hugetlb.c
 @@ -82,8 +82,6 @@ struct mutex *hugetlb_fault_mutex_table
  
  /* Forward declaration */
@@ -612,10 +612,10 @@ Index: kernel-rpi/mm/hugetlb.c
  #ifdef CONFIG_CMA
  static bool cma_reserve_called __initdata;
  
-Index: kernel-rpi/mm/internal.h
+Index: kernel-raspberry/mm/internal.h
 ===================================================================
---- kernel-rpi.orig/mm/internal.h
-+++ kernel-rpi/mm/internal.h
+--- kernel-raspberry.orig/mm/internal.h
++++ kernel-raspberry/mm/internal.h
 @@ -35,6 +35,7 @@
  void page_writeback_init(void);
  
@@ -624,10 +624,10 @@ Index: kernel-rpi/mm/internal.h
  
  void free_pgtables(struct mmu_gather *tlb, struct vm_area_struct *start_vma,
  		unsigned long floor, unsigned long ceiling);
-Index: kernel-rpi/mm/khugepaged.c
+Index: kernel-raspberry/mm/khugepaged.c
 ===================================================================
---- kernel-rpi.orig/mm/khugepaged.c
-+++ kernel-rpi/mm/khugepaged.c
+--- kernel-raspberry.orig/mm/khugepaged.c
++++ kernel-raspberry/mm/khugepaged.c
 @@ -1156,7 +1156,6 @@ static void collapse_huge_page(struct mm
  	_pmd = pmdp_collapse_flush(vma, address, pmd);
  	spin_unlock(pmd_ptl);
@@ -730,10 +730,10 @@ Index: kernel-rpi/mm/khugepaged.c
  			}
  			mmap_write_unlock(mm);
  		} else {
-Index: kernel-rpi/mm/maccess.c
+Index: kernel-raspberry/mm/maccess.c
 ===================================================================
---- kernel-rpi.orig/mm/maccess.c
-+++ kernel-rpi/mm/maccess.c
+--- kernel-raspberry.orig/mm/maccess.c
++++ kernel-raspberry/mm/maccess.c
 @@ -99,7 +99,7 @@ long strncpy_from_kernel_nofault(char *d
  	return src - unsafe_addr;
  Efault:
@@ -743,10 +743,10 @@ Index: kernel-rpi/mm/maccess.c
  	return -EFAULT;
  }
  #else /* HAVE_GET_KERNEL_NOFAULT */
-Index: kernel-rpi/mm/memblock.c
+Index: kernel-raspberry/mm/memblock.c
 ===================================================================
---- kernel-rpi.orig/mm/memblock.c
-+++ kernel-rpi/mm/memblock.c
+--- kernel-raspberry.orig/mm/memblock.c
++++ kernel-raspberry/mm/memblock.c
 @@ -1615,13 +1615,7 @@ void __init __memblock_free_late(phys_ad
  	end = PFN_DOWN(base + size);
  
@@ -762,10 +762,10 @@ Index: kernel-rpi/mm/memblock.c
  		totalram_pages_inc();
  	}
  }
-Index: kernel-rpi/mm/memcontrol.c
+Index: kernel-raspberry/mm/memcontrol.c
 ===================================================================
---- kernel-rpi.orig/mm/memcontrol.c
-+++ kernel-rpi/mm/memcontrol.c
+--- kernel-raspberry.orig/mm/memcontrol.c
++++ kernel-raspberry/mm/memcontrol.c
 @@ -2798,6 +2798,7 @@ static void commit_charge(struct page *p
  	 * - LRU isolation
  	 * - lock_page_memcg()
@@ -872,10 +872,10 @@ Index: kernel-rpi/mm/memcontrol.c
  	.cancel_attach = mem_cgroup_cancel_attach,
  	.post_attach = mem_cgroup_move_task,
  	.dfl_cftypes = memory_files,
-Index: kernel-rpi/mm/memory-failure.c
+Index: kernel-raspberry/mm/memory-failure.c
 ===================================================================
---- kernel-rpi.orig/mm/memory-failure.c
-+++ kernel-rpi/mm/memory-failure.c
+--- kernel-raspberry.orig/mm/memory-failure.c
++++ kernel-raspberry/mm/memory-failure.c
 @@ -57,7 +57,6 @@
  #include <linux/ratelimit.h>
  #include <linux/page-isolation.h>
@@ -1128,10 +1128,10 @@ Index: kernel-rpi/mm/memory-failure.c
  		put_page(page);
  		return -EBUSY;
  	}
-Index: kernel-rpi/mm/memory.c
+Index: kernel-raspberry/mm/memory.c
 ===================================================================
---- kernel-rpi.orig/mm/memory.c
-+++ kernel-rpi/mm/memory.c
+--- kernel-raspberry.orig/mm/memory.c
++++ kernel-raspberry/mm/memory.c
 @@ -121,18 +121,6 @@ int randomize_va_space __read_mostly =
  					2;
  #endif
@@ -1204,10 +1204,10 @@ Index: kernel-rpi/mm/memory.c
  	if (flags & FAULT_FLAG_USER) {
  		mem_cgroup_exit_user_fault();
  		/*
-Index: kernel-rpi/mm/memory_hotplug.c
+Index: kernel-raspberry/mm/memory_hotplug.c
 ===================================================================
---- kernel-rpi.orig/mm/memory_hotplug.c
-+++ kernel-rpi/mm/memory_hotplug.c
+--- kernel-raspberry.orig/mm/memory_hotplug.c
++++ kernel-raspberry/mm/memory_hotplug.c
 @@ -36,6 +36,7 @@
  #include <linux/memblock.h>
  #include <linux/compaction.h>
@@ -1216,10 +1216,10 @@ Index: kernel-rpi/mm/memory_hotplug.c
  
  #include <asm/tlbflush.h>
  
-Index: kernel-rpi/mm/mempolicy.c
+Index: kernel-raspberry/mm/mempolicy.c
 ===================================================================
---- kernel-rpi.orig/mm/mempolicy.c
-+++ kernel-rpi/mm/mempolicy.c
+--- kernel-raspberry.orig/mm/mempolicy.c
++++ kernel-raspberry/mm/mempolicy.c
 @@ -809,7 +809,7 @@ static int mbind_range(struct mm_struct
  		prev = vma_merge(mm, prev, vmstart, vmend, vma->vm_flags,
  				 vma->anon_vma, vma->vm_file, pgoff,
@@ -1229,10 +1229,10 @@ Index: kernel-rpi/mm/mempolicy.c
  		if (prev) {
  			vma = prev;
  			goto replace;
-Index: kernel-rpi/mm/memremap.c
+Index: kernel-raspberry/mm/memremap.c
 ===================================================================
---- kernel-rpi.orig/mm/memremap.c
-+++ kernel-rpi/mm/memremap.c
+--- kernel-raspberry.orig/mm/memremap.c
++++ kernel-raspberry/mm/memremap.c
 @@ -327,7 +327,6 @@ void *memremap_pages(struct dev_pagemap
  			WARN(1, "File system DAX not supported\n");
  			return ERR_PTR(-EINVAL);
@@ -1241,10 +1241,10 @@ Index: kernel-rpi/mm/memremap.c
  		break;
  	case MEMORY_DEVICE_GENERIC:
  		break;
-Index: kernel-rpi/mm/mm_init.c
+Index: kernel-raspberry/mm/mm_init.c
 ===================================================================
---- kernel-rpi.orig/mm/mm_init.c
-+++ kernel-rpi/mm/mm_init.c
+--- kernel-raspberry.orig/mm/mm_init.c
++++ kernel-raspberry/mm/mm_init.c
 @@ -65,14 +65,16 @@ void __init mminit_verify_pageflags_layo
  
  	shift = 8 * sizeof(unsigned long);
@@ -1264,10 +1264,10 @@ Index: kernel-rpi/mm/mm_init.c
  		NR_PAGEFLAGS);
  	mminit_dprintk(MMINIT_TRACE, "pageflags_layout_shifts",
  		"Section %d Node %d Zone %d Lastcpupid %d Kasantag %d\n",
-Index: kernel-rpi/mm/mmap.c
+Index: kernel-raspberry/mm/mmap.c
 ===================================================================
---- kernel-rpi.orig/mm/mmap.c
-+++ kernel-rpi/mm/mmap.c
+--- kernel-raspberry.orig/mm/mmap.c
++++ kernel-raspberry/mm/mmap.c
 @@ -1030,7 +1030,7 @@ again:
  static inline int is_mergeable_vma(struct vm_area_struct *vma,
  				struct file *file, unsigned long vm_flags,
@@ -1446,10 +1446,10 @@ Index: kernel-rpi/mm/mmap.c
  	vm_unacct_memory(nr_accounted);
  }
  
-Index: kernel-rpi/mm/mmu_gather.c
+Index: kernel-raspberry/mm/mmu_gather.c
 ===================================================================
---- kernel-rpi.orig/mm/mmu_gather.c
-+++ kernel-rpi/mm/mmu_gather.c
+--- kernel-raspberry.orig/mm/mmu_gather.c
++++ kernel-raspberry/mm/mmu_gather.c
 @@ -139,7 +139,7 @@ static void tlb_remove_table_smp_sync(vo
  	/* Simply deliver the interrupt */
  }
@@ -1468,10 +1468,10 @@ Index: kernel-rpi/mm/mmu_gather.c
  static void tlb_remove_table_free(struct mmu_table_batch *batch)
  {
  	__tlb_remove_table_free(batch);
-Index: kernel-rpi/mm/mmzone.c
+Index: kernel-raspberry/mm/mmzone.c
 ===================================================================
---- kernel-rpi.orig/mm/mmzone.c
-+++ kernel-rpi/mm/mmzone.c
+--- kernel-raspberry.orig/mm/mmzone.c
++++ kernel-raspberry/mm/mmzone.c
 @@ -81,6 +81,8 @@ void lruvec_init(struct lruvec *lruvec)
  
  	for_each_lru(lru)
@@ -1481,10 +1481,10 @@ Index: kernel-rpi/mm/mmzone.c
  }
  
  #if defined(CONFIG_NUMA_BALANCING) && !defined(LAST_CPUPID_NOT_IN_PAGE_FLAGS)
-Index: kernel-rpi/mm/page_alloc.c
+Index: kernel-raspberry/mm/page_alloc.c
 ===================================================================
---- kernel-rpi.orig/mm/page_alloc.c
-+++ kernel-rpi/mm/page_alloc.c
+--- kernel-raspberry.orig/mm/page_alloc.c
++++ kernel-raspberry/mm/page_alloc.c
 @@ -191,27 +191,6 @@ EXPORT_SYMBOL(init_on_alloc);
  DEFINE_STATIC_KEY_MAYBE(CONFIG_INIT_ON_FREE_DEFAULT_ON, init_on_free);
  EXPORT_SYMBOL(init_on_free);
@@ -1549,10 +1549,10 @@ Index: kernel-rpi/mm/page_alloc.c
  	/*
  	 * Forbid the first pass from falling back to types that fragment
  	 * memory until all local zones are considered.
-Index: kernel-rpi/mm/page_owner.c
+Index: kernel-raspberry/mm/page_owner.c
 ===================================================================
---- kernel-rpi.orig/mm/page_owner.c
-+++ kernel-rpi/mm/page_owner.c
+--- kernel-raspberry.orig/mm/page_owner.c
++++ kernel-raspberry/mm/page_owner.c
 @@ -329,8 +329,6 @@ print_page_owner(char __user *buf, size_
  		depot_stack_handle_t handle)
  {
@@ -1606,10 +1606,10 @@ Index: kernel-rpi/mm/page_owner.c
  	}
  
  	if (page_owner->last_migrate_reason != -1)
-Index: kernel-rpi/mm/rmap.c
+Index: kernel-raspberry/mm/rmap.c
 ===================================================================
---- kernel-rpi.orig/mm/rmap.c
-+++ kernel-rpi/mm/rmap.c
+--- kernel-raspberry.orig/mm/rmap.c
++++ kernel-raspberry/mm/rmap.c
 @@ -73,6 +73,7 @@
  #include <linux/page_idle.h>
  #include <linux/memremap.h>
@@ -1631,10 +1631,10 @@ Index: kernel-rpi/mm/rmap.c
  			if (ptep_clear_flush_young_notify(vma, address,
  						pvmw.pte)) {
  				/*
-Index: kernel-rpi/mm/shmem.c
+Index: kernel-raspberry/mm/shmem.c
 ===================================================================
---- kernel-rpi.orig/mm/shmem.c
-+++ kernel-rpi/mm/shmem.c
+--- kernel-raspberry.orig/mm/shmem.c
++++ kernel-raspberry/mm/shmem.c
 @@ -2463,7 +2463,6 @@ shmem_write_begin(struct file *file, str
  	struct inode *inode = mapping->host;
  	struct shmem_inode_info *info = SHMEM_I(inode);
@@ -1751,10 +1751,10 @@ Index: kernel-rpi/mm/shmem.c
  	return page;
  #else
  	/*
-Index: kernel-rpi/mm/swap.c
+Index: kernel-raspberry/mm/swap.c
 ===================================================================
---- kernel-rpi.orig/mm/swap.c
-+++ kernel-rpi/mm/swap.c
+--- kernel-raspberry.orig/mm/swap.c
++++ kernel-raspberry/mm/swap.c
 @@ -325,7 +325,7 @@ static bool need_activate_page_drain(int
  	return pagevec_count(&per_cpu(lru_pvecs.activate_page, cpu)) != 0;
  }
@@ -1863,10 +1863,10 @@ Index: kernel-rpi/mm/swap.c
  		struct pagevec *pvec;
  
  		local_lock(&lru_pvecs.lock);
-Index: kernel-rpi/mm/swap_slots.c
+Index: kernel-raspberry/mm/swap_slots.c
 ===================================================================
---- kernel-rpi.orig/mm/swap_slots.c
-+++ kernel-rpi/mm/swap_slots.c
+--- kernel-raspberry.orig/mm/swap_slots.c
++++ kernel-raspberry/mm/swap_slots.c
 @@ -30,6 +30,7 @@
  #include <linux/swap_slots.h>
  #include <linux/cpu.h>
@@ -1875,10 +1875,10 @@ Index: kernel-rpi/mm/swap_slots.c
  #include <linux/vmalloc.h>
  #include <linux/mutex.h>
  #include <linux/mm.h>
-Index: kernel-rpi/mm/swapfile.c
+Index: kernel-raspberry/mm/swapfile.c
 ===================================================================
---- kernel-rpi.orig/mm/swapfile.c
-+++ kernel-rpi/mm/swapfile.c
+--- kernel-raspberry.orig/mm/swapfile.c
++++ kernel-raspberry/mm/swapfile.c
 @@ -2527,6 +2527,8 @@ SYSCALL_DEFINE1(swapoff, const char __us
  	struct filename *pathname;
  	int err, found = 0;
@@ -1961,10 +1961,10 @@ Index: kernel-rpi/mm/swapfile.c
  		p->bdev = inode->i_sb->s_bdev;
  	}
  
-Index: kernel-rpi/mm/userfaultfd.c
+Index: kernel-raspberry/mm/userfaultfd.c
 ===================================================================
---- kernel-rpi.orig/mm/userfaultfd.c
-+++ kernel-rpi/mm/userfaultfd.c
+--- kernel-raspberry.orig/mm/userfaultfd.c
++++ kernel-raspberry/mm/userfaultfd.c
 @@ -63,7 +63,7 @@ int mfill_atomic_install_pte(struct mm_s
  	pte_t _dst_pte, *dst_pte;
  	bool writable = dst_vma->vm_flags & VM_WRITE;
@@ -1986,10 +1986,10 @@ Index: kernel-rpi/mm/userfaultfd.c
  	ret = mfill_atomic_install_pte(dst_mm, dst_pmd, dst_vma, dst_addr,
  				       page, false, wp_copy);
  	if (ret)
-Index: kernel-rpi/mm/vmscan.c
+Index: kernel-raspberry/mm/vmscan.c
 ===================================================================
---- kernel-rpi.orig/mm/vmscan.c
-+++ kernel-rpi/mm/vmscan.c
+--- kernel-raspberry.orig/mm/vmscan.c
++++ kernel-raspberry/mm/vmscan.c
 @@ -50,6 +50,10 @@
  #include <linux/printk.h>
  #include <linux/dax.h>
@@ -5367,10 +5367,10 @@ Index: kernel-rpi/mm/vmscan.c
  
  		/*
  		 * If we're getting trouble reclaiming, start doing writepage
-Index: kernel-rpi/mm/workingset.c
+Index: kernel-raspberry/mm/workingset.c
 ===================================================================
---- kernel-rpi.orig/mm/workingset.c
-+++ kernel-rpi/mm/workingset.c
+--- kernel-raspberry.orig/mm/workingset.c
++++ kernel-raspberry/mm/workingset.c
 @@ -187,7 +187,6 @@ static unsigned int bucket_order __read_
  static void *pack_shadow(int memcgid, pg_data_t *pgdat, unsigned long eviction,
  			 bool workingset)
@@ -5517,10 +5517,10 @@ Index: kernel-rpi/mm/workingset.c
  
  	rcu_read_lock();
  	/*
-Index: kernel-rpi/mm/zswap.c
+Index: kernel-raspberry/mm/zswap.c
 ===================================================================
---- kernel-rpi.orig/mm/zswap.c
-+++ kernel-rpi/mm/zswap.c
+--- kernel-raspberry.orig/mm/zswap.c
++++ kernel-raspberry/mm/zswap.c
 @@ -648,9 +648,8 @@ error:
  	return NULL;
  }
@@ -5624,10 +5624,10 @@ Index: kernel-rpi/mm/zswap.c
  hp_fail:
  	cpuhp_remove_state(CPUHP_MM_ZSWP_MEM_PREPARE);
  dstmem_fail:
-Index: kernel-rpi/kernel/fork.c
+Index: kernel-raspberry/kernel/fork.c
 ===================================================================
---- kernel-rpi.orig/kernel/fork.c
-+++ kernel-rpi/kernel/fork.c
+--- kernel-raspberry.orig/kernel/fork.c
++++ kernel-raspberry/kernel/fork.c
 @@ -97,6 +97,7 @@
  #include <linux/scs.h>
  #include <linux/io_uring.h>
@@ -5723,10 +5723,10 @@ Index: kernel-rpi/kernel/fork.c
  	wake_up_new_task(p);
  
  	/* forking complete and child started to run, tell ptracer */
-Index: kernel-rpi/kernel/bounds.c
+Index: kernel-raspberry/kernel/bounds.c
 ===================================================================
---- kernel-rpi.orig/kernel/bounds.c
-+++ kernel-rpi/kernel/bounds.c
+--- kernel-raspberry.orig/kernel/bounds.c
++++ kernel-raspberry/kernel/bounds.c
 @@ -22,6 +22,13 @@ int main(void)
  	DEFINE(NR_CPUS_BITS, ilog2(CONFIG_NR_CPUS));
  #endif
@@ -5741,10 +5741,10 @@ Index: kernel-rpi/kernel/bounds.c
  	/* End of constants */
  
  	return 0;
-Index: kernel-rpi/include/linux/mm.h
+Index: kernel-raspberry/include/linux/mm.h
 ===================================================================
---- kernel-rpi.orig/include/linux/mm.h
-+++ kernel-rpi/include/linux/mm.h
+--- kernel-raspberry.orig/include/linux/mm.h
++++ kernel-raspberry/include/linux/mm.h
 @@ -211,6 +211,8 @@ extern int sysctl_overcommit_memory;
  extern int sysctl_overcommit_ratio;
  extern unsigned long sysctl_overcommit_kbytes;
@@ -5772,10 +5772,10 @@ Index: kernel-rpi/include/linux/mm.h
  
  #ifdef CONFIG_PRINTK
  void mem_dump_obj(void *object);
-Index: kernel-rpi/include/linux/mm_inline.h
+Index: kernel-raspberry/include/linux/mm_inline.h
 ===================================================================
---- kernel-rpi.orig/include/linux/mm_inline.h
-+++ kernel-rpi/include/linux/mm_inline.h
+--- kernel-raspberry.orig/include/linux/mm_inline.h
++++ kernel-raspberry/include/linux/mm_inline.h
 @@ -24,15 +24,25 @@ static inline int page_is_file_lru(struc
  	return !PageSwapBacked(page);
  }
@@ -6055,10 +6055,10 @@ Index: kernel-rpi/include/linux/mm_inline.h
  	list_del(&page->lru);
  	update_lru_size(lruvec, page_lru(page), page_zonenum(page),
  			-thp_nr_pages(page));
-Index: kernel-rpi/include/linux/mm_types.h
+Index: kernel-raspberry/include/linux/mm_types.h
 ===================================================================
---- kernel-rpi.orig/include/linux/mm_types.h
-+++ kernel-rpi/include/linux/mm_types.h
+--- kernel-raspberry.orig/include/linux/mm_types.h
++++ kernel-raspberry/include/linux/mm_types.h
 @@ -350,14 +350,19 @@ struct vm_area_struct {
  	/*
  	 * For areas with an address space and backing store,
@@ -6190,10 +6190,10 @@ Index: kernel-rpi/include/linux/mm_types.h
  }
  
  #endif /* _LINUX_MM_TYPES_H */
-Index: kernel-rpi/include/linux/mmzone.h
+Index: kernel-raspberry/include/linux/mmzone.h
 ===================================================================
---- kernel-rpi.orig/include/linux/mmzone.h
-+++ kernel-rpi/include/linux/mmzone.h
+--- kernel-raspberry.orig/include/linux/mmzone.h
++++ kernel-raspberry/include/linux/mmzone.h
 @@ -294,6 +294,207 @@ enum lruvec_flags {
  					 */
  };
@@ -6427,10 +6427,10 @@ Index: kernel-rpi/include/linux/mmzone.h
  	ZONE_PADDING(_pad2_)
  
  	/* Per-node vmstats */
-Index: kernel-rpi/include/linux/page-flags-layout.h
+Index: kernel-raspberry/include/linux/page-flags-layout.h
 ===================================================================
---- kernel-rpi.orig/include/linux/page-flags-layout.h
-+++ kernel-rpi/include/linux/page-flags-layout.h
+--- kernel-raspberry.orig/include/linux/page-flags-layout.h
++++ kernel-raspberry/include/linux/page-flags-layout.h
 @@ -55,7 +55,8 @@
  #define SECTIONS_WIDTH		0
  #endif
@@ -6470,10 +6470,10 @@ Index: kernel-rpi/include/linux/page-flags-layout.h
 +
  #endif
  #endif /* _LINUX_PAGE_FLAGS_LAYOUT */
-Index: kernel-rpi/include/linux/page-flags.h
+Index: kernel-raspberry/include/linux/page-flags.h
 ===================================================================
---- kernel-rpi.orig/include/linux/page-flags.h
-+++ kernel-rpi/include/linux/page-flags.h
+--- kernel-raspberry.orig/include/linux/page-flags.h
++++ kernel-raspberry/include/linux/page-flags.h
 @@ -845,7 +845,7 @@ static inline void ClearPageSlabPfmemall
  	 1UL << PG_private	| 1UL << PG_private_2	|	\
  	 1UL << PG_writeback	| 1UL << PG_reserved	|	\
@@ -6492,10 +6492,10 @@ Index: kernel-rpi/include/linux/page-flags.h
  
  #define PAGE_FLAGS_PRIVATE				\
  	(1UL << PG_private | 1UL << PG_private_2)
-Index: kernel-rpi/include/linux/sched.h
+Index: kernel-raspberry/include/linux/sched.h
 ===================================================================
---- kernel-rpi.orig/include/linux/sched.h
-+++ kernel-rpi/include/linux/sched.h
+--- kernel-raspberry.orig/include/linux/sched.h
++++ kernel-raspberry/include/linux/sched.h
 @@ -803,6 +803,10 @@ struct task_struct {
  	struct uclamp_se		uclamp[UCLAMP_CNT];
  #endif
@@ -6538,10 +6538,10 @@ Index: kernel-rpi/include/linux/sched.h
  	struct prev_cputime		prev_cputime;
  #ifdef CONFIG_VIRT_CPU_ACCOUNTING_GEN
  	struct vtime			vtime;
-Index: kernel-rpi/include/linux/swap.h
+Index: kernel-raspberry/include/linux/swap.h
 ===================================================================
---- kernel-rpi.orig/include/linux/swap.h
-+++ kernel-rpi/include/linux/swap.h
+--- kernel-raspberry.orig/include/linux/swap.h
++++ kernel-raspberry/include/linux/swap.h
 @@ -137,6 +137,10 @@ union swap_header {
   */
  struct reclaim_state {
@@ -6561,10 +6561,10 @@ Index: kernel-rpi/include/linux/swap.h
  extern unsigned long try_to_free_mem_cgroup_pages(struct mem_cgroup *memcg,
  						  unsigned long nr_pages,
  						  gfp_t gfp_mask,
-Index: kernel-rpi/include/linux/eventfd.h
+Index: kernel-raspberry/include/linux/eventfd.h
 ===================================================================
---- kernel-rpi.orig/include/linux/eventfd.h
-+++ kernel-rpi/include/linux/eventfd.h
+--- kernel-raspberry.orig/include/linux/eventfd.h
++++ kernel-raspberry/include/linux/eventfd.h
 @@ -27,8 +27,14 @@
  #define EFD_CLOEXEC O_CLOEXEC
  #define EFD_NONBLOCK O_NONBLOCK
@@ -6612,10 +6612,10 @@ Index: kernel-rpi/include/linux/eventfd.h
  {
  	return -ENOSYS;
  }
-Index: kernel-rpi/fs/eventfd.c
+Index: kernel-raspberry/fs/eventfd.c
 ===================================================================
---- kernel-rpi.orig/fs/eventfd.c
-+++ kernel-rpi/fs/eventfd.c
+--- kernel-raspberry.orig/fs/eventfd.c
++++ kernel-raspberry/fs/eventfd.c
 @@ -43,7 +43,21 @@ struct eventfd_ctx {
  	int id;
  };
@@ -6778,10 +6778,10 @@ Index: kernel-rpi/fs/eventfd.c
  	ctx = kmalloc(sizeof(*ctx), GFP_KERNEL);
  	if (!ctx)
  		return -ENOMEM;
-Index: kernel-rpi/io_uring/io_uring.c
+Index: kernel-raspberry/io_uring/io_uring.c
 ===================================================================
---- kernel-rpi.orig/io_uring/io_uring.c
-+++ kernel-rpi/io_uring/io_uring.c
+--- kernel-raspberry.orig/io_uring/io_uring.c
++++ kernel-raspberry/io_uring/io_uring.c
 @@ -1638,7 +1638,7 @@ static void io_cqring_ev_posted(struct i
  	if (ctx->sq_data && waitqueue_active(&ctx->sq_data->wait))
  		wake_up(&ctx->sq_data->wait);
@@ -6800,10 +6800,10 @@ Index: kernel-rpi/io_uring/io_uring.c
  	if (waitqueue_active(&ctx->poll_wait))
  		__wake_up(&ctx->poll_wait, TASK_INTERRUPTIBLE, 0,
  				poll_to_key(EPOLL_URING_WAKE | EPOLLIN));
-Index: kernel-rpi/include/linux/memcontrol.h
+Index: kernel-raspberry/include/linux/memcontrol.h
 ===================================================================
---- kernel-rpi.orig/include/linux/memcontrol.h
-+++ kernel-rpi/include/linux/memcontrol.h
+--- kernel-raspberry.orig/include/linux/memcontrol.h
++++ kernel-raspberry/include/linux/memcontrol.h
 @@ -348,6 +348,11 @@ struct mem_cgroup {
  	struct deferred_split deferred_split_queue;
  #endif
@@ -6875,10 +6875,10 @@ Index: kernel-rpi/include/linux/memcontrol.h
  static inline void mem_cgroup_handle_over_high(void)
  {
  }
-Index: kernel-rpi/arch/arm64/include/asm/pgtable.h
+Index: kernel-raspberry/arch/arm64/include/asm/pgtable.h
 ===================================================================
---- kernel-rpi.orig/arch/arm64/include/asm/pgtable.h
-+++ kernel-rpi/arch/arm64/include/asm/pgtable.h
+--- kernel-raspberry.orig/arch/arm64/include/asm/pgtable.h
++++ kernel-raspberry/arch/arm64/include/asm/pgtable.h
 @@ -1016,6 +1016,7 @@ static inline bool arch_wants_old_prefau
  	return !arch_faults_on_old_pte();
  }
@@ -6887,10 +6887,10 @@ Index: kernel-rpi/arch/arm64/include/asm/pgtable.h
  
  #endif /* !__ASSEMBLY__ */
  
-Index: kernel-rpi/include/linux/nodemask.h
+Index: kernel-raspberry/include/linux/nodemask.h
 ===================================================================
---- kernel-rpi.orig/include/linux/nodemask.h
-+++ kernel-rpi/include/linux/nodemask.h
+--- kernel-raspberry.orig/include/linux/nodemask.h
++++ kernel-raspberry/include/linux/nodemask.h
 @@ -485,6 +485,7 @@ static inline int num_node_state(enum no
  #define first_online_node	0
  #define first_memory_node	0
@@ -6899,10 +6899,10 @@ Index: kernel-rpi/include/linux/nodemask.h
  #define nr_node_ids		1U
  #define nr_online_nodes		1U
  
-Index: kernel-rpi/include/linux/cpufreq_times.h
+Index: kernel-raspberry/include/linux/cpufreq_times.h
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/include/linux/cpufreq_times.h
++++ kernel-raspberry/include/linux/cpufreq_times.h
 @@ -0,0 +1,42 @@
 +/* drivers/cpufreq/cpufreq_times.c
 + *
@@ -6946,10 +6946,10 @@ Index: kernel-rpi/include/linux/cpufreq_times.h
 +	struct cpufreq_policy *policy, unsigned int new_freq) {}
 +#endif /* CONFIG_CPU_FREQ_TIMES */
 +#endif /* _LINUX_CPUFREQ_TIMES_H */
-Index: kernel-rpi/kernel/sched/cputime.c
+Index: kernel-raspberry/kernel/sched/cputime.c
 ===================================================================
---- kernel-rpi.orig/kernel/sched/cputime.c
-+++ kernel-rpi/kernel/sched/cputime.c
+--- kernel-raspberry.orig/kernel/sched/cputime.c
++++ kernel-raspberry/kernel/sched/cputime.c
 @@ -2,6 +2,7 @@
  /*
   * Simple CPU accounting cgroup controller
@@ -6978,10 +6978,10 @@ Index: kernel-rpi/kernel/sched/cputime.c
  }
  
  /*
-Index: kernel-rpi/fs/proc/base.c
+Index: kernel-raspberry/fs/proc/base.c
 ===================================================================
---- kernel-rpi.orig/fs/proc/base.c
-+++ kernel-rpi/fs/proc/base.c
+--- kernel-raspberry.orig/fs/proc/base.c
++++ kernel-raspberry/fs/proc/base.c
 @@ -97,6 +97,7 @@
  #include <linux/time_namespace.h>
  #include <linux/resctrl.h>
@@ -7071,10 +7071,10 @@ Index: kernel-rpi/fs/proc/base.c
  };
  
  static int proc_tid_base_readdir(struct file *file, struct dir_context *ctx)
-Index: kernel-rpi/drivers/cpufreq/cpufreq.c
+Index: kernel-raspberry/drivers/cpufreq/cpufreq.c
 ===================================================================
---- kernel-rpi.orig/drivers/cpufreq/cpufreq.c
-+++ kernel-rpi/drivers/cpufreq/cpufreq.c
+--- kernel-raspberry.orig/drivers/cpufreq/cpufreq.c
++++ kernel-raspberry/drivers/cpufreq/cpufreq.c
 @@ -16,6 +16,7 @@
  
  #include <linux/cpu.h>
@@ -7123,10 +7123,10 @@ Index: kernel-rpi/drivers/cpufreq/cpufreq.c
  			return 0;
  		}
  		cpufreq_exit_governor(policy);
-Index: kernel-rpi/drivers/cpufreq/cpufreq_times.c
+Index: kernel-raspberry/drivers/cpufreq/cpufreq_times.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/drivers/cpufreq/cpufreq_times.c
++++ kernel-raspberry/drivers/cpufreq/cpufreq_times.c
 @@ -0,0 +1,211 @@
 +/* drivers/cpufreq/cpufreq_times.c
 + *
@@ -7339,10 +7339,10 @@ Index: kernel-rpi/drivers/cpufreq/cpufreq_times.c
 +	if (index >= 0)
 +		WRITE_ONCE(freqs->last_index, index);
 +}
-Index: kernel-rpi/drivers/cpufreq/Kconfig
+Index: kernel-raspberry/drivers/cpufreq/Kconfig
 ===================================================================
---- kernel-rpi.orig/drivers/cpufreq/Kconfig
-+++ kernel-rpi/drivers/cpufreq/Kconfig
+--- kernel-raspberry.orig/drivers/cpufreq/Kconfig
++++ kernel-raspberry/drivers/cpufreq/Kconfig
 @@ -5,8 +5,8 @@ config CPU_FREQ
  	bool "CPU Frequency scaling"
  	select SRCU
@@ -7400,10 +7400,10 @@ Index: kernel-rpi/drivers/cpufreq/Kconfig
  
  	  To compile this driver as a module, choose M here: the
  	  module will be called cpufreq_ondemand.
-Index: kernel-rpi/drivers/cpufreq/Makefile
+Index: kernel-raspberry/drivers/cpufreq/Makefile
 ===================================================================
---- kernel-rpi.orig/drivers/cpufreq/Makefile
-+++ kernel-rpi/drivers/cpufreq/Makefile
+--- kernel-raspberry.orig/drivers/cpufreq/Makefile
++++ kernel-raspberry/drivers/cpufreq/Makefile
 @@ -5,7 +5,10 @@ obj-$(CONFIG_CPU_FREQ)			+= cpufreq.o fr
  # CPUfreq stats
  obj-$(CONFIG_CPU_FREQ_STAT)             += cpufreq_stats.o
@@ -7416,10 +7416,10 @@ Index: kernel-rpi/drivers/cpufreq/Makefile
  obj-$(CONFIG_CPU_FREQ_GOV_PERFORMANCE)	+= cpufreq_performance.o
  obj-$(CONFIG_CPU_FREQ_GOV_POWERSAVE)	+= cpufreq_powersave.o
  obj-$(CONFIG_CPU_FREQ_GOV_USERSPACE)	+= cpufreq_userspace.o
-Index: kernel-rpi/include/linux/hugetlb.h
+Index: kernel-raspberry/include/linux/hugetlb.h
 ===================================================================
---- kernel-rpi.orig/include/linux/hugetlb.h
-+++ kernel-rpi/include/linux/hugetlb.h
+--- kernel-raspberry.orig/include/linux/hugetlb.h
++++ kernel-raspberry/include/linux/hugetlb.h
 @@ -198,8 +198,8 @@ struct page *follow_huge_addr(struct mm_
  struct page *follow_huge_pd(struct vm_area_struct *vma,
  			    unsigned long address, hugepd_t hpd,
@@ -7442,10 +7442,10 @@ Index: kernel-rpi/include/linux/hugetlb.h
  {
  	return NULL;
  }
-Index: kernel-rpi/include/asm-generic/tlb.h
+Index: kernel-raspberry/include/asm-generic/tlb.h
 ===================================================================
---- kernel-rpi.orig/include/asm-generic/tlb.h
-+++ kernel-rpi/include/asm-generic/tlb.h
+--- kernel-raspberry.orig/include/asm-generic/tlb.h
++++ kernel-raspberry/include/asm-generic/tlb.h
 @@ -207,16 +207,12 @@ extern void tlb_remove_table(struct mmu_
  #define tlb_needs_table_invalidate() (true)
  #endif
@@ -7463,10 +7463,10 @@ Index: kernel-rpi/include/asm-generic/tlb.h
  #endif /* CONFIG_MMU_GATHER_RCU_TABLE_FREE */
  
  
-Index: kernel-rpi/fs/proc/internal.h
+Index: kernel-raspberry/fs/proc/internal.h
 ===================================================================
---- kernel-rpi.orig/fs/proc/internal.h
-+++ kernel-rpi/fs/proc/internal.h
+--- kernel-raspberry.orig/fs/proc/internal.h
++++ kernel-raspberry/fs/proc/internal.h
 @@ -90,6 +90,9 @@ union proc_op {
  	const char *lsm;
  };
@@ -7501,10 +7501,10 @@ Index: kernel-rpi/fs/proc/internal.h
  #endif
  #ifdef CONFIG_NUMA
  	struct mempolicy *task_mempolicy;
-Index: kernel-rpi/fs/proc/task_mmu.c
+Index: kernel-raspberry/fs/proc/task_mmu.c
 ===================================================================
---- kernel-rpi.orig/fs/proc/task_mmu.c
-+++ kernel-rpi/fs/proc/task_mmu.c
+--- kernel-raspberry.orig/fs/proc/task_mmu.c
++++ kernel-raspberry/fs/proc/task_mmu.c
 @@ -19,6 +19,8 @@
  #include <linux/shmem_fs.h>
  #include <linux/uaccess.h>
@@ -8211,10 +8211,10 @@ Index: kernel-rpi/fs/proc/task_mmu.c
  #ifdef CONFIG_NUMA
  
  struct numa_maps {
-Index: kernel-rpi/include/linux/rmap.h
+Index: kernel-raspberry/include/linux/rmap.h
 ===================================================================
---- kernel-rpi.orig/include/linux/rmap.h
-+++ kernel-rpi/include/linux/rmap.h
+--- kernel-raspberry.orig/include/linux/rmap.h
++++ kernel-raspberry/include/linux/rmap.h
 @@ -12,6 +12,9 @@
  #include <linux/memcontrol.h>
  #include <linux/highmem.h>
@@ -8225,10 +8225,10 @@ Index: kernel-rpi/include/linux/rmap.h
  /*
   * The anon_vma heads a list of private "related" vmas, to scan if
   * an anonymous page pointing to this anon_vma needs to be unmapped:
-Index: kernel-rpi/mm/damon/dbgfs.c
+Index: kernel-raspberry/mm/damon/dbgfs.c
 ===================================================================
---- kernel-rpi.orig/mm/damon/dbgfs.c
-+++ kernel-rpi/mm/damon/dbgfs.c
+--- kernel-raspberry.orig/mm/damon/dbgfs.c
++++ kernel-raspberry/mm/damon/dbgfs.c
 @@ -441,7 +441,6 @@ out:
  static int dbgfs_rm_context(char *name)
  {
@@ -8250,10 +8250,10 @@ Index: kernel-rpi/mm/damon/dbgfs.c
  	new_dirs = kmalloc_array(dbgfs_nr_ctxs - 1, sizeof(*dbgfs_dirs),
  			GFP_KERNEL);
  	if (!new_dirs) {
-Index: kernel-rpi/mm/damon/vaddr.c
+Index: kernel-raspberry/mm/damon/vaddr.c
 ===================================================================
---- kernel-rpi.orig/mm/damon/vaddr.c
-+++ kernel-rpi/mm/damon/vaddr.c
+--- kernel-raspberry.orig/mm/damon/vaddr.c
++++ kernel-raspberry/mm/damon/vaddr.c
 @@ -456,11 +456,6 @@ static int damon_mkold_pmd_entry(pmd_t *
  
  	if (pmd_huge(*pmd)) {
@@ -8278,10 +8278,10 @@ Index: kernel-rpi/mm/damon/vaddr.c
  		if (!pmd_huge(*pmd)) {
  			spin_unlock(ptl);
  			goto regular_page;
-Index: kernel-rpi/mm/kasan/report.c
+Index: kernel-raspberry/mm/kasan/report.c
 ===================================================================
---- kernel-rpi.orig/mm/kasan/report.c
-+++ kernel-rpi/mm/kasan/report.c
+--- kernel-raspberry.orig/mm/kasan/report.c
++++ kernel-raspberry/mm/kasan/report.c
 @@ -117,27 +117,26 @@ static void end_report(unsigned long *fl
  	pr_err("==================================================================\n");
  	add_taint(TAINT_BAD_PAGE, LOCKDEP_NOW_UNRELIABLE);
@@ -8336,10 +8336,10 @@ Index: kernel-rpi/mm/kasan/report.c
  		pr_err("\n");
  	}
  #endif
-Index: kernel-rpi/mm/kfence/report.c
+Index: kernel-raspberry/mm/kfence/report.c
 ===================================================================
---- kernel-rpi.orig/mm/kfence/report.c
-+++ kernel-rpi/mm/kfence/report.c
+--- kernel-raspberry.orig/mm/kfence/report.c
++++ kernel-raspberry/mm/kfence/report.c
 @@ -267,7 +267,8 @@ void kfence_report_error(unsigned long a
  
  	lockdep_on();
@@ -8350,3 +8350,16 @@ Index: kernel-rpi/mm/kfence/report.c
  
  	/* We encountered a memory safety error, taint the kernel! */
  	add_taint(TAINT_BAD_PAGE, LOCKDEP_STILL_OK);
+Index: kernel-raspberry/fs/erofs/xattr.c
+===================================================================
+--- kernel-raspberry.orig/fs/erofs/xattr.c
++++ kernel-raspberry/fs/erofs/xattr.c
+@@ -470,7 +470,7 @@ int erofs_getxattr(struct inode *inode,
+ 
+ static int erofs_xattr_generic_get(const struct xattr_handler *handler,
+ 				   struct dentry *unused, struct inode *inode,
+-				   const char *name, void *buffer, size_t size)
++				   const char *name, void *buffer, size_t size, int flag)
+ {
+ 	struct erofs_sb_info *const sbi = EROFS_I_SB(inode);
+ 
