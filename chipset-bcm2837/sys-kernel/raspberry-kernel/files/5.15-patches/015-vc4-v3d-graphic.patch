@@ -28,13 +28,14 @@ Index: kernel-raspberry/drivers/gpu/drm/v3d/v3d_bo.c
  	int ret;
  
 -	if (args->flags != 0) {
-+	if (args->flags != 0 && args->flags != ARC_CALLOC) {
- 		DRM_INFO("unknown create_bo flags: %d\n", args->flags);
+-		DRM_INFO("unknown create_bo flags: %d\n", args->flags);
++	if (args->flags != 0 && args->flags != ARC_CALLOC && args->flags != CROS_CALLOC) {
++		DRM_ERROR("unknown create_bo flags: %d\n", args->flags);
  		return -EINVAL;
  	}
  
-+  if (is_vc4_enable() && args->flags == ARC_CALLOC) {
-+    ret = import_bo_from_vc4(dev, file_priv, PAGE_ALIGN(args->size), &args->handle);
++  if (is_vc4_enable() && args->flags != 0) {
++    ret = import_bo_from_vc4(dev, file_priv, PAGE_ALIGN(args->size), &args->handle, args->flags);
 +    if (ret) {
 +      DRM_ERROR("import_bo_from_vc4 error:%d\n", ret);
 +    }
@@ -56,7 +57,7 @@ Index: kernel-raspberry/drivers/gpu/drm/v3d/v3d_vc4_bind.h
 ===================================================================
 --- /dev/null
 +++ kernel-raspberry/drivers/gpu/drm/v3d/v3d_vc4_bind.h
-@@ -0,0 +1,20 @@
+@@ -0,0 +1,21 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/* Copyright (C) 2020 FydeOS team */
 +/* Author: Yang Tsao (yang@fydeos.io)*/
@@ -66,7 +67,8 @@ Index: kernel-raspberry/drivers/gpu/drm/v3d/v3d_vc4_bind.h
 +#include <drm/drm_device.h>
 +#include <drm/drm_file.h>
 +
-+#define ARC_CALLOC (1<<7)
++#define CROS_CALLOC (1<<7)
++#define ARC_CALLOC (1<<6)
 +extern struct drm_device *vc4_drm;
 +extern struct drm_file *vc4_drm_file;
 +
@@ -75,7 +77,7 @@ Index: kernel-raspberry/drivers/gpu/drm/v3d/v3d_vc4_bind.h
 +}
 +
 +int import_bo_from_vc4(struct drm_device *dev, struct drm_file *file_priv,
-+  size_t unaligned_size, u32 *handle);
++  size_t unaligned_size, u32 *handle , u32 flags);
 +#endif /* V3D_VC4_BIND_H */
 Index: kernel-raspberry/drivers/gpu/drm/v3d/v3d_drv.c
 ===================================================================
@@ -103,8 +105,7 @@ Index: kernel-raspberry/drivers/gpu/drm/v3d/v3d_vc4_bind.c
 ===================================================================
 --- /dev/null
 +++ kernel-raspberry/drivers/gpu/drm/v3d/v3d_vc4_bind.c
-@@ -0,0 +1,46 @@
-+#define DEBUG
+@@ -0,0 +1,55 @@
 +#include <linux/fdtable.h>
 +#include <drm/drm_drv.h>
 +#include <drm/drm_prime.h>
@@ -114,17 +115,21 @@ Index: kernel-raspberry/drivers/gpu/drm/v3d/v3d_vc4_bind.c
 +#include "uapi/drm/vc4_drm.h"
 +
 +int import_bo_from_vc4(struct drm_device *dev,
-+    struct drm_file *file_priv, size_t unaligned_size, u32 *handle)
++    struct drm_file *file_priv, size_t unaligned_size, u32 *handle, u32 flags)
 +{
 +  struct drm_vc4_create_bo args = {0};
 +  int ret, prime_fd = 0;
 +  u32 vc4_handle = 0;
++  bool has_close_fd = false ;
++  bool has_delete_handle = false;
 +
-+  if (!is_vc4_enable())
++  if (!is_vc4_enable()) {
++    DRM_ERROR("vc4 is disable\n");
 +    return -ENODEV;
++  }
 +
 +  args.size = unaligned_size;
-+  args.flags = ARC_CALLOC;
++  args.flags = flags;
 +  ret = vc4_create_bo_ioctl(vc4_drm, &args, vc4_drm_file);
 +  if (ret)
 +    goto out;
@@ -142,12 +147,18 @@ Index: kernel-raspberry/drivers/gpu/drm/v3d/v3d_vc4_bind.c
 +out:
 +  if(prime_fd) {
 +    close_fd(prime_fd);
++    has_close_fd = true;
 +  }
-+  if(vc4_handle)
++  if(vc4_handle) {
 +    drm_gem_handle_delete(vc4_drm_file, vc4_handle);
++    has_delete_handle = true;
++  }
 +  if (ret)
-+  	DRM_ERROR("Borrow bo from vc4 size:%uk, vc4 handle:%u, fd:%d, v3d handle:%u, ret:%d\n",
-+      (u32) (unaligned_size / 1024), vc4_handle, prime_fd, *handle, ret);
++  	DRM_ERROR("Borrow bo from vc4 size:%uk, vc4 handle:%u, fd:%d, v3d handle:%u, ret:%d, close_fd:%d, delete_handle:%d\n",
++      (u32) (unaligned_size / 1024), vc4_handle, prime_fd, *handle, ret, has_close_fd, has_delete_handle);
++  else
++    DRM_DEBUG("Borrow bo from vc4 size:%uk, vc4 handle:%u, fd:%d, v3d handle:%u, ret:%d, close_fd:%d, delete_handle:%d\n",
++      (u32) (unaligned_size / 1024), vc4_handle, prime_fd, *handle, ret, has_close_fd, has_delete_handle);
 +  return ret;
 +}
 Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_bo.c
@@ -162,11 +173,12 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_bo.c
  #include <linux/dma-buf.h>
  
  #include "vc4_drv.h"
-@@ -32,13 +31,35 @@ static const char * const bo_type_names[
+@@ -32,13 +31,36 @@ static const char * const bo_type_names[
  	"RCL",
  	"BCL",
  	"kernel BO cache",
 +  "V3D Bind",
++  "ARC Bind",
  };
 +static const char del_label[] = "[deleted]";
 +static const char user_label[] = "[user label]";
@@ -188,7 +200,7 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_bo.c
 +  static void print_bo_status(const char *func, u32 handle, struct vc4_bo *bo) {
 +    if (!bo || !func)
 +      return;
-+    DRM_DEBUG("%s: %s:handle:%u, size:%lu, ref:%u, mad:%d\n", func, label_name(bo->label),
++    DRM_WARN("%s: %s:handle:%u, size:%luKB, ref:%u, mad:%d\n", func, label_name(bo->label),
 +      handle, bo->base.base.size/1024, refcount_read(&bo->usecnt), bo->madv);
 +  }
 +#else
@@ -198,7 +210,7 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_bo.c
  static void vc4_bo_stats_print(struct drm_printer *p, struct vc4_dev *vc4)
  {
  	int i;
-@@ -47,7 +68,7 @@ static void vc4_bo_stats_print(struct dr
+@@ -47,7 +69,7 @@ static void vc4_bo_stats_print(struct dr
  		if (!vc4->bo_labels[i].num_allocated)
  			continue;
  
@@ -207,7 +219,7 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_bo.c
  			   vc4->bo_labels[i].name,
  			   vc4->bo_labels[i].size_allocated / 1024,
  			   vc4->bo_labels[i].num_allocated);
-@@ -152,7 +173,6 @@ static void vc4_bo_set_label(struct drm_
+@@ -152,7 +174,6 @@ static void vc4_bo_set_label(struct drm_
  		kfree(vc4->bo_labels[bo->label].name);
  		vc4->bo_labels[bo->label].name = NULL;
  	}
@@ -215,7 +227,7 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_bo.c
  	bo->label = label;
  }
  
-@@ -165,7 +185,7 @@ static void vc4_bo_destroy(struct vc4_bo
+@@ -165,7 +186,7 @@ static void vc4_bo_destroy(struct vc4_bo
  {
  	struct drm_gem_object *obj = &bo->base.base;
  	struct vc4_dev *vc4 = to_vc4_dev(obj->dev);
@@ -224,7 +236,7 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_bo.c
  	lockdep_assert_held(&vc4->bo_lock);
  
  	vc4_bo_set_label(obj, -1);
-@@ -248,24 +268,25 @@ static void vc4_bo_cache_purge(struct dr
+@@ -248,24 +269,25 @@ static void vc4_bo_cache_purge(struct dr
  void vc4_bo_add_to_purgeable_pool(struct vc4_bo *bo)
  {
  	struct vc4_dev *vc4 = to_vc4_dev(bo->base.base.dev);
@@ -254,7 +266,7 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_bo.c
  	/* list_del_init() is used here because the caller might release
  	 * the purgeable lock in order to acquire the madv one and update the
  	 * madv status.
-@@ -395,10 +416,10 @@ struct drm_gem_object *vc4_create_object
+@@ -395,10 +417,10 @@ struct drm_gem_object *vc4_create_object
  {
  	struct vc4_dev *vc4 = to_vc4_dev(dev);
  	struct vc4_bo *bo;
@@ -267,7 +279,7 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_bo.c
  	bo = kzalloc(sizeof(*bo), GFP_KERNEL);
  	if (!bo)
  		return NULL;
-@@ -413,7 +434,6 @@ struct drm_gem_object *vc4_create_object
+@@ -413,7 +435,6 @@ struct drm_gem_object *vc4_create_object
  	vc4->bo_labels[VC4_BO_TYPE_KERNEL].num_allocated++;
  	vc4->bo_labels[VC4_BO_TYPE_KERNEL].size_allocated += size;
  	mutex_unlock(&vc4->bo_lock);
@@ -275,7 +287,7 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_bo.c
  	bo->base.base.funcs = &vc4_gem_object_funcs;
  
  	return &bo->base.base;
-@@ -426,10 +446,10 @@ struct vc4_bo *vc4_bo_create(struct drm_
+@@ -426,10 +447,10 @@ struct vc4_bo *vc4_bo_create(struct drm_
  	struct vc4_dev *vc4 = to_vc4_dev(dev);
  	struct drm_gem_cma_object *cma_obj;
  	struct vc4_bo *bo;
@@ -288,7 +300,7 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_bo.c
  	if (size == 0)
  		return ERR_PTR(-EINVAL);
  
-@@ -492,13 +512,13 @@ int vc4_bo_dumb_create(struct drm_file *
+@@ -492,13 +513,13 @@ int vc4_bo_dumb_create(struct drm_file *
  		       struct drm_device *dev,
  		       struct drm_mode_create_dumb *args)
  {
@@ -305,7 +317,7 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_bo.c
  	ret = vc4_dumb_fixup_args(args);
  	if (ret)
  		return ret;
-@@ -546,7 +566,6 @@ static void vc4_free_object(struct drm_g
+@@ -546,7 +567,6 @@ static void vc4_free_object(struct drm_g
  	struct vc4_dev *vc4 = to_vc4_dev(dev);
  	struct vc4_bo *bo = to_vc4_bo(gem_bo);
  	struct list_head *cache_list;
@@ -313,7 +325,16 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_bo.c
  	/* Remove the BO from the purgeable list. */
  	mutex_lock(&bo->madv_lock);
  	if (bo->madv == VC4_MADV_DONTNEED && !refcount_read(&bo->usecnt))
-@@ -619,12 +638,12 @@ static void vc4_bo_cache_time_work(struc
+@@ -581,7 +601,7 @@ static void vc4_free_object(struct drm_g
+ 		vc4_bo_destroy(bo);
+ 		goto out;
+ 	}
+-
++  print_bo_status(__func__, 0, bo);
+ 	if (bo->validated_shader) {
+ 		kfree(bo->validated_shader->uniform_addr_offsets);
+ 		kfree(bo->validated_shader->texture_samples);
+@@ -619,12 +639,12 @@ static void vc4_bo_cache_time_work(struc
  
  int vc4_bo_inc_usecnt(struct vc4_bo *bo)
  {
@@ -329,7 +350,7 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_bo.c
  	/* Fast path: if the BO is already retained by someone, no need to
  	 * check the madv status.
  	 */
-@@ -659,14 +678,15 @@ int vc4_bo_inc_usecnt(struct vc4_bo *bo)
+@@ -659,14 +679,15 @@ int vc4_bo_inc_usecnt(struct vc4_bo *bo)
  
  void vc4_bo_dec_usecnt(struct vc4_bo *bo)
  {
@@ -347,16 +368,24 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_bo.c
  	if (refcount_dec_not_one(&bo->usecnt))
  		return;
  
-@@ -709,7 +729,7 @@ static struct dma_buf *vc4_prime_export(
+@@ -705,11 +726,14 @@ static struct dma_buf *vc4_prime_export(
+ 		DRM_ERROR("Failed to increment BO usecnt\n");
+ 		return ERR_PTR(ret);
+ 	}
+-
  	dmabuf = drm_gem_prime_export(obj, flags);
  	if (IS_ERR(dmabuf))
  		vc4_bo_dec_usecnt(bo);
 -
++  if (bo->label == VC4_BO_TYPE_ARC_BIND) {
++    bo->madv = VC4_MADV_DONTNEED;
++    vc4_bo_dec_usecnt(bo);
++  }
 +  print_bo_status(__func__, 0, bo);
  	return dmabuf;
  }
  
-@@ -765,6 +785,7 @@ static const struct drm_gem_object_funcs
+@@ -765,6 +789,7 @@ static const struct drm_gem_object_funcs
  
  static int vc4_grab_bin_bo(struct vc4_dev *vc4, struct vc4_file *vc4file)
  {
@@ -364,7 +393,7 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_bo.c
  	int ret;
  
  	if (!vc4->v3d)
-@@ -776,7 +797,7 @@ static int vc4_grab_bin_bo(struct vc4_de
+@@ -776,7 +801,7 @@ static int vc4_grab_bin_bo(struct vc4_de
  	ret = vc4_v3d_bin_bo_get(vc4, &vc4file->bin_bo_used);
  	if (ret)
  		return ret;
@@ -373,7 +402,7 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_bo.c
  	return 0;
  }
  
-@@ -788,19 +809,19 @@ int vc4_create_bo_ioctl(struct drm_devic
+@@ -788,19 +813,27 @@ int vc4_create_bo_ioctl(struct drm_devic
  	struct vc4_dev *vc4 = to_vc4_dev(dev);
  	struct vc4_bo *bo = NULL;
  	int ret;
@@ -382,22 +411,30 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_bo.c
  	if (WARN_ON_ONCE(vc4->is_vc5))
  		return -ENODEV;
 -
-+#endif
  	ret = vc4_grab_bin_bo(vc4, vc4file);
  	if (ret)
  		return ret;
 -
++#endif
  	/*
  	 * We can't allocate from the BO cache, because the BOs don't
  	 * get zeroed, and that might leak data between users.
  	 */
 -	bo = vc4_bo_create(dev, args->size, false, VC4_BO_TYPE_V3D);
-+	bo = vc4_bo_create(dev, args->size, false, args->flags == V3D_BIND ?
-+        VC4_BO_TYPE_V3D_BIND : VC4_BO_TYPE_V3D);
++  switch(args->flags) {
++    case V3D_BIND:
++      bo = vc4_bo_create(dev, args->size, false, VC4_BO_TYPE_V3D_BIND);
++      break;
++    case ARC_BIND:
++      bo = vc4_bo_create(dev, args->size, false, VC4_BO_TYPE_ARC_BIND);
++      break;
++    default:
++      bo = vc4_bo_create(dev, args->size, false, VC4_BO_TYPE_V3D);
++  }
  	if (IS_ERR(bo))
  		return PTR_ERR(bo);
  
-@@ -808,20 +829,20 @@ int vc4_create_bo_ioctl(struct drm_devic
+@@ -808,20 +841,20 @@ int vc4_create_bo_ioctl(struct drm_devic
  
  	ret = drm_gem_handle_create(file_priv, &bo->base.base, &args->handle);
  	drm_gem_object_put(&bo->base.base);
@@ -422,7 +459,7 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_bo.c
  	gem_obj = drm_gem_object_lookup(file_priv, args->handle);
  	if (!gem_obj) {
  		DRM_DEBUG("Failed to look up GEM BO %d\n", args->handle);
-@@ -855,12 +876,12 @@ vc4_create_shader_bo_ioctl(struct drm_de
+@@ -855,12 +888,12 @@ vc4_create_shader_bo_ioctl(struct drm_de
  		return -EINVAL;
  
  	if (args->flags != 0) {
@@ -437,7 +474,7 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_bo.c
  		return -EINVAL;
  	}
  
-@@ -918,15 +939,15 @@ fail:
+@@ -918,15 +951,15 @@ fail:
  int vc4_set_tiling_ioctl(struct drm_device *dev, void *data,
  			 struct drm_file *file_priv)
  {
@@ -456,7 +493,7 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_bo.c
  	if (args->flags != 0)
  		return -EINVAL;
  
-@@ -965,14 +986,14 @@ int vc4_set_tiling_ioctl(struct drm_devi
+@@ -965,14 +998,14 @@ int vc4_set_tiling_ioctl(struct drm_devi
  int vc4_get_tiling_ioctl(struct drm_device *dev, void *data,
  			 struct drm_file *file_priv)
  {
@@ -474,7 +511,7 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_bo.c
  	if (args->flags != 0 || args->modifier != 0)
  		return -EINVAL;
  
-@@ -995,13 +1016,13 @@ int vc4_get_tiling_ioctl(struct drm_devi
+@@ -995,13 +1028,13 @@ int vc4_get_tiling_ioctl(struct drm_devi
  
  int vc4_bo_debugfs_init(struct drm_minor *minor)
  {
@@ -491,7 +528,7 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_bo.c
  	ret = vc4_debugfs_add_file(minor, "bo_stats",
  				   vc4_bo_stats_debugfs, NULL);
  	if (ret)
-@@ -1016,10 +1037,10 @@ int vc4_bo_cache_init(struct drm_device
+@@ -1016,10 +1049,10 @@ int vc4_bo_cache_init(struct drm_device
  	struct vc4_dev *vc4 = to_vc4_dev(dev);
  	int ret;
  	int i;
@@ -504,7 +541,7 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_bo.c
  	/* Create the initial set of BO labels that the kernel will
  	 * use.  This lets us avoid a bunch of string reallocation in
  	 * the kernel's draw and BO allocation paths.
-@@ -1044,7 +1065,6 @@ int vc4_bo_cache_init(struct drm_device
+@@ -1044,7 +1077,6 @@ int vc4_bo_cache_init(struct drm_device
  
  	INIT_WORK(&vc4->bo_cache.time_work, vc4_bo_cache_time_work);
  	timer_setup(&vc4->bo_cache.time_timer, vc4_bo_cache_time_timer, 0);
@@ -512,7 +549,7 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_bo.c
  	return drmm_add_action_or_reset(dev, vc4_bo_cache_destroy, NULL);
  }
  
-@@ -1089,16 +1109,16 @@ int vc4_label_bo_ioctl(struct drm_device
+@@ -1089,16 +1121,16 @@ int vc4_label_bo_ioctl(struct drm_device
  
  	name = strndup_user(u64_to_user_ptr(args->name), args->len + 1);
  	if (IS_ERR(name))
@@ -724,25 +761,27 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_drv.h
 ===================================================================
 --- kernel-raspberry.orig/drivers/gpu/drm/vc4/vc4_drv.h
 +++ kernel-raspberry/drivers/gpu/drm/vc4/vc4_drv.h
-@@ -21,6 +21,9 @@
+@@ -21,6 +21,10 @@
  #include "uapi/drm/vc4_drm.h"
  #include "vc4_regs.h"
  
 +#define CURSOR_TIMEOUT_MSEC 20
 +#define V3D_BIND (1<<7)
++#define ARC_BIND (1<<6)
 +
  struct drm_device;
  struct drm_gem_object;
  
-@@ -39,6 +42,7 @@ enum vc4_kernel_bo_type {
+@@ -39,6 +43,8 @@ enum vc4_kernel_bo_type {
  	VC4_BO_TYPE_RCL,
  	VC4_BO_TYPE_BCL,
  	VC4_BO_TYPE_KERNEL_CACHE,
 +  VC4_BO_TYPE_V3D_BIND,
++  VC4_BO_TYPE_ARC_BIND,
  	VC4_BO_TYPE_COUNT
  };
  
-@@ -440,6 +444,7 @@ struct vc4_plane_state {
+@@ -440,6 +446,7 @@ struct vc4_plane_state {
  	 * bytes/sec.
  	 */
  	u64 membus_load;
@@ -750,7 +789,7 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_drv.h
  };
  
  static inline struct vc4_plane_state *
-@@ -1071,5 +1076,4 @@ int vc4_perfmon_destroy_ioctl(struct drm
+@@ -1071,5 +1078,4 @@ int vc4_perfmon_destroy_ioctl(struct drm
  			      struct drm_file *file_priv);
  int vc4_perfmon_get_values_ioctl(struct drm_device *dev, void *data,
  				 struct drm_file *file_priv);

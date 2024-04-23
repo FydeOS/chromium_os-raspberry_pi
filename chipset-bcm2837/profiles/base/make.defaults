@@ -7,7 +7,7 @@ VIDEO_CARDS="vc4"
 # Initial value just for style purposes.
 USE=""
 
-USE="${USE} hardfp kernel-5_10 boot_dts_device_tree transparent_hugepage -acpi_ac"
+USE="${USE} hardfp kernel-5_10 boot_dts_device_tree -acpi_ac"
 USE="${USE} mosys_eventlog neon -opengl opengles"
 USE="${USE} watchdog direncription_allow_v2"
 

@@ -485,7 +485,7 @@ Index: minigbm/v3d.c
 ===================================================================
 --- /dev/null
 +++ minigbm/v3d.c
-@@ -0,0 +1,138 @@
+@@ -0,0 +1,145 @@
 +/*
 + * Copyright 2019 The FydeOS Authors. All rights reserved.
 + * Use of this source code is governed by a BSD-style license that can be
@@ -503,8 +503,8 @@ Index: minigbm/v3d.c
 +#include "drv_helpers.h"
 +#include "util.h"
 +#include "external/v3d_drm.h"
-+#define ARC_CALLOC (1<<7)
-+#define CROS_CALLOC (1<<6)
++#define CROS_CALLOC (1<<7)
++#define ARC_CALLOC (1<<6)
 +enum v3d_tiling_mode {
 +        /* Untiled resources.  Not valid as texture inputs. */
 +        V3D_TILING_RASTER,
@@ -567,8 +567,15 @@ Index: minigbm/v3d.c
 +  drv_bo_from_format(bo, stride, 1, algin_height, format);
 +  bo->meta.total_size = ALIGN(bo->meta.total_size, 4096);
 +  bo_create.size = bo->meta.total_size;
-+  if (use_flags & BO_USE_SCANOUT || use_flags & (BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER)) {
-+     bo_create.flags = ARC_CALLOC;
++  if (use_flags & (BO_USE_SW_MASK | BO_USE_SCANOUT | BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER)) {
++#ifdef __ANDROID__
++    if (width * height < 4097)
++      bo_create.flags = CROS_CALLOC;
++    else
++      bo_create.flags = ARC_CALLOC;
++#else
++     bo_create.flags = CROS_CALLOC;
++#endif
 +     bo->meta.format_modifier = DRM_FORMAT_MOD_LINEAR;
 +     bo->meta.tiling = V3D_TILING_RASTER;
 +  } else {
