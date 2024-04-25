@@ -1,0 +1,1 @@
+USE="${USE} -tpm tpm2_simulator tpm2 vtpm_proxy tpm2_simulator_manufacturer"
