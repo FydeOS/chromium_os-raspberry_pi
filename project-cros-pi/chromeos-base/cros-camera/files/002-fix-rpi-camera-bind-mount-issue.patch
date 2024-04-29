@@ -1,0 +1,15 @@
+Index: camera/hal_adapter/init/cros-camera.conf
+===================================================================
+--- camera.orig/hal_adapter/init/cros-camera.conf
++++ camera/hal_adapter/init/cros-camera.conf
+@@ -52,7 +52,9 @@ pre-start script
+   if [ "$(cros_config /camera clock)" = "boottime" ]; then
+     printf "boottime" > "${UVC_CLOCK_FILE}" || true
+   fi
+-
++  if [ ! -d /var/lib/ml_core/opencl_cache ]; then
++    mkdir -p /var/lib/ml_core/opencl_cache # croslint: disable:
++  fi
+   # Exit here so that additional commands cannot be executed.
+   exit 0
+ end script
