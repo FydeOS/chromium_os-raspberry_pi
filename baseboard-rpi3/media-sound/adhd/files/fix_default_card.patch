@@ -2,7 +2,7 @@ Index: adhd/cras/src/server/cras_alsa_io.c
 ===================================================================
 --- a/adhd/cras/src/server/cras_alsa_io.c
 +++ b/adhd/cras/src/server/cras_alsa_io.c
-@@ -219,6 +219,11 @@ static const struct {
+@@ -215,6 +215,11 @@ static const struct {
          .type = CRAS_NODE_TYPE_ALSA_LOOPBACK,
          .position = NODE_POSITION_INTERNAL,
      },
@@ -14,7 +14,7 @@ Index: adhd/cras/src/server/cras_alsa_io.c
  };
 
  static inline int set_hwparams(struct cras_iodev* iodev) {
-@@ -805,6 +810,7 @@ static void set_node_initial_state(struc
+@@ -890,6 +895,7 @@ static void set_node_initial_state(struc
 
    node->volume = 100;
    node->type = CRAS_NODE_TYPE_UNKNOWN;
@@ -22,7 +22,7 @@ Index: adhd/cras/src/server/cras_alsa_io.c
    // Go through the known names
    for (i = 0; i < ARRAY_SIZE(node_defaults); i++) {
      if (!strncmp(node->name, node_defaults[i].name,
-@@ -2443,7 +2449,7 @@ int alsa_iodev_legacy_complete_init(stru
+@@ -2378,7 +2384,7 @@ int alsa_iodev_legacy_complete_init(stru
        !no_create_default_output_node(aio)) {
      if (first_internal_device(aio) && !has_node(aio, INTERNAL_SPEAKER) &&
          !has_node(aio, HDMI)) {

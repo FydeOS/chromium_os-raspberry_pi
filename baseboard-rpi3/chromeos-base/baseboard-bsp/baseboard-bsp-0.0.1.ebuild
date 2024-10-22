@@ -14,7 +14,7 @@ IUSE=""
 RDEPEND="
   chromeos-base/rpi-boot-bin
   chromeos-base/rpi-firmware
-  media-libs/raspberrypi-userland
+  dev-embedded/raspberrypi-utils
   sys-apps/haveged
 "
 

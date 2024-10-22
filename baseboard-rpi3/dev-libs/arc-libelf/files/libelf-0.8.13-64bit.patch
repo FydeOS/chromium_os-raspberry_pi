@@ -1,0 +1,12 @@
+diff -uraN libelf-0.8.13.orig/configure.in libelf-0.8.13/configure.in
+--- libelf-0.8.13.orig/configure.in	2018-04-04 15:44:02.970391337 -0600
++++ libelf-0.8.13/configure.in	2018-04-04 15:42:27.530226667 -0600
+@@ -90,7 +90,7 @@
+ AC_CHECK_SIZEOF(short,2)
+ AC_CHECK_SIZEOF(int,4)
+ AC_CHECK_SIZEOF(long,4)
+-AC_CHECK_SIZEOF(long long,0)
++AC_CHECK_SIZEOF(long long,8)
+ # Windows port
+ AC_CHECK_SIZEOF(__int64, 0)
+ 

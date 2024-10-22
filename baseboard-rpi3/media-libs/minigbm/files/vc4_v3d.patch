@@ -2,7 +2,7 @@ Index: minigbm/drv.c
 ===================================================================
 --- minigbm.orig/drv.c
 +++ minigbm/drv.c
-@@ -14,7 +14,6 @@
+@@ -15,7 +15,6 @@
  #include <sys/types.h>
  #include <unistd.h>
  #include <xf86drm.h>
@@ -10,7 +10,7 @@ Index: minigbm/drv.c
  #ifdef __ANDROID__
  #include <cutils/log.h>
  #include <libgen.h>
-@@ -39,6 +38,9 @@ extern const struct backend backend_msm;
+@@ -40,6 +39,9 @@ extern const struct backend backend_msm;
  #ifdef DRV_VC4
  extern const struct backend backend_vc4;
  #endif
@@ -20,7 +20,7 @@ Index: minigbm/drv.c
  
  // Dumb / generic drivers
  extern const struct backend backend_evdi;
-@@ -68,6 +70,9 @@ static const struct backend *drv_backend
+@@ -71,6 +73,9 @@ static const struct backend *drv_backend
  #ifdef DRV_VC4
  	&backend_vc4,
  #endif
@@ -30,7 +30,7 @@ Index: minigbm/drv.c
  	&backend_evdi,	    &backend_komeda,	&backend_marvell, &backend_mediatek,
  	&backend_meson,	    &backend_nouveau,	&backend_radeon,  &backend_rockchip,
  	&backend_sun4i_drm, &backend_synaptics, &backend_udl,	  &backend_virtgpu,
-@@ -98,6 +103,9 @@ static const struct backend *drv_get_bac
+@@ -101,6 +106,9 @@ static const struct backend *drv_get_bac
  		const struct backend *b = drv_backend_list[i];
  		if (!strcmp(drm_version->name, b->name)) {
  			drmFreeVersion(drm_version);
@@ -40,7 +40,7 @@ Index: minigbm/drv.c
  			return b;
  		}
  	}
-@@ -208,7 +216,12 @@ struct combination *drv_get_combination(
+@@ -213,7 +221,12 @@ struct combination *drv_get_combination(
  			if (!best || best->metadata.priority < curr->metadata.priority)
  				best = curr;
  	}
@@ -54,7 +54,7 @@ Index: minigbm/drv.c
  	return best;
  }
  
-@@ -485,7 +498,6 @@ void *drv_bo_map(struct bo *bo, const st
+@@ -499,7 +512,6 @@ void *drv_bo_map(struct bo *bo, const st
  
  	if (bo->is_test_buffer)
  		return MAP_FAILED;
@@ -62,7 +62,7 @@ Index: minigbm/drv.c
  	mapping.rect = *rect;
  	mapping.refcount = 1;
  
-@@ -519,6 +531,7 @@ void *drv_bo_map(struct bo *bo, const st
+@@ -533,6 +545,7 @@ void *drv_bo_map(struct bo *bo, const st
  	if (!mapping.vma) {
  		*map_data = NULL;
  		pthread_mutex_unlock(&drv->mappings_lock);
@@ -70,7 +70,7 @@ Index: minigbm/drv.c
  		return MAP_FAILED;
  	}
  
-@@ -528,6 +541,7 @@ void *drv_bo_map(struct bo *bo, const st
+@@ -542,6 +555,7 @@ void *drv_bo_map(struct bo *bo, const st
  		*map_data = NULL;
  		free(mapping.vma);
  		pthread_mutex_unlock(&drv->mappings_lock);

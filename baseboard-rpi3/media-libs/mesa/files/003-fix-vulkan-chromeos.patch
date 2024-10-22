@@ -2,7 +2,7 @@ Index: mesa/src/broadcom/vulkan/v3dv_device.c
 ===================================================================
 --- mesa.orig/src/broadcom/vulkan/v3dv_device.c
 +++ mesa/src/broadcom/vulkan/v3dv_device.c
-@@ -1040,7 +1040,7 @@ create_physical_device(struct v3dv_insta
+@@ -1236,7 +1236,7 @@ create_physical_device(struct v3dv_insta
     if (display_device)
        primary_path = display_device->nodes[DRM_NODE_PRIMARY];
     else
@@ -11,7 +11,7 @@ Index: mesa/src/broadcom/vulkan/v3dv_device.c
  #else
     primary_path = gpu_device->nodes[DRM_NODE_PRIMARY];
  #endif
-@@ -1257,6 +1257,7 @@ enumerate_devices(struct vk_instance *vk
+@@ -1459,6 +1459,7 @@ enumerate_devices(struct vk_instance *vk
              if (strncmp(*compat, "brcm,2711-v3d", 13) == 0 ||
                  strncmp(*compat, "brcm,2712-v3d", 13) == 0) {
                 v3d_idx = i;

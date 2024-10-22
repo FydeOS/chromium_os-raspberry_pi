@@ -14,16 +14,16 @@ Index: src/chrome/browser/ash/login/chrome_restart_request.cc
  
  bool IsRunningTest() {
    const base::CommandLine* current_command_line =
-@@ -161,6 +166,12 @@ void DeriveCommandLine(const GURL& start
-     ::switches::kDisableWebRtcHWDecoding,
-     ::switches::kDisableWebRtcHWEncoding,
-     ::switches::kOzonePlatform,
-+    ::switches::kDisableExplicitDmaFences,
-+    kDisableBufferBwCompression,
-+    kFydeOSAccelConfig,
-+    kFydeOSAccelRevertX,
-+    kFydeOSAccelRevertY,
-+    kFydeOSAccelRevertZ,
-     switches::kAshClearFastInkBuffer,
-     switches::kAshEnablePaletteOnAllDisplays,
-     switches::kAshEnableTabletMode,
+@@ -158,6 +163,12 @@ void DeriveCommandLine(const GURL& start
+       ::switches::kEnableUnsafeWebGPU,
+       ::switches::kEnableWebGPUDeveloperFeatures,
+       ::switches::kOzonePlatform,
++      ::switches::kDisableExplicitDmaFences,
++      kDisableBufferBwCompression,
++      kFydeOSAccelConfig,
++      kFydeOSAccelRevertX,
++      kFydeOSAccelRevertY,
++      kFydeOSAccelRevertZ,
+       switches::kAshClearFastInkBuffer,
+       switches::kAshEnablePaletteOnAllDisplays,
+       switches::kAshEnableTabletMode,

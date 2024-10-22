@@ -4,18 +4,19 @@
 
 EAPI=7
 
-CROS_WORKON_COMMIT="65109bc8ac33e24af77c1b28b712dae414111ebb"
-CROS_WORKON_TREE="58e3a387b9a0237a9272e0812b071bc7a74109b3"
+CROS_WORKON_COMMIT="63e17ccc0a2ed5e762aedfa71d9133672e77aa24"
+CROS_WORKON_TREE="0f544b5d12cafe043027cf950b69b0cab1b9aaf4"
 CROS_WORKON_PROJECT="chromiumos/third_party/mesa"
 CROS_WORKON_LOCALNAME="mesa"
-CROS_WORKON_EGIT_BRANCH="upstream/mesa-23.3.0-rc3"
+CROS_WORKON_EGIT_BRANCH="m/release-R126-15886.B"
 
-inherit meson multilib-minimal flag-o-matic toolchain-funcs cros-workon arc-build
+MULTILIB_COMPAT=( abi_arm_{32,64} )
+inherit cros-workon arc-build meson multilib-minimal flag-o-matic toolchain-funcs
 
 DESCRIPTION="OpenGL-like graphic library for Linux"
 HOMEPAGE="http://mesa3d.sourceforge.net/"
 
-KEYWORDS="~*"
+KEYWORDS="*"
 
 # Most files are MIT/X11.
 # Some files in src/glx are SGI-B-2.0.
@@ -44,7 +45,11 @@ DEPEND="
 RDEPEND="${DEPEND}"
 
 src_configure() {
+	cros_optimize_package_for_speed
+
 	arc-build-select-clang
+
+  append-flags "-fuse-ld=lld"
 
 	multilib-minimal_src_configure
 }
@@ -78,9 +83,7 @@ multilib_src_configure() {
 		-Dvulkan-drivers=$(usex vulkan broadcom '')
 		--cross-file="${ARC_CROSS_FILE}"
 	)
-  if [ "$ABI" == "arm" ]; then
-    append-lfs-flags
-  fi
+
 	meson_src_configure
 }
 
@@ -117,7 +120,7 @@ multilib_src_install_all() {
 
 	# Install init files to advertise supported API versions.
 	insinto "${ARC_PREFIX}/vendor/etc/init"
-  doins "${FILESDIR}/init.gpu.rc"
+	doins "${FILESDIR}/init.gpu.rc"
 
 	# Install vulkan files
 	if use vulkan; then

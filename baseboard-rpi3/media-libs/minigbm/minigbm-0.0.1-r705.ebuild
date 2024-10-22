@@ -3,6 +3,8 @@
 
 EAPI="7"
 
+CROS_WORKON_COMMIT="c52bbc8435516643f696c602d1442719a232f7e6"
+CROS_WORKON_TREE="2ff4b83e46449a4cc032a6f89976f725843afb70"
 CROS_WORKON_PROJECT="chromiumos/platform/minigbm"
 CROS_WORKON_LOCALNAME="../platform/minigbm"
 CROS_WORKON_OUTOFTREE_BUILD=1
@@ -14,7 +16,7 @@ HOMEPAGE="https://chromium.googlesource.com/chromiumos/platform/minigbm"
 
 LICENSE="BSD-Google"
 SLOT="0"
-KEYWORDS="~*"
+KEYWORDS="*"
 VIDEO_CARDS="
 	amdgpu exynos intel marvell mediatek msm
 	radeon radeonsi rockchip tegra vc4 virgl v3d
@@ -97,3 +99,5 @@ src_install() {
 
 	default
 }
+
+PATCHES=( "${FILESDIR}/vc4_v3d.patch" )

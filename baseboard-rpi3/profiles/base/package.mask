@@ -1,8 +1,8 @@
-media-sound/adhd::chromiumos
+#media-sound/adhd::chromiumos
 media-libs/minigbm::chromiumos
 virtual/chromeos-config-bsp::chromiumos
 media-libs/mesa::chromiumos
 media-libs/arc-mesa::arc-plus
 =media-libs/arc-mesa-9999::arc-plus
 media-libs/arc-cros-gralloc::chromiumos
-net-wireless/wpa_supplicant-cros::chromiumos
+#net-wireless/wpa_supplicant-cros::chromiumos

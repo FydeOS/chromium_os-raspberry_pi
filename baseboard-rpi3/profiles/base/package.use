@@ -4,4 +4,5 @@ media-libs/piglit waffle
 media-libs/waffle gbm
 sys-apps/flashrom use_os_timer
 media-sound/adhd -selinux
-#media-libs/arc-mesa android_vulkan_compute_0 vulkan
+media-libs/arc-mesa android_vulkan_compute_0 vulkan abi_arm_64 abi_arm_32
+dev-libs/arc-libelf abi_arm_64 abi_arm_32
