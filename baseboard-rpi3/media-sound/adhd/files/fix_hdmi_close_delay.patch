@@ -1,0 +1,15 @@
+diff --git a/adhd/cras/src/server/cras_iodev_list.c b/adhd/cras/src/server/cras_iodev_list.c
+index 52958aee..187894c9 100644
+--- a/adhd/cras/src/server/cras_iodev_list.c
++++ b/adhd/cras/src/server/cras_iodev_list.c
+@@ -1409,6 +1409,10 @@ static int possibly_close_enabled_devs(enum CRAS_STREAM_DIRECTION dir) {
+     }
+
+     // Allow output devs to drain before closing.
++    if (edev->dev->active_node->type == CRAS_NODE_TYPE_HDMI) {
++      close_dev(edev->dev);
++      continue;
++    };
+     clock_gettime(CLOCK_MONOTONIC_RAW, &edev->dev->idle_timeout);
+     add_timespecs(&edev->dev->idle_timeout, &idle_timeout_interval);
+     idle_dev_check(NULL, NULL);
