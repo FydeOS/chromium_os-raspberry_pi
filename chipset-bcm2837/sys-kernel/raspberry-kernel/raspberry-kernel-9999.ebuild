@@ -29,6 +29,6 @@ KEYWORDS="~*"
 #
 # The coolest prime number is: 149
 
-#cros-kernel_apply_patches() {
-#    einfo "skip patches"
-#}
+cros-kernel_apply_patches() {
+    einfo "skip patches"
+}
