@@ -7,15 +7,15 @@
 EAPI=7
 
 CROS_WORKON_PROJECT="chromiumos/third_party/kernel"
-CROS_WORKON_LOCALNAME="kernel/v6.1-rpi"
-CROS_WORKON_EGIT_BRANCH="rpi-6.1.y"
+CROS_WORKON_LOCALNAME="kernel/v5.10-rpi"
+CROS_WORKON_EGIT_BRANCH="rpi-5.10.y"
 CROS_WORKON_OUTOFTREE_BUILD=1
 
 # This must be inherited *after* EGIT/CROS_WORKON variables defined
 inherit cros-workon cros-kernel2
 
 HOMEPAGE="https://www.chromium.org/chromium-os/chromiumos-design-docs/chromium-os-kernel"
-DESCRIPTION="FydeOS Linux Kernel 6.1"
+DESCRIPTION="FydeOS Linux Kernel 5.10"
 KEYWORDS="~*"
 
 # Change the following (commented out) number to the next prime number
@@ -30,5 +30,5 @@ KEYWORDS="~*"
 # The coolest prime number is: 149
 
 cros-kernel_apply_patches() {
-  einfo "skip patches"
+    einfo "skip patches"
 }

@@ -2,7 +2,7 @@ Index: minigbm/drv.c
 ===================================================================
 --- minigbm.orig/drv.c
 +++ minigbm/drv.c
-@@ -15,7 +15,6 @@
+@@ -14,7 +14,6 @@
  #include <sys/types.h>
  #include <unistd.h>
  #include <xf86drm.h>
@@ -10,17 +10,17 @@ Index: minigbm/drv.c
  #ifdef __ANDROID__
  #include <cutils/log.h>
  #include <libgen.h>
-@@ -40,6 +39,9 @@ extern const struct backend backend_msm;
+@@ -39,6 +38,9 @@ extern const struct backend backend_msm;
  #ifdef DRV_VC4
  extern const struct backend backend_vc4;
  #endif
 +#ifdef DRV_V3D
 +extern const struct backend backend_v3d;
 +#endif
- 
+
  // Dumb / generic drivers
  extern const struct backend backend_evdi;
-@@ -71,6 +73,9 @@ static const struct backend *drv_backend
+@@ -68,6 +70,9 @@ static const struct backend *drv_backend
  #ifdef DRV_VC4
  	&backend_vc4,
  #endif
@@ -30,7 +30,7 @@ Index: minigbm/drv.c
  	&backend_evdi,	    &backend_komeda,	&backend_marvell, &backend_mediatek,
  	&backend_meson,	    &backend_nouveau,	&backend_radeon,  &backend_rockchip,
  	&backend_sun4i_drm, &backend_synaptics, &backend_udl,	  &backend_virtgpu,
-@@ -101,6 +106,9 @@ static const struct backend *drv_get_bac
+@@ -98,6 +103,9 @@ static const struct backend *drv_get_bac
  		const struct backend *b = drv_backend_list[i];
  		if (!strcmp(drm_version->name, b->name)) {
  			drmFreeVersion(drm_version);
@@ -40,7 +40,7 @@ Index: minigbm/drv.c
  			return b;
  		}
  	}
-@@ -213,7 +221,12 @@ struct combination *drv_get_combination(
+@@ -208,7 +216,12 @@ struct combination *drv_get_combination(
  			if (!best || best->metadata.priority < curr->metadata.priority)
  				best = curr;
  	}
@@ -53,31 +53,31 @@ Index: minigbm/drv.c
 +  #endif
  	return best;
  }
- 
-@@ -499,7 +512,6 @@ void *drv_bo_map(struct bo *bo, const st
- 
+
+@@ -485,7 +498,6 @@ void *drv_bo_map(struct bo *bo, const st
+
  	if (bo->is_test_buffer)
  		return MAP_FAILED;
 -
  	mapping.rect = *rect;
  	mapping.refcount = 1;
- 
-@@ -533,6 +545,7 @@ void *drv_bo_map(struct bo *bo, const st
+
+@@ -519,6 +531,7 @@ void *drv_bo_map(struct bo *bo, const st
  	if (!mapping.vma) {
  		*map_data = NULL;
  		pthread_mutex_unlock(&drv->mappings_lock);
 +		drv_loge("calloc for vma failed.\n");
  		return MAP_FAILED;
  	}
- 
-@@ -542,6 +555,7 @@ void *drv_bo_map(struct bo *bo, const st
+
+@@ -528,6 +541,7 @@ void *drv_bo_map(struct bo *bo, const st
  		*map_data = NULL;
  		free(mapping.vma);
  		pthread_mutex_unlock(&drv->mappings_lock);
 +		drv_loge("driver:%s bo_map failed.\n", drv->backend->name);
  		return MAP_FAILED;
  	}
- 
+
 Index: minigbm/drv_helpers.c
 ===================================================================
 --- minigbm.orig/drv_helpers.c
@@ -485,7 +485,7 @@ Index: minigbm/v3d.c
 ===================================================================
 --- /dev/null
 +++ minigbm/v3d.c
-@@ -0,0 +1,145 @@
+@@ -0,0 +1,139 @@
 +/*
 + * Copyright 2019 The FydeOS Authors. All rights reserved.
 + * Use of this source code is governed by a BSD-style license that can be
@@ -493,6 +493,7 @@ Index: minigbm/v3d.c
 + * Author: Yang Tsao <yang@fydeos.io>
 + */
 +#ifdef DRV_V3D
++#define DEBUG
 +#include <errno.h>
 +#include <stdio.h>
 +#include <string.h>
@@ -503,8 +504,8 @@ Index: minigbm/v3d.c
 +#include "drv_helpers.h"
 +#include "util.h"
 +#include "external/v3d_drm.h"
-+#define CROS_CALLOC (1<<7)
-+#define ARC_CALLOC (1<<6)
++#define ARC_CALLOC (1<<7)
++#define CROS_CALLOC (1<<6)
 +enum v3d_tiling_mode {
 +        /* Untiled resources.  Not valid as texture inputs. */
 +        V3D_TILING_RASTER,
@@ -568,14 +569,7 @@ Index: minigbm/v3d.c
 +  bo->meta.total_size = ALIGN(bo->meta.total_size, 4096);
 +  bo_create.size = bo->meta.total_size;
 +  if (use_flags & (BO_USE_SW_MASK | BO_USE_SCANOUT | BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER)) {
-+#ifdef __ANDROID__
-+    if (width * height < 4097)
-+      bo_create.flags = CROS_CALLOC;
-+    else
-+      bo_create.flags = ARC_CALLOC;
-+#else
-+     bo_create.flags = CROS_CALLOC;
-+#endif
++     bo_create.flags = ARC_CALLOC;
 +     bo->meta.format_modifier = DRM_FORMAT_MOD_LINEAR;
 +     bo->meta.tiling = V3D_TILING_RASTER;
 +  } else {
@@ -634,33 +628,34 @@ Index: minigbm/v3d.c
 Index: minigbm/vc4.c
 ===================================================================
 --- minigbm.orig/vc4.c
-+++ minigbm/vc4.c
-@@ -3,9 +3,7 @@
-  * Use of this source code is governed by a BSD-style license that can be
-  * found in the LICENSE file.
-  */
++++ /dev/null
+@@ -1,136 +0,0 @@
+-/*
+- * Copyright 2017 The Chromium OS Authors. All rights reserved.
+- * Use of this source code is governed by a BSD-style license that can be
+- * found in the LICENSE file.
+- */
 -
- #ifdef DRV_VC4
+-#ifdef DRV_VC4
 -
- #include <errno.h>
- #include <stdio.h>
- #include <string.h>
-@@ -17,51 +15,46 @@
- #include "drv_priv.h"
- #include "util.h"
- 
-+#define VC4_TILING_NONE 0
-+#define VC4_TILING_T 1
-+
- static const uint32_t render_target_formats[] = { DRM_FORMAT_ARGB8888, DRM_FORMAT_RGB565,
-+              DRM_FORMAT_ABGR8888, DRM_FORMAT_XBGR8888, DRM_FORMAT_BGR565,
- 						  DRM_FORMAT_XRGB8888 };
- 
+-#include <errno.h>
+-#include <stdio.h>
+-#include <string.h>
+-#include <sys/mman.h>
+-#include <vc4_drm.h>
+-#include <xf86drm.h>
+-
+-#include "drv_helpers.h"
+-#include "drv_priv.h"
+-#include "util.h"
+-
+-static const uint32_t render_target_formats[] = { DRM_FORMAT_ARGB8888, DRM_FORMAT_RGB565,
+-						  DRM_FORMAT_XRGB8888 };
+-
 -static const uint32_t texture_only_formats[] = { DRM_FORMAT_NV12, DRM_FORMAT_YVU420 };
-+static const uint32_t texture_target_formats[] = { DRM_FORMAT_NV12, DRM_FORMAT_YVU420, DRM_FORMAT_R8 };
- 
- static int vc4_init(struct driver *drv)
- {
+-
+-static int vc4_init(struct driver *drv)
+-{
 -	drv_add_combinations(drv, render_target_formats, ARRAY_SIZE(render_target_formats),
 -			     &LINEAR_METADATA, BO_USE_RENDER_MASK);
 -
@@ -675,36 +670,16 @@ Index: minigbm/vc4.c
 -			       BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT | BO_USE_HW_VIDEO_ENCODER);
 -
 -	return drv_modify_linear_combinations(drv);
-+  struct format_metadata metadata = {1, VC4_TILING_NONE,DRM_FORMAT_MOD_LINEAR};
-+  drv_add_combinations(drv, render_target_formats, ARRAY_SIZE(render_target_formats),
-+          &metadata, BO_USE_RENDER_MASK | BO_USE_SCANOUT);
-+  drv_add_combinations(drv, texture_target_formats, ARRAY_SIZE(texture_target_formats),
-+          &metadata, BO_USE_TEXTURE_MASK);
-+  drv_modify_combination(drv, DRM_FORMAT_ABGR8888, &metadata, BO_USE_TEXTURE);
-+  drv_modify_combination(drv, DRM_FORMAT_XBGR8888, &metadata, BO_USE_TEXTURE);
-+  drv_modify_combination(drv, DRM_FORMAT_YVU420, &metadata,  BO_USE_CAMERA_READ |
-+                              BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
-+                              BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
-+  drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata,
-+                              BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
-+                              BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER);
-+
-+  drv_add_combination(drv, DRM_FORMAT_R8, &metadata,
-+          BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SW_MASK |
-+        BO_USE_LINEAR | BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER |
-+        BO_USE_GPU_DATA_BUFFER | BO_USE_SENSOR_DIRECT_DATA);
-+  drv_logi("vc4 driver inited.\n");
-+  return drv_modify_linear_combinations(drv);
- }
- 
- static int vc4_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t height,
- 				      uint32_t format, uint64_t modifier)
- {
- 	int ret;
+-}
+-
+-static int vc4_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t height,
+-				      uint32_t format, uint64_t modifier)
+-{
+-	int ret;
 -	size_t plane;
- 	uint32_t stride;
- 	struct drm_vc4_create_bo bo_create = { 0 };
- 
+-	uint32_t stride;
+-	struct drm_vc4_create_bo bo_create = { 0 };
+-
 -	switch (modifier) {
 -	case DRM_FORMAT_MOD_LINEAR:
 -		break;
@@ -719,32 +694,89 @@ Index: minigbm/vc4.c
 -	 * Since the ARM L1 cache line size is 64 bytes, align to that as a
 -	 * performance optimization.
 -	 */
- 	stride = drv_stride_from_format(format, width, 0);
- 	stride = ALIGN(stride, 64);
- 	drv_bo_from_format(bo, stride, 1, height, format);
-@@ -70,12 +63,14 @@ static int vc4_bo_create_for_modifier(st
- 
- 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VC4_CREATE_BO, &bo_create);
- 	if (ret) {
--		drv_loge("DRM_IOCTL_VC4_CREATE_BO failed (size=%zu)\n", bo->meta.total_size);
-+		drv_loge("DRM_IOCTL_VC4_CREATE_BO failed (size=%zu), ret=%d\n", bo->meta.total_size, ret);
- 		return -errno;
- 	}
- 
- 	bo->handle.u32 = bo_create.handle;
+-	stride = drv_stride_from_format(format, width, 0);
+-	stride = ALIGN(stride, 64);
+-	drv_bo_from_format(bo, stride, 1, height, format);
 -
-+#ifdef DEBUG
-+	drv_logi("create vc4 bo handle:%u, size:%u\n", bo->handle.u32, bo_create.size);
-+#endif
- 	return 0;
- }
- 
-@@ -117,7 +112,7 @@ static void *vc4_bo_map(struct bo *bo, s
- 	}
- 
- 	vma->length = bo->meta.total_size;
+-	bo_create.size = bo->meta.total_size;
+-
+-	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_VC4_CREATE_BO, &bo_create);
+-	if (ret) {
+-		drv_loge("DRM_IOCTL_VC4_CREATE_BO failed (size=%zu)\n", bo->meta.total_size);
+-		return -errno;
+-	}
+-
+-	bo->handle.u32 = bo_create.handle;
+-
+-	return 0;
+-}
+-
+-static int vc4_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t format,
+-			 uint64_t use_flags)
+-{
+-	struct combination *combo;
+-
+-	combo = drv_get_combination(bo->drv, format, use_flags);
+-	if (!combo)
+-		return -EINVAL;
+-
+-	return vc4_bo_create_for_modifier(bo, width, height, format, combo->metadata.modifier);
+-}
+-
+-static int vc4_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint32_t height,
+-					uint32_t format, const uint64_t *modifiers, uint32_t count)
+-{
+-	static const uint64_t modifier_order[] = {
+-		DRM_FORMAT_MOD_LINEAR,
+-	};
+-	uint64_t modifier;
+-
+-	modifier = drv_pick_modifier(modifiers, count, modifier_order, ARRAY_SIZE(modifier_order));
+-
+-	return vc4_bo_create_for_modifier(bo, width, height, format, modifier);
+-}
+-
+-static void *vc4_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
+-{
+-	int ret;
+-	struct drm_vc4_mmap_bo bo_map = { 0 };
+-
+-	bo_map.handle = bo->handle.u32;
+-	ret = drmCommandWriteRead(bo->drv->fd, DRM_VC4_MMAP_BO, &bo_map, sizeof(bo_map));
+-	if (ret) {
+-		drv_loge("DRM_VC4_MMAP_BO failed\n");
+-		return MAP_FAILED;
+-	}
+-
+-	vma->length = bo->meta.total_size;
 -	return mmap(NULL, bo->meta.total_size, drv_get_prot(map_flags), MAP_SHARED, bo->drv->fd,
-+	return mmap(0, bo->meta.total_size, drv_get_prot(map_flags), MAP_SHARED, bo->drv->fd,
- 		    bo_map.offset);
- }
- 
+-		    bo_map.offset);
+-}
+-
+-const struct backend backend_vc4 = {
+-	.name = "vc4",
+-	.init = vc4_init,
+-	.bo_create = vc4_bo_create,
+-	.bo_create_with_modifiers = vc4_bo_create_with_modifiers,
+-	.bo_import = drv_prime_bo_import,
+-	.bo_destroy = drv_gem_bo_destroy,
+-	.bo_map = vc4_bo_map,
+-	.bo_unmap = drv_bo_munmap,
+-	.resolve_format_and_use_flags = drv_resolve_format_and_use_flags_helper,
+-};
+-
+-#endif
+Index: minigbm/dumb_driver.c
+===================================================================
+--- minigbm.orig/dumb_driver.c
++++ minigbm/dumb_driver.c
+@@ -73,6 +73,9 @@ INIT_DUMB_DRIVER(radeon)
+ INIT_DUMB_DRIVER_WITH_NAME(sun4i_drm, "sun4i-drm")
+ INIT_DUMB_DRIVER(synaptics)
+ INIT_DUMB_DRIVER(udl)
++#ifdef DRV_VC4
++INIT_DUMB_DRIVER(vc4)
++#endif
+ INIT_DUMB_DRIVER(vkms)
+
+ #ifndef DRV_ROCKCHIP

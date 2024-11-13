@@ -5,18 +5,22 @@
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=7
-
-CROS_WORKON_PROJECT="chromiumos/third_party/kernel"
+CROS_WORKON_REPO="https://github.com/raspberrypi"
+CROS_WORKON_COMMIT="fbd8b3facb36ce888b1cdcf5f45a78475a8208f2"
+CROS_WORKON_PROJECT="linux"
 CROS_WORKON_LOCALNAME="kernel/v6.1-rpi"
 CROS_WORKON_EGIT_BRANCH="rpi-6.1.y"
-CROS_WORKON_OUTOFTREE_BUILD=1
+CROS_WORKON_INCREMENTAL_BUILD="1"
+CROS_WORKON_MANUAL_UPREV=1
+#ECLASS_DEBUG_OUTPUT="on"
+EGIT_MASTER="rpi-6.1.y"
 
 # This must be inherited *after* EGIT/CROS_WORKON variables defined
 inherit cros-workon cros-kernel2
 
 HOMEPAGE="https://www.chromium.org/chromium-os/chromiumos-design-docs/chromium-os-kernel"
-DESCRIPTION="FydeOS Linux Kernel 6.1"
-KEYWORDS="~*"
+DESCRIPTION="Chromium OS Linux kernel 6.1"
+KEYWORDS="*"
 
 # Change the following (commented out) number to the next prime number
 # when you change "cros-kernel2.eclass" to work around http://crbug.com/220902
@@ -27,8 +31,4 @@ KEYWORDS="~*"
 # Don't forget to update the comment in _all_ chromeos-kernel-x_x-9999.ebuild
 # files (!!!)
 #
-# The coolest prime number is: 149
-
-cros-kernel_apply_patches() {
-  einfo "skip patches"
-}
+# The coolest prime number is: 151

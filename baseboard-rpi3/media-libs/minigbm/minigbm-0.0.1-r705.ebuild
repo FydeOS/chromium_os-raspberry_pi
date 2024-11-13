@@ -44,10 +44,10 @@ DEPEND="${RDEPEND}
 	)"
 
 src_prepare() {
+  eapply ${FILESDIR}/vc6.patch
 	default
 	sanitizers-setup-env
 	cros-common.mk_src_prepare
-  eapply -p1 ${FILESDIR}/vc4_v3d.patch
 }
 
 src_configure() {
