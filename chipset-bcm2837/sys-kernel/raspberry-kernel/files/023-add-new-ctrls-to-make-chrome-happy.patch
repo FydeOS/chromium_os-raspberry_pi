@@ -1,8 +1,8 @@
-Index: kernel-raspberry/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
+Index: kernel-rpi-6_1/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
 ===================================================================
---- kernel-raspberry.orig/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
-+++ kernel-raspberry/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
-@@ -2382,7 +2382,22 @@ static int bcm2835_codec_s_ctrl(struct v
+--- kernel-rpi-6_1.orig/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
++++ kernel-rpi-6_1/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
+@@ -2422,7 +2422,22 @@ static int bcm2835_codec_s_ctrl(struct v
  	case V4L2_CID_MPEG_VIDEO_B_FRAMES:
  		ret = 0;
  		break;
@@ -26,7 +26,7 @@ Index: kernel-raspberry/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2
  	case V4L2_CID_JPEG_COMPRESSION_QUALITY:
  		if (!ctx->component)
  			break;
-@@ -3466,7 +3481,7 @@ static int bcm2835_codec_open(struct fil
+@@ -3521,7 +3536,7 @@ static int bcm2835_codec_open(struct fil
  	break;
  	case ISP:
  	{
@@ -35,7 +35,7 @@ Index: kernel-raspberry/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2
  
  		v4l2_ctrl_new_std(hdl, &bcm2835_codec_ctrl_ops,
  				  V4L2_CID_HFLIP,
-@@ -3474,6 +3489,12 @@ static int bcm2835_codec_open(struct fil
+@@ -3529,6 +3544,12 @@ static int bcm2835_codec_open(struct fil
  		v4l2_ctrl_new_std(hdl, &bcm2835_codec_ctrl_ops,
  				  V4L2_CID_VFLIP,
  				  1, 0, 1, 0);
@@ -48,10 +48,10 @@ Index: kernel-raspberry/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2
  		if (hdl->error) {
  			rc = hdl->error;
  			goto free_ctrl_handler;
-Index: kernel-raspberry/drivers/staging/media/rpivid/rpivid.c
+Index: kernel-rpi-6_1/drivers/staging/media/rpivid/rpivid.c
 ===================================================================
---- kernel-raspberry.orig/drivers/staging/media/rpivid/rpivid.c
-+++ kernel-raspberry/drivers/staging/media/rpivid/rpivid.c
+--- kernel-rpi-6_1.orig/drivers/staging/media/rpivid/rpivid.c
++++ kernel-rpi-6_1/drivers/staging/media/rpivid/rpivid.c
 @@ -89,6 +89,23 @@ static const struct rpivid_control rpivi
  		},
  		.required	= false,

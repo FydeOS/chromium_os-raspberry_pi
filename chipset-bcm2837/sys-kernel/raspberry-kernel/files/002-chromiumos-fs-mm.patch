@@ -1,18 +1,18 @@
-Index: kernel-raspberry/drivers/Kconfig
+Index: kernel-rpi-6_1/drivers/Kconfig
 ===================================================================
---- kernel-raspberry.orig/drivers/Kconfig
-+++ kernel-raspberry/drivers/Kconfig
-@@ -239,4 +239,6 @@ source "drivers/peci/Kconfig"
+--- kernel-rpi-6_1.orig/drivers/Kconfig
++++ kernel-rpi-6_1/drivers/Kconfig
+@@ -243,4 +243,6 @@ source "drivers/hte/Kconfig"
  
- source "drivers/hte/Kconfig"
+ source "drivers/cdx/Kconfig"
  
 +source "drivers/pkglist/Kconfig"
 +
  endmenu
-Index: kernel-raspberry/drivers/pkglist/Kconfig
+Index: kernel-rpi-6_1/drivers/pkglist/Kconfig
 ===================================================================
 --- /dev/null
-+++ kernel-raspberry/drivers/pkglist/Kconfig
++++ kernel-rpi-6_1/drivers/pkglist/Kconfig
 @@ -0,0 +1,30 @@
 +config PKGLIST
 +	tristate "Package list for emulated 'SD card' file system for Android"
@@ -44,18 +44,18 @@ Index: kernel-raspberry/drivers/pkglist/Kconfig
 +	help
 +	  This does not allow configuration of sdcardfs.
 +endchoice
-Index: kernel-raspberry/drivers/pkglist/Makefile
+Index: kernel-rpi-6_1/drivers/pkglist/Makefile
 ===================================================================
 --- /dev/null
-+++ kernel-raspberry/drivers/pkglist/Makefile
++++ kernel-rpi-6_1/drivers/pkglist/Makefile
 @@ -0,0 +1,3 @@
 +obj-$(CONFIG_PKGLIST) += pkg.o
 +pkg-$(CONFIG_PKGLIST_USE_CONFIGFS) += pkglist.o
 +pkg-$(CONFIG_PKGLIST_NO_CONFIG) += pkglist_none.o
-Index: kernel-raspberry/drivers/pkglist/pkglist.c
+Index: kernel-rpi-6_1/drivers/pkglist/pkglist.c
 ===================================================================
 --- /dev/null
-+++ kernel-raspberry/drivers/pkglist/pkglist.c
++++ kernel-rpi-6_1/drivers/pkglist/pkglist.c
 @@ -0,0 +1,966 @@
 +/*
 + * Copyright (C) 2017 Google Inc., Author: Daniel Rosenberg <drosen@google.com>
@@ -1023,10 +1023,10 @@ Index: kernel-raspberry/drivers/pkglist/pkglist.c
 +MODULE_AUTHOR("Daniel Rosenberg, Google");
 +MODULE_DESCRIPTION("Configfs Pkglist implementation");
 +MODULE_LICENSE("GPL v2");
-Index: kernel-raspberry/drivers/pkglist/pkglist_none.c
+Index: kernel-rpi-6_1/drivers/pkglist/pkglist_none.c
 ===================================================================
 --- /dev/null
-+++ kernel-raspberry/drivers/pkglist/pkglist_none.c
++++ kernel-rpi-6_1/drivers/pkglist/pkglist_none.c
 @@ -0,0 +1,57 @@
 +/*
 + * Copyright (C) 2017 Google Inc., Author: Daniel Rosenberg <drosen@google.com>
@@ -1085,19 +1085,24 @@ Index: kernel-raspberry/drivers/pkglist/pkglist_none.c
 +MODULE_AUTHOR("Daniel Rosenberg, Google");
 +MODULE_DESCRIPTION("Empty Pkglist implementation");
 +MODULE_LICENSE("GPL v2");
-Index: kernel-raspberry/drivers/Makefile
+Index: kernel-rpi-6_1/drivers/Makefile
 ===================================================================
---- kernel-raspberry.orig/drivers/Makefile
-+++ kernel-raspberry/drivers/Makefile
-@@ -189,3 +189,4 @@ obj-$(CONFIG_COUNTER)		+= counter/
+--- kernel-rpi-6_1.orig/drivers/Makefile
++++ kernel-rpi-6_1/drivers/Makefile
+@@ -195,7 +195,9 @@ obj-$(CONFIG_COUNTER)		+= counter/
  obj-$(CONFIG_MOST)		+= most/
  obj-$(CONFIG_PECI)		+= peci/
  obj-$(CONFIG_HTE)		+= hte/
-+obj-$(CONFIG_PKGLIST)          += pkglist/
-Index: kernel-raspberry/drivers/char/mem.c
++obj-$(CONFIG_PKGLIST)   += pkglist/
+ obj-$(CONFIG_DRM_ACCEL)		+= accel/
+ obj-$(CONFIG_CDX_BUS)		+= cdx/
+ 
+ obj-$(CONFIG_S390)		+= s390/
++
+Index: kernel-rpi-6_1/drivers/char/mem.c
 ===================================================================
---- kernel-raspberry.orig/drivers/char/mem.c
-+++ kernel-raspberry/drivers/char/mem.c
+--- kernel-rpi-6_1.orig/drivers/char/mem.c
++++ kernel-rpi-6_1/drivers/char/mem.c
 @@ -30,6 +30,7 @@
  #include <linux/uio.h>
  #include <linux/uaccess.h>
@@ -1106,21 +1111,21 @@ Index: kernel-raspberry/drivers/char/mem.c
  
  #ifdef CONFIG_IA64
  # include <linux/efi.h>
-@@ -717,6 +718,9 @@ static const struct memdev {
+@@ -710,6 +711,9 @@ static const struct memdev {
  #ifdef CONFIG_PRINTK
- 	[11] = { "kmsg", 0644, &kmsg_fops, 0 },
+ 	[11] = { "kmsg", &kmsg_fops, 0, 0644 },
  #endif
 +#ifdef CONFIG_LOW_MEM_NOTIFY
-+	[12] = { "chromeos-low-mem", 0666, &low_mem_notify_fops, 0 },
++	[12] = { "chromeos-low-mem", &low_mem_notify_fops, 0, 0666 },
 +#endif
  };
  
  static int memory_open(struct inode *inode, struct file *filp)
-Index: kernel-raspberry/fs/Kconfig
+Index: kernel-rpi-6_1/fs/Kconfig
 ===================================================================
---- kernel-raspberry.orig/fs/Kconfig
-+++ kernel-raspberry/fs/Kconfig
-@@ -297,6 +297,7 @@ source "fs/orangefs/Kconfig"
+--- kernel-rpi-6_1.orig/fs/Kconfig
++++ kernel-rpi-6_1/fs/Kconfig
+@@ -309,6 +309,7 @@ source "fs/orangefs/Kconfig"
  source "fs/adfs/Kconfig"
  source "fs/affs/Kconfig"
  source "fs/ecryptfs/Kconfig"
@@ -1128,10 +1133,10 @@ Index: kernel-raspberry/fs/Kconfig
  source "fs/hfs/Kconfig"
  source "fs/hfsplus/Kconfig"
  source "fs/befs/Kconfig"
-Index: kernel-raspberry/fs/Makefile
+Index: kernel-rpi-6_1/fs/Makefile
 ===================================================================
---- kernel-raspberry.orig/fs/Makefile
-+++ kernel-raspberry/fs/Makefile
+--- kernel-rpi-6_1.orig/fs/Makefile
++++ kernel-rpi-6_1/fs/Makefile
 @@ -4,7 +4,7 @@
  #
  # 14 Sep 2000, Christoph Hellwig <hch@infradead.org>
@@ -1141,7 +1146,7 @@ Index: kernel-raspberry/fs/Makefile
  
  
  obj-y :=	open.o read_write.o file_table.o super.o \
-@@ -62,7 +62,7 @@ obj-$(CONFIG_CONFIGFS_FS)	+= configfs/
+@@ -57,7 +57,7 @@ obj-$(CONFIG_CONFIGFS_FS)	+= configfs/
  obj-y				+= devpts/
  
  obj-$(CONFIG_DLM)		+= dlm/
@@ -1150,7 +1155,7 @@ Index: kernel-raspberry/fs/Makefile
  # Do not add any filesystems before this line
  obj-$(CONFIG_NETFS_SUPPORT)	+= netfs/
  obj-$(CONFIG_FSCACHE)		+= fscache/
-@@ -86,6 +86,7 @@ obj-$(CONFIG_ISO9660_FS)	+= isofs/
+@@ -81,6 +81,7 @@ obj-$(CONFIG_ISO9660_FS)	+= isofs/
  obj-$(CONFIG_HFSPLUS_FS)	+= hfsplus/ # Before hfs to find wrapped HFS+
  obj-$(CONFIG_HFS_FS)		+= hfs/
  obj-$(CONFIG_ECRYPT_FS)		+= ecryptfs/
@@ -1158,10 +1163,10 @@ Index: kernel-raspberry/fs/Makefile
  obj-$(CONFIG_VXFS_FS)		+= freevxfs/
  obj-$(CONFIG_NFS_FS)		+= nfs/
  obj-$(CONFIG_EXPORTFS)		+= exportfs/
-Index: kernel-raspberry/fs/esdfs/Kconfig
+Index: kernel-rpi-6_1/fs/esdfs/Kconfig
 ===================================================================
 --- /dev/null
-+++ kernel-raspberry/fs/esdfs/Kconfig
++++ kernel-rpi-6_1/fs/esdfs/Kconfig
 @@ -0,0 +1,7 @@
 +config ESD_FS
 +	tristate "Emulated 'SD card' file system for Android (EXPERIMENTAL)"
@@ -1170,10 +1175,10 @@ Index: kernel-raspberry/fs/esdfs/Kconfig
 +	help
 +	  Esdfs is a wrapfs-based file system, designed to implement the
 +	  Android "sdcard" FUSE-backed file system from within the kernel.
-Index: kernel-raspberry/fs/esdfs/Makefile
+Index: kernel-rpi-6_1/fs/esdfs/Makefile
 ===================================================================
 --- /dev/null
-+++ kernel-raspberry/fs/esdfs/Makefile
++++ kernel-rpi-6_1/fs/esdfs/Makefile
 @@ -0,0 +1,7 @@
 +ESDFS_VERSION="0.2"
 +
@@ -1182,10 +1187,10 @@ Index: kernel-raspberry/fs/esdfs/Makefile
 +obj-$(CONFIG_ESD_FS) += esdfs.o
 +
 +esdfs-y := dentry.o file.o inode.o main.o super.o lookup.o mmap.o derive.o
-Index: kernel-raspberry/fs/esdfs/dentry.c
+Index: kernel-rpi-6_1/fs/esdfs/dentry.c
 ===================================================================
 --- /dev/null
-+++ kernel-raspberry/fs/esdfs/dentry.c
++++ kernel-rpi-6_1/fs/esdfs/dentry.c
 @@ -0,0 +1,158 @@
 +/*
 + * Copyright (c) 1998-2014 Erez Zadok
@@ -1345,11 +1350,11 @@ Index: kernel-raspberry/fs/esdfs/dentry.c
 +	.d_compare	= esdfs_d_compare,
 +	.d_release	= esdfs_d_release,
 +};
-Index: kernel-raspberry/fs/esdfs/derive.c
+Index: kernel-rpi-6_1/fs/esdfs/derive.c
 ===================================================================
 --- /dev/null
-+++ kernel-raspberry/fs/esdfs/derive.c
-@@ -0,0 +1,608 @@
++++ kernel-rpi-6_1/fs/esdfs/derive.c
+@@ -0,0 +1,609 @@
 +/*
 + * Copyright (c) 2013-2014 Motorola Mobility LLC
 + * Copyright (C) 2017      Google, Inc.
@@ -1373,6 +1378,7 @@ Index: kernel-raspberry/fs/esdfs/derive.c
 +#include <linux/vmalloc.h>
 +#include <linux/security.h>
 +#include <linux/uaccess.h>
++#include <linux/filelock.h>
 +#include "esdfs.h"
 +
 +static struct qstr names_secure[] = {
@@ -1863,7 +1869,7 @@ Index: kernel-raspberry/fs/esdfs/derive.c
 +		error = security_path_chown(&path, newattrs.ia_uid,
 +						newattrs.ia_gid);
 +		if (!error)
-+			error = notify_change(&init_user_ns, path.dentry,
++			error = notify_change(&nop_mnt_idmap, path.dentry,
 +						&newattrs, &delegated_inode);
 +		inode_unlock(inode);
 +		if (delegated_inode) {
@@ -1948,7 +1954,7 @@ Index: kernel-raspberry/fs/esdfs/derive.c
 +	mode = S_IFREG;
 +	lower_parent_dentry = lock_parent(lower_dentry);
 +	esdfs_set_lower_mode(ESDFS_SB(dir_dentry->d_sb), inode_i, &mode);
-+	err = vfs_create(&init_user_ns, lower_dir_path.dentry->d_inode,
++	err = vfs_create(&nop_mnt_idmap, lower_dir_path.dentry->d_inode,
 +			 lower_dentry, mode, true);
 +	unlock_dir(lower_parent_dentry);
 +	dput(lower_dentry);
@@ -1958,10 +1964,10 @@ Index: kernel-raspberry/fs/esdfs/derive.c
 +	esdfs_revert_creds(creds, &mask);
 +	return err;
 +}
-Index: kernel-raspberry/fs/esdfs/esdfs.h
+Index: kernel-rpi-6_1/fs/esdfs/esdfs.h
 ===================================================================
 --- /dev/null
-+++ kernel-raspberry/fs/esdfs/esdfs.h
++++ kernel-rpi-6_1/fs/esdfs/esdfs.h
 @@ -0,0 +1,627 @@
 +/*
 + * Copyright (c) 1998-2014 Erez Zadok
@@ -2466,7 +2472,7 @@ Index: kernel-raspberry/fs/esdfs/esdfs.h
 +	dest->i_rdev = src->i_rdev;
 +	dest->i_atime = src->i_atime;
 +	dest->i_mtime = src->i_mtime;
-+	dest->i_ctime = src->i_ctime;
++	dest->__i_ctime = src->__i_ctime;
 +	dest->i_blkbits = src->i_blkbits;
 +	dest->i_flags = src->i_flags;
 +	set_nlink(dest, src->i_nlink);
@@ -2590,10 +2596,10 @@ Index: kernel-raspberry/fs/esdfs/esdfs.h
 +}
 +
 +#endif	/* not _ESDFS_H_ */
-Index: kernel-raspberry/fs/esdfs/file.c
+Index: kernel-rpi-6_1/fs/esdfs/file.c
 ===================================================================
 --- /dev/null
-+++ kernel-raspberry/fs/esdfs/file.c
++++ kernel-rpi-6_1/fs/esdfs/file.c
 @@ -0,0 +1,473 @@
 +/*
 + * Copyright (c) 1998-2014 Erez Zadok
@@ -3049,7 +3055,7 @@ Index: kernel-raspberry/fs/esdfs/file.c
 +	.fasync		= esdfs_fasync,
 +	.read_iter	= esdfs_read_iter,
 +	.write_iter	= esdfs_write_iter,
-+	.splice_read    = generic_file_splice_read,
++	.splice_read    = copy_splice_read,
 +	.splice_write   = iter_file_splice_write,
 +};
 +
@@ -3057,7 +3063,7 @@ Index: kernel-raspberry/fs/esdfs/file.c
 +const struct file_operations esdfs_dir_fops = {
 +	.llseek		= esdfs_file_llseek,
 +	.read		= generic_read_dir,
-+	.iterate	= esdfs_readdir,
++	.iterate_shared = esdfs_readdir,
 +	.unlocked_ioctl	= esdfs_unlocked_ioctl,
 +#ifdef CONFIG_COMPAT
 +	.compat_ioctl	= esdfs_compat_ioctl,
@@ -3068,11 +3074,11 @@ Index: kernel-raspberry/fs/esdfs/file.c
 +	.fsync		= esdfs_fsync,
 +	.fasync		= esdfs_fasync,
 +};
-Index: kernel-raspberry/fs/esdfs/inode.c
+Index: kernel-rpi-6_1/fs/esdfs/inode.c
 ===================================================================
 --- /dev/null
-+++ kernel-raspberry/fs/esdfs/inode.c
-@@ -0,0 +1,550 @@
++++ kernel-rpi-6_1/fs/esdfs/inode.c
+@@ -0,0 +1,553 @@
 +/*
 + * Copyright (c) 1998-2014 Erez Zadok
 + * Copyright (c) 2009	   Shrikar Archak
@@ -3089,7 +3095,7 @@ Index: kernel-raspberry/fs/esdfs/inode.c
 +#include "esdfs.h"
 +#include <linux/fsnotify.h>
 +
-+static int esdfs_create(struct user_namespace *mnt_userns, struct inode *dir,
++static int esdfs_create(struct mnt_idmap *idmap, struct inode *dir,
 +			struct dentry *dentry, umode_t mode, bool want_excl)
 +{
 +	int err;
@@ -3122,7 +3128,7 @@ Index: kernel-raspberry/fs/esdfs/inode.c
 +	esdfs_set_lower_mode(ESDFS_SB(dir->i_sb), ESDFS_I(dir), &mode);
 +
 +	lower_inode = esdfs_lower_inode(dir);
-+	err = vfs_create(mnt_userns, lower_inode, lower_dentry, mode,
++	err = vfs_create(idmap, lower_inode, lower_dentry, mode,
 +			 want_excl);
 +	if (err)
 +		goto out;
@@ -3177,7 +3183,7 @@ Index: kernel-raspberry/fs/esdfs/inode.c
 +	 */
 +	lower_dir_inode = lower_dir_dentry->d_inode;
 +
-+	err = vfs_unlink(&init_user_ns, lower_dir_inode, lower_dentry, NULL);
++	err = vfs_unlink(&nop_mnt_idmap, lower_dir_inode, lower_dentry, NULL);
 +
 +	/*
 +	 * Note: unlinking on top of NFS can cause silly-renamed files.
@@ -3194,7 +3200,7 @@ Index: kernel-raspberry/fs/esdfs/inode.c
 +	fsstack_copy_inode_size(dir, lower_dir_inode);
 +	set_nlink(dentry->d_inode,
 +		  esdfs_lower_inode(dentry->d_inode)->i_nlink);
-+	dentry->d_inode->i_ctime = dir->i_ctime;
++	dentry->d_inode->__i_ctime = dir->__i_ctime;
 +	d_drop(dentry); /* this is needed, else LTP fails (VFS won't do it) */
 +out:
 +	unlock_dir(lower_dir_dentry);
@@ -3204,7 +3210,7 @@ Index: kernel-raspberry/fs/esdfs/inode.c
 +	return err;
 +}
 +
-+static int esdfs_mkdir(struct user_namespace *mnt_userns, struct inode *dir,
++static int esdfs_mkdir(struct mnt_idmap *idmap, struct inode *dir,
 +		       struct dentry *dentry, umode_t mode)
 +{
 +	int err;
@@ -3229,7 +3235,7 @@ Index: kernel-raspberry/fs/esdfs/inode.c
 +
 +	mode |= S_IFDIR;
 +	esdfs_set_lower_mode(ESDFS_SB(dir->i_sb), ESDFS_I(dir), &mode);
-+	err = vfs_mkdir(mnt_userns, lower_parent_dentry->d_inode, lower_dentry,
++	err = vfs_mkdir(idmap, lower_parent_dentry->d_inode, lower_dentry,
 +			mode);
 +	if (err)
 +		goto unlock_lower_parent;
@@ -3286,7 +3292,7 @@ Index: kernel-raspberry/fs/esdfs/inode.c
 +		goto out;
 +	}
 +
-+	err = vfs_rmdir(&init_user_ns, lower_dir_dentry->d_inode, lower_dentry);
++	err = vfs_rmdir(&nop_mnt_idmap, lower_dir_dentry->d_inode, lower_dentry);
 +	if (err)
 +		goto out;
 +
@@ -3308,7 +3314,7 @@ Index: kernel-raspberry/fs/esdfs/inode.c
 + * The locking rules in esdfs_rename are complex.  We could use a simpler
 + * superblock-level name-space lock for renames and copy-ups.
 + */
-+static int esdfs_rename(struct user_namespace *mnt_userns,
++static int esdfs_rename(struct mnt_idmap *idmap,
 +			struct inode *old_dir, struct dentry *old_dentry,
 +			struct inode *new_dir, struct dentry *new_dentry,
 +			unsigned int flags)
@@ -3377,10 +3383,10 @@ Index: kernel-raspberry/fs/esdfs/inode.c
 +		goto out;
 +	}
 +
-+	rd.old_mnt_userns = mnt_userns;
++	rd.old_mnt_idmap = idmap;
 +	rd.old_dir = lower_old_dir_dentry->d_inode;
 +	rd.old_dentry = lower_old_dentry;
-+	rd.new_mnt_userns = mnt_userns;
++	rd.new_mnt_idmap = idmap;
 +	rd.new_dir = lower_new_dir_dentry->d_inode;
 +	rd.new_dentry = lower_new_dentry;
 +	rd.flags = flags;
@@ -3414,14 +3420,14 @@ Index: kernel-raspberry/fs/esdfs/inode.c
 +	return err;
 +}
 +
-+static int esdfs_permission(struct user_namespace *mnt_userns,
++static int esdfs_permission(struct mnt_idmap * idmap,
 +			    struct inode *inode, int mask)
 +{
 +	struct inode *lower_inode;
 +	int err;
 +
 +	/* First, check the upper permissions */
-+	err = generic_permission(mnt_userns, inode, mask);
++	err = generic_permission(idmap, inode, mask);
 +
 +	/* Basic checking of the lower inode (can't override creds here) */
 +	lower_inode = esdfs_lower_inode(inode);
@@ -3439,7 +3445,7 @@ Index: kernel-raspberry/fs/esdfs/inode.c
 +	return err;
 +}
 +
-+static int esdfs_setattr(struct user_namespace *mnt_userns,
++static int esdfs_setattr(struct mnt_idmap * idmap,
 +			 struct dentry *dentry, struct iattr *ia)
 +{
 +	int err;
@@ -3471,7 +3477,7 @@ Index: kernel-raspberry/fs/esdfs/inode.c
 +	 * this user can change the lower inode: that should happen when
 +	 * calling notify_change on the lower inode.
 +	 */
-+	err = setattr_prepare(mnt_userns, dentry, ia);
++	err = setattr_prepare(idmap, dentry, ia);
 +	if (err)
 +		return err;
 +
@@ -3538,7 +3544,7 @@ Index: kernel-raspberry/fs/esdfs/inode.c
 +	 * tries to open(), unlink(), then ftruncate() a file.
 +	 */
 +	inode_lock(lower_dentry->d_inode);
-+	err = notify_change(mnt_userns, lower_dentry,
++	err = notify_change(idmap, lower_dentry,
 +			    &lower_ia, /* note: lower_ia */
 +			    NULL);
 +	inode_unlock(lower_dentry->d_inode);
@@ -3559,7 +3565,7 @@ Index: kernel-raspberry/fs/esdfs/inode.c
 +	return err;
 +}
 +
-+static int esdfs_getattr(struct user_namespace *mnt_userns,
++static int esdfs_getattr(struct mnt_idmap * idmap,
 +			 const struct path *path, struct kstat *stat,
 +			 u32 request_mask, unsigned int flags)
 +{
@@ -3583,14 +3589,17 @@ Index: kernel-raspberry/fs/esdfs/inode.c
 +	esdfs_get_lower_path(dentry, &lower_path);
 +
 +	/* We need the lower getattr to calculate stat->blocks for us. */
-+	err = vfs_getattr(&lower_path, &lower_stat, request_mask, flags);
++  if (flags & AT_GETATTR_NOSEC)
++    err = vfs_getattr_nosec(&lower_path, &lower_stat, request_mask, flags);
++  else
++	  err = vfs_getattr(&lower_path, &lower_stat, request_mask, flags);
 +	if (err)
 +		goto out;
 +
 +	lower_inode = esdfs_lower_inode(inode);
 +	esdfs_copy_attr(inode, lower_inode);
 +	fsstack_copy_inode_size(inode, lower_inode);
-+	generic_fillattr(mnt_userns, inode, stat);
++	generic_fillattr(idmap, request_mask, inode, stat);
 +
 +	stat->blocks = lower_stat.blocks;
 +
@@ -3623,10 +3632,10 @@ Index: kernel-raspberry/fs/esdfs/inode.c
 +	.setattr	= esdfs_setattr,
 +	.getattr	= esdfs_getattr,
 +};
-Index: kernel-raspberry/fs/esdfs/lookup.c
+Index: kernel-rpi-6_1/fs/esdfs/lookup.c
 ===================================================================
 --- /dev/null
-+++ kernel-raspberry/fs/esdfs/lookup.c
++++ kernel-rpi-6_1/fs/esdfs/lookup.c
 @@ -0,0 +1,474 @@
 +/*
 + * Copyright (c) 1998-2014 Erez Zadok
@@ -3836,8 +3845,8 @@ Index: kernel-raspberry/fs/esdfs/lookup.c
 +	inode->i_atime.tv_nsec = 0;
 +	inode->i_mtime.tv_sec = 0;
 +	inode->i_mtime.tv_nsec = 0;
-+	inode->i_ctime.tv_sec = 0;
-+	inode->i_ctime.tv_nsec = 0;
++	inode->__i_ctime.tv_sec = 0;
++	inode->__i_ctime.tv_nsec = 0;
 +
 +	/* properly initialize special inodes */
 +	if (S_ISBLK(lower_inode->i_mode) || S_ISCHR(lower_inode->i_mode) ||
@@ -4102,11 +4111,11 @@ Index: kernel-raspberry/fs/esdfs/lookup.c
 +		dput(real_parent);
 +	return ret;
 +}
-Index: kernel-raspberry/fs/esdfs/main.c
+Index: kernel-rpi-6_1/fs/esdfs/main.c
 ===================================================================
 --- /dev/null
-+++ kernel-raspberry/fs/esdfs/main.c
-@@ -0,0 +1,725 @@
++++ kernel-rpi-6_1/fs/esdfs/main.c
+@@ -0,0 +1,726 @@
 +/*
 + * Copyright (c) 1998-2014 Erez Zadok
 + * Copyright (c) 2009	   Shrikar Archak
@@ -4125,6 +4134,7 @@ Index: kernel-raspberry/fs/esdfs/main.c
 +#include <linux/parser.h>
 +#include <linux/security.h>
 +#include <linux/proc_ns.h>
++#include <linux/proc_fs.h>
 +
 +/*
 + * Derived from first generation "ANDROID_EMU" glue in modifed F2FS driver.
@@ -4265,8 +4275,8 @@ Index: kernel-raspberry/fs/esdfs/main.c
 +	struct ns_common *ns;
 +	struct user_namespace *user_ns = ERR_PTR(-EINVAL);
 +
-+	file = proc_ns_fget(fd);
-+	if (IS_ERR(file))
++	file = fget(fd);
++	if (IS_ERR(file) || !proc_ns_file(file))
 +		return ERR_CAST(file);
 +
 +	ns = get_proc_ns(file_inode(file));
@@ -4832,10 +4842,10 @@ Index: kernel-raspberry/fs/esdfs/main.c
 +
 +module_init(init_esdfs_fs);
 +module_exit(exit_esdfs_fs);
-Index: kernel-raspberry/fs/esdfs/mmap.c
+Index: kernel-rpi-6_1/fs/esdfs/mmap.c
 ===================================================================
 --- /dev/null
-+++ kernel-raspberry/fs/esdfs/mmap.c
++++ kernel-rpi-6_1/fs/esdfs/mmap.c
 @@ -0,0 +1,98 @@
 +/*
 + * Copyright (c) 1998-2014 Erez Zadok
@@ -4935,10 +4945,10 @@ Index: kernel-raspberry/fs/esdfs/mmap.c
 +	.open		= esdfs_vm_open,
 +	.close		= esdfs_vm_close,
 +};
-Index: kernel-raspberry/fs/esdfs/super.c
+Index: kernel-rpi-6_1/fs/esdfs/super.c
 ===================================================================
 --- /dev/null
-+++ kernel-raspberry/fs/esdfs/super.c
++++ kernel-rpi-6_1/fs/esdfs/super.c
 @@ -0,0 +1,290 @@
 +/*
 + * Copyright (c) 1998-2014 Erez Zadok
@@ -5230,10 +5240,10 @@ Index: kernel-raspberry/fs/esdfs/super.c
 +	.destroy_inode	= esdfs_destroy_inode,
 +	.drop_inode	= generic_delete_inode,
 +};
-Index: kernel-raspberry/include/linux/low-mem-notify.h
+Index: kernel-rpi-6_1/include/linux/low-mem-notify.h
 ===================================================================
 --- /dev/null
-+++ kernel-raspberry/include/linux/low-mem-notify.h
++++ kernel-rpi-6_1/include/linux/low-mem-notify.h
 @@ -0,0 +1,22 @@
 +#ifndef _LINUX_LOW_MEM_NOTIFY_H
 +#define _LINUX_LOW_MEM_NOTIFY_H
@@ -5257,11 +5267,11 @@ Index: kernel-raspberry/include/linux/low-mem-notify.h
 +#endif
 +
 +#endif
-Index: kernel-raspberry/include/linux/mm.h
+Index: kernel-rpi-6_1/include/linux/mm.h
 ===================================================================
---- kernel-raspberry.orig/include/linux/mm.h
-+++ kernel-raspberry/include/linux/mm.h
-@@ -202,6 +202,7 @@ static inline void __mm_zero_struct_page
+--- kernel-rpi-6_1.orig/include/linux/mm.h
++++ kernel-rpi-6_1/include/linux/mm.h
+@@ -198,6 +198,7 @@ static inline void __mm_zero_struct_page
  #define DEFAULT_MAX_MAP_COUNT	(USHRT_MAX - MAPCOUNT_ELF_CORE_MARGIN)
  
  extern int sysctl_max_map_count;
@@ -5269,7 +5279,7 @@ Index: kernel-raspberry/include/linux/mm.h
  
  extern unsigned long sysctl_user_reserve_kbytes;
  extern unsigned long sysctl_admin_reserve_kbytes;
-@@ -209,6 +210,7 @@ extern unsigned long sysctl_admin_reserv
+@@ -205,6 +206,7 @@ extern unsigned long sysctl_admin_reserv
  extern int sysctl_overcommit_memory;
  extern int sysctl_overcommit_ratio;
  extern unsigned long sysctl_overcommit_kbytes;
@@ -5277,7 +5287,7 @@ Index: kernel-raspberry/include/linux/mm.h
  
  int overcommit_ratio_handler(struct ctl_table *, int, void *, size_t *,
  		loff_t *);
-@@ -3478,6 +3480,9 @@ unsigned long wp_shared_mapping_range(st
+@@ -3998,6 +4000,9 @@ unsigned long wp_shared_mapping_range(st
  #endif
  
  extern int sysctl_nr_trim_pages;
@@ -5287,13 +5297,13 @@ Index: kernel-raspberry/include/linux/mm.h
  
  #ifdef CONFIG_PRINTK
  void mem_dump_obj(void *object);
-Index: kernel-raspberry/mm/vmscan.c
+Index: kernel-rpi-6_1/mm/vmscan.c
 ===================================================================
---- kernel-raspberry.orig/mm/vmscan.c
-+++ kernel-raspberry/mm/vmscan.c
-@@ -203,6 +203,28 @@ static void set_task_reclaim_state(struc
- 	task->reclaim_state = rs;
- }
+--- kernel-rpi-6_1.orig/mm/vmscan.c
++++ kernel-rpi-6_1/mm/vmscan.c
+@@ -188,6 +188,28 @@ struct scan_control {
+  */
+ int vm_swappiness = 60;
  
 +int min_filelist_kbytes_handler(struct ctl_table *table, int write,
 +                               void *buf, size_t *len, loff_t *pos)
@@ -5320,7 +5330,7 @@ Index: kernel-raspberry/mm/vmscan.c
  LIST_HEAD(shrinker_list);
  DECLARE_RWSEM(shrinker_rwsem);
  
-@@ -2903,6 +2925,28 @@ static void prepare_scan_count(pg_data_t
+@@ -3003,6 +3025,28 @@ static void prepare_scan_count(pg_data_t
  }
  
  /*
@@ -5349,7 +5359,7 @@ Index: kernel-raspberry/mm/vmscan.c
   * Determine how aggressively the anon and file LRU lists should be
   * scanned.
   *
-@@ -2940,6 +2984,11 @@ static void get_scan_count(struct lruvec
+@@ -3040,6 +3084,11 @@ static void get_scan_count(struct lruvec
  		goto out;
  	}
  
@@ -5361,11 +5371,11 @@ Index: kernel-raspberry/mm/vmscan.c
  	/*
  	 * Do not apply any pressure balancing cleverness when the
  	 * system is close to OOM, scan both anon and file equally
-Index: kernel-raspberry/fs/proc/task_mmu.c
+Index: kernel-rpi-6_1/fs/proc/task_mmu.c
 ===================================================================
---- kernel-raspberry.orig/fs/proc/task_mmu.c
-+++ kernel-raspberry/fs/proc/task_mmu.c
-@@ -19,6 +19,8 @@
+--- kernel-rpi-6_1.orig/fs/proc/task_mmu.c
++++ kernel-rpi-6_1/fs/proc/task_mmu.c
+@@ -20,6 +20,8 @@
  #include <linux/shmem_fs.h>
  #include <linux/uaccess.h>
  #include <linux/pkeys.h>
@@ -5462,7 +5472,7 @@ Index: kernel-raspberry/fs/proc/task_mmu.c
  static int show_smaps_rollup(struct seq_file *m, void *v)
  {
  	struct proc_maps_private *priv = m->private;
-@@ -1048,6 +1131,50 @@ static int smaps_rollup_release(struct i
+@@ -1052,6 +1135,50 @@ static int smaps_rollup_release(struct i
  	return single_release(inode, file);
  }
  
@@ -5513,7 +5523,7 @@ Index: kernel-raspberry/fs/proc/task_mmu.c
  const struct file_operations proc_pid_smaps_operations = {
  	.open		= pid_smaps_open,
  	.read		= seq_read,
-@@ -1062,6 +1189,13 @@ const struct file_operations proc_pid_sm
+@@ -1066,6 +1193,13 @@ const struct file_operations proc_pid_sm
  	.release	= smaps_rollup_release,
  };
  
@@ -5527,7 +5537,7 @@ Index: kernel-raspberry/fs/proc/task_mmu.c
  enum clear_refs_types {
  	CLEAR_REFS_ALL = 1,
  	CLEAR_REFS_ANON,
-@@ -1761,6 +1895,404 @@ const struct file_operations proc_pagema
+@@ -1773,6 +1907,404 @@ const struct file_operations proc_pagema
  };
  #endif /* CONFIG_PROC_PAGE_MONITOR */
  
@@ -5932,11 +5942,11 @@ Index: kernel-raspberry/fs/proc/task_mmu.c
  #ifdef CONFIG_NUMA
  
  struct numa_maps {
-Index: kernel-raspberry/mm/mmap.c
+Index: kernel-rpi-6_1/mm/mmap.c
 ===================================================================
---- kernel-raspberry.orig/mm/mmap.c
-+++ kernel-raspberry/mm/mmap.c
-@@ -1374,7 +1374,8 @@ unsigned long do_mmap(struct file *file,
+--- kernel-rpi-6_1.orig/mm/mmap.c
++++ kernel-rpi-6_1/mm/mmap.c
+@@ -1330,7 +1330,8 @@ unsigned long do_mmap(struct file *file,
  			if (path_noexec(&file->f_path)) {
  				if (vm_flags & VM_EXEC)
  					return -EPERM;
@@ -5946,11 +5956,11 @@ Index: kernel-raspberry/mm/mmap.c
  			}
  
  			if (!file->f_op->mmap)
-Index: kernel-raspberry/net/netfilter/Makefile
+Index: kernel-rpi-6_1/net/netfilter/Makefile
 ===================================================================
---- kernel-raspberry.orig/net/netfilter/Makefile
-+++ kernel-raspberry/net/netfilter/Makefile
-@@ -206,6 +206,7 @@ obj-$(CONFIG_NETFILTER_XT_MATCH_PHYSDEV)
+--- kernel-rpi-6_1.orig/net/netfilter/Makefile
++++ kernel-rpi-6_1/net/netfilter/Makefile
+@@ -215,6 +215,7 @@ obj-$(CONFIG_NETFILTER_XT_MATCH_PHYSDEV)
  obj-$(CONFIG_NETFILTER_XT_MATCH_PKTTYPE) += xt_pkttype.o
  obj-$(CONFIG_NETFILTER_XT_MATCH_POLICY) += xt_policy.o
  obj-$(CONFIG_NETFILTER_XT_MATCH_QUOTA) += xt_quota.o
@@ -5958,10 +5968,10 @@ Index: kernel-raspberry/net/netfilter/Makefile
  obj-$(CONFIG_NETFILTER_XT_MATCH_RATEEST) += xt_rateest.o
  obj-$(CONFIG_NETFILTER_XT_MATCH_REALM) += xt_realm.o
  obj-$(CONFIG_NETFILTER_XT_MATCH_RECENT) += xt_recent.o
-Index: kernel-raspberry/net/netfilter/xt_quota2.c
+Index: kernel-rpi-6_1/net/netfilter/xt_quota2.c
 ===================================================================
 --- /dev/null
-+++ kernel-raspberry/net/netfilter/xt_quota2.c
++++ kernel-rpi-6_1/net/netfilter/xt_quota2.c
 @@ -0,0 +1,397 @@
 +/*
 + * xt_quota2 - enhanced xt_quota that can count upwards and in packets
@@ -6360,11 +6370,11 @@ Index: kernel-raspberry/net/netfilter/xt_quota2.c
 +MODULE_LICENSE("GPL");
 +MODULE_ALIAS("ipt_quota2");
 +MODULE_ALIAS("ip6t_quota2");
-Index: kernel-raspberry/net/netfilter/Kconfig
+Index: kernel-rpi-6_1/net/netfilter/Kconfig
 ===================================================================
---- kernel-raspberry.orig/net/netfilter/Kconfig
-+++ kernel-raspberry/net/netfilter/Kconfig
-@@ -1523,6 +1523,29 @@ config NETFILTER_XT_MATCH_QUOTA
+--- kernel-rpi-6_1.orig/net/netfilter/Kconfig
++++ kernel-rpi-6_1/net/netfilter/Kconfig
+@@ -1525,6 +1525,29 @@ config NETFILTER_XT_MATCH_QUOTA
  	  If you want to compile it as a module, say M here and read
  	  <file:Documentation/kbuild/modules.rst>.  If unsure, say `N'.
  
@@ -6394,10 +6404,10 @@ Index: kernel-raspberry/net/netfilter/Kconfig
  config NETFILTER_XT_MATCH_RATEEST
  	tristate '"rateest" match support'
  	depends on NETFILTER_ADVANCED
-Index: kernel-raspberry/include/linux/netfilter/xt_quota2.h
+Index: kernel-rpi-6_1/include/linux/netfilter/xt_quota2.h
 ===================================================================
 --- /dev/null
-+++ kernel-raspberry/include/linux/netfilter/xt_quota2.h
++++ kernel-rpi-6_1/include/linux/netfilter/xt_quota2.h
 @@ -0,0 +1,26 @@
 +#ifndef _XT_QUOTA_H
 +#define _XT_QUOTA_H
@@ -6425,11 +6435,11 @@ Index: kernel-raspberry/include/linux/netfilter/xt_quota2.h
 +};
 +
 +#endif /* _XT_QUOTA_H */
-Index: kernel-raspberry/fs/namespace.c
+Index: kernel-rpi-6_1/fs/namespace.c
 ===================================================================
---- kernel-raspberry.orig/fs/namespace.c
-+++ kernel-raspberry/fs/namespace.c
-@@ -790,8 +790,14 @@ mountpoint:
+--- kernel-rpi-6_1.orig/fs/namespace.c
++++ kernel-rpi-6_1/fs/namespace.c
+@@ -810,8 +810,14 @@ mountpoint:
  			goto done;
  	}
  
@@ -6446,7 +6456,7 @@ Index: kernel-raspberry/fs/namespace.c
  	if (!new)
  		return ERR_PTR(-ENOMEM);
  
-@@ -3332,6 +3338,24 @@ int path_mount(const char *dev_name, str
+@@ -3632,6 +3638,24 @@ int path_mount(const char *dev_name, str
  	if (!(flags & MS_NOATIME))
  		mnt_flags |= MNT_RELATIME;
  
@@ -6471,10 +6481,10 @@ Index: kernel-raspberry/fs/namespace.c
  	/* Separate the per-mountpoint flags */
  	if (flags & MS_NOSUID)
  		mnt_flags |= MNT_NOSUID;
-Index: kernel-raspberry/net/netfilter/xt_IDLETIMER.c
+Index: kernel-rpi-6_1/net/netfilter/xt_IDLETIMER.c
 ===================================================================
---- kernel-raspberry.orig/net/netfilter/xt_IDLETIMER.c
-+++ kernel-raspberry/net/netfilter/xt_IDLETIMER.c
+--- kernel-rpi-6_1.orig/net/netfilter/xt_IDLETIMER.c
++++ kernel-rpi-6_1/net/netfilter/xt_IDLETIMER.c
 @@ -28,6 +28,11 @@
  #include <linux/kobject.h>
  #include <linux/workqueue.h>
@@ -6931,37 +6941,34 @@ Index: kernel-raspberry/net/netfilter/xt_IDLETIMER.c
  		}
  		pr_debug("increased refcnt of timer %s to %u\n",
  			 info->label, info->timer->refcnt);
-@@ -414,8 +664,9 @@ static void idletimer_tg_destroy(const s
+@@ -422,8 +672,10 @@ static void idletimer_tg_destroy(const s
+ 	mutex_unlock(&list_mutex);
  
- 		list_del(&info->timer->entry);
- 		del_timer_sync(&info->timer->timer);
--		cancel_work_sync(&info->timer->work);
- 		sysfs_remove_file(idletimer_tg_kobj, &info->timer->attr.attr);
-+		unregister_pm_notifier(&info->timer->pm_nb);
-+		cancel_work_sync(&info->timer->work);
- 		kfree(info->timer->attr.attr.name);
- 		kfree(info->timer);
+ 	timer_shutdown_sync(&info->timer->timer);
++  unregister_pm_notifier(&info->timer->pm_nb);
+ 	cancel_work_sync(&info->timer->work);
+ 	sysfs_remove_file(idletimer_tg_kobj, &info->timer->attr.attr);
++  unregister_pm_notifier(&info->timer->pm_nb);
+ 	kfree(info->timer->attr.attr.name);
+ 	kfree(info->timer);
+ }
+@@ -453,6 +705,7 @@ static void idletimer_tg_destroy_v1(cons
  	} else {
-@@ -443,8 +694,9 @@ static void idletimer_tg_destroy_v1(cons
- 		} else {
- 			del_timer_sync(&info->timer->timer);
- 		}
--		cancel_work_sync(&info->timer->work);
- 		sysfs_remove_file(idletimer_tg_kobj, &info->timer->attr.attr);
-+		unregister_pm_notifier(&info->timer->pm_nb);
-+		cancel_work_sync(&info->timer->work);
- 		kfree(info->timer->attr.attr.name);
- 		kfree(info->timer);
- 	} else {
-@@ -540,3 +792,4 @@ MODULE_DESCRIPTION("Xtables: idle time m
+ 		timer_shutdown_sync(&info->timer->timer);
+ 	}
++  unregister_pm_notifier(&info->timer->pm_nb);
+ 	cancel_work_sync(&info->timer->work);
+ 	sysfs_remove_file(idletimer_tg_kobj, &info->timer->attr.attr);
+ 	kfree(info->timer->attr.attr.name);
+@@ -565,3 +818,4 @@ MODULE_DESCRIPTION("Xtables: idle time m
  MODULE_LICENSE("GPL v2");
  MODULE_ALIAS("ipt_IDLETIMER");
  MODULE_ALIAS("ip6t_IDLETIMER");
 +MODULE_ALIAS("arpt_IDLETIMER");
-Index: kernel-raspberry/include/linux/pkglist.h
+Index: kernel-rpi-6_1/include/linux/pkglist.h
 ===================================================================
 --- /dev/null
-+++ kernel-raspberry/include/linux/pkglist.h
++++ kernel-rpi-6_1/include/linux/pkglist.h
 @@ -0,0 +1,38 @@
 +#ifndef _PKGLIST_H_
 +#define _PKGLIST_H_
@@ -7001,10 +7008,10 @@ Index: kernel-raspberry/include/linux/pkglist.h
 +void pkglist_register_update_listener(struct pkg_list *pkg);
 +void pkglist_unregister_update_listener(struct pkg_list *pkg);
 +#endif
-Index: kernel-raspberry/include/uapi/linux/magic.h
+Index: kernel-rpi-6_1/include/uapi/linux/magic.h
 ===================================================================
---- kernel-raspberry.orig/include/uapi/linux/magic.h
-+++ kernel-raspberry/include/uapi/linux/magic.h
+--- kernel-rpi-6_1.orig/include/uapi/linux/magic.h
++++ kernel-rpi-6_1/include/uapi/linux/magic.h
 @@ -62,6 +62,8 @@
  #define REISER2FS_SUPER_MAGIC_STRING	"ReIsEr2Fs"
  #define REISER2FS_JR_SUPER_MAGIC_STRING	"ReIsEr3Fs"
@@ -7014,11 +7021,11 @@ Index: kernel-raspberry/include/uapi/linux/magic.h
  #define SMB_SUPER_MAGIC		0x517B
  #define CIFS_SUPER_MAGIC	0xFF534D42      /* the first four bytes of SMB PDUs */
  #define SMB2_SUPER_MAGIC	0xFE534D42
-Index: kernel-raspberry/kernel/sysctl.c
+Index: kernel-rpi-6_1/kernel/sysctl.c
 ===================================================================
---- kernel-raspberry.orig/kernel/sysctl.c
-+++ kernel-raspberry/kernel/sysctl.c
-@@ -1659,6 +1659,20 @@ static struct ctl_table kern_table[] = {
+--- kernel-rpi-6_1.orig/kernel/sysctl.c
++++ kernel-rpi-6_1/kernel/sysctl.c
+@@ -1623,6 +1623,20 @@ static struct ctl_table kern_table[] = {
  		.mode		= 0644,
  		.proc_handler	= proc_dointvec,
  	},
@@ -7039,9 +7046,34 @@ Index: kernel-raspberry/kernel/sysctl.c
  #ifdef CONFIG_PROC_SYSCTL
  	{
  		.procname	= "tainted",
-@@ -2370,6 +2384,15 @@ static struct ctl_table vm_table[] = {
+@@ -2220,6 +2234,24 @@ static struct ctl_table vm_table[] = {
  		.mode		= 0644,
- 		.proc_handler	= mmap_min_addr_handler,
+ 		.proc_handler	= proc_doulongvec_minmax,
+ 	},
++  {
++    .procname = "min_filelist_kbytes",
++    .data   = &min_filelist_kbytes,
++    .maxlen   = sizeof(min_filelist_kbytes),
++    .mode   = 0644,
++    .proc_handler = min_filelist_kbytes_handler,
++  },
++#ifdef CONFIG_DISK_BASED_SWAP
++  {
++    .procname = "disk_based_swap",
++    .data   = &sysctl_disk_based_swap,
++    .maxlen   = sizeof(sysctl_disk_based_swap),
++    .mode   = 0644,
++    .proc_handler = proc_dointvec_minmax,
++    .extra1   = SYSCTL_ZERO,
++    .extra2   = SYSCTL_ONE,
++  },
++#endif
+ 	{
+ 		.procname	= "admin_reserve_kbytes",
+ 		.data		= &sysctl_admin_reserve_kbytes,
+@@ -2248,6 +2280,15 @@ static struct ctl_table vm_table[] = {
+ 		.extra1		= (void *)&mmap_rnd_compat_bits_min,
+ 		.extra2		= (void *)&mmap_rnd_compat_bits_max,
  	},
 +	{
 +		.procname	= "mmap_noexec_taint",
@@ -7053,45 +7085,13 @@ Index: kernel-raspberry/kernel/sysctl.c
 +		.extra2		= SYSCTL_ONE,
 +	},
  #endif
- #ifdef CONFIG_NUMA
- 	{
-@@ -2430,6 +2453,13 @@ static struct ctl_table vm_table[] = {
- 		.mode		= 0644,
- 		.proc_handler	= proc_doulongvec_minmax,
- 	},
-+	{
-+		.procname	= "min_filelist_kbytes",
-+		.data		= &min_filelist_kbytes,
-+		.maxlen		= sizeof(min_filelist_kbytes),
-+		.mode		= 0644,
-+		.proc_handler	= min_filelist_kbytes_handler,
-+	},
- #ifdef CONFIG_HAVE_ARCH_MMAP_RND_BITS
- 	{
- 		.procname	= "mmap_rnd_bits",
-@@ -2460,6 +2490,17 @@ static struct ctl_table vm_table[] = {
- 		.mode		= 0644,
- 		.proc_handler	= proc_dointvec_minmax,
- 		.extra1		= SYSCTL_ZERO,
-+		.extra2		= SYSCTL_ONE,
-+	},
-+#endif
-+#ifdef CONFIG_DISK_BASED_SWAP
-+	{
-+		.procname	= "disk_based_swap",
-+		.data		= &sysctl_disk_based_swap,
-+		.maxlen		= sizeof(sysctl_disk_based_swap),
-+		.mode		= 0644,
-+		.proc_handler	= proc_dointvec_minmax,
-+		.extra1		= SYSCTL_ZERO,
- 		.extra2		= SYSCTL_ONE,
- 	},
- #endif
-Index: kernel-raspberry/include/linux/sched/sysctl.h
+ 	{ }
+ };
+Index: kernel-rpi-6_1/include/linux/sched/sysctl.h
 ===================================================================
---- kernel-raspberry.orig/include/linux/sched/sysctl.h
-+++ kernel-raspberry/include/linux/sched/sysctl.h
-@@ -21,6 +21,9 @@ enum sched_tunable_scaling {
+--- kernel-rpi-6_1.orig/include/linux/sched/sysctl.h
++++ kernel-rpi-6_1/include/linux/sched/sysctl.h
+@@ -19,6 +19,9 @@ enum sched_tunable_scaling {
  	SCHED_TUNABLESCALING_END,
  };
  
@@ -7101,11 +7101,11 @@ Index: kernel-raspberry/include/linux/sched/sysctl.h
  #define NUMA_BALANCING_DISABLED		0x0
  #define NUMA_BALANCING_NORMAL		0x1
  #define NUMA_BALANCING_MEMORY_TIERING	0x2
-Index: kernel-raspberry/kernel/sched/core.c
+Index: kernel-rpi-6_1/kernel/sched/core.c
 ===================================================================
---- kernel-raspberry.orig/kernel/sched/core.c
-+++ kernel-raspberry/kernel/sched/core.c
-@@ -145,6 +145,9 @@ __read_mostly int sysctl_resched_latency
+--- kernel-rpi-6_1.orig/kernel/sched/core.c
++++ kernel-rpi-6_1/kernel/sched/core.c
+@@ -149,6 +149,9 @@ __read_mostly int sysctl_resched_latency
   */
  const_debug unsigned int sysctl_sched_nr_migrate = SCHED_NR_MIGRATE_BREAK;
  
@@ -7115,7 +7115,7 @@ Index: kernel-raspberry/kernel/sched/core.c
  __read_mostly int scheduler_running;
  
  #ifdef CONFIG_SCHED_CORE
-@@ -9087,7 +9090,8 @@ int cpuset_cpumask_can_shrink(const stru
+@@ -9329,7 +9332,8 @@ int cpuset_cpumask_can_shrink(const stru
  	return ret;
  }
  
@@ -7125,7 +7125,7 @@ Index: kernel-raspberry/kernel/sched/core.c
  {
  	int ret = 0;
  
-@@ -9100,9 +9104,22 @@ int task_can_attach(struct task_struct *
+@@ -9342,9 +9346,22 @@ int task_can_attach(struct task_struct *
  	 * success of set_cpus_allowed_ptr() on all attached tasks
  	 * before cpus_mask may be changed.
  	 */
@@ -7150,7 +7150,7 @@ Index: kernel-raspberry/kernel/sched/core.c
  	return ret;
  }
  
-@@ -10536,6 +10553,27 @@ static int cpu_uclamp_max_show(struct se
+@@ -10822,6 +10839,27 @@ static int cpu_uclamp_max_show(struct se
  	cpu_uclamp_print(sf, UCLAMP_MAX);
  	return 0;
  }
@@ -7178,7 +7178,7 @@ Index: kernel-raspberry/kernel/sched/core.c
  #endif /* CONFIG_UCLAMP_TASK_GROUP */
  
  #ifdef CONFIG_FAIR_GROUP_SCHED
-@@ -10978,6 +11016,12 @@ static struct cftype cpu_legacy_files[]
+@@ -11294,6 +11332,12 @@ static struct cftype cpu_legacy_files[]
  		.seq_show = cpu_uclamp_max_show,
  		.write = cpu_uclamp_max_write,
  	},
@@ -7191,7 +7191,7 @@ Index: kernel-raspberry/kernel/sched/core.c
  #endif
  	{ }	/* Terminate */
  };
-@@ -11176,6 +11220,12 @@ static struct cftype cpu_files[] = {
+@@ -11510,6 +11554,12 @@ static struct cftype cpu_files[] = {
  		.seq_show = cpu_uclamp_max_show,
  		.write = cpu_uclamp_max_write,
  	},
@@ -7204,10 +7204,10 @@ Index: kernel-raspberry/kernel/sched/core.c
  #endif
  	{ }	/* terminate */
  };
-Index: kernel-raspberry/kernel/sched/cpufreq_schedutil.c
+Index: kernel-rpi-6_1/kernel/sched/cpufreq_schedutil.c
 ===================================================================
---- kernel-raspberry.orig/kernel/sched/cpufreq_schedutil.c
-+++ kernel-raspberry/kernel/sched/cpufreq_schedutil.c
+--- kernel-rpi-6_1.orig/kernel/sched/cpufreq_schedutil.c
++++ kernel-rpi-6_1/kernel/sched/cpufreq_schedutil.c
 @@ -20,6 +20,7 @@ struct sugov_policy {
  	struct list_head	tunables_hook;
  
@@ -7216,7 +7216,7 @@ Index: kernel-raspberry/kernel/sched/cpufreq_schedutil.c
  	u64			last_freq_update_time;
  	s64			freq_update_delay_ns;
  	unsigned int		next_freq;
-@@ -179,9 +180,13 @@ static bool sugov_iowait_reset(struct su
+@@ -178,9 +179,13 @@ static bool sugov_iowait_reset(struct su
  			       bool set_iowait_boost)
  {
  	s64 delta_ns = time - sg_cpu->last_update;
@@ -7231,15 +7231,15 @@ Index: kernel-raspberry/kernel/sched/cpufreq_schedutil.c
  		return false;
  
  	sg_cpu->iowait_boost = set_iowait_boost ? IOWAIT_BOOST_MIN : 0;
-@@ -254,6 +259,7 @@ static void sugov_iowait_boost(struct su
- static void sugov_iowait_apply(struct sugov_cpu *sg_cpu, u64 time)
+@@ -255,6 +260,7 @@ static void sugov_iowait_apply(struct su
+ 			       unsigned long max_cap)
  {
  	unsigned long boost;
 +  struct sugov_policy *sg_policy = sg_cpu->sg_policy;
  
  	/* No boost currently required */
  	if (!sg_cpu->iowait_boost)
-@@ -263,7 +269,9 @@ static void sugov_iowait_apply(struct su
+@@ -264,7 +270,9 @@ static void sugov_iowait_apply(struct su
  	if (sugov_iowait_reset(sg_cpu, time, false))
  		return;
  
@@ -7250,7 +7250,7 @@ Index: kernel-raspberry/kernel/sched/cpufreq_schedutil.c
  		/*
  		 * No boost pending; reduce the boost value.
  		 */
-@@ -450,6 +458,7 @@ sugov_update_shared(struct update_util_d
+@@ -454,6 +462,7 @@ sugov_update_shared(struct update_util_d
  		if (!sugov_update_next_freq(sg_policy, time, next_f))
  			goto unlock;
  
@@ -7258,10 +7258,10 @@ Index: kernel-raspberry/kernel/sched/cpufreq_schedutil.c
  		if (sg_policy->policy->fast_switch_enabled)
  			cpufreq_driver_fast_switch(sg_policy->policy, next_f);
  		else
-Index: kernel-raspberry/kernel/sched/sched.h
+Index: kernel-rpi-6_1/kernel/sched/sched.h
 ===================================================================
---- kernel-raspberry.orig/kernel/sched/sched.h
-+++ kernel-raspberry/kernel/sched/sched.h
+--- kernel-rpi-6_1.orig/kernel/sched/sched.h
++++ kernel-rpi-6_1/kernel/sched/sched.h
 @@ -10,6 +10,7 @@
  #include <linux/sched/cpufreq.h>
  #include <linux/sched/deadline.h>
@@ -7270,7 +7270,7 @@ Index: kernel-raspberry/kernel/sched/sched.h
  #include <linux/sched/loadavg.h>
  #include <linux/sched/mm.h>
  #include <linux/sched/rseq_api.h>
-@@ -416,6 +417,7 @@ struct task_group {
+@@ -410,6 +411,7 @@ struct task_group {
  	struct uclamp_se	uclamp_req[UCLAMP_CNT];
  	/* Effective clamp values used for a task group */
  	struct uclamp_se	uclamp[UCLAMP_CNT];
@@ -7278,17 +7278,17 @@ Index: kernel-raspberry/kernel/sched/sched.h
  #endif
  
  };
-@@ -2438,6 +2440,9 @@ extern void check_preempt_curr(struct rq
- extern const_debug unsigned int sysctl_sched_nr_migrate;
- extern const_debug unsigned int sysctl_sched_migration_cost;
+@@ -2534,6 +2536,9 @@ extern const_debug unsigned int sysctl_s
+ 
+ extern unsigned int sysctl_sched_base_slice;
  
 +extern unsigned int sysctl_iowait_reset_ticks;
 +extern unsigned int sysctl_iowait_apply_ticks;
 +
  #ifdef CONFIG_SCHED_DEBUG
- extern unsigned int sysctl_sched_latency;
- extern unsigned int sysctl_sched_min_granularity;
-@@ -3049,6 +3054,11 @@ out:
+ extern int sysctl_resched_latency_warn_ms;
+ extern int sysctl_resched_latency_warn_once;
+@@ -3117,6 +3122,11 @@ out:
  	return clamp(util, min_util, max_util);
  }
  
@@ -7300,7 +7300,7 @@ Index: kernel-raspberry/kernel/sched/sched.h
  /* Is the rq being capped/throttled by uclamp_max? */
  static inline bool uclamp_rq_is_capped(struct rq *rq)
  {
-@@ -3092,7 +3102,7 @@ unsigned long uclamp_rq_util_with(struct
+@@ -3160,7 +3170,7 @@ unsigned long uclamp_rq_util_with(struct
  {
  	return util;
  }
@@ -7309,7 +7309,7 @@ Index: kernel-raspberry/kernel/sched/sched.h
  static inline bool uclamp_rq_is_capped(struct rq *rq) { return false; }
  
  static inline bool uclamp_is_used(void)
-@@ -3119,7 +3129,33 @@ static inline bool uclamp_rq_is_idle(str
+@@ -3187,7 +3197,33 @@ static inline bool uclamp_rq_is_idle(str
  	return false;
  }
  #endif /* CONFIG_UCLAMP_TASK */
@@ -7343,11 +7343,11 @@ Index: kernel-raspberry/kernel/sched/sched.h
  #ifdef CONFIG_HAVE_SCHED_AVG_IRQ
  static inline unsigned long cpu_util_irq(struct rq *rq)
  {
-Index: kernel-raspberry/mm/Kconfig
+Index: kernel-rpi-6_1/mm/Kconfig
 ===================================================================
---- kernel-raspberry.orig/mm/Kconfig
-+++ kernel-raspberry/mm/Kconfig
-@@ -590,6 +590,17 @@ config PAGE_REPORTING
+--- kernel-rpi-6_1.orig/mm/Kconfig
++++ kernel-rpi-6_1/mm/Kconfig
+@@ -680,6 +680,17 @@ config PAGE_REPORTING
  	  those pages to another entity, such as a hypervisor, so that the
  	  memory can be freed within the host for other uses.
  
@@ -7365,7 +7365,7 @@ Index: kernel-raspberry/mm/Kconfig
  #
  # support for page migration
  #
-@@ -678,6 +689,23 @@ config DEFAULT_MMAP_MIN_ADDR
+@@ -778,6 +789,23 @@ config DEFAULT_MMAP_MIN_ADDR
  	  This value can be changed after boot using the
  	  /proc/sys/vm/mmap_min_addr tunable.
  
@@ -7389,8 +7389,8 @@ Index: kernel-raspberry/mm/Kconfig
  config ARCH_SUPPORTS_MEMORY_FAILURE
  	bool
  
-@@ -1151,8 +1179,19 @@ config LRU_GEN_STATS
- # }
+@@ -1279,8 +1307,19 @@ config PER_VMA_LOCK
+ 	  handling page faults instead of taking mmap_lock.
  
  config LOCK_MM_AND_FIND_VMA
 -	bool
@@ -7411,19 +7411,19 @@ Index: kernel-raspberry/mm/Kconfig
  
  source "mm/damon/Kconfig"
  
-Index: kernel-raspberry/fs/proc/base.c
+Index: kernel-rpi-6_1/fs/proc/base.c
 ===================================================================
---- kernel-raspberry.orig/fs/proc/base.c
-+++ kernel-raspberry/fs/proc/base.c
-@@ -96,6 +96,7 @@
+--- kernel-rpi-6_1.orig/fs/proc/base.c
++++ kernel-rpi-6_1/fs/proc/base.c
+@@ -97,6 +97,7 @@
  #include <linux/time_namespace.h>
  #include <linux/resctrl.h>
  #include <linux/cn_proc.h>
 +#include <linux/cpufreq_times.h>
+ #include <linux/ksm.h>
  #include <trace/events/oom.h>
  #include "internal.h"
- #include "fd.h"
-@@ -150,6 +151,12 @@ struct pid_entry {
+@@ -186,6 +187,12 @@ struct pid_entry {
  		NULL, &proc_pid_attr_operations,	\
  		{ .lsm = LSM })
  
@@ -7436,7 +7436,7 @@ Index: kernel-raspberry/fs/proc/base.c
  /*
   * Count the number of hardlinks for the pid_entry table, excluding the .
   * and .. links.
-@@ -898,7 +905,11 @@ static ssize_t mem_read(struct file *fil
+@@ -957,7 +964,11 @@ static ssize_t mem_read(struct file *fil
  static ssize_t mem_write(struct file *file, const char __user *buf,
  			 size_t count, loff_t *ppos)
  {
@@ -7448,7 +7448,7 @@ Index: kernel-raspberry/fs/proc/base.c
  }
  
  loff_t mem_lseek(struct file *file, loff_t offset, int orig)
-@@ -2657,7 +2668,7 @@ static struct dentry *proc_pident_instan
+@@ -2716,7 +2727,7 @@ static struct dentry *proc_pident_instan
  	return d_splice_alias(inode, dentry);
  }
  
@@ -7457,7 +7457,7 @@ Index: kernel-raspberry/fs/proc/base.c
  					 struct dentry *dentry,
  					 const struct pid_entry *p,
  					 const struct pid_entry *end)
-@@ -2870,7 +2881,7 @@ static const struct pid_entry attr_dir_s
+@@ -2929,7 +2940,7 @@ static const struct pid_entry attr_dir_s
  
  static int proc_attr_dir_readdir(struct file *file, struct dir_context *ctx)
  {
@@ -7466,7 +7466,7 @@ Index: kernel-raspberry/fs/proc/base.c
  				   attr_dir_stuff, ARRAY_SIZE(attr_dir_stuff));
  }
  
-@@ -3269,18 +3280,22 @@ static const struct pid_entry tgid_base_
+@@ -3331,18 +3342,22 @@ static const struct pid_entry tgid_base_
  #ifdef CONFIG_NUMA
  	REG("numa_maps",  S_IRUGO, proc_pid_numa_maps_operations),
  #endif
@@ -7490,7 +7490,7 @@ Index: kernel-raspberry/fs/proc/base.c
  #endif
  #ifdef CONFIG_SECURITY
  	DIR("attr",       S_IRUGO|S_IXUGO, proc_attr_dir_inode_operations, proc_attr_dir_operations),
-@@ -3336,6 +3351,9 @@ static const struct pid_entry tgid_base_
+@@ -3398,6 +3413,9 @@ static const struct pid_entry tgid_base_
  #ifdef CONFIG_LIVEPATCH
  	ONE("patch_state",  S_IRUSR, proc_pid_patch_state),
  #endif
@@ -7500,7 +7500,7 @@ Index: kernel-raspberry/fs/proc/base.c
  #ifdef CONFIG_STACKLEAK_METRICS
  	ONE("stack_depth", S_IRUGO, proc_stack_depth),
  #endif
-@@ -3619,7 +3637,7 @@ static const struct pid_entry tid_base_s
+@@ -3681,7 +3699,7 @@ static const struct pid_entry tid_base_s
  #ifdef CONFIG_NUMA
  	REG("numa_maps", S_IRUGO, proc_pid_numa_maps_operations),
  #endif
@@ -7509,7 +7509,7 @@ Index: kernel-raspberry/fs/proc/base.c
  	LNK("cwd",       proc_cwd_link),
  	LNK("root",      proc_root_link),
  	LNK("exe",       proc_exe_link),
-@@ -3688,6 +3706,12 @@ static const struct pid_entry tid_base_s
+@@ -3750,6 +3768,12 @@ static const struct pid_entry tid_base_s
  	ONE("ksm_merging_pages",  S_IRUSR, proc_pid_ksm_merging_pages),
  	ONE("ksm_stat",  S_IRUSR, proc_pid_ksm_stat),
  #endif
@@ -7522,10 +7522,10 @@ Index: kernel-raspberry/fs/proc/base.c
  };
  
  static int proc_tid_base_readdir(struct file *file, struct dir_context *ctx)
-Index: kernel-raspberry/mm/low-mem-notify.c
+Index: kernel-rpi-6_1/mm/low-mem-notify.c
 ===================================================================
 --- /dev/null
-+++ kernel-raspberry/mm/low-mem-notify.c
++++ kernel-rpi-6_1/mm/low-mem-notify.c
 @@ -0,0 +1,399 @@
 +/*
 + * mm/low-mem-notify.c
@@ -7926,11 +7926,11 @@ Index: kernel-raspberry/mm/low-mem-notify.c
 +module_init(low_mem_init)
 +
 +#endif
-Index: kernel-raspberry/mm/util.c
+Index: kernel-rpi-6_1/mm/util.c
 ===================================================================
---- kernel-raspberry.orig/mm/util.c
-+++ kernel-raspberry/mm/util.c
-@@ -863,6 +863,7 @@ int sysctl_overcommit_memory __read_most
+--- kernel-rpi-6_1.orig/mm/util.c
++++ kernel-rpi-6_1/mm/util.c
+@@ -814,6 +814,7 @@ int sysctl_overcommit_memory __read_most
  int sysctl_overcommit_ratio __read_mostly = 50;
  unsigned long sysctl_overcommit_kbytes __read_mostly;
  int sysctl_max_map_count __read_mostly = DEFAULT_MAX_MAP_COUNT;
@@ -7938,31 +7938,31 @@ Index: kernel-raspberry/mm/util.c
  unsigned long sysctl_user_reserve_kbytes __read_mostly = 1UL << 17; /* 128MB */
  unsigned long sysctl_admin_reserve_kbytes __read_mostly = 1UL << 13; /* 8MB */
  
-Index: kernel-raspberry/mm/Makefile
+Index: kernel-rpi-6_1/mm/Makefile
 ===================================================================
---- kernel-raspberry.orig/mm/Makefile
-+++ kernel-raspberry/mm/Makefile
-@@ -124,6 +124,7 @@ obj-$(CONFIG_SECRETMEM) += secretmem.o
+--- kernel-rpi-6_1.orig/mm/Makefile
++++ kernel-rpi-6_1/mm/Makefile
+@@ -123,6 +123,7 @@ obj-$(CONFIG_SECRETMEM) += secretmem.o
  obj-$(CONFIG_CMA_SYSFS) += cma_sysfs.o
  obj-$(CONFIG_USERFAULTFD) += userfaultfd.o
  obj-$(CONFIG_IDLE_PAGE_TRACKING) += page_idle.o
 +obj-$(CONFIG_LOW_MEM_NOTIFY) += low-mem-notify.o
+ obj-$(CONFIG_DEBUG_PAGEALLOC) += debug_page_alloc.o
  obj-$(CONFIG_DEBUG_PAGE_REF) += debug_page_ref.o
  obj-$(CONFIG_DAMON) += damon/
- obj-$(CONFIG_HARDENED_USERCOPY) += usercopy.o
-Index: kernel-raspberry/net/core/dev_ioctl.c
+Index: kernel-rpi-6_1/net/core/dev_ioctl.c
 ===================================================================
---- kernel-raspberry.orig/net/core/dev_ioctl.c
-+++ kernel-raspberry/net/core/dev_ioctl.c
-@@ -8,6 +8,7 @@
+--- kernel-rpi-6_1.orig/net/core/dev_ioctl.c
++++ kernel-rpi-6_1/net/core/dev_ioctl.c
+@@ -9,6 +9,7 @@
  #include <linux/wireless.h>
  #include <linux/if_bridge.h>
- #include <net/dsa.h>
+ #include <net/dsa_stubs.h>
 +#include <net/sock.h>
  #include <net/wext.h>
  
  #include "dev.h"
-@@ -578,7 +579,7 @@ int dev_ioctl(struct net *net, unsigned
+@@ -776,7 +777,7 @@ int dev_ioctl(struct net *net, unsigned
  	case SIOCBRADDIF:
  	case SIOCBRDELIF:
  	case SIOCSHWTSTAMP:
@@ -7971,10 +7971,10 @@ Index: kernel-raspberry/net/core/dev_ioctl.c
  			return -EPERM;
  		fallthrough;
  	case SIOCBONDSLAVEINFOQUERY:
-Index: kernel-raspberry/net/xfrm/xfrm_algo.c
+Index: kernel-rpi-6_1/net/xfrm/xfrm_algo.c
 ===================================================================
---- kernel-raspberry.orig/net/xfrm/xfrm_algo.c
-+++ kernel-raspberry/net/xfrm/xfrm_algo.c
+--- kernel-rpi-6_1.orig/net/xfrm/xfrm_algo.c
++++ kernel-rpi-6_1/net/xfrm/xfrm_algo.c
 @@ -237,7 +237,7 @@ static struct xfrm_algo_desc aalg_list[]
  
  	.uinfo = {
@@ -7984,31 +7984,24 @@ Index: kernel-raspberry/net/xfrm/xfrm_algo.c
  			.icv_fullbits = 256,
  		}
  	},
-Index: kernel-raspberry/net/xfrm/xfrm_sysctl.c
+Index: kernel-rpi-6_1/net/xfrm/xfrm_sysctl.c
 ===================================================================
---- kernel-raspberry.orig/net/xfrm/xfrm_sysctl.c
-+++ kernel-raspberry/net/xfrm/xfrm_sysctl.c
-@@ -55,9 +55,13 @@ int __net_init xfrm_sysctl_init(struct n
- 	table[2].data = &net->xfrm.sysctl_larval_drop;
- 	table[3].data = &net->xfrm.sysctl_acq_expires;
+--- kernel-rpi-6_1.orig/net/xfrm/xfrm_sysctl.c
++++ kernel-rpi-6_1/net/xfrm/xfrm_sysctl.c
+@@ -58,7 +58,8 @@ int __net_init xfrm_sysctl_init(struct n
  
--	/* Don't export sysctls to unprivileged users */
--	if (net->user_ns != &init_user_ns)
+ 	/* Don't export sysctls to unprivileged users */
+ 	if (net->user_ns != &init_user_ns) {
 -		table[0].procname = NULL;
-+	/* Only export xfrm_acq_expires to unprivileged users. This is required
-+	 * By Android Ipsec stack as per CTS.
-+	 */
-+	if (net->user_ns != &init_user_ns) {
-+		table[0] = table[3];
++    table[0] = table[3];
 +		table[1].procname = NULL;
-+	}
+ 		table_size = 0;
+ 	}
  
- 	net->xfrm.sysctl_hdr = register_net_sysctl(net, "net/core", table);
- 	if (!net->xfrm.sysctl_hdr)
-Index: kernel-raspberry/kernel/cgroup/cgroup-v1.c
+Index: kernel-rpi-6_1/kernel/cgroup/cgroup-v1.c
 ===================================================================
---- kernel-raspberry.orig/kernel/cgroup/cgroup-v1.c
-+++ kernel-raspberry/kernel/cgroup/cgroup-v1.c
+--- kernel-rpi-6_1.orig/kernel/cgroup/cgroup-v1.c
++++ kernel-rpi-6_1/kernel/cgroup/cgroup-v1.c
 @@ -513,7 +513,8 @@ static ssize_t __cgroup1_procs_write(str
  	tcred = get_task_cred(task);
  	if (!uid_eq(cred->euid, GLOBAL_ROOT_UID) &&
@@ -8019,19 +8012,19 @@ Index: kernel-raspberry/kernel/cgroup/cgroup-v1.c
  		ret = -EACCES;
  	put_cred(tcred);
  	if (ret)
-Index: kernel-raspberry/mm/page_alloc.c
+Index: kernel-rpi-6_1/mm/page_alloc.c
 ===================================================================
---- kernel-raspberry.orig/mm/page_alloc.c
-+++ kernel-raspberry/mm/page_alloc.c
-@@ -76,6 +76,7 @@
+--- kernel-rpi-6_1.orig/mm/page_alloc.c
++++ kernel-rpi-6_1/mm/page_alloc.c
+@@ -52,6 +52,7 @@
+ #include <linux/psi.h>
  #include <linux/khugepaged.h>
- #include <linux/buffer_head.h>
  #include <linux/delayacct.h>
 +#include <linux/low-mem-notify.h>
- #include <asm/sections.h>
- #include <asm/tlbflush.h>
  #include <asm/div64.h>
-@@ -4943,9 +4944,10 @@ should_reclaim_retry(gfp_t gfp_mask, uns
+ #include "internal.h"
+ #include "shuffle.h"
+@@ -3851,9 +3852,10 @@ should_reclaim_retry(gfp_t gfp_mask, uns
  	else
  		(*no_progress_loops)++;
  
@@ -8044,7 +8037,7 @@ Index: kernel-raspberry/mm/page_alloc.c
  
  	/*
  	 * Keep reclaiming pages while there is a chance this will lead
-@@ -5557,6 +5559,8 @@ struct page *__alloc_pages(gfp_t gfp, un
+@@ -4461,6 +4463,8 @@ struct page *__alloc_pages(gfp_t gfp, un
  			&alloc_gfp, &alloc_flags))
  		return NULL;
  
@@ -8053,10 +8046,10 @@ Index: kernel-raspberry/mm/page_alloc.c
  	/*
  	 * Forbid the first pass from falling back to types that fragment
  	 * memory until all local zones are considered.
-Index: kernel-raspberry/fs/proc/internal.h
+Index: kernel-rpi-6_1/fs/proc/internal.h
 ===================================================================
---- kernel-raspberry.orig/fs/proc/internal.h
-+++ kernel-raspberry/fs/proc/internal.h
+--- kernel-rpi-6_1.orig/fs/proc/internal.h
++++ kernel-rpi-6_1/fs/proc/internal.h
 @@ -95,6 +95,9 @@ union proc_op {
  	const char *lsm;
  };
@@ -8091,10 +8084,10 @@ Index: kernel-raspberry/fs/proc/internal.h
  #ifdef CONFIG_NUMA
  	struct mempolicy *task_mempolicy;
  #endif
-Index: kernel-raspberry/include/linux/cpufreq_times.h
+Index: kernel-rpi-6_1/include/linux/cpufreq_times.h
 ===================================================================
 --- /dev/null
-+++ kernel-raspberry/include/linux/cpufreq_times.h
++++ kernel-rpi-6_1/include/linux/cpufreq_times.h
 @@ -0,0 +1,42 @@
 +/* drivers/cpufreq/cpufreq_times.c
 + *
@@ -8138,10 +8131,10 @@ Index: kernel-raspberry/include/linux/cpufreq_times.h
 +	struct cpufreq_policy *policy, unsigned int new_freq) {}
 +#endif /* CONFIG_CPU_FREQ_TIMES */
 +#endif /* _LINUX_CPUFREQ_TIMES_H */
-Index: kernel-raspberry/fs/proc/latsense.c
+Index: kernel-rpi-6_1/fs/proc/latsense.c
 ===================================================================
 --- /dev/null
-+++ kernel-raspberry/fs/proc/latsense.c
++++ kernel-rpi-6_1/fs/proc/latsense.c
 @@ -0,0 +1,94 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
@@ -8237,10 +8230,10 @@ Index: kernel-raspberry/fs/proc/latsense.c
 +	.llseek		= seq_lseek,
 +	.release	= single_release,
 +};
-Index: kernel-raspberry/fs/proc/Makefile
+Index: kernel-rpi-6_1/fs/proc/Makefile
 ===================================================================
---- kernel-raspberry.orig/fs/proc/Makefile
-+++ kernel-raspberry/fs/proc/Makefile
+--- kernel-rpi-6_1.orig/fs/proc/Makefile
++++ kernel-rpi-6_1/fs/proc/Makefile
 @@ -27,6 +27,7 @@ proc-y	+= softirqs.o
  proc-y	+= namespaces.o
  proc-y	+= self.o
@@ -8249,10 +8242,10 @@ Index: kernel-raspberry/fs/proc/Makefile
  proc-$(CONFIG_PROC_SYSCTL)	+= proc_sysctl.o
  proc-$(CONFIG_NET)		+= proc_net.o
  proc-$(CONFIG_PROC_KCORE)	+= kcore.o
-Index: kernel-raspberry/fs/proc/Kconfig
+Index: kernel-rpi-6_1/fs/proc/Kconfig
 ===================================================================
---- kernel-raspberry.orig/fs/proc/Kconfig
-+++ kernel-raspberry/fs/proc/Kconfig
+--- kernel-rpi-6_1.orig/fs/proc/Kconfig
++++ kernel-rpi-6_1/fs/proc/Kconfig
 @@ -108,3 +108,9 @@ config PROC_PID_ARCH_STATUS
  config PROC_CPU_RESCTRL
  	def_bool n
@@ -8263,10 +8256,10 @@ Index: kernel-raspberry/fs/proc/Kconfig
 +	depends on PROC_FS && UCLAMP_TASK
 +	help
 +	Enable /proc/pid/tasks/tid latency sensitive scheduler attribute
-Index: kernel-raspberry/include/linux/sched/latsense.h
+Index: kernel-rpi-6_1/include/linux/sched/latsense.h
 ===================================================================
 --- /dev/null
-+++ kernel-raspberry/include/linux/sched/latsense.h
++++ kernel-rpi-6_1/include/linux/sched/latsense.h
 @@ -0,0 +1,8 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +#ifndef _LINUX_SCHED_LATSENSE_H
@@ -8276,11 +8269,11 @@ Index: kernel-raspberry/include/linux/sched/latsense.h
 +extern int proc_sched_get_latency_sensitive(struct task_struct *p);
 +
 +#endif /* _LINUX_SCHED_LATSENSE_H */
-Index: kernel-raspberry/include/linux/sched.h
+Index: kernel-rpi-6_1/include/linux/sched.h
 ===================================================================
---- kernel-raspberry.orig/include/linux/sched.h
-+++ kernel-raspberry/include/linux/sched.h
-@@ -815,6 +815,10 @@ struct task_struct {
+--- kernel-rpi-6_1.orig/include/linux/sched.h
++++ kernel-rpi-6_1/include/linux/sched.h
+@@ -824,6 +824,10 @@ struct task_struct {
  
  	struct sched_statistics         stats;
  
@@ -8291,7 +8284,7 @@ Index: kernel-raspberry/include/linux/sched.h
  #ifdef CONFIG_PREEMPT_NOTIFIERS
  	/* List of struct preempt_notifier: */
  	struct hlist_head		preempt_notifiers;
-@@ -1023,6 +1027,10 @@ struct task_struct {
+@@ -1028,6 +1032,10 @@ struct task_struct {
  	u64				stimescaled;
  #endif
  	u64				gtime;
@@ -8302,7 +8295,7 @@ Index: kernel-raspberry/include/linux/sched.h
  	struct prev_cputime		prev_cputime;
  #ifdef CONFIG_VIRT_CPU_ACCOUNTING_GEN
  	struct vtime			vtime;
-@@ -1846,7 +1854,7 @@ current_restore_flags(unsigned long orig
+@@ -1860,7 +1868,7 @@ current_restore_flags(unsigned long orig
  }
  
  extern int cpuset_cpumask_can_shrink(const struct cpumask *cur, const struct cpumask *trial);
@@ -8311,20 +8304,20 @@ Index: kernel-raspberry/include/linux/sched.h
  extern int dl_bw_alloc(int cpu, u64 dl_bw);
  extern void dl_bw_free(int cpu, u64 dl_bw);
  #ifdef CONFIG_SMP
-Index: kernel-raspberry/kernel/cgroup/cpuset.c
+Index: kernel-rpi-6_1/kernel/cgroup/cpuset.c
 ===================================================================
---- kernel-raspberry.orig/kernel/cgroup/cpuset.c
-+++ kernel-raspberry/kernel/cgroup/cpuset.c
-@@ -2539,7 +2539,7 @@ static int cpuset_can_attach(struct cgro
- 		goto out_unlock;
+--- kernel-rpi-6_1.orig/kernel/cgroup/cpuset.c
++++ kernel-rpi-6_1/kernel/cgroup/cpuset.c
+@@ -2559,7 +2559,7 @@ static int cpuset_can_attach(struct cgro
+ 	mems_updated = !nodes_equal(cs->effective_mems, oldcs->effective_mems);
  
  	cgroup_taskset_for_each(task, css, tset) {
 -		ret = task_can_attach(task);
 +		ret = task_can_attach(task, cs->effective_cpus);
  		if (ret)
  			goto out_unlock;
- 		ret = security_task_setscheduler(task);
-@@ -3368,7 +3368,7 @@ static int cpuset_can_fork(struct task_s
+ 
+@@ -3424,7 +3424,7 @@ static int cpuset_can_fork(struct task_s
  	if (ret)
  		goto out_unlock;
  
@@ -8333,25 +8326,25 @@ Index: kernel-raspberry/kernel/cgroup/cpuset.c
  	if (ret)
  		goto out_unlock;
  
-Index: kernel-raspberry/include/linux/rmap.h
+Index: kernel-rpi-6_1/include/linux/rmap.h
 ===================================================================
---- kernel-raspberry.orig/include/linux/rmap.h
-+++ kernel-raspberry/include/linux/rmap.h
+--- kernel-rpi-6_1.orig/include/linux/rmap.h
++++ kernel-rpi-6_1/include/linux/rmap.h
 @@ -14,6 +14,10 @@
  #include <linux/pagemap.h>
  #include <linux/memremap.h>
  
-+extern int isolate_lru_page(struct page *page);
++extern bool isolate_lru_page(struct page *page);
 +extern void putback_lru_page(struct page *page);
 +extern unsigned long reclaim_pages(struct list_head *page_list);
 +
  /*
   * The anon_vma heads a list of private "related" vmas, to scan if
   * an anonymous page pointing to this anon_vma needs to be unmapped:
-Index: kernel-raspberry/kernel/sched/latsense.c
+Index: kernel-rpi-6_1/kernel/sched/latsense.c
 ===================================================================
 --- /dev/null
-+++ kernel-raspberry/kernel/sched/latsense.c
++++ kernel-rpi-6_1/kernel/sched/latsense.c
 @@ -0,0 +1,17 @@
 +// SPDX-License-Identifier: GPL-2.0
 +#include "sched.h"
@@ -8370,10 +8363,10 @@ Index: kernel-raspberry/kernel/sched/latsense.c
 +{
 +	return p->proc_latency_sensitive;
 +}
-Index: kernel-raspberry/kernel/sched/build_utility.c
+Index: kernel-rpi-6_1/kernel/sched/build_utility.c
 ===================================================================
---- kernel-raspberry.orig/kernel/sched/build_utility.c
-+++ kernel-raspberry/kernel/sched/build_utility.c
+--- kernel-rpi-6_1.orig/kernel/sched/build_utility.c
++++ kernel-rpi-6_1/kernel/sched/build_utility.c
 @@ -108,3 +108,7 @@
  #ifdef CONFIG_SCHED_AUTOGROUP
  # include "autogroup.c"
@@ -8382,102 +8375,11 @@ Index: kernel-raspberry/kernel/sched/build_utility.c
 +#ifdef CONFIG_PROC_LATSENSE
 +# include "latsense.c"
 +#endif
-Index: kernel-raspberry/fs/nfs/nfs4proc.c
+Index: kernel-rpi-6_1/fs/nfs/nfs4proc.c
 ===================================================================
---- kernel-raspberry.orig/fs/nfs/nfs4proc.c
-+++ kernel-raspberry/fs/nfs/nfs4proc.c
-@@ -328,7 +328,7 @@ static void nfs4_setup_readdir(u64 cooki
- 	memset(&readdir->verifier, 0, sizeof(readdir->verifier));
- 	if (cookie == 2)
- 		return;
--	
-+
- 	/*
- 	 * NFSv4 servers do not return entries for '.' and '..'
- 	 * Therefore, we fake these entries here.  We let '.'
-@@ -337,7 +337,7 @@ static void nfs4_setup_readdir(u64 cooki
- 	 * instead of 1 or 2.
- 	 */
- 	start = p = kmap_atomic(*readdir->pages);
--	
-+
- 	if (cookie == 0) {
- 		*p++ = xdr_one;                                  /* next */
- 		*p++ = xdr_zero;                   /* cookie, first word */
-@@ -351,7 +351,7 @@ static void nfs4_setup_readdir(u64 cooki
- 		*p++ = htonl(NF4DIR);
- 		p = xdr_encode_hyper(p, NFS_FILEID(d_inode(dentry)));
- 	}
--	
-+
- 	*p++ = xdr_one;                                  /* next */
- 	*p++ = xdr_zero;                   /* cookie, first word */
- 	*p++ = xdr_two;                   /* cookie, second word */
-@@ -2150,7 +2150,7 @@ static int nfs4_open_recover_helper(stru
- 	nfs4_init_opendata_res(opendata);
- 	ret = _nfs4_recover_proc_open(opendata);
- 	if (ret != 0)
--		return ret; 
-+		return ret;
- 	newstate = nfs4_opendata_to_nfs4_state(opendata);
- 	if (IS_ERR(newstate))
- 		return PTR_ERR(newstate);
-@@ -3722,13 +3722,13 @@ static const struct rpc_call_ops nfs4_cl
- 	.rpc_release = nfs4_free_closedata,
- };
- 
--/* 
-- * It is possible for data to be read/written from a mem-mapped file 
-+/*
-+ * It is possible for data to be read/written from a mem-mapped file
-  * after the sys_close call (which hits the vfs layer as a flush).
-- * This means that we can't safely call nfsv4 close on a file until 
-+ * This means that we can't safely call nfsv4 close on a file until
-  * the inode is cleared. This in turn means that we are not good
-- * NFSv4 citizens - we do not indicate to the server to update the file's 
-- * share state even when we are done with one of the three share 
-+ * NFSv4 citizens - we do not indicate to the server to update the file's
-+ * share state even when we are done with one of the three share
-  * stateid's in the inode.
-  *
-  * NOTE: Caller must be holding the sp->so_owner semaphore!
-@@ -4348,7 +4348,7 @@ int nfs4_proc_getattr(struct nfs_server
- 	return err;
- }
- 
--/* 
-+/*
-  * The file is not closed if it is opened due to the a request to change
-  * the size of the file. The open call will not be needed once the
-  * VFS layer lookup-intents are implemented.
-@@ -4380,7 +4380,7 @@ nfs4_proc_setattr(struct dentry *dentry,
- 		pnfs_commit_and_return_layout(inode);
- 
- 	nfs_fattr_init(fattr);
--	
-+
- 	/* Deal with open(O_TRUNC) */
- 	if (sattr->ia_valid & ATTR_OPEN)
- 		sattr->ia_valid &= ~(ATTR_MTIME|ATTR_CTIME);
-@@ -5037,7 +5037,7 @@ static int _nfs4_proc_symlink(struct ino
- 	data->arg.u.symlink.pages = &page;
- 	data->arg.u.symlink.len = len;
- 	data->arg.label = label;
--	
-+
- 	status = nfs4_do_create(dir, dentry, data);
- 
- 	nfs4_free_createdata(data);
-@@ -7722,7 +7722,7 @@ static int nfs4_xattr_set_nfs4_acl(const
- 
- static int nfs4_xattr_get_nfs4_acl(const struct xattr_handler *handler,
- 				   struct dentry *unused, struct inode *inode,
--				   const char *key, void *buf, size_t buflen)
-+				   const char *key, void *buf, size_t buflen, int flags)
- {
- 	return nfs4_proc_get_acl(inode, buf, buflen, NFS4ACL_ACL);
- }
-@@ -7746,7 +7746,7 @@ static int nfs4_xattr_set_nfs4_dacl(cons
+--- kernel-rpi-6_1.orig/fs/nfs/nfs4proc.c
++++ kernel-rpi-6_1/fs/nfs/nfs4proc.c
+@@ -7765,7 +7765,7 @@ static int nfs4_xattr_set_nfs4_dacl(cons
  
  static int nfs4_xattr_get_nfs4_dacl(const struct xattr_handler *handler,
  				    struct dentry *unused, struct inode *inode,
@@ -8486,7 +8388,7 @@ Index: kernel-raspberry/fs/nfs/nfs4proc.c
  {
  	return nfs4_proc_get_acl(inode, buf, buflen, NFS4ACL_DACL);
  }
-@@ -7769,7 +7769,7 @@ static int nfs4_xattr_set_nfs4_sacl(cons
+@@ -7788,7 +7788,7 @@ static int nfs4_xattr_set_nfs4_sacl(cons
  
  static int nfs4_xattr_get_nfs4_sacl(const struct xattr_handler *handler,
  				    struct dentry *unused, struct inode *inode,
@@ -8495,7 +8397,7 @@ Index: kernel-raspberry/fs/nfs/nfs4proc.c
  {
  	return nfs4_proc_get_acl(inode, buf, buflen, NFS4ACL_SACL);
  }
-@@ -7797,7 +7797,7 @@ static int nfs4_xattr_set_nfs4_label(con
+@@ -7816,7 +7816,7 @@ static int nfs4_xattr_set_nfs4_label(con
  
  static int nfs4_xattr_get_nfs4_label(const struct xattr_handler *handler,
  				     struct dentry *unused, struct inode *inode,

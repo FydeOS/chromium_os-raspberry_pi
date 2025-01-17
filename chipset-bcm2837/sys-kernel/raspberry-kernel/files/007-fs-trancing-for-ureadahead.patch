@@ -1,8 +1,8 @@
-Index: kernel-raspberry/fs/exec.c
+Index: kernel-rpi-6_1/fs/exec.c
 ===================================================================
---- kernel-raspberry.orig/fs/exec.c
-+++ kernel-raspberry/fs/exec.c
-@@ -69,6 +69,7 @@
+--- kernel-rpi-6_1.orig/fs/exec.c
++++ kernel-rpi-6_1/fs/exec.c
+@@ -71,6 +71,7 @@
  #include <asm/mmu_context.h>
  #include <asm/tlb.h>
  
@@ -10,33 +10,32 @@ Index: kernel-raspberry/fs/exec.c
  #include <trace/events/task.h>
  #include "internal.h"
  
-@@ -941,8 +942,10 @@ static struct file *do_open_execat(int f
+@@ -939,6 +940,10 @@ static struct file *do_open_execat(int f
  	if (err)
  		goto exit;
  
--	if (name->name[0] != '\0')
-+	if (name->name[0] != '\0') {
- 		fsnotify_open(file);
++  if (name->name[0] != '\0') {
++    fsnotify_open(file);
 +    trace_open_exec(name->name);
 +  }
- 
- out:
  	return file;
-Index: kernel-raspberry/fs/open.c
+ 
+ exit:
+Index: kernel-rpi-6_1/fs/open.c
 ===================================================================
---- kernel-raspberry.orig/fs/open.c
-+++ kernel-raspberry/fs/open.c
-@@ -36,6 +36,9 @@
+--- kernel-rpi-6_1.orig/fs/open.c
++++ kernel-rpi-6_1/fs/open.c
+@@ -37,6 +37,9 @@
  
  #include "internal.h"
  
 +#define CREATE_TRACE_POINTS
 +#include <trace/events/fs_trace.h>
 +
- int do_truncate(struct user_namespace *mnt_userns, struct dentry *dentry,
+ int do_truncate(struct mnt_idmap *idmap, struct dentry *dentry,
  		loff_t length, unsigned int time_attrs, struct file *filp)
  {
-@@ -1278,7 +1281,7 @@ struct file *filp_open(const char *filen
+@@ -1379,7 +1382,7 @@ struct file *filp_open(const char *filen
  {
  	struct filename *name = getname_kernel(filename);
  	struct file *file = ERR_CAST(name);
@@ -45,18 +44,18 @@ Index: kernel-raspberry/fs/open.c
  	if (!IS_ERR(name)) {
  		file = file_open_name(name, flags, mode);
  		putname(name);
-@@ -1322,6 +1325,7 @@ static long do_sys_openat2(int dfd, cons
+@@ -1422,6 +1425,7 @@ static long do_sys_openat2(int dfd, cons
+ 			fd = PTR_ERR(f);
  		} else {
- 			fsnotify_open(f);
  			fd_install(fd, f);
 +      trace_do_sys_open(tmp->name, how->flags, how->mode);
  		}
  	}
  	putname(tmp);
-Index: kernel-raspberry/include/trace/events/fs_trace.h
+Index: kernel-rpi-6_1/include/trace/events/fs_trace.h
 ===================================================================
 --- /dev/null
-+++ kernel-raspberry/include/trace/events/fs_trace.h
++++ kernel-rpi-6_1/include/trace/events/fs_trace.h
 @@ -0,0 +1,55 @@
 +#undef TRACE_SYSTEM
 +#define TRACE_SYSTEM fs

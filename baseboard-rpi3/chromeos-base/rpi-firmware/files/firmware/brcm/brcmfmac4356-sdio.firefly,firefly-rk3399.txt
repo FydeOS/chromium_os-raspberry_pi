@@ -1,1 +1,0 @@
-brcmfmac4356-sdio.AP6356S.txt

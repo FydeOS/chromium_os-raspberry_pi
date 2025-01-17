@@ -12,8 +12,8 @@ KEYWORDS="*"
 IUSE=""
 
 RDEPEND="
-  chromeos-base/rpi-boot-bin
-  chromeos-base/rpi-firmware
+  sys-boot/raspi-firmware
+  sys-kernel/raspi-accessory-firmware
   dev-embedded/raspberrypi-utils
   sys-apps/haveged
 "

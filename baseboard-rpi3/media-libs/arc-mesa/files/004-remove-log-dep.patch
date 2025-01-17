@@ -1,0 +1,12 @@
+Index: mesa/meson.build
+===================================================================
+--- mesa.orig/meson.build
++++ mesa/meson.build
+@@ -870,7 +870,6 @@ if with_platform_android
+     dep_android = [
+       dependency('cutils'),
+       dependency('hardware'),
+-      dependency('log'),
+       dependency('sync'),
+     ]
+     if with_libbacktrace

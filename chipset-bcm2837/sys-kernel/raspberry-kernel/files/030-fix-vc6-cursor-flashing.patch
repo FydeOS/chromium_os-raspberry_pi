@@ -1,51 +1,21 @@
-Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_hvs.c
+Index: kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_hvs.c
 ===================================================================
---- kernel-raspberry.orig/drivers/gpu/drm/vc4/vc4_hvs.c
-+++ kernel-raspberry/drivers/gpu/drm/vc4/vc4_hvs.c
-@@ -1359,23 +1359,20 @@ void vc4_hvs_atomic_flush(struct drm_crt
+--- kernel-rpi-6_1.orig/drivers/gpu/drm/vc4/vc4_hvs.c
++++ kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_hvs.c
+@@ -1453,10 +1453,8 @@ void vc4_hvs_atomic_flush(struct drm_crt
+ 
  	WARN_ON_ONCE(vc4->gen > VC4_GEN_6);
  
- 	if (!drm_dev_enter(dev, &idx)) {
+-	if (!drm_dev_enter(dev, &idx)) {
 -		vc4_crtc_send_vblank(crtc);
 -		return;
-+		goto end;
- 	}
+-	}
++	if (!drm_dev_enter(dev, &idx))
++    goto end;
  
  	if (vc4_state->assigned_channel == VC4_HVS_CHANNEL_DISABLED)
--		return;
-+		goto exit;
- 
- 	if (debug_dump_regs) {
- 		DRM_INFO("CRTC %d HVS before:\n", drm_crtc_index(crtc));
- 		vc4_hvs_dump_state(hvs);
- 	}
--
- 	drm_atomic_crtc_for_each_plane(plane, crtc) {
- 		vc4_plane_state = to_vc4_plane_state(plane->state);
- 		lbm_size += vc4_plane_state->lbm_size;
- 	}
--
- 	if (drm_mm_node_allocated(&vc4_crtc->lbm)) {
- 		spin_lock_irqsave(&vc4_crtc->irq_lock, irqflags);
- 		drm_mm_remove_node(&vc4_crtc->lbm);
-@@ -1394,7 +1391,7 @@ void vc4_hvs_atomic_flush(struct drm_crt
- 
- 		if (ret) {
- 			pr_err("Failed to allocate LBM ret %d\n", ret);
--			return;
-+			goto exit;
- 		}
- 	}
- 
-@@ -1425,7 +1422,6 @@ void vc4_hvs_atomic_flush(struct drm_crt
- 				 */
- 				enable_bg_fill = vc4_plane_state->needs_bg_fill;
- 			}
--
- 			if (vc4_plane_state->lbm_size) {
- 				vc4_plane_state->dlist[vc4_plane_state->lbm_offset] =
- 								lbm_offset;
-@@ -1442,7 +1438,6 @@ void vc4_hvs_atomic_flush(struct drm_crt
+ 		goto exit;
+@@ -1501,7 +1499,6 @@ void vc4_hvs_atomic_flush(struct drm_crt
  
  	writel(SCALER_CTL0_END, dlist_next);
  	dlist_next++;
@@ -53,22 +23,28 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_hvs.c
  	WARN_ON(!vc4_state->mm);
  	WARN_ON_ONCE(dlist_next - dlist_start != vc4_state->mm->mm_node.size);
  
-@@ -1513,7 +1508,10 @@ void vc4_hvs_atomic_flush(struct drm_crt
- 		vc4_hvs_dump_state(hvs);
- 	}
+@@ -1567,6 +1564,8 @@ void vc4_hvs_atomic_flush(struct drm_crt
  
-+exit:
+ exit:
  	drm_dev_exit(idx);
 +end:
 +	vc4_crtc_send_vblank(crtc);
  }
  
  void vc4_hvs_mask_underrun(struct vc4_hvs *hvs, int channel)
-Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_plane.c
+@@ -2164,6 +2163,7 @@ static int vc4_hvs_cob_init(struct vc4_h
+ 		#define VC6_COB_LINE_WIDTH	3840
+ 		#define VC6_COB_NUM_LINES	4
+ 		reg = 0;
++    base = 0;
+ 		top = 3840;
+ 
+ 		HVS_WRITE(SCALER6(DISP2_COB),
+Index: kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_plane.c
 ===================================================================
---- kernel-raspberry.orig/drivers/gpu/drm/vc4/vc4_plane.c
-+++ kernel-raspberry/drivers/gpu/drm/vc4/vc4_plane.c
-@@ -2045,8 +2045,7 @@ u32 vc4_plane_write_dlist(struct drm_pla
+--- kernel-rpi-6_1.orig/drivers/gpu/drm/vc4/vc4_plane.c
++++ kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_plane.c
+@@ -2278,8 +2278,7 @@ u32 vc4_plane_write_dlist(struct drm_pla
  
  	/* Can't memcpy_toio() because it needs to be 32-bit writes. */
  	for (i = 0; i < vc4_state->dlist_count; i++)
@@ -78,7 +54,7 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_plane.c
  	drm_dev_exit(idx);
  
  out:
-@@ -2115,66 +2114,82 @@ void vc4_plane_async_set_fb(struct drm_p
+@@ -2347,66 +2346,82 @@ void vc4_plane_async_set_fb(struct drm_p
  	drm_dev_exit(idx);
  }
  
@@ -214,7 +190,7 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_plane.c
  	/* Note that we can't just call vc4_plane_write_dlist()
  	 * because that would smash the context data that the HVS is
  	 * currently using.
-@@ -2185,7 +2200,8 @@ static void vc4_plane_atomic_async_updat
+@@ -2417,7 +2432,8 @@ static void vc4_plane_atomic_async_updat
  	       &vc4_state->hw_dlist[vc4_state->pos2_offset]);
  	writel(vc4_state->dlist[vc4_state->ptr0_offset[0]],
  	       &vc4_state->hw_dlist[vc4_state->ptr0_offset[0]]);
@@ -224,9 +200,11 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_plane.c
  	drm_dev_exit(idx);
  }
  
-@@ -2196,16 +2212,8 @@ static int vc4_plane_atomic_async_check(
+@@ -2426,18 +2442,9 @@ static int vc4_plane_atomic_async_check(
+ {
+ 	struct drm_plane_state *new_plane_state = drm_atomic_get_new_plane_state(state,
  										 plane);
- 	struct vc4_dev *vc4 = to_vc4_dev(plane->dev);
+-	struct vc4_dev *vc4 = to_vc4_dev(plane->dev);
  	struct vc4_plane_state *old_vc4_state, *new_vc4_state;
 -	int ret;
  	u32 i;
@@ -241,7 +219,7 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_plane.c
  	old_vc4_state = to_vc4_plane_state(plane->state);
  	new_vc4_state = to_vc4_plane_state(new_plane_state);
  
-@@ -2233,7 +2241,6 @@ static int vc4_plane_atomic_async_check(
+@@ -2465,7 +2472,6 @@ static int vc4_plane_atomic_async_check(
  		if (new_vc4_state->dlist[i] != old_vc4_state->dlist[i])
  			return -EINVAL;
  	}
@@ -249,11 +227,11 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_plane.c
  	return 0;
  }
  
-Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_crtc.c
+Index: kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_crtc.c
 ===================================================================
---- kernel-raspberry.orig/drivers/gpu/drm/vc4/vc4_crtc.c
-+++ kernel-raspberry/drivers/gpu/drm/vc4/vc4_crtc.c
-@@ -916,9 +916,7 @@ vc4_async_page_flip_complete(struct vc4_
+--- kernel-rpi-6_1.orig/drivers/gpu/drm/vc4/vc4_crtc.c
++++ kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_crtc.c
+@@ -932,9 +932,7 @@ vc4_async_page_flip_complete(struct vc4_
  {
  	struct drm_crtc *crtc = flip_state->crtc;
  	struct drm_device *dev = crtc->dev;
@@ -263,11 +241,20 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_crtc.c
  	if (flip_state->event) {
  		unsigned long flags;
  
-Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_kms.c
+Index: kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_kms.c
 ===================================================================
---- kernel-raspberry.orig/drivers/gpu/drm/vc4/vc4_kms.c
-+++ kernel-raspberry/drivers/gpu/drm/vc4/vc4_kms.c
-@@ -522,8 +522,6 @@ static int vc4_atomic_commit_setup(struc
+--- kernel-rpi-6_1.orig/drivers/gpu/drm/vc4/vc4_kms.c
++++ kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_kms.c
+@@ -511,8 +511,6 @@ static void vc4_atomic_commit_tail(struc
+ 
+ static int vc4_atomic_commit_setup(struct drm_atomic_state *state)
+ {
+-	struct drm_device *dev = state->dev;
+-	struct vc4_dev *vc4 = to_vc4_dev(dev);
+ 	struct drm_crtc_state *crtc_state;
+ 	struct vc4_hvs_state *hvs_state;
+ 	struct drm_crtc *crtc;
+@@ -523,8 +521,6 @@ static int vc4_atomic_commit_setup(struc
  	 * drm_atomic_helper_setup_commit() from auto-completing
  	 * commit->flip_done.
  	 */
@@ -276,15 +263,15 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_kms.c
  	hvs_state = vc4_hvs_get_new_global_state(state);
  	if (WARN_ON(IS_ERR(hvs_state)))
  		return PTR_ERR(hvs_state);
-Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_drv.h
+Index: kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_drv.h
 ===================================================================
---- kernel-raspberry.orig/drivers/gpu/drm/vc4/vc4_drv.h
-+++ kernel-raspberry/drivers/gpu/drm/vc4/vc4_drv.h
-@@ -493,6 +493,7 @@ struct vc4_plane_state {
+--- kernel-rpi-6_1.orig/drivers/gpu/drm/vc4/vc4_drv.h
++++ kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_drv.h
+@@ -505,6 +505,7 @@ struct vc4_plane_state {
  	 * bytes/sec.
  	 */
  	u64 membus_load;
 +  ktime_t update_time;
  };
  
- static inline struct vc4_plane_state *
+ #define to_vc4_plane_state(_state)				\

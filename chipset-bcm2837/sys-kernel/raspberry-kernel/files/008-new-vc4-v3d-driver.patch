@@ -144,7 +144,7 @@ Index: kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_drv.c
  DEFINE_DRM_GEM_FOPS(vc4_drm_fops);
  
  static const struct drm_ioctl_desc vc4_drm_ioctls[] = {
-@@ -247,6 +272,8 @@ const struct drm_driver vc5_drm_driver =
+@@ -244,6 +269,8 @@ const struct drm_driver vc5_drm_driver =
  	.driver_features = (DRIVER_MODESET |
  			    DRIVER_ATOMIC |
  			    DRIVER_GEM),
@@ -153,15 +153,15 @@ Index: kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_drv.c
  
  #if defined(CONFIG_DEBUG_FS)
  	.debugfs_init = vc4_debugfs_init,
-@@ -440,6 +467,7 @@ static int vc4_drm_bind(struct device *d
+@@ -437,6 +464,7 @@ static int vc4_drm_bind(struct device *d
  
- 	drm_fbdev_generic_setup(drm, 16);
+ 	drm_fbdev_dma_setup(drm, 16);
  
 +  vc4_drm = drm;
  	return 0;
  
  unbind_all:
-@@ -450,6 +478,8 @@ static void vc4_drm_unbind(struct device
+@@ -447,6 +475,8 @@ static void vc4_drm_unbind(struct device
  {
  	struct drm_device *drm = dev_get_drvdata(dev);
  
@@ -232,7 +232,7 @@ Index: kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_kms.c
 ===================================================================
 --- kernel-rpi-6_1.orig/drivers/gpu/drm/vc4/vc4_kms.c
 +++ kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_kms.c
-@@ -524,7 +524,6 @@ static int vc4_atomic_commit_setup(struc
+@@ -525,7 +525,6 @@ static int vc4_atomic_commit_setup(struc
  	 */
  	if (!vc4->firmware_kms)
  		state->legacy_cursor_update = false;
@@ -240,7 +240,7 @@ Index: kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_kms.c
  	hvs_state = vc4_hvs_get_new_global_state(state);
  	if (WARN_ON(IS_ERR(hvs_state)))
  		return PTR_ERR(hvs_state);
-@@ -1122,9 +1121,18 @@ static const struct drm_mode_config_func
+@@ -1132,9 +1131,18 @@ static const struct drm_mode_config_func
  	.fb_create = vc4_fb_create,
  };
  

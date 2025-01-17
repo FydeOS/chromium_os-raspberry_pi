@@ -1,8 +1,8 @@
-Index: kernel-raspberry/mm/mprotect.c
+Index: kernel-rpi-6_1/mm/mprotect.c
 ===================================================================
---- kernel-raspberry.orig/mm/mprotect.c
-+++ kernel-raspberry/mm/mprotect.c
-@@ -816,7 +816,10 @@ out:
+--- kernel-rpi-6_1.orig/mm/mprotect.c
++++ kernel-rpi-6_1/mm/mprotect.c
+@@ -837,7 +837,10 @@ out:
  SYSCALL_DEFINE3(mprotect, unsigned long, start, size_t, len,
  		unsigned long, prot)
  {

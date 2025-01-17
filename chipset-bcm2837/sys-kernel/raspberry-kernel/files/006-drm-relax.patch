@@ -1,21 +1,22 @@
-Index: kernel-raspberry/drivers/gpu/drm/drm_auth.c
+Index: kernel-rpi-6_1/drivers/gpu/drm/drm_auth.c
 ===================================================================
---- kernel-raspberry.orig/drivers/gpu/drm/drm_auth.c
-+++ kernel-raspberry/drivers/gpu/drm/drm_auth.c
-@@ -235,7 +235,7 @@ static int drm_new_set_master(struct drm
- static int
+--- kernel-rpi-6_1.orig/drivers/gpu/drm/drm_auth.c
++++ kernel-rpi-6_1/drivers/gpu/drm/drm_auth.c
+@@ -236,7 +236,8 @@ static int
  drm_master_check_perm(struct drm_device *dev, struct drm_file *file_priv)
  {
--	if (file_priv->pid == task_pid(current) && file_priv->was_master)
-+	if ((drm_master_relax || file_priv->pid == task_pid(current)) && file_priv->was_master)
+ 	if (file_priv->was_master &&
+-	    rcu_access_pointer(file_priv->pid) == task_tgid(current))
++	    (rcu_access_pointer(file_priv->pid) == task_tgid(current)
++        || drm_master_relax))
  		return 0;
  
  	if (!capable(CAP_SYS_ADMIN))
-Index: kernel-raspberry/drivers/gpu/drm/drm_drv.c
+Index: kernel-rpi-6_1/drivers/gpu/drm/drm_drv.c
 ===================================================================
---- kernel-raspberry.orig/drivers/gpu/drm/drm_drv.c
-+++ kernel-raspberry/drivers/gpu/drm/drm_drv.c
-@@ -1031,6 +1031,8 @@ out:
+--- kernel-rpi-6_1.orig/drivers/gpu/drm/drm_drv.c
++++ kernel-rpi-6_1/drivers/gpu/drm/drm_drv.c
+@@ -1058,6 +1058,8 @@ out:
  	return err;
  }
  
@@ -24,7 +25,7 @@ Index: kernel-raspberry/drivers/gpu/drm/drm_drv.c
  static const struct file_operations drm_stub_fops = {
  	.owner = THIS_MODULE,
  	.open = drm_stub_open,
-@@ -1063,6 +1065,9 @@ static int __init drm_core_init(void)
+@@ -1090,6 +1092,9 @@ static int __init drm_core_init(void)
  
  	drm_debugfs_root = debugfs_create_dir("dri", NULL);
  
@@ -34,11 +35,11 @@ Index: kernel-raspberry/drivers/gpu/drm/drm_drv.c
  	ret = register_chrdev(DRM_MAJOR, "drm", &drm_stub_fops);
  	if (ret < 0)
  		goto error;
-Index: kernel-raspberry/include/drm/drm_drv.h
+Index: kernel-rpi-6_1/include/drm/drm_drv.h
 ===================================================================
---- kernel-raspberry.orig/include/drm/drm_drv.h
-+++ kernel-raspberry/include/drm/drm_drv.h
-@@ -483,6 +483,8 @@ void *__devm_drm_dev_alloc(struct device
+--- kernel-rpi-6_1.orig/include/drm/drm_drv.h
++++ kernel-rpi-6_1/include/drm/drm_drv.h
+@@ -467,6 +467,8 @@ void *__devm_drm_dev_alloc(struct device
  			   const struct drm_driver *driver,
  			   size_t size, size_t offset);
  

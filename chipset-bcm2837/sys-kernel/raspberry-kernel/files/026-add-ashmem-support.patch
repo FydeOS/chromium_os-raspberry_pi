@@ -1,7 +1,7 @@
-Index: kernel-raspberry/drivers/staging/android/Kconfig
+Index: kernel-rpi-6_1/drivers/staging/android/Kconfig
 ===================================================================
 --- /dev/null
-+++ kernel-raspberry/drivers/staging/android/Kconfig
++++ kernel-rpi-6_1/drivers/staging/android/Kconfig
 @@ -0,0 +1,15 @@
 +# SPDX-License-Identifier: GPL-2.0
 +menu "Android"
@@ -18,19 +18,19 @@ Index: kernel-raspberry/drivers/staging/android/Kconfig
 +	  because it can discard shared memory units when under memory pressure.
 +
 +endmenu
-Index: kernel-raspberry/drivers/staging/android/Makefile
+Index: kernel-rpi-6_1/drivers/staging/android/Makefile
 ===================================================================
 --- /dev/null
-+++ kernel-raspberry/drivers/staging/android/Makefile
++++ kernel-rpi-6_1/drivers/staging/android/Makefile
 @@ -0,0 +1,4 @@
 +# SPDX-License-Identifier: GPL-2.0
 +ccflags-y += -I$(src)			# needed for trace events
 +
 +obj-$(CONFIG_ASHMEM)			+= ashmem.o
-Index: kernel-raspberry/drivers/staging/android/ashmem.c
+Index: kernel-rpi-6_1/drivers/staging/android/ashmem.c
 ===================================================================
 --- /dev/null
-+++ kernel-raspberry/drivers/staging/android/ashmem.c
++++ kernel-rpi-6_1/drivers/staging/android/ashmem.c
 @@ -0,0 +1,970 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/* mm/ashmem.c
@@ -435,7 +435,7 @@ Index: kernel-raspberry/drivers/staging/android/ashmem.c
 +		ret = -EPERM;
 +		goto out;
 +	}
-+	vma->vm_flags &= ~calc_vm_may_flags(~asma->prot_mask);
++  vm_flags_clear(vma, calc_vm_may_flags(~asma->prot_mask));
 +
 +	if (!asma->file) {
 +		char *name = ASHMEM_NAME_DEF;
@@ -1002,10 +1002,10 @@ Index: kernel-raspberry/drivers/staging/android/ashmem.c
 +	return ret;
 +}
 +device_initcall(ashmem_init);
-Index: kernel-raspberry/drivers/staging/android/ashmem.h
+Index: kernel-rpi-6_1/drivers/staging/android/ashmem.h
 ===================================================================
 --- /dev/null
-+++ kernel-raspberry/drivers/staging/android/ashmem.h
++++ kernel-rpi-6_1/drivers/staging/android/ashmem.h
 @@ -0,0 +1,24 @@
 +/* SPDX-License-Identifier: GPL-2.0 OR Apache-2.0 */
 +/*
@@ -1031,10 +1031,10 @@ Index: kernel-raspberry/drivers/staging/android/ashmem.h
 +#endif
 +
 +#endif	/* _LINUX_ASHMEM_H */
-Index: kernel-raspberry/drivers/staging/android/uapi/ashmem.h
+Index: kernel-rpi-6_1/drivers/staging/android/uapi/ashmem.h
 ===================================================================
 --- /dev/null
-+++ kernel-raspberry/drivers/staging/android/uapi/ashmem.h
++++ kernel-rpi-6_1/drivers/staging/android/uapi/ashmem.h
 @@ -0,0 +1,43 @@
 +/* SPDX-License-Identifier: GPL-2.0 OR Apache-2.0 */
 +/*
@@ -1079,11 +1079,11 @@ Index: kernel-raspberry/drivers/staging/android/uapi/ashmem.h
 +#define ASHMEM_PURGE_ALL_CACHES	_IO(__ASHMEMIOC, 10)
 +
 +#endif	/* _UAPI_LINUX_ASHMEM_H */
-Index: kernel-raspberry/drivers/staging/Kconfig
+Index: kernel-rpi-6_1/drivers/staging/Kconfig
 ===================================================================
---- kernel-raspberry.orig/drivers/staging/Kconfig
-+++ kernel-raspberry/drivers/staging/Kconfig
-@@ -58,6 +58,8 @@ source "drivers/staging/media/Kconfig"
+--- kernel-rpi-6_1.orig/drivers/staging/Kconfig
++++ kernel-rpi-6_1/drivers/staging/Kconfig
+@@ -56,6 +56,8 @@ source "drivers/staging/media/Kconfig"
  
  source "drivers/staging/board/Kconfig"
  
@@ -1092,11 +1092,11 @@ Index: kernel-raspberry/drivers/staging/Kconfig
  source "drivers/staging/gdm724x/Kconfig"
  
  source "drivers/staging/fbtft/Kconfig"
-Index: kernel-raspberry/drivers/staging/Makefile
+Index: kernel-rpi-6_1/drivers/staging/Makefile
 ===================================================================
---- kernel-raspberry.orig/drivers/staging/Makefile
-+++ kernel-raspberry/drivers/staging/Makefile
-@@ -18,6 +18,7 @@ obj-$(CONFIG_IIO)		+= iio/
+--- kernel-rpi-6_1.orig/drivers/staging/Makefile
++++ kernel-rpi-6_1/drivers/staging/Makefile
+@@ -17,6 +17,7 @@ obj-$(CONFIG_IIO)		+= iio/
  obj-$(CONFIG_FB_SM750)		+= sm750fb/
  obj-$(CONFIG_USB_EMXX)		+= emxx_udc/
  obj-$(CONFIG_MFD_NVEC)		+= nvec/

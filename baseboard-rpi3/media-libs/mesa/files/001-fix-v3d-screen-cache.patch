@@ -2,7 +2,7 @@ Index: mesa/src/gallium/drivers/v3d/v3d_screen.c
 ===================================================================
 --- mesa.orig/src/gallium/drivers/v3d/v3d_screen.c
 +++ mesa/src/gallium/drivers/v3d/v3d_screen.c
-@@ -867,8 +867,11 @@ static struct disk_cache *
+@@ -897,8 +897,11 @@ static struct disk_cache *
  v3d_screen_get_disk_shader_cache(struct pipe_screen *pscreen)
  {
          struct v3d_screen *screen = v3d_screen(pscreen);
@@ -15,12 +15,12 @@ Index: mesa/src/gallium/drivers/v3d/v3d_screen.c
  }
  
  static int
-Index: mesa/src/gallium/targets/dri/meson.build
+Index: mesa/src/gallium/targets/dril/meson.build
 ===================================================================
---- mesa.orig/src/gallium/targets/dri/meson.build
-+++ mesa/src/gallium/targets/dri/meson.build
-@@ -68,43 +68,7 @@ libgallium_dri = shared_library(
-   name_suffix : 'so',
+--- mesa.orig/src/gallium/targets/dril/meson.build
++++ mesa/src/gallium/targets/dril/meson.build
+@@ -62,44 +62,7 @@ dril_dri = shared_library(
+   name_suffix : libname_suffix,
  )
  
 -foreach d : [[with_gallium_kmsro, [
@@ -58,6 +58,7 @@ Index: mesa/src/gallium/targets/dri/meson.build
 -               'stm_dri.so',
 -               'sun4i-drm_dri.so',
 -               'udl_dri.so',
+-               'vkms_dri.so',
 -               'zynqmp-dpsub_dri.so',
 -             ]],
 +foreach d : [

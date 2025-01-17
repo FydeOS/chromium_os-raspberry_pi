@@ -1,12 +1,75 @@
-Index: kernel-raspberry/drivers/base/dd.c
+Index: kernel-rpi-6_1/block/early-lookup.c
 ===================================================================
---- kernel-raspberry.orig/drivers/base/dd.c
-+++ kernel-raspberry/drivers/base/dd.c
-@@ -745,6 +745,7 @@ int driver_probe_done(void)
- 		return -EBUSY;
+--- kernel-rpi-6_1.orig/block/early-lookup.c
++++ kernel-rpi-6_1/block/early-lookup.c
+@@ -18,7 +18,7 @@ struct uuidcmp {
+  *
+  * Returns 1 if the device matches, and 0 otherwise.
+  */
+-static int __init match_dev_by_uuid(struct device *dev, const void *data)
++static int match_dev_by_uuid(struct device *dev, const void *data)
+ {
+ 	struct block_device *bdev = dev_to_bdev(dev);
+ 	const struct uuidcmp *cmp = data;
+@@ -43,7 +43,7 @@ static int __init match_dev_by_uuid(stru
+  *
+  * Returns 0 on success or a negative error code on failure.
+  */
+-static int __init devt_from_partuuid(const char *uuid_str, dev_t *devt)
++static int devt_from_partuuid(const char *uuid_str, dev_t *devt)
+ {
+ 	struct uuidcmp cmp;
+ 	struct device *dev = NULL;
+@@ -99,7 +99,7 @@ out_invalid:
+  *
+  * Returns 1 if the device matches, and 0 otherwise.
+  */
+-static int __init match_dev_by_label(struct device *dev, const void *data)
++static int match_dev_by_label(struct device *dev, const void *data)
+ {
+ 	struct block_device *bdev = dev_to_bdev(dev);
+ 	const char *label = data;
+@@ -109,7 +109,7 @@ static int __init match_dev_by_label(str
+ 	return 1;
+ }
+ 
+-static int __init devt_from_partlabel(const char *label, dev_t *devt)
++static int devt_from_partlabel(const char *label, dev_t *devt)
+ {
+ 	struct device *dev;
+ 
+@@ -121,7 +121,7 @@ static int __init devt_from_partlabel(co
  	return 0;
  }
-+EXPORT_SYMBOL_GPL(driver_probe_done);
  
- /**
-  * wait_for_device_probe
+-static dev_t __init blk_lookup_devt(const char *name, int partno)
++static dev_t blk_lookup_devt(const char *name, int partno)
+ {
+ 	dev_t devt = MKDEV(0, 0);
+ 	struct class_dev_iter iter;
+@@ -194,7 +194,7 @@ static int __init devt_from_devname(cons
+ 	return -ENODEV;
+ }
+ 
+-static int __init devt_from_devnum(const char *name, dev_t *devt)
++static int devt_from_devnum(const char *name, dev_t *devt)
+ {
+ 	unsigned maj, min, offset;
+ 	char *p, dummy;
+@@ -241,7 +241,7 @@ static int __init devt_from_devnum(const
+  *	name contains slashes, the device name has them replaced with
+  *	bangs.
+  */
+-int __init early_lookup_bdev(const char *name, dev_t *devt)
++int early_lookup_bdev(const char *name, dev_t *devt)
+ {
+ 	if (strncmp(name, "PARTUUID=", 9) == 0)
+ 		return devt_from_partuuid(name + 9, devt);
+@@ -251,6 +251,7 @@ int __init early_lookup_bdev(const char
+ 		return devt_from_devname(name + 5, devt);
+ 	return devt_from_devnum(name, devt);
+ }
++EXPORT_SYMBOL_GPL(early_lookup_bdev);
+ 
+ static char __init *bdevt_str(dev_t devt, char *buf)
+ {

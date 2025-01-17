@@ -1,19 +1,17 @@
-Index: kernel-raspberry/drivers/md/dm-verity-target.c
+Index: kernel-rpi-6_1/drivers/md/dm-verity-target.c
 ===================================================================
---- kernel-raspberry.orig/drivers/md/dm-verity-target.c
-+++ kernel-raspberry/drivers/md/dm-verity-target.c
-@@ -16,8 +16,10 @@
- #include "dm-verity.h"
- #include "dm-verity-fec.h"
- #include "dm-verity-verify-sig.h"
-+#include <linux/delay.h>
- #include <linux/module.h>
- #include <linux/reboot.h>
-+#include <crypto/hash.h>
+--- kernel-rpi-6_1.orig/drivers/md/dm-verity-target.c
++++ kernel-rpi-6_1/drivers/md/dm-verity-target.c
+@@ -22,6 +22,8 @@
  #include <linux/scatterlist.h>
  #include <linux/string.h>
  #include <linux/jump_label.h>
-@@ -37,8 +39,9 @@
++#include <linux/delay.h>
++#include <crypto/hash.h>
+ 
+ #define DM_MSG_PREFIX			"verity"
+ 
+@@ -38,8 +40,9 @@
  #define DM_VERITY_OPT_IGN_ZEROES	"ignore_zero_blocks"
  #define DM_VERITY_OPT_AT_MOST_ONCE	"check_at_most_once"
  #define DM_VERITY_OPT_TASKLET_VERIFY	"try_verify_in_tasklet"
@@ -24,7 +22,7 @@ Index: kernel-raspberry/drivers/md/dm-verity-target.c
  					 DM_VERITY_ROOT_HASH_VERIFICATION_OPTS)
  
  static unsigned int dm_verity_prefetch_cluster = DM_VERITY_DEFAULT_PREFETCH_SIZE;
-@@ -54,6 +57,122 @@ struct dm_verity_prefetch_work {
+@@ -55,6 +58,122 @@ struct dm_verity_prefetch_work {
  	unsigned int n_blocks;
  };
  
@@ -147,7 +145,7 @@ Index: kernel-raspberry/drivers/md/dm-verity-target.c
  /*
   * Auxiliary structure appended to each dm-bufio buffer. If the value
   * hash_verified is nonzero, hash of the block has been verified.
-@@ -524,7 +643,7 @@ static int verity_verify_io(struct dm_ve
+@@ -587,7 +706,7 @@ static int verity_verify_io(struct dm_ve
  		sector_t cur_block = io->block + b;
  		struct ahash_request *req = verity_io_hash_req(v, io);
  
@@ -156,7 +154,7 @@ Index: kernel-raspberry/drivers/md/dm-verity-target.c
  		    likely(test_bit(cur_block, v->validated_blocks))) {
  			verity_bv_skip_block(v, io, iter);
  			continue;
-@@ -616,6 +735,8 @@ static void verity_finish_io(struct dm_v
+@@ -683,6 +802,8 @@ static void verity_finish_io(struct dm_v
  	struct dm_verity *v = io->v;
  	struct bio *bio = dm_bio_from_per_bio_data(io, v->ti->per_io_data_size);
  
@@ -165,7 +163,7 @@ Index: kernel-raspberry/drivers/md/dm-verity-target.c
  	bio->bi_end_io = io->orig_bi_end_io;
  	bio->bi_status = status;
  
-@@ -1110,6 +1231,22 @@ static int verity_parse_opt_args(struct
+@@ -1163,6 +1284,22 @@ static int verity_parse_opt_args(struct
  			static_branch_inc(&use_tasklet_enabled);
  			continue;
  
@@ -188,7 +186,7 @@ Index: kernel-raspberry/drivers/md/dm-verity-target.c
  		} else if (verity_is_fec_opt_arg(arg_name)) {
  			if (only_modifier_opts)
  				continue;
-@@ -1146,6 +1283,135 @@ static int verity_parse_opt_args(struct
+@@ -1199,6 +1336,135 @@ static int verity_parse_opt_args(struct
  	return r;
  }
  
@@ -324,7 +322,7 @@ Index: kernel-raspberry/drivers/md/dm-verity-target.c
  /*
   * Target parameters:
   *	<version>	The current format is version 1.
-@@ -1173,10 +1439,19 @@ static int verity_ctr(struct dm_target *
+@@ -1225,10 +1491,19 @@ static int verity_ctr(struct dm_target *
  	sector_t hash_position;
  	char dummy;
  	char *root_hash_digest_to_validate;
@@ -344,44 +342,45 @@ Index: kernel-raspberry/drivers/md/dm-verity-target.c
  		return -ENOMEM;
  	}
  	ti->private = v;
-@@ -1215,13 +1490,13 @@ static int verity_ctr(struct dm_target *
+@@ -1267,13 +1542,13 @@ static int verity_ctr(struct dm_target *
  	}
  	v->version = num;
  
--	r = dm_get_device(ti, argv[1], FMODE_READ, &v->data_dev);
+-	r = dm_get_device(ti, argv[1], BLK_OPEN_READ, &v->data_dev);
 +	r = verity_get_device(ti, argv[1], &v->data_dev);
  	if (r) {
  		ti->error = "Data device lookup failed";
  		goto bad;
  	}
  
--	r = dm_get_device(ti, argv[2], FMODE_READ, &v->hash_dev);
+-	r = dm_get_device(ti, argv[2], BLK_OPEN_READ, &v->hash_dev);
 +	r = verity_get_device(ti, argv[2], &v->hash_dev);
  	if (r) {
  		ti->error = "Hash device lookup failed";
  		goto bad;
-@@ -1433,14 +1708,14 @@ static int verity_ctr(struct dm_target *
- 				       __alignof__(struct dm_verity_io));
- 
+@@ -1499,7 +1774,7 @@ static int verity_ctr(struct dm_target *
  	verity_verify_sig_opts_cleanup(&verify_args);
+ 
+ 	dm_audit_log_ctr(DM_MSG_PREFIX, ti, 1);
 -
-+	free_chromeos_argv(chromeos_argv);
++  free_chromeos_argv(chromeos_argv);
  	return 0;
  
  bad:
- 
+@@ -1507,7 +1782,7 @@ bad:
  	verity_verify_sig_opts_cleanup(&verify_args);
+ 	dm_audit_log_ctr(DM_MSG_PREFIX, ti, 0);
  	verity_dtr(ti);
 -
-+	free_chromeos_argv(chromeos_argv);
++  free_chromeos_argv(chromeos_argv);
  	return r;
  }
  
-Index: kernel-raspberry/drivers/md/dm-verity.h
+Index: kernel-rpi-6_1/drivers/md/dm-verity.h
 ===================================================================
---- kernel-raspberry.orig/drivers/md/dm-verity.h
-+++ kernel-raspberry/drivers/md/dm-verity.h
-@@ -15,6 +15,7 @@
+--- kernel-rpi-6_1.orig/drivers/md/dm-verity.h
++++ kernel-rpi-6_1/drivers/md/dm-verity.h
+@@ -16,6 +16,7 @@
  #include <linux/device-mapper.h>
  #include <linux/interrupt.h>
  #include <crypto/hash.h>
@@ -389,7 +388,7 @@ Index: kernel-raspberry/drivers/md/dm-verity.h
  
  #define DM_VERITY_MAX_LEVELS		63
  
-@@ -58,6 +59,7 @@ struct dm_verity {
+@@ -59,6 +60,7 @@ struct dm_verity {
  	unsigned int ahash_reqsize;/* the size of temporary space for crypto */
  	enum verity_mode mode;	/* mode for handling verification errors */
  	unsigned int corrupted_errs;/* Number of errors for corrupted blocks */
@@ -397,7 +396,7 @@ Index: kernel-raspberry/drivers/md/dm-verity.h
  
  	struct workqueue_struct *verify_wq;
  
-@@ -97,6 +99,40 @@ struct dm_verity_io {
+@@ -102,6 +104,40 @@ struct dm_verity_io {
  	 */
  };
  
@@ -438,11 +437,11 @@ Index: kernel-raspberry/drivers/md/dm-verity.h
  static inline struct ahash_request *verity_io_hash_req(struct dm_verity *v,
  						     struct dm_verity_io *io)
  {
-Index: kernel-raspberry/drivers/md/dm-verity-chromeos.c
+Index: kernel-rpi-6_1/drivers/md/dm-verity-chromeos.c
 ===================================================================
 --- /dev/null
-+++ kernel-raspberry/drivers/md/dm-verity-chromeos.c
-@@ -0,0 +1,292 @@
++++ kernel-rpi-6_1/drivers/md/dm-verity-chromeos.c
+@@ -0,0 +1,289 @@
 +/*
 + * Copyright (C) 2010 The Chromium OS Authors <chromium-os-dev@chromium.org>
 + *                    All Rights Reserved.
@@ -509,7 +508,7 @@ Index: kernel-raspberry/drivers/md/dm-verity-chromeos.c
 +	bio->bi_iter.bi_idx = 0;
 +	bio->bi_iter.bi_size = block_size;
 +	bio->bi_iter.bi_bvec_done = 0;
-+	bio_set_op_attrs(bio, op, op_flags);
++	bio->bi_opf =  op | op_flags;
 +	bio->bi_io_vec[0].bv_page = page;
 +	bio->bi_io_vec[0].bv_len = block_size;
 +	bio->bi_io_vec[0].bv_offset = 0;
@@ -533,13 +532,18 @@ Index: kernel-raspberry/drivers/md/dm-verity-chromeos.c
 +
 +static char kern_guid[48];
 +
-+/* get_boot_dev is bassed on dm_get_device_by_uuid in dm_bootcache. */
-+static dev_t get_boot_dev(void)
++/*
++ * get_boot_dev is based on dm_get_device_by_uuid in dm_bootcache.
++ *
++ * This function is marked __ref because it calls the __init marked
++ * early_lookup_bdev when called from the early boot code.
++ */
++static dev_t __ref get_boot_dev(void)
 +{
 +	const char partuuid[] = "PARTUUID=";
 +	char uuid[sizeof(partuuid) + 36];
 +	char *uuid_str;
-+	dev_t devt = 0;
++	dev_t devt;
 +
 +	if (!strlen(kern_guid)) {
 +		DMERR("Couldn't get uuid, try root dev");
@@ -554,14 +558,11 @@ Index: kernel-raspberry/drivers/md/dm-verity-chromeos.c
 +	} else {
 +		uuid_str = kern_guid;
 +	}
-+	devt = name_to_dev_t(uuid_str);
-+	if (!devt)
-+		goto found_nothing;
++        if (early_lookup_bdev(uuid_str, &devt)) {
++                DMDEBUG("No matching partition for GUID: %s", uuid_str);
++                return 0;
++        }
 +	return devt;
-+
-+found_nothing:
-+	DMDEBUG("No matching partition for GUID: %s", uuid_str);
-+	return 0;
 +}
 +
 +/*
@@ -583,7 +584,7 @@ Index: kernel-raspberry/drivers/md/dm-verity-chromeos.c
 +	struct bio *bio;
 +	struct page *page;
 +	dev_t devt;
-+	fmode_t dev_mode;
++	blk_mode_t dev_mode;
 +
 +	devt = get_boot_dev();
 +	if (!devt) {
@@ -593,9 +594,9 @@ Index: kernel-raspberry/drivers/md/dm-verity-chromeos.c
 +	}
 +
 +	/* First we open the device for reading. */
-+	dev_mode = FMODE_READ | FMODE_EXCL;
++	dev_mode = BLK_OPEN_READ | BLK_OPEN_EXCL;
 +	bdev = blkdev_get_by_dev(devt, dev_mode,
-+				 chromeos_invalidate_kernel_bio);
++				 chromeos_invalidate_kernel_bio, NULL);
 +	if (IS_ERR(bdev)) {
 +		DMERR("invalidate_kernel: could not open device for reading");
 +		dev_mode = 0;
@@ -615,14 +616,9 @@ Index: kernel-raspberry/drivers/md/dm-verity-chromeos.c
 +		goto failed_to_alloc_page;
 +	}
 +
-+	/*
-+	 * Request read operation with REQ_PREFLUSH flag to ensure that the
-+	 * cache of non-volatile storage device has been flushed before read is
-+	 * started.
-+	 */
 +	if (chromeos_invalidate_kernel_submit(bio, bdev,
 +					      REQ_OP_READ,
-+					      REQ_SYNC | REQ_PREFLUSH,
++					      REQ_SYNC,
 +					      page)) {
 +		ret = -1;
 +		goto failed_to_submit_read;
@@ -641,10 +637,10 @@ Index: kernel-raspberry/drivers/md/dm-verity-chromeos.c
 +	memcpy(page_address(page), DMVERROR, strlen(DMVERROR));
 +
 +	/* The block dev was being changed on read. Let's reopen here. */
-+	blkdev_put(bdev, dev_mode);
-+	dev_mode = FMODE_WRITE | FMODE_EXCL;
++	blkdev_put(bdev, chromeos_invalidate_kernel_bio);
++	dev_mode = BLK_OPEN_WRITE | BLK_OPEN_EXCL;
 +	bdev = blkdev_get_by_dev(devt, dev_mode,
-+				 chromeos_invalidate_kernel_bio);
++				 chromeos_invalidate_kernel_bio, NULL);
 +	if (IS_ERR(bdev)) {
 +		DMERR("invalidate_kernel: could not open device for writing");
 +		dev_mode = 0;
@@ -682,7 +678,7 @@ Index: kernel-raspberry/drivers/md/dm-verity-chromeos.c
 +	bio_put(bio);
 +failed_bio_alloc:
 +	if (dev_mode)
-+		blkdev_put(bdev, dev_mode);
++		blkdev_put(bdev, chromeos_invalidate_kernel_bio);
 +failed_to_read:
 +	return ret;
 +}
@@ -735,10 +731,10 @@ Index: kernel-raspberry/drivers/md/dm-verity-chromeos.c
 +#undef MODULE_PARAM_PREFIX
 +#define MODULE_PARAM_PREFIX	""
 +module_param_string(kern_guid, kern_guid, sizeof(kern_guid), 0);
-Index: kernel-raspberry/drivers/md/Makefile
+Index: kernel-rpi-6_1/drivers/md/Makefile
 ===================================================================
---- kernel-raspberry.orig/drivers/md/Makefile
-+++ kernel-raspberry/drivers/md/Makefile
+--- kernel-rpi-6_1.orig/drivers/md/Makefile
++++ kernel-rpi-6_1/drivers/md/Makefile
 @@ -84,6 +84,7 @@ obj-$(CONFIG_DM_INTEGRITY)	+= dm-integri
  obj-$(CONFIG_DM_ZONED)		+= dm-zoned.o
  obj-$(CONFIG_DM_WRITECACHE)	+= dm-writecache.o
@@ -747,11 +743,11 @@ Index: kernel-raspberry/drivers/md/Makefile
  
  ifeq ($(CONFIG_DM_INIT),y)
  dm-mod-objs			+= dm-init.o
-Index: kernel-raspberry/drivers/md/Kconfig
+Index: kernel-rpi-6_1/drivers/md/Kconfig
 ===================================================================
---- kernel-raspberry.orig/drivers/md/Kconfig
-+++ kernel-raspberry/drivers/md/Kconfig
-@@ -294,6 +294,16 @@ config DM_CRYPT
+--- kernel-rpi-6_1.orig/drivers/md/Kconfig
++++ kernel-rpi-6_1/drivers/md/Kconfig
+@@ -304,6 +304,16 @@ config DM_CRYPT
  
  	  If unsure, say N.
  
@@ -768,3 +764,36 @@ Index: kernel-raspberry/drivers/md/Kconfig
  config DM_SNAPSHOT
         tristate "Snapshot target"
         depends on BLK_DEV_DM
+Index: kernel-rpi-6_1/drivers/base/dd.c
+===================================================================
+--- kernel-rpi-6_1.orig/drivers/base/dd.c
++++ kernel-rpi-6_1/drivers/base/dd.c
+@@ -753,13 +753,14 @@ static int really_probe_debug(struct dev
+  *
+  * Should somehow figure out how to use a semaphore, not an atomic variable...
+  */
+-bool __init driver_probe_done(void)
++bool driver_probe_done(void)
+ {
+ 	int local_probe_count = atomic_read(&probe_count);
+ 
+ 	pr_debug("%s: probe_count = %d\n", __func__, local_probe_count);
+ 	return !local_probe_count;
+ }
++EXPORT_SYMBOL(driver_probe_done);
+ 
+ /**
+  * wait_for_device_probe
+Index: kernel-rpi-6_1/include/linux/device/driver.h
+===================================================================
+--- kernel-rpi-6_1.orig/include/linux/device/driver.h
++++ kernel-rpi-6_1/include/linux/device/driver.h
+@@ -126,7 +126,7 @@ int __must_check driver_register(struct
+ void driver_unregister(struct device_driver *drv);
+ 
+ struct device_driver *driver_find(const char *name, const struct bus_type *bus);
+-bool __init driver_probe_done(void);
++bool driver_probe_done(void);
+ void wait_for_device_probe(void);
+ void __init wait_for_init_devices_probe(void);
+ 

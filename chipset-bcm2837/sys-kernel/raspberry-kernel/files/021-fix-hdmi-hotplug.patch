@@ -1,33 +1,30 @@
-Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_hdmi.h
+Index: kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_hdmi.h
 ===================================================================
---- kernel-raspberry.orig/drivers/gpu/drm/vc4/vc4_hdmi.h
-+++ kernel-raspberry/drivers/gpu/drm/vc4/vc4_hdmi.h
-@@ -5,6 +5,8 @@
- #include <media/cec.h>
+--- kernel-rpi-6_1.orig/drivers/gpu/drm/vc4/vc4_hdmi.h
++++ kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_hdmi.h
+@@ -7,6 +7,8 @@
  #include <sound/dmaengine_pcm.h>
+ #include <sound/hdmi-codec.h>
  #include <sound/soc.h>
 +#include <sound/hdmi-codec.h>
 +#include <sound/jack.h>
  
  #include "vc4_drv.h"
  
-@@ -236,6 +238,11 @@ struct vc4_hdmi {
- 	 * for use outside of KMS hooks. Protected by @mutex.
+@@ -266,6 +268,8 @@ struct vc4_hdmi {
+ 	 * ALSA jack detection.
  	 */
- 	int broadcast_rgb;
-+  struct snd_soc_jack hdmi_jack;
+ 	struct snd_soc_jack hdmi_jack;
 +  struct snd_soc_jack_pin hdmi_jack_pin;
-+  hdmi_codec_plugged_cb plugged_cb;
-+  struct device *codec_dev;
 +  enum drm_connector_status last_connector_result;
  };
  
- static inline struct vc4_hdmi *
-Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_hdmi.c
+ #define connector_to_vc4_hdmi(_connector)				\
+Index: kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_hdmi.c
 ===================================================================
---- kernel-raspberry.orig/drivers/gpu/drm/vc4/vc4_hdmi.c
-+++ kernel-raspberry/drivers/gpu/drm/vc4/vc4_hdmi.c
-@@ -130,6 +130,12 @@ static const char * const output_format_
+--- kernel-rpi-6_1.orig/drivers/gpu/drm/vc4/vc4_hdmi.c
++++ kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_hdmi.c
+@@ -123,6 +123,12 @@ static const char * const output_format_
  	[VC4_HDMI_OUTPUT_YUV444]	= "YUV 4:4:4",
  };
  
@@ -40,8 +37,8 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_hdmi.c
  static const char *vc4_hdmi_output_fmt_str(enum vc4_hdmi_output_format fmt)
  {
  	if (fmt >= ARRAY_SIZE(output_format_str))
-@@ -454,6 +460,11 @@ static void vc4_hdmi_handle_hotplug(stru
- 	edid = drm_get_edid(connector, vc4_hdmi->ddc);
+@@ -461,6 +467,11 @@ static void vc4_hdmi_handle_hotplug(stru
+ 
  	if (!edid)
  		return;
 +  if (status != vc4_hdmi->last_connector_result) {
@@ -52,35 +49,31 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_hdmi.c
  
  	cec_s_phys_addr_from_edid(vc4_hdmi->cec_adap, edid);
  	kfree(edid);
-@@ -2715,11 +2726,26 @@ static int vc4_hdmi_audio_get_eld(struct
- 	return 0;
- }
+@@ -1926,7 +1937,7 @@ static void vc4_hdmi_encoder_post_crtc_e
+ 	spin_lock_irqsave(&vc4_hdmi->hw_lock, flags);
  
-+static int vc4_hdmi_audio_hook_plugged_cb(struct device *dev, void *data,
-+			       hdmi_codec_plugged_cb fn,
-+			       struct device *codec_dev) {
-+  struct vc4_hdmi *vc4_hdmi = dev_get_drvdata(dev);
+ 	HDMI_WRITE(HDMI_VID_CTL,
+-	   (HDMI_READ(HDMI_VID_CTL) &~ 
++	   (HDMI_READ(HDMI_VID_CTL) &~
+ 	   (VC4_HD_VID_CTL_VSYNC_LOW | VC4_HD_VID_CTL_HSYNC_LOW)) |
+ 	   VC4_HD_VID_CTL_ENABLE |
+ 	   VC4_HD_VID_CTL_CLRRGB |
+@@ -2780,10 +2791,12 @@ static int vc4_hdmi_audio_hook_plugged_c
+ 					   struct device *codec_dev)
+ {
+ 	struct vc4_hdmi *vc4_hdmi = dev_get_drvdata(dev);
+-
 +  bool plugged;
-+  mutex_lock(&vc4_hdmi->mutex);
-+  vc4_hdmi->plugged_cb = fn;
-+  vc4_hdmi->codec_dev = codec_dev;
+ 	mutex_lock(&vc4_hdmi->update_plugged_status_lock);
+ 	vc4_hdmi->plugged_cb = fn;
+ 	vc4_hdmi->codec_dev = codec_dev;
 +  plugged = vc4_hdmi->last_connector_result == connector_status_connected;
 +  handle_plugged_change(vc4_hdmi, plugged);
-+  mutex_unlock(&vc4_hdmi->mutex);
-+  return 0;
-+}
-+
- static const struct hdmi_codec_ops vc4_hdmi_codec_ops = {
- 	.get_eld = vc4_hdmi_audio_get_eld,
- 	.prepare = vc4_hdmi_audio_prepare,
- 	.audio_shutdown = vc4_hdmi_audio_shutdown,
- 	.audio_startup = vc4_hdmi_audio_startup,
-+  .hook_plugged_cb = vc4_hdmi_audio_hook_plugged_cb,
- };
+ 	mutex_unlock(&vc4_hdmi->update_plugged_status_lock);
  
- static struct hdmi_codec_pdata vc4_hdmi_codec_pdata = {
-@@ -2736,6 +2762,28 @@ static void vc4_hdmi_audio_codec_release
- 	vc4_hdmi->audio.codec_pdev = NULL;
+ 	return 0;
+@@ -2827,6 +2840,28 @@ static int vc4_hdmi_codec_init(struct sn
+ 	return snd_soc_component_set_jack(component, &vc4_hdmi->hdmi_jack, NULL);
  }
  
 +static const struct snd_soc_dapm_widget vc4_hdmi_widgets[] = {
@@ -108,7 +101,7 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_hdmi.c
  static int vc4_hdmi_audio_init(struct vc4_hdmi *vc4_hdmi)
  {
  	const struct vc4_hdmi_register *mai_data =
-@@ -2846,6 +2894,7 @@ static int vc4_hdmi_audio_init(struct vc
+@@ -2940,6 +2975,7 @@ static int vc4_hdmi_audio_init(struct vc
  	dai_link->cpus		= &vc4_hdmi->audio.cpu;
  	dai_link->codecs	= &vc4_hdmi->audio.codec;
  	dai_link->platforms	= &vc4_hdmi->audio.platform;
@@ -116,7 +109,7 @@ Index: kernel-raspberry/drivers/gpu/drm/vc4/vc4_hdmi.c
  
  	dai_link->num_cpus	= 1;
  	dai_link->num_codecs	= 1;
-@@ -2864,6 +2913,8 @@ static int vc4_hdmi_audio_init(struct vc
+@@ -2960,6 +2996,8 @@ static int vc4_hdmi_audio_init(struct vc
  	card->driver_name = "vc4-hdmi";
  	card->dev = dev;
  	card->owner = THIS_MODULE;
