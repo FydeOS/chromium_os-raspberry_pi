@@ -18,7 +18,7 @@ HOMEPAGE="http://mesa3d.org/"
 # GLES[2]/gl[2]{,ext,platform}.h are SGI-B-2.0
 LICENSE="MIT SGI-B-2.0"
 
-IUSE="debug vulkan libglvnd zstd egl gles2"
+IUSE="debug vulkan libglvnd zstd egl gles2 perfetto"
 
 COMMON_DEPEND="
 	dev-libs/expat:=
@@ -29,6 +29,14 @@ RDEPEND="${COMMON_DEPEND}
 	libglvnd? ( media-libs/libglvnd )
 	!libglvnd? ( !media-libs/libglvnd )
 	zstd? ( app-arch/zstd )
+	dev-libs/libxml2
+  app-arch/libarchive:=
+  dev-libs/libconfig:=
+  sys-libs/ncurses:=
+  >=sys-libs/zlib-1.2.13
+  virtual/libudev:=
+  dev-util/spirv-tools
+  media-libs/minigbm
 "
 
 DEPEND="${COMMON_DEPEND}
@@ -42,8 +50,9 @@ BDEPEND="
 "
 
 src_configure() {
+	cros_optimize_package_for_speed
 	emesonargs+=(
-		-Dexecmem=disabled
+		-Dexecmem=false
 		-Dglvnd=$(usex libglvnd true false)
 		-Dllvm=disabled
 		-Dshader-cache=disabled
@@ -56,12 +65,13 @@ src_configure() {
 		-Dgallium-drivers=v3d
 		-Dgallium-vdpau=disabled
 		-Dgallium-xa=disabled
-		-Dperfetto=disabled
+		-Dperfetto=$(usex perfetto true false)
 		$(meson_feature zstd)
 		-Dplatforms=
 		-Dtools=
 		--buildtype $(usex debug debug release)
 		-Dvulkan-drivers=$(usex vulkan broadcom '')
+		-Dvulkan-beta=true
 	)
 
 	meson_src_configure

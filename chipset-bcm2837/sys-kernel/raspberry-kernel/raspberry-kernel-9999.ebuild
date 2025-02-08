@@ -8,7 +8,7 @@ EAPI=7
 
 CROS_WORKON_PROJECT="chromiumos/third_party/kernel"
 CROS_WORKON_LOCALNAME="kernel/v6.1-rpi"
-CROS_WORKON_EGIT_BRANCH="rpi-6.1.y"
+CROS_WORKON_EGIT_BRANCH="rpi-6.6.y"
 CROS_WORKON_OUTOFTREE_BUILD=1
 
 # This must be inherited *after* EGIT/CROS_WORKON variables defined

@@ -1,0 +1,52 @@
+Index: mesa/src/gallium/targets/dril/meson.build
+===================================================================
+--- mesa.orig/src/gallium/targets/dril/meson.build
++++ mesa/src/gallium/targets/dril/meson.build
+@@ -29,6 +29,7 @@ dril_link_depends = []
+ dril_drivers = []
+ 
+ dri_sym = configure_file(input : 'dri.sym.in', output : 'dri.sym', configuration : sym_config)
++gbm_dep = dependency('gbm', version : '>= 18.0.0' ,required: with_gallium_v3d)
+ 
+ if with_ld_version_script
+   dril_ld_args += ['-Wl,--version-script', join_paths(meson.current_build_dir(), 'dri.sym')]
+@@ -51,10 +52,10 @@ dril_dri = shared_library(
+   link_depends : dril_link_depends,
+   link_with : [
+     libgallium,
+-    libgbm,
+   ],
+   dependencies : [
+     idep_mesautil,
++    gbm_dep,
+   ],
+   # Will be deleted during installation, see install_megadrivers.py
+   install : true,
+Index: mesa/src/meson.build
+===================================================================
+--- mesa.orig/src/meson.build
++++ mesa/src/meson.build
+@@ -138,6 +138,10 @@ if with_gallium and with_gbm
+   endif
+ endif
+ 
++if with_gallium_v3d
++  subdir('gallium/targets/dril')
++endif
++
+ # This must be after at least mesa, glx, and gallium, since libgl will be
+ # defined in one of those subdirs depending on the glx provider.
+ if with_glx != 'disabled' and not with_glvnd
+Index: mesa/src/gallium/targets/dril/dril_target.c
+===================================================================
+--- mesa.orig/src/gallium/targets/dril/dril_target.c
++++ mesa/src/gallium/targets/dril/dril_target.c
+@@ -25,7 +25,7 @@
+ #include <dlfcn.h>
+ #include <EGL/egl.h>
+ #include <EGL/eglext.h>
+-#include "gbm/main/gbm.h"
++#include <gbm.h>
+ #include "drm-uapi/drm_fourcc.h"
+ 
+ #define EGL_PLATFORM_GBM_MESA             0x31D7

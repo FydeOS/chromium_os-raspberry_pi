@@ -1,0 +1,49 @@
+Index: mesa/src/broadcom/common/v3d_limits.h
+===================================================================
+--- mesa.orig/src/broadcom/common/v3d_limits.h
++++ mesa/src/broadcom/common/v3d_limits.h
+@@ -57,7 +57,7 @@
+ /* Minimum alignment for texel buffers */
+ #define V3D_TMU_TEXEL_ALIGN 64
+ 
+-#define V3D_MAX_IMAGE_DIMENSION 4096
++#define V3D_MAX_IMAGE_DIMENSION 8192
+ 
+ /* The HW can do 16384 (15), but we run into hangs when we expose that. Also,
+  * since we are only exposing images up to 4096 pixels per dimension 13 is
+Index: mesa/src/broadcom/vulkan/v3dv_device.c
+===================================================================
+--- mesa.orig/src/broadcom/vulkan/v3dv_device.c
++++ mesa/src/broadcom/vulkan/v3dv_device.c
+@@ -837,7 +837,7 @@ get_device_properties(const struct v3dv_
+    const uint32_t page_size = 4096;
+    const uint64_t mem_size = compute_heap_size();
+ 
+-   const uint32_t max_varying_components = 16 * 4;
++   const uint32_t max_varying_components = 16 * 4 + 4;
+ 
+    const uint32_t max_per_stage_resources = 128;
+ 
+@@ -1383,6 +1383,7 @@ create_physical_device(struct v3dv_insta
+    mem->memoryTypes[0].propertyFlags =
+       VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT |
+       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
++      VK_MEMORY_PROPERTY_HOST_CACHED_BIT |
+       VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    mem->memoryTypes[0].heapIndex = 0;
+ 
+Index: mesa/src/broadcom/vulkan/v3dv_formats.c
+===================================================================
+--- mesa.orig/src/broadcom/vulkan/v3dv_formats.c
++++ mesa/src/broadcom/vulkan/v3dv_formats.c
+@@ -193,6 +193,10 @@ image_format_plane_features(struct v3dv_
+       flags |= VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT |
+                VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT;
+    }
++   /* Support chromium */
++   if (v3dv_format->tex_type != TEXTURE_DATA_FORMAT_NO &&
++      tiling == VK_IMAGE_TILING_LINEAR )
++     flags |= VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT;
+ 
+    return flags;
+ }

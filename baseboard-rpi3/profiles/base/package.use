@@ -1,4 +1,4 @@
-media-libs/mesa egl -gbm gles2 shared-glapi
+media-libs/mesa egl -gbm gles2 shared-glapi -perfetto
 media-libs/mesa-img egl -gbm gles2 shared-glapi
 media-libs/piglit waffle
 media-libs/waffle gbm
