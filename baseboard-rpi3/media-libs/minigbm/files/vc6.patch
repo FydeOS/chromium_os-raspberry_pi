@@ -356,7 +356,7 @@ Index: minigbm/v3d.c
 ===================================================================
 --- /dev/null
 +++ minigbm/v3d.c
-@@ -0,0 +1,211 @@
+@@ -0,0 +1,210 @@
 +/*
 + * Copyright 2019 The FydeOS Authors. All rights reserved.
 + * Use of this source code is governed by a BSD-style license that can be
@@ -364,7 +364,6 @@ Index: minigbm/v3d.c
 + * Author: Yang Tsao <yang@fydeos.io>
 + */
 +#ifdef DRV_V3D
-+#define DEBUG
 +#include <errno.h>
 +#include <stdio.h>
 +#include <string.h>
@@ -420,6 +419,7 @@ Index: minigbm/v3d.c
 +  drv_add_combinations(drv, texture_target_formats, ARRAY_SIZE(texture_target_formats),
 +           &metadata, BO_USE_TEXTURE_MASK );
 +  drv_add_combination(drv, DRM_FORMAT_ARGB2101010, &metadata, BO_USE_TEXTURE | BO_USE_SCANOUT | BO_USE_LINEAR);
++
 +  drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata, BO_USE_SCANOUT | BO_USE_LINEAR | BO_USE_HW_VIDEO_DECODER |
 +        BO_USE_SW_MASK | BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_ENCODER | BO_USE_SENSOR_DIRECT_DATA);
 +
@@ -475,8 +475,8 @@ Index: minigbm/v3d.c
 +
 +  bo->handle.u32 = bo_create.handle;
 +#ifdef DEBUG
-+ drv_logi("create v3d bo handler:0x%x, size:%zu, format:%s, width:%u, height:%u, use_flags:0x%llx\n",
-+   bo_create.handle, bo->meta.total_size, (char *)&format, width, height, use_flags & (BO_USE_SW_MASK | BO_USE_SCANOUT));
++ drv_logi("create v3d bo handler:0x%x, size:%zu, format:%4s, width:%u, height:%u, use_flags:0x%llx\n",
++   bo->handle.u32, bo->meta.total_size, (char *)&format, width, height, use_flags & (BO_USE_SW_MASK | BO_USE_SCANOUT));
 +#endif
 +  return 0;
 +}
@@ -497,7 +497,7 @@ Index: minigbm/v3d.c
 +  addr=mmap(0, bo->meta.total_size, drv_get_prot(map_flags), MAP_SHARED, bo->drv->fd,
 +        bo_map.offset);
 +  if (addr == MAP_FAILED) {
-+    drv_loge("mmap failed. w:%d, h:%d, size:%zu, format:%s, error:%s, offset:%llu", bo->meta.width, bo->meta.height, bo->meta.total_size, (char *)&bo->meta.format,
++    drv_loge("mmap failed. w:%d, h:%d, size:%zu, format:%4s, error:%s, offset:%llu", bo->meta.width, bo->meta.height, bo->meta.total_size, (char *)&bo->meta.format,
 +      strerror(errno), bo_map.offset);
 +    return MAP_FAILED;
 +  }
@@ -516,7 +516,6 @@ Index: minigbm/v3d.c
 +    addr = priv->cached_addr;
 +  }
 +  return addr;
-+
 +out_free_priv:
 +  free(priv);
 +out_unmap_addr:
@@ -747,16 +746,3 @@ Index: minigbm/dumb_driver.c
  INIT_DUMB_DRIVER(vkms)
  
  #ifndef DRV_ROCKCHIP
-Index: minigbm/minigbm_helpers.c
-===================================================================
---- minigbm.orig/minigbm_helpers.c
-+++ minigbm/minigbm_helpers.c
-@@ -195,7 +195,7 @@ static int detect_device_info(unsigned i
- 	} else if (strncmp("pvr", version->name, version->name_len) == 0) {
- 		info->dev_type_flags |= GBM_DEV_TYPE_FLAG_3D | GBM_DEV_TYPE_FLAG_ARMSOC;
- 	} else if (strncmp("v3d", version->name, version->name_len) == 0) {
--		info->dev_type_flags |= GBM_DEV_TYPE_FLAG_3D | GBM_DEV_TYPE_FLAG_ARMSOC;
-+		info->dev_type_flags |= GBM_DEV_TYPE_FLAG_3D | GBM_DEV_TYPE_FLAG_ARMSOC | GBM_DEV_TYPE_FLAG_DISPLAY;
- 	} else if (strncmp("vgem", version->name, version->name_len) == 0) {
- 		info->dev_type_flags |= GBM_DEV_TYPE_FLAG_BLOCKED;
- 	} else if (strncmp("evdi", version->name, version->name_len) == 0) {

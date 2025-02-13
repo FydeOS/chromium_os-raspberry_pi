@@ -1,0 +1,24 @@
+Index: mesa/src/mapi/shared-glapi/meson.build
+===================================================================
+--- mesa.orig/src/mapi/shared-glapi/meson.build
++++ mesa/src/mapi/shared-glapi/meson.build
+@@ -26,7 +26,7 @@ if with_platform_windows
+   _glapi_c_args += ['-D_GLAPI_DLL_EXPORTS']
+ endif
+ 
+-libglapi = static_library(
++libglapi = shared_library(
+   'glapi',
+   [files_shared_glapi, shared_glapi_mapi_tmp_h],
+   c_args : [
+@@ -40,6 +40,9 @@ libglapi = static_library(
+   link_args : [ld_args_gc_sections],
+   include_directories : [inc_src, inc_include, inc_mapi],
+   dependencies : [dep_thread, idep_mesautil],
+-  install : false,
++  soversion : host_machine.system() == 'windows' ? '' : '0',
++  version : '0.0.0',
++  name_prefix : host_machine.system() == 'windows' ? 'lib' : [],  # always use lib, but avoid warnings on !windows
++  install : true,
+ )
+ libglapi_build_dir = meson.current_build_dir()
