@@ -1,7 +1,7 @@
 diff --git a/installer/chromeos-install b/installer/chromeos-install
 index 72839d966..92a8a6f48 100755
---- a/installer/chromeos-install
-+++ b/installer/chromeos-install
+--- a/installer/chromeos-install.sh
++++ b/installer/chromeos-install.sh
 @@ -645,6 +645,8 @@ install_stateful() {
      #
      touch ${TMPMNT}/.developer_mode
