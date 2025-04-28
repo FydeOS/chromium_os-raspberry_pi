@@ -1,7 +1,7 @@
-Index: kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_hvs.c
+Index: v6.6-rpi/drivers/gpu/drm/vc4/vc4_hvs.c
 ===================================================================
---- kernel-rpi-6_1.orig/drivers/gpu/drm/vc4/vc4_hvs.c
-+++ kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_hvs.c
+--- v6.6-rpi.orig/drivers/gpu/drm/vc4/vc4_hvs.c
++++ v6.6-rpi/drivers/gpu/drm/vc4/vc4_hvs.c
 @@ -1453,10 +1453,8 @@ void vc4_hvs_atomic_flush(struct drm_crt
  
  	WARN_ON_ONCE(vc4->gen > VC4_GEN_6);
@@ -40,10 +40,10 @@ Index: kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_hvs.c
  		top = 3840;
  
  		HVS_WRITE(SCALER6(DISP2_COB),
-Index: kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_plane.c
+Index: v6.6-rpi/drivers/gpu/drm/vc4/vc4_plane.c
 ===================================================================
---- kernel-rpi-6_1.orig/drivers/gpu/drm/vc4/vc4_plane.c
-+++ kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_plane.c
+--- v6.6-rpi.orig/drivers/gpu/drm/vc4/vc4_plane.c
++++ v6.6-rpi/drivers/gpu/drm/vc4/vc4_plane.c
 @@ -2278,8 +2278,7 @@ u32 vc4_plane_write_dlist(struct drm_pla
  
  	/* Can't memcpy_toio() because it needs to be 32-bit writes. */
@@ -227,10 +227,10 @@ Index: kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_plane.c
  	return 0;
  }
  
-Index: kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_crtc.c
+Index: v6.6-rpi/drivers/gpu/drm/vc4/vc4_crtc.c
 ===================================================================
---- kernel-rpi-6_1.orig/drivers/gpu/drm/vc4/vc4_crtc.c
-+++ kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_crtc.c
+--- v6.6-rpi.orig/drivers/gpu/drm/vc4/vc4_crtc.c
++++ v6.6-rpi/drivers/gpu/drm/vc4/vc4_crtc.c
 @@ -932,9 +932,7 @@ vc4_async_page_flip_complete(struct vc4_
  {
  	struct drm_crtc *crtc = flip_state->crtc;
@@ -241,10 +241,10 @@ Index: kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_crtc.c
  	if (flip_state->event) {
  		unsigned long flags;
  
-Index: kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_kms.c
+Index: v6.6-rpi/drivers/gpu/drm/vc4/vc4_kms.c
 ===================================================================
---- kernel-rpi-6_1.orig/drivers/gpu/drm/vc4/vc4_kms.c
-+++ kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_kms.c
+--- v6.6-rpi.orig/drivers/gpu/drm/vc4/vc4_kms.c
++++ v6.6-rpi/drivers/gpu/drm/vc4/vc4_kms.c
 @@ -511,8 +511,6 @@ static void vc4_atomic_commit_tail(struc
  
  static int vc4_atomic_commit_setup(struct drm_atomic_state *state)
@@ -263,10 +263,10 @@ Index: kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_kms.c
  	hvs_state = vc4_hvs_get_new_global_state(state);
  	if (WARN_ON(IS_ERR(hvs_state)))
  		return PTR_ERR(hvs_state);
-Index: kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_drv.h
+Index: v6.6-rpi/drivers/gpu/drm/vc4/vc4_drv.h
 ===================================================================
---- kernel-rpi-6_1.orig/drivers/gpu/drm/vc4/vc4_drv.h
-+++ kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_drv.h
+--- v6.6-rpi.orig/drivers/gpu/drm/vc4/vc4_drv.h
++++ v6.6-rpi/drivers/gpu/drm/vc4/vc4_drv.h
 @@ -505,6 +505,7 @@ struct vc4_plane_state {
  	 * bytes/sec.
  	 */

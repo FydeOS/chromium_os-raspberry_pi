@@ -1,0 +1,48 @@
+Index: kernel-rpi-6_6/fs/proc/latsense.c
+===================================================================
+--- kernel-rpi-6_6.orig/fs/proc/latsense.c
++++ kernel-rpi-6_6/fs/proc/latsense.c
+@@ -9,6 +9,7 @@
+ #include <linux/types.h>
+ #include <linux/errno.h>
+ #include <linux/kernel.h>
++#include <linux/ptrace.h>
+ #include <linux/sched/task.h>
+ #include <linux/sched/latsense.h>
+ #include <linux/proc_fs.h>
+@@ -72,10 +73,35 @@ sched_latsense_write(struct file *file,
+ 	return count;
+ }
+ 
++static int sched_latsense_access(struct inode *inode, fmode_t mode)
++{
++	struct task_struct *p;
++	int ret = -EACCES;
++
++	if (!(mode & FMODE_WRITE))
++		return 0;
++
++	p = get_proc_task(inode);
++	if (!p)
++		return -ESRCH;
++
++	if (ptrace_may_access(p, PTRACE_MODE_ATTACH_REALCREDS) ||
++			capable(CAP_SYS_NICE)) {
++		ret = 0;
++	}
++
++	put_task_struct(p);
++	return ret;
++}
++
+ static int sched_latsense_open(struct inode *inode, struct file *filp)
+ {
+ 	int ret;
+ 
++	ret = sched_latsense_access(inode, filp->f_mode);
++	if (ret < 0)
++		return ret;
++
+ 	ret = single_open(filp, sched_latsense_show, NULL);
+ 	if (!ret) {
+ 		struct seq_file *m = filp->private_data;

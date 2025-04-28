@@ -1,7 +1,7 @@
-Index: kernel-rpi-6_1/arch/arm64/Kconfig
+Index: v6.6-rpi/arch/arm64/Kconfig
 ===================================================================
---- kernel-rpi-6_1.orig/arch/arm64/Kconfig
-+++ kernel-rpi-6_1/arch/arm64/Kconfig
+--- v6.6-rpi.orig/arch/arm64/Kconfig
++++ v6.6-rpi/arch/arm64/Kconfig
 @@ -25,6 +25,7 @@ config ARM64
  	select ARCH_HAS_DEBUG_VM_PGTABLE
  	select ARCH_HAS_DMA_PREP_COHERENT
@@ -10,10 +10,10 @@ Index: kernel-rpi-6_1/arch/arm64/Kconfig
  	select ARCH_HAS_FAST_MULTIPLIER
  	select ARCH_HAS_FORTIFY_SOURCE
  	select ARCH_HAS_GCOV_PROFILE_ALL
-Index: kernel-rpi-6_1/arch/arm64/include/asm/thread_info.h
+Index: v6.6-rpi/arch/arm64/include/asm/thread_info.h
 ===================================================================
---- kernel-rpi-6_1.orig/arch/arm64/include/asm/thread_info.h
-+++ kernel-rpi-6_1/arch/arm64/include/asm/thread_info.h
+--- v6.6-rpi.orig/arch/arm64/include/asm/thread_info.h
++++ v6.6-rpi/arch/arm64/include/asm/thread_info.h
 @@ -17,6 +17,7 @@ struct task_struct;
  #include <asm/memory.h>
  #include <asm/stack_pointer.h>
@@ -63,10 +63,10 @@ Index: kernel-rpi-6_1/arch/arm64/include/asm/thread_info.h
  }
  
  #endif /* __ASM_THREAD_INFO_H */
-Index: kernel-rpi-6_1/arch/arm64/include/asm/unistd.h
+Index: v6.6-rpi/arch/arm64/include/asm/unistd.h
 ===================================================================
---- kernel-rpi-6_1.orig/arch/arm64/include/asm/unistd.h
-+++ kernel-rpi-6_1/arch/arm64/include/asm/unistd.h
+--- v6.6-rpi.orig/arch/arm64/include/asm/unistd.h
++++ v6.6-rpi/arch/arm64/include/asm/unistd.h
 @@ -21,13 +21,349 @@
   */
  #define __NR_compat_restart_syscall	0
@@ -417,10 +417,10 @@ Index: kernel-rpi-6_1/arch/arm64/include/asm/unistd.h
  #define __NR_compat_clock_gettime64	403
  #define __NR_compat_clock_getres_time64	406
  
-Index: kernel-rpi-6_1/arch/arm64/kernel/syscall.c
+Index: v6.6-rpi/arch/arm64/kernel/syscall.c
 ===================================================================
---- kernel-rpi-6_1.orig/arch/arm64/kernel/syscall.c
-+++ kernel-rpi-6_1/arch/arm64/kernel/syscall.c
+--- v6.6-rpi.orig/arch/arm64/kernel/syscall.c
++++ v6.6-rpi/arch/arm64/kernel/syscall.c
 @@ -150,13 +150,26 @@ trace_exit:
  
  void do_el0_svc(struct pt_regs *regs)
@@ -450,10 +450,10 @@ Index: kernel-rpi-6_1/arch/arm64/kernel/syscall.c
 +#endif
  }
  #endif
-Index: kernel-rpi-6_1/include/linux/alt-syscall.h
+Index: v6.6-rpi/include/linux/alt-syscall.h
 ===================================================================
 --- /dev/null
-+++ kernel-rpi-6_1/include/linux/alt-syscall.h
++++ v6.6-rpi/include/linux/alt-syscall.h
 @@ -0,0 +1,60 @@
 +#ifndef _ALT_SYSCALL_H
 +#define _ALT_SYSCALL_H
@@ -515,10 +515,10 @@ Index: kernel-rpi-6_1/include/linux/alt-syscall.h
 +#endif
 +
 +#endif /* _ALT_SYSCALL_H */
-Index: kernel-rpi-6_1/include/linux/android_aid.h
+Index: v6.6-rpi/include/linux/android_aid.h
 ===================================================================
 --- /dev/null
-+++ kernel-rpi-6_1/include/linux/android_aid.h
++++ v6.6-rpi/include/linux/android_aid.h
 @@ -0,0 +1,28 @@
 +/* include/linux/android_aid.h
 + *
@@ -548,10 +548,10 @@ Index: kernel-rpi-6_1/include/linux/android_aid.h
 +#define AID_NET_BW_ACCT  (3007)  /* change bandwidth statistics accounting */
 +
 +#endif
-Index: kernel-rpi-6_1/include/net/netns/core.h
+Index: v6.6-rpi/include/net/netns/core.h
 ===================================================================
---- kernel-rpi-6_1.orig/include/net/netns/core.h
-+++ kernel-rpi-6_1/include/net/netns/core.h
+--- v6.6-rpi.orig/include/net/netns/core.h
++++ v6.6-rpi/include/net/netns/core.h
 @@ -13,6 +13,7 @@ struct netns_core {
  	struct ctl_table_header	*sysctl_hdr;
  
@@ -560,10 +560,10 @@ Index: kernel-rpi-6_1/include/net/netns/core.h
  	u8	sysctl_txrehash;
  
  #ifdef CONFIG_PROC_FS
-Index: kernel-rpi-6_1/include/net/sock.h
+Index: v6.6-rpi/include/net/sock.h
 ===================================================================
---- kernel-rpi-6_1.orig/include/net/sock.h
-+++ kernel-rpi-6_1/include/net/sock.h
+--- v6.6-rpi.orig/include/net/sock.h
++++ v6.6-rpi/include/net/sock.h
 @@ -2941,6 +2941,8 @@ bool sk_ns_capable(const struct sock *sk
  		   struct user_namespace *user_ns, int cap);
  bool sk_capable(const struct sock *sk, int cap);
@@ -573,10 +573,10 @@ Index: kernel-rpi-6_1/include/net/sock.h
  
  void sk_get_meminfo(const struct sock *sk, u32 *meminfo);
  
-Index: kernel-rpi-6_1/net/core/sock.c
+Index: v6.6-rpi/net/core/sock.c
 ===================================================================
---- kernel-rpi-6_1.orig/net/core/sock.c
-+++ kernel-rpi-6_1/net/core/sock.c
+--- v6.6-rpi.orig/net/core/sock.c
++++ v6.6-rpi/net/core/sock.c
 @@ -118,6 +118,9 @@
  #include <linux/mroute.h>
  #include <linux/mroute6.h>
@@ -649,10 +649,10 @@ Index: kernel-rpi-6_1/net/core/sock.c
  		sock_valbool_flag(sk, SOCK_RCVMARK, valbool);
  		break;
  
-Index: kernel-rpi-6_1/net/ipv4/af_inet.c
+Index: v6.6-rpi/net/ipv4/af_inet.c
 ===================================================================
---- kernel-rpi-6_1.orig/net/ipv4/af_inet.c
-+++ kernel-rpi-6_1/net/ipv4/af_inet.c
+--- v6.6-rpi.orig/net/ipv4/af_inet.c
++++ v6.6-rpi/net/ipv4/af_inet.c
 @@ -85,6 +85,7 @@
  #include <linux/netfilter_ipv4.h>
  #include <linux/random.h>
@@ -680,10 +680,10 @@ Index: kernel-rpi-6_1/net/ipv4/af_inet.c
  		goto out_rcu_unlock;
  
  	sock->ops = answer->ops;
-Index: kernel-rpi-6_1/net/socket.c
+Index: v6.6-rpi/net/socket.c
 ===================================================================
---- kernel-rpi-6_1.orig/net/socket.c
-+++ kernel-rpi-6_1/net/socket.c
+--- v6.6-rpi.orig/net/socket.c
++++ v6.6-rpi/net/socket.c
 @@ -369,7 +369,7 @@ static const struct dentry_operations so
  
  static int sockfs_xattr_get(const struct xattr_handler *handler,
@@ -693,10 +693,10 @@ Index: kernel-rpi-6_1/net/socket.c
  {
  	if (value) {
  		if (dentry->d_name.len + 1 > size)
-Index: kernel-rpi-6_1/security/Kconfig
+Index: v6.6-rpi/security/Kconfig
 ===================================================================
---- kernel-rpi-6_1.orig/security/Kconfig
-+++ kernel-rpi-6_1/security/Kconfig
+--- v6.6-rpi.orig/security/Kconfig
++++ v6.6-rpi/security/Kconfig
 @@ -226,11 +226,13 @@ source "security/yama/Kconfig"
  source "security/safesetid/Kconfig"
  source "security/lockdown/Kconfig"
@@ -744,10 +744,10 @@ Index: kernel-rpi-6_1/security/Kconfig
 +	  Allow syscall table to be swapped on a running process.
 +
 +endmenu
-Index: kernel-rpi-6_1/fs/ecryptfs/inode.c
+Index: v6.6-rpi/fs/ecryptfs/inode.c
 ===================================================================
---- kernel-rpi-6_1.orig/fs/ecryptfs/inode.c
-+++ kernel-rpi-6_1/fs/ecryptfs/inode.c
+--- v6.6-rpi.orig/fs/ecryptfs/inode.c
++++ v6.6-rpi/fs/ecryptfs/inode.c
 @@ -392,39 +392,54 @@ static struct dentry *ecryptfs_lookup(st
  				      unsigned int flags)
  {
@@ -855,10 +855,10 @@ Index: kernel-rpi-6_1/fs/ecryptfs/inode.c
  {
  	return ecryptfs_getxattr(dentry, inode, name, buffer, size);
  }
-Index: kernel-rpi-6_1/security/Makefile
+Index: v6.6-rpi/security/Makefile
 ===================================================================
---- kernel-rpi-6_1.orig/security/Makefile
-+++ kernel-rpi-6_1/security/Makefile
+--- v6.6-rpi.orig/security/Makefile
++++ v6.6-rpi/security/Makefile
 @@ -12,6 +12,7 @@ obj-$(CONFIG_MMU)			+= min_addr.o
  # Object file lists
  obj-$(CONFIG_SECURITY)			+= security.o
@@ -867,10 +867,10 @@ Index: kernel-rpi-6_1/security/Makefile
  obj-$(CONFIG_SECURITY_SELINUX)		+= selinux/
  obj-$(CONFIG_SECURITY_SMACK)		+= smack/
  obj-$(CONFIG_SECURITY)			+= lsm_audit.o
-Index: kernel-rpi-6_1/fs/ecryptfs/mmap.c
+Index: v6.6-rpi/fs/ecryptfs/mmap.c
 ===================================================================
---- kernel-rpi-6_1.orig/fs/ecryptfs/mmap.c
-+++ kernel-rpi-6_1/fs/ecryptfs/mmap.c
+--- v6.6-rpi.orig/fs/ecryptfs/mmap.c
++++ v6.6-rpi/fs/ecryptfs/mmap.c
 @@ -422,8 +422,9 @@ static int ecryptfs_write_inode_size_to_
  		goto out;
  	}
@@ -883,10 +883,10 @@ Index: kernel-rpi-6_1/fs/ecryptfs/mmap.c
  	if (size < 0)
  		size = 8;
  	put_unaligned_be64(i_size_read(ecryptfs_inode), xattr_virt);
-Index: kernel-rpi-6_1/fs/xattr.c
+Index: v6.6-rpi/fs/xattr.c
 ===================================================================
---- kernel-rpi-6_1.orig/fs/xattr.c
-+++ kernel-rpi-6_1/fs/xattr.c
+--- v6.6-rpi.orig/fs/xattr.c
++++ v6.6-rpi/fs/xattr.c
 @@ -391,7 +391,7 @@ vfs_getxattr_alloc(struct mnt_idmap *idm
  		return PTR_ERR(handler);
  	if (!handler->get)
@@ -996,10 +996,10 @@ Index: kernel-rpi-6_1/fs/xattr.c
  }
  EXPORT_SYMBOL_GPL(vfs_getxattr);
  
-Index: kernel-rpi-6_1/include/uapi/linux/xattr.h
+Index: v6.6-rpi/include/uapi/linux/xattr.h
 ===================================================================
---- kernel-rpi-6_1.orig/include/uapi/linux/xattr.h
-+++ kernel-rpi-6_1/include/uapi/linux/xattr.h
+--- v6.6-rpi.orig/include/uapi/linux/xattr.h
++++ v6.6-rpi/include/uapi/linux/xattr.h
 @@ -20,6 +20,9 @@
  
  #define XATTR_CREATE	0x1	/* set value, fail if attr already exists */
@@ -1010,10 +1010,10 @@ Index: kernel-rpi-6_1/include/uapi/linux/xattr.h
  #endif
  
  /* Namespaces */
-Index: kernel-rpi-6_1/net/ipv6/af_inet6.c
+Index: v6.6-rpi/net/ipv6/af_inet6.c
 ===================================================================
---- kernel-rpi-6_1.orig/net/ipv6/af_inet6.c
-+++ kernel-rpi-6_1/net/ipv6/af_inet6.c
+--- v6.6-rpi.orig/net/ipv6/af_inet6.c
++++ v6.6-rpi/net/ipv6/af_inet6.c
 @@ -39,6 +39,7 @@
  #include <linux/netdevice.h>
  #include <linux/icmpv6.h>
@@ -1040,10 +1040,10 @@ Index: kernel-rpi-6_1/net/ipv6/af_inet6.c
  		goto out_rcu_unlock;
  
  	sock->ops = answer->ops;
-Index: kernel-rpi-6_1/security/commoncap.c
+Index: v6.6-rpi/security/commoncap.c
 ===================================================================
---- kernel-rpi-6_1.orig/security/commoncap.c
-+++ kernel-rpi-6_1/security/commoncap.c
+--- v6.6-rpi.orig/security/commoncap.c
++++ v6.6-rpi/security/commoncap.c
 @@ -84,7 +84,7 @@ int cap_capable(const struct cred *cred,
  		if (ns->level <= cred->user_ns->level)
  			return -EPERM;
@@ -1075,10 +1075,10 @@ Index: kernel-rpi-6_1/security/commoncap.c
  	if (size == -ENODATA || size == -EOPNOTSUPP)
  		/* no data, that's ok */
  		return -ENODATA;
-Index: kernel-rpi-6_1/security/integrity/evm/evm_main.c
+Index: v6.6-rpi/security/integrity/evm/evm_main.c
 ===================================================================
---- kernel-rpi-6_1.orig/security/integrity/evm/evm_main.c
-+++ kernel-rpi-6_1/security/integrity/evm/evm_main.c
+--- v6.6-rpi.orig/security/integrity/evm/evm_main.c
++++ v6.6-rpi/security/integrity/evm/evm_main.c
 @@ -140,7 +140,7 @@ static int evm_find_protected_xattrs(str
  		return -EOPNOTSUPP;
  
@@ -1112,10 +1112,10 @@ Index: kernel-rpi-6_1/security/integrity/evm/evm_main.c
  				if (rc < 0)
  					return rc;
  			}
-Index: kernel-rpi-6_1/security/selinux/Kconfig
+Index: v6.6-rpi/security/selinux/Kconfig
 ===================================================================
---- kernel-rpi-6_1.orig/security/selinux/Kconfig
-+++ kernel-rpi-6_1/security/selinux/Kconfig
+--- v6.6-rpi.orig/security/selinux/Kconfig
++++ v6.6-rpi/security/selinux/Kconfig
 @@ -37,6 +37,16 @@ config SECURITY_SELINUX_DEVELOP
  	  permissive mode (if permitted by the policy) via
  	  /sys/fs/selinux/enforce.
@@ -1133,10 +1133,10 @@ Index: kernel-rpi-6_1/security/selinux/Kconfig
  config SECURITY_SELINUX_AVC_STATS
  	bool "SELinux AVC Statistics"
  	depends on SECURITY_SELINUX
-Index: kernel-rpi-6_1/security/selinux/avc.c
+Index: v6.6-rpi/security/selinux/avc.c
 ===================================================================
---- kernel-rpi-6_1.orig/security/selinux/avc.c
-+++ kernel-rpi-6_1/security/selinux/avc.c
+--- v6.6-rpi.orig/security/selinux/avc.c
++++ v6.6-rpi/security/selinux/avc.c
 @@ -763,6 +763,15 @@ noinline int slow_avc_audit(u32 ssid, u3
  	if (WARN_ON(!tclass || tclass >= ARRAY_SIZE(secclass_map)))
  		return -EINVAL;
@@ -1153,10 +1153,10 @@ Index: kernel-rpi-6_1/security/selinux/avc.c
  	if (!a) {
  		a = &stack_data;
  		a->type = LSM_AUDIT_DATA_NONE;
-Index: kernel-rpi-6_1/security/selinux/hooks.c
+Index: v6.6-rpi/security/selinux/hooks.c
 ===================================================================
---- kernel-rpi-6_1.orig/security/selinux/hooks.c
-+++ kernel-rpi-6_1/security/selinux/hooks.c
+--- v6.6-rpi.orig/security/selinux/hooks.c
++++ v6.6-rpi/security/selinux/hooks.c
 @@ -514,7 +514,7 @@ static int sb_check_xattr_support(struct
  		goto fallback;
  	}
@@ -1192,10 +1192,10 @@ Index: kernel-rpi-6_1/security/selinux/hooks.c
  	}
  	if (rc < 0) {
  		kfree(context);
-Index: kernel-rpi-6_1/security/selinux/include/classmap.h
+Index: v6.6-rpi/security/selinux/include/classmap.h
 ===================================================================
---- kernel-rpi-6_1.orig/security/selinux/include/classmap.h
-+++ kernel-rpi-6_1/security/selinux/include/classmap.h
+--- v6.6-rpi.orig/security/selinux/include/classmap.h
++++ v6.6-rpi/security/selinux/include/classmap.h
 @@ -117,7 +117,8 @@ const struct security_class_mapping secc
  	  { COMMON_IPC_PERMS, NULL } },
  	{ "netlink_route_socket",
@@ -1206,10 +1206,10 @@ Index: kernel-rpi-6_1/security/selinux/include/classmap.h
  	{ "netlink_tcpdiag_socket",
  	  { COMMON_SOCK_PERMS,
  	    "nlmsg_read", "nlmsg_write", NULL } },
-Index: kernel-rpi-6_1/security/selinux/include/security.h
+Index: v6.6-rpi/security/selinux/include/security.h
 ===================================================================
---- kernel-rpi-6_1.orig/security/selinux/include/security.h
-+++ kernel-rpi-6_1/security/selinux/include/security.h
+--- v6.6-rpi.orig/security/selinux/include/security.h
++++ v6.6-rpi/security/selinux/include/security.h
 @@ -95,6 +95,8 @@ struct selinux_state {
  #endif
  	bool initialized;
@@ -1253,10 +1253,10 @@ Index: kernel-rpi-6_1/security/selinux/include/security.h
 +extern void selinux_nlmsg_init(void);
  
  #endif /* _SELINUX_SECURITY_H_ */
-Index: kernel-rpi-6_1/security/selinux/nlmsgtab.c
+Index: v6.6-rpi/security/selinux/nlmsgtab.c
 ===================================================================
---- kernel-rpi-6_1.orig/security/selinux/nlmsgtab.c
-+++ kernel-rpi-6_1/security/selinux/nlmsgtab.c
+--- v6.6-rpi.orig/security/selinux/nlmsgtab.c
++++ v6.6-rpi/security/selinux/nlmsgtab.c
 @@ -25,7 +25,8 @@ struct nlmsg_perm {
  	u32	perm;
  };
@@ -1311,10 +1311,10 @@ Index: kernel-rpi-6_1/security/selinux/nlmsgtab.c
 +					RTM_GETNEIGHTBL);
 +	}
 +}
-Index: kernel-rpi-6_1/security/selinux/ss/policydb.c
+Index: v6.6-rpi/security/selinux/ss/policydb.c
 ===================================================================
---- kernel-rpi-6_1.orig/security/selinux/ss/policydb.c
-+++ kernel-rpi-6_1/security/selinux/ss/policydb.c
+--- v6.6-rpi.orig/security/selinux/ss/policydb.c
++++ v6.6-rpi/security/selinux/ss/policydb.c
 @@ -2009,7 +2009,6 @@ static int filename_trans_read_helper(st
  		if (!datum)
  			goto out;
@@ -1346,10 +1346,10 @@ Index: kernel-rpi-6_1/security/selinux/ss/policydb.c
  	if (p->policyvers >= POLICYDB_VERSION_POLCAP) {
  		rc = ebitmap_read(&p->policycaps, fp);
  		if (rc)
-Index: kernel-rpi-6_1/security/selinux/ss/policydb.h
+Index: v6.6-rpi/security/selinux/ss/policydb.h
 ===================================================================
---- kernel-rpi-6_1.orig/security/selinux/ss/policydb.h
-+++ kernel-rpi-6_1/security/selinux/ss/policydb.h
+--- v6.6-rpi.orig/security/selinux/ss/policydb.h
++++ v6.6-rpi/security/selinux/ss/policydb.h
 @@ -238,6 +238,8 @@ struct genfs {
  /* The policy database */
  struct policydb {
@@ -1368,10 +1368,10 @@ Index: kernel-rpi-6_1/security/selinux/ss/policydb.h
  
  /* the config flags related to unknown classes/perms are bits 2 and 3 */
  #define REJECT_UNKNOWN	0x00000002
-Index: kernel-rpi-6_1/security/selinux/ss/services.c
+Index: v6.6-rpi/security/selinux/ss/services.c
 ===================================================================
---- kernel-rpi-6_1.orig/security/selinux/ss/services.c
-+++ kernel-rpi-6_1/security/selinux/ss/services.c
+--- v6.6-rpi.orig/security/selinux/ss/services.c
++++ v6.6-rpi/security/selinux/ss/services.c
 @@ -956,10 +956,7 @@ void services_compute_xperms_decision(st
  					xpermd->driver))
  			return;
@@ -1415,10 +1415,10 @@ Index: kernel-rpi-6_1/security/selinux/ss/services.c
  {
  	struct selinux_state *state = &selinux_state;
  	struct selinux_policy *policy;
-Index: kernel-rpi-6_1/security/smack/smack_lsm.c
+Index: v6.6-rpi/security/smack/smack_lsm.c
 ===================================================================
---- kernel-rpi-6_1.orig/security/smack/smack_lsm.c
-+++ kernel-rpi-6_1/security/smack/smack_lsm.c
+--- v6.6-rpi.orig/security/smack/smack_lsm.c
++++ v6.6-rpi/security/smack/smack_lsm.c
 @@ -301,7 +301,7 @@ static struct smack_known *smk_fetch(con
  	if (buffer == NULL)
  		return ERR_PTR(-ENOMEM);
@@ -1440,10 +1440,10 @@ Index: kernel-rpi-6_1/security/smack/smack_lsm.c
  			if (rc >= 0 && strncmp(trattr, TRANS_TRUE,
  					       TRANS_TRUE_SIZE) != 0)
  				rc = -EINVAL;
-Index: kernel-rpi-6_1/drivers/net/tun.c
+Index: v6.6-rpi/drivers/net/tun.c
 ===================================================================
---- kernel-rpi-6_1.orig/drivers/net/tun.c
-+++ kernel-rpi-6_1/drivers/net/tun.c
+--- v6.6-rpi.orig/drivers/net/tun.c
++++ v6.6-rpi/drivers/net/tun.c
 @@ -3096,6 +3096,12 @@ static long __tun_chr_ioctl(struct file
  	int ret;
  	bool do_notify = false;
@@ -1466,10 +1466,10 @@ Index: kernel-rpi-6_1/drivers/net/tun.c
  
  	tfile->sk.sk_write_space = tun_sock_write_space;
  	tfile->sk.sk_sndbuf = INT_MAX;
-Index: kernel-rpi-6_1/fs/ext4/xattr_security.c
+Index: v6.6-rpi/fs/ext4/xattr_security.c
 ===================================================================
---- kernel-rpi-6_1.orig/fs/ext4/xattr_security.c
-+++ kernel-rpi-6_1/fs/ext4/xattr_security.c
+--- v6.6-rpi.orig/fs/ext4/xattr_security.c
++++ v6.6-rpi/fs/ext4/xattr_security.c
 @@ -15,7 +15,7 @@
  static int
  ext4_xattr_security_get(const struct xattr_handler *handler,
@@ -1479,10 +1479,10 @@ Index: kernel-rpi-6_1/fs/ext4/xattr_security.c
  {
  	return ext4_xattr_get(inode, EXT4_XATTR_INDEX_SECURITY,
  			      name, buffer, size);
-Index: kernel-rpi-6_1/fs/fuse/xattr.c
+Index: v6.6-rpi/fs/fuse/xattr.c
 ===================================================================
---- kernel-rpi-6_1.orig/fs/fuse/xattr.c
-+++ kernel-rpi-6_1/fs/fuse/xattr.c
+--- v6.6-rpi.orig/fs/fuse/xattr.c
++++ v6.6-rpi/fs/fuse/xattr.c
 @@ -180,7 +180,7 @@ int fuse_removexattr(struct inode *inode
  
  static int fuse_xattr_get(const struct xattr_handler *handler,
@@ -1492,10 +1492,10 @@ Index: kernel-rpi-6_1/fs/fuse/xattr.c
  {
  	if (fuse_is_bad(inode))
  		return -EIO;
-Index: kernel-rpi-6_1/fs/overlayfs/inode.c
+Index: v6.6-rpi/fs/overlayfs/inode.c
 ===================================================================
---- kernel-rpi-6_1.orig/fs/overlayfs/inode.c
-+++ kernel-rpi-6_1/fs/overlayfs/inode.c
+--- v6.6-rpi.orig/fs/overlayfs/inode.c
++++ v6.6-rpi/fs/overlayfs/inode.c
 @@ -402,7 +402,7 @@ out:
  }
  
@@ -1505,10 +1505,10 @@ Index: kernel-rpi-6_1/fs/overlayfs/inode.c
  {
  	ssize_t res;
  	const struct cred *old_cred;
-Index: kernel-rpi-6_1/fs/squashfs/xattr.c
+Index: v6.6-rpi/fs/squashfs/xattr.c
 ===================================================================
---- kernel-rpi-6_1.orig/fs/squashfs/xattr.c
-+++ kernel-rpi-6_1/fs/squashfs/xattr.c
+--- v6.6-rpi.orig/fs/squashfs/xattr.c
++++ v6.6-rpi/fs/squashfs/xattr.c
 @@ -204,7 +204,7 @@ static int squashfs_xattr_handler_get(co
  				      struct dentry *unused,
  				      struct inode *inode,
@@ -1518,10 +1518,10 @@ Index: kernel-rpi-6_1/fs/squashfs/xattr.c
  {
  	return squashfs_xattr_get(inode, handler->flags, name,
  		buffer, size);
-Index: kernel-rpi-6_1/net/ipv4/devinet.c
+Index: v6.6-rpi/net/ipv4/devinet.c
 ===================================================================
---- kernel-rpi-6_1.orig/net/ipv4/devinet.c
-+++ kernel-rpi-6_1/net/ipv4/devinet.c
+--- v6.6-rpi.orig/net/ipv4/devinet.c
++++ v6.6-rpi/net/ipv4/devinet.c
 @@ -61,6 +61,7 @@
  #include <net/rtnetlink.h>
  #include <net/net_namespace.h>
@@ -1548,10 +1548,10 @@ Index: kernel-rpi-6_1/net/ipv4/devinet.c
  			goto out;
  		ret = -EINVAL;
  		if (sin->sin_family != AF_INET)
-Index: kernel-rpi-6_1/security/chromiumos/Kconfig
+Index: v6.6-rpi/security/chromiumos/Kconfig
 ===================================================================
 --- /dev/null
-+++ kernel-rpi-6_1/security/chromiumos/Kconfig
++++ v6.6-rpi/security/chromiumos/Kconfig
 @@ -0,0 +1,45 @@
 +config SECURITY_CHROMIUMOS
 +	bool "Chromium OS Security Module"
@@ -1598,20 +1598,20 @@ Index: kernel-rpi-6_1/security/chromiumos/Kconfig
 +	  When enabled, attempts to open /proc/self/mem for write access
 +	  will always fail.  Write access to this file allows bypassing
 +	  of memory map permissions (such as modifying read-only code).
-Index: kernel-rpi-6_1/security/chromiumos/Makefile
+Index: v6.6-rpi/security/chromiumos/Makefile
 ===================================================================
 --- /dev/null
-+++ kernel-rpi-6_1/security/chromiumos/Makefile
++++ v6.6-rpi/security/chromiumos/Makefile
 @@ -0,0 +1,5 @@
 +obj-$(CONFIG_SECURITY_CHROMIUMOS) := chromiumos_lsm.o
 +
 +chromiumos_lsm-y := inode_mark.o lsm.o securityfs.o utils.o
 +
 +obj-$(CONFIG_ALT_SYSCALL_CHROMIUMOS) += alt-syscall.o
-Index: kernel-rpi-6_1/security/chromiumos/alt-syscall.c
+Index: v6.6-rpi/security/chromiumos/alt-syscall.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi-6_1/security/chromiumos/alt-syscall.c
++++ v6.6-rpi/security/chromiumos/alt-syscall.c
 @@ -0,0 +1,557 @@
 +/*
 + * Chromium OS alt-syscall tables
@@ -2170,10 +2170,10 @@ Index: kernel-rpi-6_1/security/chromiumos/alt-syscall.c
 +	return 0;
 +}
 +module_init(chromiumos_alt_syscall_init);
-Index: kernel-rpi-6_1/security/chromiumos/alt-syscall.h
+Index: v6.6-rpi/security/chromiumos/alt-syscall.h
 ===================================================================
 --- /dev/null
-+++ kernel-rpi-6_1/security/chromiumos/alt-syscall.h
++++ v6.6-rpi/security/chromiumos/alt-syscall.h
 @@ -0,0 +1,379 @@
 +/*
 + * Linux Security Module for Chromium OS
@@ -2554,10 +2554,10 @@ Index: kernel-rpi-6_1/security/chromiumos/alt-syscall.h
 +#endif
 +
 +#endif /* ALT_SYSCALL_H */
-Index: kernel-rpi-6_1/security/chromiumos/android_whitelists.h
+Index: v6.6-rpi/security/chromiumos/android_whitelists.h
 ===================================================================
 --- /dev/null
-+++ kernel-rpi-6_1/security/chromiumos/android_whitelists.h
++++ v6.6-rpi/security/chromiumos/android_whitelists.h
 @@ -0,0 +1,653 @@
 +/*
 + * Linux Security Module for Chromium OS
@@ -3212,10 +3212,10 @@ Index: kernel-rpi-6_1/security/chromiumos/android_whitelists.h
 +#endif /* CONFIG_COMPAT */
 +
 +#endif /* ANDROID_WHITELISTS_H */
-Index: kernel-rpi-6_1/security/chromiumos/complete_whitelists.h
+Index: v6.6-rpi/security/chromiumos/complete_whitelists.h
 ===================================================================
 --- /dev/null
-+++ kernel-rpi-6_1/security/chromiumos/complete_whitelists.h
++++ v6.6-rpi/security/chromiumos/complete_whitelists.h
 @@ -0,0 +1,373 @@
 +/*
 + * Linux Security Module for Chromium OS
@@ -3590,10 +3590,10 @@ Index: kernel-rpi-6_1/security/chromiumos/complete_whitelists.h
 +#endif /* CONFIG_COMPAT */
 +
 +#endif /* COMPLETE_WHITELISTS_H */
-Index: kernel-rpi-6_1/security/chromiumos/inode_mark.c
+Index: v6.6-rpi/security/chromiumos/inode_mark.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi-6_1/security/chromiumos/inode_mark.c
++++ v6.6-rpi/security/chromiumos/inode_mark.c
 @@ -0,0 +1,353 @@
 +/*
 + * Linux Security Module for Chromium OS
@@ -3948,10 +3948,10 @@ Index: kernel-rpi-6_1/security/chromiumos/inode_mark.c
 +
 +	return policy;
 +}
-Index: kernel-rpi-6_1/security/chromiumos/inode_mark.h
+Index: v6.6-rpi/security/chromiumos/inode_mark.h
 ===================================================================
 --- /dev/null
-+++ kernel-rpi-6_1/security/chromiumos/inode_mark.h
++++ v6.6-rpi/security/chromiumos/inode_mark.h
 @@ -0,0 +1,47 @@
 +/*
 + * Linux Security Module for Chromium OS
@@ -4000,10 +4000,10 @@ Index: kernel-rpi-6_1/security/chromiumos/inode_mark.h
 +chromiumos_get_inode_security_policy(
 +	struct dentry *dentry, struct inode *inode,
 +	enum chromiumos_inode_security_policy_type type);
-Index: kernel-rpi-6_1/security/chromiumos/lsm.c
+Index: v6.6-rpi/security/chromiumos/lsm.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi-6_1/security/chromiumos/lsm.c
++++ v6.6-rpi/security/chromiumos/lsm.c
 @@ -0,0 +1,341 @@
 +/*
 + * Linux Security Module for Chromium OS
@@ -4346,10 +4346,10 @@ Index: kernel-rpi-6_1/security/chromiumos/lsm.c
 +	.name = "chromiumos",
 +	.init = chromiumos_security_init
 +};
-Index: kernel-rpi-6_1/security/chromiumos/read_write_test_whitelists.h
+Index: v6.6-rpi/security/chromiumos/read_write_test_whitelists.h
 ===================================================================
 --- /dev/null
-+++ kernel-rpi-6_1/security/chromiumos/read_write_test_whitelists.h
++++ v6.6-rpi/security/chromiumos/read_write_test_whitelists.h
 @@ -0,0 +1,56 @@
 +/*
 + * Linux Security Module for Chromium OS
@@ -4407,10 +4407,10 @@ Index: kernel-rpi-6_1/security/chromiumos/read_write_test_whitelists.h
 +#endif /* CONFIG_COMPAT */
 +
 +#endif /* READ_WRITE_TESTS_WHITELISTS_H */
-Index: kernel-rpi-6_1/security/chromiumos/securityfs.c
+Index: v6.6-rpi/security/chromiumos/securityfs.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi-6_1/security/chromiumos/securityfs.c
++++ v6.6-rpi/security/chromiumos/securityfs.c
 @@ -0,0 +1,241 @@
 +/*
 + * Linux Security Module for Chromium OS
@@ -4653,10 +4653,10 @@ Index: kernel-rpi-6_1/security/chromiumos/securityfs.c
 +	return ret;
 +}
 +fs_initcall(chromiumos_init_securityfs);
-Index: kernel-rpi-6_1/security/chromiumos/third_party_whitelists.h
+Index: v6.6-rpi/security/chromiumos/third_party_whitelists.h
 ===================================================================
 --- /dev/null
-+++ kernel-rpi-6_1/security/chromiumos/third_party_whitelists.h
++++ v6.6-rpi/security/chromiumos/third_party_whitelists.h
 @@ -0,0 +1,252 @@
 +/*
 + * Linux Security Module for Chromium OS
@@ -4910,10 +4910,10 @@ Index: kernel-rpi-6_1/security/chromiumos/third_party_whitelists.h
 +#endif /* CONFIG_COMPAT */
 +
 +#endif /* THIRD_PARTY_WHITELISTS_H */
-Index: kernel-rpi-6_1/security/chromiumos/utils.c
+Index: v6.6-rpi/security/chromiumos/utils.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi-6_1/security/chromiumos/utils.c
++++ v6.6-rpi/security/chromiumos/utils.c
 @@ -0,0 +1,157 @@
 +/*
 + * Utilities for the Linux Security Module for Chromium OS
@@ -5072,10 +5072,10 @@ Index: kernel-rpi-6_1/security/chromiumos/utils.c
 +out:
 +	return buffer;
 +}
-Index: kernel-rpi-6_1/security/chromiumos/utils.h
+Index: v6.6-rpi/security/chromiumos/utils.h
 ===================================================================
 --- /dev/null
-+++ kernel-rpi-6_1/security/chromiumos/utils.h
++++ v6.6-rpi/security/chromiumos/utils.h
 @@ -0,0 +1,30 @@
 +/*
 + * Utilities for the Linux Security Module for Chromium OS
@@ -5107,11 +5107,11 @@ Index: kernel-rpi-6_1/security/chromiumos/utils.h
 +char *printable_cmdline(struct task_struct *task);
 +
 +#endif /* _SECURITY_CHROMIUMOS_UTILS_H */
-Index: kernel-rpi-6_1/net/core/sysctl_net_core.c
+Index: v6.6-rpi/net/core/sysctl_net_core.c
 ===================================================================
---- kernel-rpi-6_1.orig/net/core/sysctl_net_core.c
-+++ kernel-rpi-6_1/net/core/sysctl_net_core.c
-@@ -675,6 +675,15 @@ static struct ctl_table netns_core_table
+--- v6.6-rpi.orig/net/core/sysctl_net_core.c
++++ v6.6-rpi/net/core/sysctl_net_core.c
+@@ -678,6 +678,15 @@ static struct ctl_table netns_core_table
  	},
  #endif
  	{
@@ -5127,7 +5127,7 @@ Index: kernel-rpi-6_1/net/core/sysctl_net_core.c
  		.procname	= "somaxconn",
  		.data		= &init_net.core.sysctl_somaxconn,
  		.maxlen		= sizeof(int),
-@@ -711,6 +720,8 @@ static __net_init int sysctl_core_net_in
+@@ -714,6 +723,8 @@ static __net_init int sysctl_core_net_in
  {
  	struct ctl_table *tbl, *tmp;
  
@@ -5136,10 +5136,10 @@ Index: kernel-rpi-6_1/net/core/sysctl_net_core.c
  	tbl = netns_core_table;
  	if (!net_eq(net, &init_net)) {
  		tbl = kmemdup(tbl, sizeof(netns_core_table), GFP_KERNEL);
-Index: kernel-rpi-6_1/arch/arm64/include/asm/syscall.h
+Index: v6.6-rpi/arch/arm64/include/asm/syscall.h
 ===================================================================
---- kernel-rpi-6_1.orig/arch/arm64/include/asm/syscall.h
-+++ kernel-rpi-6_1/arch/arm64/include/asm/syscall.h
+--- v6.6-rpi.orig/arch/arm64/include/asm/syscall.h
++++ v6.6-rpi/arch/arm64/include/asm/syscall.h
 @@ -17,6 +17,8 @@ extern const syscall_fn_t sys_call_table
  extern const syscall_fn_t compat_sys_call_table[];
  #endif
@@ -5149,10 +5149,10 @@ Index: kernel-rpi-6_1/arch/arm64/include/asm/syscall.h
  static inline int syscall_get_nr(struct task_struct *task,
  				 struct pt_regs *regs)
  {
-Index: kernel-rpi-6_1/arch/arm64/kernel/Makefile
+Index: v6.6-rpi/arch/arm64/kernel/Makefile
 ===================================================================
---- kernel-rpi-6_1.orig/arch/arm64/kernel/Makefile
-+++ kernel-rpi-6_1/arch/arm64/kernel/Makefile
+--- v6.6-rpi.orig/arch/arm64/kernel/Makefile
++++ v6.6-rpi/arch/arm64/kernel/Makefile
 @@ -79,6 +79,8 @@ CFLAGS_patch-scs.o			+= -mbranch-protect
  $(obj)/vdso-wrap.o: $(obj)/vdso/vdso.so
  $(obj)/vdso32-wrap.o: $(obj)/vdso32/vdso.so
@@ -5162,10 +5162,10 @@ Index: kernel-rpi-6_1/arch/arm64/kernel/Makefile
  obj-y					+= probes/
  obj-y					+= head.o
  extra-y					+= vmlinux.lds
-Index: kernel-rpi-6_1/arch/arm64/kernel/alt-syscall.c
+Index: v6.6-rpi/arch/arm64/kernel/alt-syscall.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi-6_1/arch/arm64/kernel/alt-syscall.c
++++ v6.6-rpi/arch/arm64/kernel/alt-syscall.c
 @@ -0,0 +1,78 @@
 +/*
 + * AArch64 alt-syscall implementation
@@ -5245,10 +5245,10 @@ Index: kernel-rpi-6_1/arch/arm64/kernel/alt-syscall.c
 +
 +	return 0;
 +}
-Index: kernel-rpi-6_1/include/linux/syscalls.h
+Index: v6.6-rpi/include/linux/syscalls.h
 ===================================================================
---- kernel-rpi-6_1.orig/include/linux/syscalls.h
-+++ kernel-rpi-6_1/include/linux/syscalls.h
+--- v6.6-rpi.orig/include/linux/syscalls.h
++++ v6.6-rpi/include/linux/syscalls.h
 @@ -1277,4 +1277,24 @@ int __sys_getsockopt(int fd, int level,
  		int __user *optlen);
  int __sys_setsockopt(int fd, int level, int optname, char __user *optval,
@@ -5274,10 +5274,10 @@ Index: kernel-rpi-6_1/include/linux/syscalls.h
 +int ksys_adjtimex_time32(struct old_timex32 __user *utp);
 +
  #endif
-Index: kernel-rpi-6_1/include/uapi/linux/prctl.h
+Index: v6.6-rpi/include/uapi/linux/prctl.h
 ===================================================================
---- kernel-rpi-6_1.orig/include/uapi/linux/prctl.h
-+++ kernel-rpi-6_1/include/uapi/linux/prctl.h
+--- v6.6-rpi.orig/include/uapi/linux/prctl.h
++++ v6.6-rpi/include/uapi/linux/prctl.h
 @@ -155,6 +155,9 @@ struct prctl_mm_map {
  #define PR_SET_PTRACER 0x59616d61
  # define PR_SET_PTRACER_ANY ((unsigned long)-1)
@@ -5288,10 +5288,10 @@ Index: kernel-rpi-6_1/include/uapi/linux/prctl.h
  #define PR_SET_CHILD_SUBREAPER	36
  #define PR_GET_CHILD_SUBREAPER	37
  
-Index: kernel-rpi-6_1/kernel/Makefile
+Index: v6.6-rpi/kernel/Makefile
 ===================================================================
---- kernel-rpi-6_1.orig/kernel/Makefile
-+++ kernel-rpi-6_1/kernel/Makefile
+--- v6.6-rpi.orig/kernel/Makefile
++++ v6.6-rpi/kernel/Makefile
 @@ -52,6 +52,8 @@ obj-y += dma/
  obj-y += entry/
  obj-$(CONFIG_MODULES) += module/
@@ -5301,10 +5301,10 @@ Index: kernel-rpi-6_1/kernel/Makefile
  obj-$(CONFIG_KCMP) += kcmp.o
  obj-$(CONFIG_FREEZER) += freezer.o
  obj-$(CONFIG_PROFILING) += profile.o
-Index: kernel-rpi-6_1/kernel/alt-syscall.c
+Index: v6.6-rpi/kernel/alt-syscall.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi-6_1/kernel/alt-syscall.c
++++ v6.6-rpi/kernel/alt-syscall.c
 @@ -0,0 +1,65 @@
 +/*
 + * Alternate Syscall Table Infrastructure
@@ -5371,10 +5371,10 @@ Index: kernel-rpi-6_1/kernel/alt-syscall.c
 +
 +	return -ENOENT;
 +}
-Index: kernel-rpi-6_1/kernel/sys.c
+Index: v6.6-rpi/kernel/sys.c
 ===================================================================
---- kernel-rpi-6_1.orig/kernel/sys.c
-+++ kernel-rpi-6_1/kernel/sys.c
+--- v6.6-rpi.orig/kernel/sys.c
++++ v6.6-rpi/kernel/sys.c
 @@ -48,6 +48,7 @@
  
  #include <linux/compat.h>
@@ -5582,10 +5582,10 @@ Index: kernel-rpi-6_1/kernel/sys.c
  /**
   * do_sysinfo - fill in sysinfo struct
   * @info: pointer to buffer to fill
-Index: kernel-rpi-6_1/security/security.c
+Index: v6.6-rpi/security/security.c
 ===================================================================
---- kernel-rpi-6_1.orig/security/security.c
-+++ kernel-rpi-6_1/security/security.c
+--- v6.6-rpi.orig/security/security.c
++++ v6.6-rpi/security/security.c
 @@ -1246,6 +1246,7 @@ void security_sb_free(struct super_block
  	kfree(sb->s_security);
  	sb->s_security = NULL;
@@ -5594,10 +5594,10 @@ Index: kernel-rpi-6_1/security/security.c
  
  /**
   * security_free_mnt_opts() - Free memory associated with mount options
-Index: kernel-rpi-6_1/kernel/time/time.c
+Index: v6.6-rpi/kernel/time/time.c
 ===================================================================
---- kernel-rpi-6_1.orig/kernel/time/time.c
-+++ kernel-rpi-6_1/kernel/time/time.c
+--- v6.6-rpi.orig/kernel/time/time.c
++++ v6.6-rpi/kernel/time/time.c
 @@ -266,7 +266,7 @@ COMPAT_SYSCALL_DEFINE2(settimeofday, str
  #endif
  
@@ -5641,10 +5641,10 @@ Index: kernel-rpi-6_1/kernel/time/time.c
  #endif
  
  /**
-Index: kernel-rpi-6_1/kernel/time/posix-timers.c
+Index: v6.6-rpi/kernel/time/posix-timers.c
 ===================================================================
---- kernel-rpi-6_1.orig/kernel/time/posix-timers.c
-+++ kernel-rpi-6_1/kernel/time/posix-timers.c
+--- v6.6-rpi.orig/kernel/time/posix-timers.c
++++ v6.6-rpi/kernel/time/posix-timers.c
 @@ -1159,8 +1159,8 @@ int do_clock_adjtime(const clockid_t whi
  	return kc->clock_adj(which_clock, ktx);
  }
@@ -5692,10 +5692,10 @@ Index: kernel-rpi-6_1/kernel/time/posix-timers.c
  SYSCALL_DEFINE2(clock_getres_time32, clockid_t, which_clock,
  		struct old_timespec32 __user *, tp)
  {
-Index: kernel-rpi-6_1/fs/overlayfs/overlayfs.h
+Index: v6.6-rpi/fs/overlayfs/overlayfs.h
 ===================================================================
---- kernel-rpi-6_1.orig/fs/overlayfs/overlayfs.h
-+++ kernel-rpi-6_1/fs/overlayfs/overlayfs.h
+--- v6.6-rpi.orig/fs/overlayfs/overlayfs.h
++++ v6.6-rpi/fs/overlayfs/overlayfs.h
 @@ -258,12 +258,13 @@ static inline int ovl_do_symlink(struct
  static inline ssize_t ovl_do_getxattr(const struct path *path, const char *name,
  				      void *value, size_t size)
@@ -5721,10 +5721,10 @@ Index: kernel-rpi-6_1/fs/overlayfs/overlayfs.h
  ssize_t ovl_listxattr(struct dentry *dentry, char *list, size_t size);
  
  #ifdef CONFIG_FS_POSIX_ACL
-Index: kernel-rpi-6_1/include/linux/xattr.h
+Index: v6.6-rpi/include/linux/xattr.h
 ===================================================================
---- kernel-rpi-6_1.orig/include/linux/xattr.h
-+++ kernel-rpi-6_1/include/linux/xattr.h
+--- v6.6-rpi.orig/include/linux/xattr.h
++++ v6.6-rpi/include/linux/xattr.h
 @@ -40,7 +40,7 @@ struct xattr_handler {
  	bool (*list)(struct dentry *dentry);
  	int (*get)(const struct xattr_handler *, struct dentry *dentry,
@@ -5744,10 +5744,10 @@ Index: kernel-rpi-6_1/include/linux/xattr.h
  ssize_t vfs_getxattr(struct mnt_idmap *, struct dentry *, const char *,
  		     void *, size_t);
  ssize_t vfs_listxattr(struct dentry *d, char *list, size_t size);
-Index: kernel-rpi-6_1/fs/overlayfs/super.c
+Index: v6.6-rpi/fs/overlayfs/super.c
 ===================================================================
---- kernel-rpi-6_1.orig/fs/overlayfs/super.c
-+++ kernel-rpi-6_1/fs/overlayfs/super.c
+--- v6.6-rpi.orig/fs/overlayfs/super.c
++++ v6.6-rpi/fs/overlayfs/super.c
 @@ -439,7 +439,7 @@ static bool ovl_workdir_ok(struct dentry
  
  static int ovl_own_xattr_get(const struct xattr_handler *handler,
@@ -5769,10 +5769,10 @@ Index: kernel-rpi-6_1/fs/overlayfs/super.c
  }
  
  static int ovl_other_xattr_set(const struct xattr_handler *handler,
-Index: kernel-rpi-6_1/fs/kernfs/inode.c
+Index: v6.6-rpi/fs/kernfs/inode.c
 ===================================================================
---- kernel-rpi-6_1.orig/fs/kernfs/inode.c
-+++ kernel-rpi-6_1/fs/kernfs/inode.c
+--- v6.6-rpi.orig/fs/kernfs/inode.c
++++ v6.6-rpi/fs/kernfs/inode.c
 @@ -320,7 +320,8 @@ int kernfs_xattr_set(struct kernfs_node
  
  static int kernfs_vfs_xattr_get(const struct xattr_handler *handler,
@@ -5783,10 +5783,10 @@ Index: kernel-rpi-6_1/fs/kernfs/inode.c
  {
  	const char *name = xattr_full_name(handler, suffix);
  	struct kernfs_node *kn = inode->i_private;
-Index: kernel-rpi-6_1/fs/ext4/xattr_trusted.c
+Index: v6.6-rpi/fs/ext4/xattr_trusted.c
 ===================================================================
---- kernel-rpi-6_1.orig/fs/ext4/xattr_trusted.c
-+++ kernel-rpi-6_1/fs/ext4/xattr_trusted.c
+--- v6.6-rpi.orig/fs/ext4/xattr_trusted.c
++++ v6.6-rpi/fs/ext4/xattr_trusted.c
 @@ -22,7 +22,7 @@ ext4_xattr_trusted_list(struct dentry *d
  static int
  ext4_xattr_trusted_get(const struct xattr_handler *handler,
@@ -5796,10 +5796,10 @@ Index: kernel-rpi-6_1/fs/ext4/xattr_trusted.c
  {
  	return ext4_xattr_get(inode, EXT4_XATTR_INDEX_TRUSTED,
  			      name, buffer, size);
-Index: kernel-rpi-6_1/fs/ext4/xattr_user.c
+Index: v6.6-rpi/fs/ext4/xattr_user.c
 ===================================================================
---- kernel-rpi-6_1.orig/fs/ext4/xattr_user.c
-+++ kernel-rpi-6_1/fs/ext4/xattr_user.c
+--- v6.6-rpi.orig/fs/ext4/xattr_user.c
++++ v6.6-rpi/fs/ext4/xattr_user.c
 @@ -21,7 +21,7 @@ ext4_xattr_user_list(struct dentry *dent
  static int
  ext4_xattr_user_get(const struct xattr_handler *handler,
@@ -5809,10 +5809,10 @@ Index: kernel-rpi-6_1/fs/ext4/xattr_user.c
  {
  	if (!test_opt(inode->i_sb, XATTR_USER))
  		return -EOPNOTSUPP;
-Index: kernel-rpi-6_1/fs/ecryptfs/ecryptfs_kernel.h
+Index: v6.6-rpi/fs/ecryptfs/ecryptfs_kernel.h
 ===================================================================
---- kernel-rpi-6_1.orig/fs/ecryptfs/ecryptfs_kernel.h
-+++ kernel-rpi-6_1/fs/ecryptfs/ecryptfs_kernel.h
+--- v6.6-rpi.orig/fs/ecryptfs/ecryptfs_kernel.h
++++ v6.6-rpi/fs/ecryptfs/ecryptfs_kernel.h
 @@ -662,6 +662,7 @@ int ecryptfs_read_lower_page_segment(str
  				     pgoff_t page_index,
  				     size_t offset_in_page, size_t size,
@@ -5821,10 +5821,10 @@ Index: kernel-rpi-6_1/fs/ecryptfs/ecryptfs_kernel.h
  struct page *ecryptfs_get_locked_page(struct inode *inode, loff_t index);
  int ecryptfs_parse_packet_length(unsigned char *data, size_t *size,
  				 size_t *length_size);
-Index: kernel-rpi-6_1/fs/ecryptfs/read_write.c
+Index: v6.6-rpi/fs/ecryptfs/read_write.c
 ===================================================================
---- kernel-rpi-6_1.orig/fs/ecryptfs/read_write.c
-+++ kernel-rpi-6_1/fs/ecryptfs/read_write.c
+--- v6.6-rpi.orig/fs/ecryptfs/read_write.c
++++ v6.6-rpi/fs/ecryptfs/read_write.c
 @@ -261,3 +261,25 @@ int ecryptfs_read_lower_page_segment(str
  	flush_dcache_page(page_for_ecryptfs);
  	return rc;
@@ -5851,10 +5851,10 @@ Index: kernel-rpi-6_1/fs/ecryptfs/read_write.c
 +		return 0;
 +	return vfs_fsync(lower_file, datasync);
 +}
-Index: kernel-rpi-6_1/fs/ext4/xattr_hurd.c
+Index: v6.6-rpi/fs/ext4/xattr_hurd.c
 ===================================================================
---- kernel-rpi-6_1.orig/fs/ext4/xattr_hurd.c
-+++ kernel-rpi-6_1/fs/ext4/xattr_hurd.c
+--- v6.6-rpi.orig/fs/ext4/xattr_hurd.c
++++ v6.6-rpi/fs/ext4/xattr_hurd.c
 @@ -21,7 +21,8 @@ ext4_xattr_hurd_list(struct dentry *dent
  static int
  ext4_xattr_hurd_get(const struct xattr_handler *handler,
@@ -5865,11 +5865,11 @@ Index: kernel-rpi-6_1/fs/ext4/xattr_hurd.c
  {
  	if (!test_opt(inode->i_sb, XATTR_USER))
  		return -EOPNOTSUPP;
-Index: kernel-rpi-6_1/mm/shmem.c
+Index: v6.6-rpi/mm/shmem.c
 ===================================================================
---- kernel-rpi-6_1.orig/mm/shmem.c
-+++ kernel-rpi-6_1/mm/shmem.c
-@@ -3664,7 +3664,7 @@ static int shmem_initxattrs(struct inode
+--- v6.6-rpi.orig/mm/shmem.c
++++ v6.6-rpi/mm/shmem.c
+@@ -3663,7 +3663,7 @@ static int shmem_initxattrs(struct inode
  
  static int shmem_xattr_handler_get(const struct xattr_handler *handler,
  				   struct dentry *unused, struct inode *inode,
@@ -5878,11 +5878,11 @@ Index: kernel-rpi-6_1/mm/shmem.c
  {
  	struct shmem_inode_info *info = SHMEM_I(inode);
  
-Index: kernel-rpi-6_1/kernel/events/core.c
+Index: v6.6-rpi/kernel/events/core.c
 ===================================================================
---- kernel-rpi-6_1.orig/kernel/events/core.c
-+++ kernel-rpi-6_1/kernel/events/core.c
-@@ -12451,9 +12451,8 @@ perf_check_permission(struct perf_event_
+--- v6.6-rpi.orig/kernel/events/core.c
++++ v6.6-rpi/kernel/events/core.c
+@@ -12452,9 +12452,8 @@ perf_check_permission(struct perf_event_
   * @group_fd:		group leader event fd
   * @flags:		perf event open flags
   */
@@ -5894,7 +5894,7 @@ Index: kernel-rpi-6_1/kernel/events/core.c
  {
  	struct perf_event *group_leader = NULL, *output_event = NULL;
  	struct perf_event_pmu_context *pmu_ctx;
-@@ -12845,6 +12844,12 @@ err_fd:
+@@ -12846,6 +12845,12 @@ err_fd:
  	return err;
  }
  
@@ -5907,10 +5907,10 @@ Index: kernel-rpi-6_1/kernel/events/core.c
  /**
   * perf_event_create_kernel_counter
   *
-Index: kernel-rpi-6_1/kernel/kcmp.c
+Index: v6.6-rpi/kernel/kcmp.c
 ===================================================================
---- kernel-rpi-6_1.orig/kernel/kcmp.c
-+++ kernel-rpi-6_1/kernel/kcmp.c
+--- v6.6-rpi.orig/kernel/kcmp.c
++++ v6.6-rpi/kernel/kcmp.c
 @@ -132,8 +132,8 @@ static int kcmp_epoll_target(struct task
  }
  #endif
@@ -5935,10 +5935,10 @@ Index: kernel-rpi-6_1/kernel/kcmp.c
  static __init int kcmp_cookies_init(void)
  {
  	int i;
-Index: kernel-rpi-6_1/security/selinux/include/audit.h
+Index: v6.6-rpi/security/selinux/include/audit.h
 ===================================================================
---- kernel-rpi-6_1.orig/security/selinux/include/audit.h
-+++ kernel-rpi-6_1/security/selinux/include/audit.h
+--- v6.6-rpi.orig/security/selinux/include/audit.h
++++ v6.6-rpi/security/selinux/include/audit.h
 @@ -21,14 +21,12 @@
   *	@op: the operator the rule uses
   *	@rulestr: the text "target" of the rule
@@ -5955,10 +5955,10 @@ Index: kernel-rpi-6_1/security/selinux/include/audit.h
  
  /**
   *	selinux_audit_rule_free - free an selinux audit rule structure.
-Index: kernel-rpi-6_1/fs/nfs/nfs4proc.c
+Index: v6.6-rpi/fs/nfs/nfs4proc.c
 ===================================================================
---- kernel-rpi-6_1.orig/fs/nfs/nfs4proc.c
-+++ kernel-rpi-6_1/fs/nfs/nfs4proc.c
+--- v6.6-rpi.orig/fs/nfs/nfs4proc.c
++++ v6.6-rpi/fs/nfs/nfs4proc.c
 @@ -328,7 +328,7 @@ static void nfs4_setup_readdir(u64 cooki
  	memset(&readdir->verifier, 0, sizeof(readdir->verifier));
  	if (cookie == 2)

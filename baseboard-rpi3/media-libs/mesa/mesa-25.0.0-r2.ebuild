@@ -3,7 +3,7 @@
 
 EAPI=7
 
-CROS_WORKON_COMMIT="1d051e5cb1f182c8ff51753a3de6af6956bd0954"
+CROS_WORKON_COMMIT="64552db2f8358f5e7b3f0326d8ac261823dfa5d0"
 CROS_WORKON_TREE="58e3a387b9a0237a9272e0812b071bc7a74109b3"
 CROS_WORKON_PROJECT="chromiumos/third_party/mesa"
 CROS_WORKON_LOCALNAME="mesa"
@@ -54,10 +54,10 @@ BDEPEND="
 src_configure() {
 	cros_optimize_package_for_speed
 	emesonargs+=(
-		-Dexecmem=false
-		-Dglvnd=$(usex libglvnd true false)
+		-Dglvnd=$(usex libglvnd enabled disabled)
 		-Dllvm=disabled
 		-Dshader-cache=enabled
+    -Dshader-cache-default=false
 		-Dglx=disabled
 		-Degl=enabled
 		-Dgbm=disabled

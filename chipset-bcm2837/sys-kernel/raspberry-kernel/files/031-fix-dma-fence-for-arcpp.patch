@@ -1,7 +1,7 @@
-Index: kernel-rpi-6_1/drivers/dma-buf/dma-fence-array.c
+Index: v6.6-rpi/drivers/dma-buf/dma-fence-array.c
 ===================================================================
---- kernel-rpi-6_1.orig/drivers/dma-buf/dma-fence-array.c
-+++ kernel-rpi-6_1/drivers/dma-buf/dma-fence-array.c
+--- v6.6-rpi.orig/drivers/dma-buf/dma-fence-array.c
++++ v6.6-rpi/drivers/dma-buf/dma-fence-array.c
 @@ -103,36 +103,10 @@ static bool dma_fence_array_enable_signa
  static bool dma_fence_array_signaled(struct dma_fence *fence)
  {
@@ -40,10 +40,10 @@ Index: kernel-rpi-6_1/drivers/dma-buf/dma-fence-array.c
  	dma_fence_array_clear_pending_error(array);
  	return true;
  }
-Index: kernel-rpi-6_1/drivers/dma-buf/dma-fence-unwrap.c
+Index: v6.6-rpi/drivers/dma-buf/dma-fence-unwrap.c
 ===================================================================
---- kernel-rpi-6_1.orig/drivers/dma-buf/dma-fence-unwrap.c
-+++ kernel-rpi-6_1/drivers/dma-buf/dma-fence-unwrap.c
+--- v6.6-rpi.orig/drivers/dma-buf/dma-fence-unwrap.c
++++ v6.6-rpi/drivers/dma-buf/dma-fence-unwrap.c
 @@ -12,7 +12,6 @@
  #include <linux/dma-fence-chain.h>
  #include <linux/dma-fence-unwrap.h>
@@ -206,10 +206,10 @@ Index: kernel-rpi-6_1/drivers/dma-buf/dma-fence-unwrap.c
  
  return_tmp:
  	kfree(array);
-Index: kernel-rpi-6_1/drivers/dma-buf/heaps/cma_heap.c
+Index: v6.6-rpi/drivers/dma-buf/heaps/cma_heap.c
 ===================================================================
---- kernel-rpi-6_1.orig/drivers/dma-buf/heaps/cma_heap.c
-+++ kernel-rpi-6_1/drivers/dma-buf/heaps/cma_heap.c
+--- v6.6-rpi.orig/drivers/dma-buf/heaps/cma_heap.c
++++ v6.6-rpi/drivers/dma-buf/heaps/cma_heap.c
 @@ -165,7 +165,7 @@ static vm_fault_t cma_heap_vm_fault(stru
  	struct vm_area_struct *vma = vmf->vma;
  	struct cma_heap_buffer *buffer = vma->vm_private_data;
@@ -219,45 +219,10 @@ Index: kernel-rpi-6_1/drivers/dma-buf/heaps/cma_heap.c
  		return VM_FAULT_SIGBUS;
  
  	vmf->page = buffer->pages[vmf->pgoff];
-Index: kernel-rpi-6_1/drivers/dma-buf/heaps/system_heap.c
+Index: v6.6-rpi/drivers/dma-buf/st-dma-fence-chain.c
 ===================================================================
---- kernel-rpi-6_1.orig/drivers/dma-buf/heaps/system_heap.c
-+++ kernel-rpi-6_1/drivers/dma-buf/heaps/system_heap.c
-@@ -54,11 +54,6 @@ static gfp_t order_flags[] = {HIGH_ORDER
- static const unsigned int orders[] = {8, 4, 0};
- #define NUM_ORDERS ARRAY_SIZE(orders)
- 
--static unsigned int module_max_order = orders[0];
--
--module_param_named(max_order, module_max_order, uint, 0400);
--MODULE_PARM_DESC(max_order, "Maximum allocation order override.");
--
- static struct sg_table *dup_sg_table(struct sg_table *table)
- {
- 	struct sg_table *new_table;
-@@ -344,7 +339,7 @@ static struct dma_buf *system_heap_alloc
- 	struct system_heap_buffer *buffer;
- 	DEFINE_DMA_BUF_EXPORT_INFO(exp_info);
- 	unsigned long size_remaining = len;
--	unsigned int max_order = module_max_order;
-+	unsigned int max_order = orders[0];
- 	struct dma_buf *dmabuf;
- 	struct sg_table *table;
- 	struct scatterlist *sg;
-@@ -438,9 +433,6 @@ static int system_heap_create(void)
- 	if (IS_ERR(sys_heap))
- 		return PTR_ERR(sys_heap);
- 
--	if (module_max_order > orders[0])
--		module_max_order = orders[0];
--
- 	return 0;
- }
- module_init(system_heap_create);
-Index: kernel-rpi-6_1/drivers/dma-buf/st-dma-fence-chain.c
-===================================================================
---- kernel-rpi-6_1.orig/drivers/dma-buf/st-dma-fence-chain.c
-+++ kernel-rpi-6_1/drivers/dma-buf/st-dma-fence-chain.c
+--- v6.6-rpi.orig/drivers/dma-buf/st-dma-fence-chain.c
++++ v6.6-rpi/drivers/dma-buf/st-dma-fence-chain.c
 @@ -476,9 +476,10 @@ static int find_race(void *arg)
  	for (i = 0; i < ncpus; i++) {
  		int ret;
@@ -300,10 +265,10 @@ Index: kernel-rpi-6_1/drivers/dma-buf/st-dma-fence-chain.c
  
  err:
  	fence_chains_fini(&fc);
-Index: kernel-rpi-6_1/drivers/dma-buf/st-dma-fence.c
+Index: v6.6-rpi/drivers/dma-buf/st-dma-fence.c
 ===================================================================
---- kernel-rpi-6_1.orig/drivers/dma-buf/st-dma-fence.c
-+++ kernel-rpi-6_1/drivers/dma-buf/st-dma-fence.c
+--- v6.6-rpi.orig/drivers/dma-buf/st-dma-fence.c
++++ v6.6-rpi/drivers/dma-buf/st-dma-fence.c
 @@ -540,12 +540,6 @@ static int race_signal_callback(void *ar
  			t[i].before = pass;
  			t[i].task = kthread_run(thread_signal_callback, &t[i],
@@ -330,10 +295,10 @@ Index: kernel-rpi-6_1/drivers/dma-buf/st-dma-fence.c
  		}
  	}
  
-Index: kernel-rpi-6_1/drivers/dma-buf/sync_debug.c
+Index: v6.6-rpi/drivers/dma-buf/sync_debug.c
 ===================================================================
---- kernel-rpi-6_1.orig/drivers/dma-buf/sync_debug.c
-+++ kernel-rpi-6_1/drivers/dma-buf/sync_debug.c
+--- v6.6-rpi.orig/drivers/dma-buf/sync_debug.c
++++ v6.6-rpi/drivers/dma-buf/sync_debug.c
 @@ -110,12 +110,12 @@ static void sync_print_obj(struct seq_fi
  
  	seq_printf(s, "%s: %d\n", obj->name, obj->value);
@@ -349,10 +314,10 @@ Index: kernel-rpi-6_1/drivers/dma-buf/sync_debug.c
  }
  
  static void sync_print_sync_file(struct seq_file *s,
-Index: kernel-rpi-6_1/drivers/dma-buf/udmabuf.c
+Index: v6.6-rpi/drivers/dma-buf/udmabuf.c
 ===================================================================
---- kernel-rpi-6_1.orig/drivers/dma-buf/udmabuf.c
-+++ kernel-rpi-6_1/drivers/dma-buf/udmabuf.c
+--- v6.6-rpi.orig/drivers/dma-buf/udmabuf.c
++++ v6.6-rpi/drivers/dma-buf/udmabuf.c
 @@ -35,13 +35,12 @@ static vm_fault_t udmabuf_vm_fault(struc
  	struct vm_area_struct *vma = vmf->vma;
  	struct udmabuf *ubuf = vma->vm_private_data;

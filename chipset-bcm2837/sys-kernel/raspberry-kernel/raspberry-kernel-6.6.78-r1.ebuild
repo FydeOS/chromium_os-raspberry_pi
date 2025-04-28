@@ -6,9 +6,9 @@
 
 EAPI=7
 CROS_WORKON_REPO="https://github.com/raspberrypi"
-CROS_WORKON_COMMIT="dfff38316c1284c30c68d02cc424bad0562cf253"
+CROS_WORKON_COMMIT="bba53a117a4a5c29da892962332ff1605990e17a"
 CROS_WORKON_PROJECT="linux"
-CROS_WORKON_LOCALNAME="kernel/v6.1-rpi"
+CROS_WORKON_LOCALNAME="kernel/v6.6-rpi"
 CROS_WORKON_EGIT_BRANCH="rpi-6.6.y"
 CROS_WORKON_INCREMENTAL_BUILD="1"
 CROS_WORKON_MANUAL_UPREV=1
@@ -19,7 +19,7 @@ EGIT_MASTER="rpi-6.6.y"
 inherit cros-workon cros-kernel2
 
 HOMEPAGE="https://www.chromium.org/chromium-os/chromiumos-design-docs/chromium-os-kernel"
-DESCRIPTION="Chromium OS Linux kernel 6.1"
+DESCRIPTION="Chromium OS Linux kernel 6.6"
 KEYWORDS="*"
 
 # Change the following (commented out) number to the next prime number

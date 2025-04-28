@@ -356,7 +356,7 @@ Index: minigbm/v3d.c
 ===================================================================
 --- /dev/null
 +++ minigbm/v3d.c
-@@ -0,0 +1,210 @@
+@@ -0,0 +1,214 @@
 +/*
 + * Copyright 2019 The FydeOS Authors. All rights reserved.
 + * Use of this source code is governed by a BSD-style license that can be
@@ -405,7 +405,7 @@ Index: minigbm/v3d.c
 +
 +static const uint32_t texture_target_formats[] = {
 + DRM_FORMAT_YVU420, DRM_FORMAT_NV12,DRM_FORMAT_YVU420_ANDROID, DRM_FORMAT_R8,
-+ DRM_FORMAT_GR88, DRM_FORMAT_R16
++ DRM_FORMAT_GR88, DRM_FORMAT_R16, DRM_FORMAT_NV21, DRM_FORMAT_P010
 +      };
 +
 +static int v3d_init(struct driver *drv) {
@@ -428,6 +428,10 @@ Index: minigbm/v3d.c
 +	drv_add_combination(drv, DRM_FORMAT_YUYV, &metadata,
 +		BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT | BO_USE_LINEAR | BO_USE_TEXTURE);
 +	drv_add_combination(drv, DRM_FORMAT_BGR888, &metadata, BO_USE_SW_MASK);
++  drv_modify_combination(drv, DRM_FORMAT_NV21, &metadata, BO_USE_SCANOUT);
++  drv_modify_combination(drv, DRM_FORMAT_P010, &metadata,
++               BO_USE_SCANOUT | BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER |
++               BO_USE_PROTECTED);
 +
 +	drv_modify_combination(drv, DRM_FORMAT_YVU420, &metadata, BO_USE_HW_VIDEO_DECODER);
 +	drv_modify_combination(drv, DRM_FORMAT_YVU420_ANDROID, &metadata, BO_USE_HW_VIDEO_DECODER);
@@ -712,13 +716,11 @@ Index: minigbm/dumb_driver.c
 ===================================================================
 --- minigbm.orig/dumb_driver.c
 +++ minigbm/dumb_driver.c
-@@ -29,8 +29,8 @@ static const uint32_t scanout_render_for
- 						   DRM_FORMAT_ABGR8888, DRM_FORMAT_XBGR8888,
+@@ -30,7 +30,7 @@ static const uint32_t scanout_render_for
  						   DRM_FORMAT_BGR888,	DRM_FORMAT_RGB565 };
  
--static const uint32_t texture_only_formats[] = { DRM_FORMAT_R8, DRM_FORMAT_NV12, DRM_FORMAT_NV21,
+ static const uint32_t texture_only_formats[] = { DRM_FORMAT_R8, DRM_FORMAT_NV12, DRM_FORMAT_NV21,
 -						 DRM_FORMAT_YVU420, DRM_FORMAT_YVU420_ANDROID };
-+static const uint32_t texture_only_formats[] = { DRM_FORMAT_R8, /*DRM_FORMAT_NV12, */ DRM_FORMAT_NV21,
 +						 DRM_FORMAT_YVU420, DRM_FORMAT_YVU420_ANDROID, DRM_FORMAT_GR88 };
  
  static int dumb_driver_init(struct driver *drv)
@@ -727,12 +729,12 @@ Index: minigbm/dumb_driver.c
  			       BO_USE_HW_VIDEO_ENCODER | BO_USE_HW_VIDEO_DECODER |
  				   BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE |
  				   BO_USE_GPU_DATA_BUFFER | BO_USE_SENSOR_DIRECT_DATA);
-+  /*
++
  	drv_modify_combination(drv, DRM_FORMAT_NV12, &LINEAR_METADATA,
 -			       BO_USE_HW_VIDEO_ENCODER | BO_USE_HW_VIDEO_DECODER |
 +			       BO_USE_HW_VIDEO_ENCODER | BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT |
  				   BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE);
-+  */
++
  	drv_modify_combination(drv, DRM_FORMAT_NV21, &LINEAR_METADATA, BO_USE_HW_VIDEO_ENCODER);
  
  	return drv_modify_linear_combinations(drv);

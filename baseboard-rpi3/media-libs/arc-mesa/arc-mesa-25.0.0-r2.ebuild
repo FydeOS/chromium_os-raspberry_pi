@@ -4,7 +4,7 @@
 
 EAPI=7
 
-CROS_WORKON_COMMIT="1d051e5cb1f182c8ff51753a3de6af6956bd0954"
+CROS_WORKON_COMMIT="64552db2f8358f5e7b3f0326d8ac261823dfa5d0"
 CROS_WORKON_TREE="0f544b5d12cafe043027cf950b69b0cab1b9aaf4"
 CROS_WORKON_PROJECT="chromiumos/third_party/mesa"
 CROS_WORKON_LOCALNAME="mesa"
@@ -65,6 +65,7 @@ multilib_src_configure() {
 		-Ddri-drivers-path="/system/vendor/$(get_libdir)/dri"
 		-Dllvm=disabled
 		-Dshader-cache=enabled
+    -Dshared-glapi=enabled
 		-Dglx=disabled
 		-Degl=enabled
 		-Dgbm=disabled

@@ -1,7 +1,7 @@
-Index: kernel-rpi-6_1/drivers/md/dm-verity-target.c
+Index: v6.6-rpi/drivers/md/dm-verity-target.c
 ===================================================================
---- kernel-rpi-6_1.orig/drivers/md/dm-verity-target.c
-+++ kernel-rpi-6_1/drivers/md/dm-verity-target.c
+--- v6.6-rpi.orig/drivers/md/dm-verity-target.c
++++ v6.6-rpi/drivers/md/dm-verity-target.c
 @@ -22,6 +22,8 @@
  #include <linux/scatterlist.h>
  #include <linux/string.h>
@@ -376,10 +376,10 @@ Index: kernel-rpi-6_1/drivers/md/dm-verity-target.c
  	return r;
  }
  
-Index: kernel-rpi-6_1/drivers/md/dm-verity.h
+Index: v6.6-rpi/drivers/md/dm-verity.h
 ===================================================================
---- kernel-rpi-6_1.orig/drivers/md/dm-verity.h
-+++ kernel-rpi-6_1/drivers/md/dm-verity.h
+--- v6.6-rpi.orig/drivers/md/dm-verity.h
++++ v6.6-rpi/drivers/md/dm-verity.h
 @@ -16,6 +16,7 @@
  #include <linux/device-mapper.h>
  #include <linux/interrupt.h>
@@ -437,10 +437,10 @@ Index: kernel-rpi-6_1/drivers/md/dm-verity.h
  static inline struct ahash_request *verity_io_hash_req(struct dm_verity *v,
  						     struct dm_verity_io *io)
  {
-Index: kernel-rpi-6_1/drivers/md/dm-verity-chromeos.c
+Index: v6.6-rpi/drivers/md/dm-verity-chromeos.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi-6_1/drivers/md/dm-verity-chromeos.c
++++ v6.6-rpi/drivers/md/dm-verity-chromeos.c
 @@ -0,0 +1,289 @@
 +/*
 + * Copyright (C) 2010 The Chromium OS Authors <chromium-os-dev@chromium.org>
@@ -731,10 +731,10 @@ Index: kernel-rpi-6_1/drivers/md/dm-verity-chromeos.c
 +#undef MODULE_PARAM_PREFIX
 +#define MODULE_PARAM_PREFIX	""
 +module_param_string(kern_guid, kern_guid, sizeof(kern_guid), 0);
-Index: kernel-rpi-6_1/drivers/md/Makefile
+Index: v6.6-rpi/drivers/md/Makefile
 ===================================================================
---- kernel-rpi-6_1.orig/drivers/md/Makefile
-+++ kernel-rpi-6_1/drivers/md/Makefile
+--- v6.6-rpi.orig/drivers/md/Makefile
++++ v6.6-rpi/drivers/md/Makefile
 @@ -84,6 +84,7 @@ obj-$(CONFIG_DM_INTEGRITY)	+= dm-integri
  obj-$(CONFIG_DM_ZONED)		+= dm-zoned.o
  obj-$(CONFIG_DM_WRITECACHE)	+= dm-writecache.o
@@ -743,10 +743,10 @@ Index: kernel-rpi-6_1/drivers/md/Makefile
  
  ifeq ($(CONFIG_DM_INIT),y)
  dm-mod-objs			+= dm-init.o
-Index: kernel-rpi-6_1/drivers/md/Kconfig
+Index: v6.6-rpi/drivers/md/Kconfig
 ===================================================================
---- kernel-rpi-6_1.orig/drivers/md/Kconfig
-+++ kernel-rpi-6_1/drivers/md/Kconfig
+--- v6.6-rpi.orig/drivers/md/Kconfig
++++ v6.6-rpi/drivers/md/Kconfig
 @@ -304,6 +304,16 @@ config DM_CRYPT
  
  	  If unsure, say N.
@@ -764,10 +764,10 @@ Index: kernel-rpi-6_1/drivers/md/Kconfig
  config DM_SNAPSHOT
         tristate "Snapshot target"
         depends on BLK_DEV_DM
-Index: kernel-rpi-6_1/drivers/base/dd.c
+Index: v6.6-rpi/drivers/base/dd.c
 ===================================================================
---- kernel-rpi-6_1.orig/drivers/base/dd.c
-+++ kernel-rpi-6_1/drivers/base/dd.c
+--- v6.6-rpi.orig/drivers/base/dd.c
++++ v6.6-rpi/drivers/base/dd.c
 @@ -753,13 +753,14 @@ static int really_probe_debug(struct dev
   *
   * Should somehow figure out how to use a semaphore, not an atomic variable...
@@ -784,10 +784,10 @@ Index: kernel-rpi-6_1/drivers/base/dd.c
  
  /**
   * wait_for_device_probe
-Index: kernel-rpi-6_1/include/linux/device/driver.h
+Index: v6.6-rpi/include/linux/device/driver.h
 ===================================================================
---- kernel-rpi-6_1.orig/include/linux/device/driver.h
-+++ kernel-rpi-6_1/include/linux/device/driver.h
+--- v6.6-rpi.orig/include/linux/device/driver.h
++++ v6.6-rpi/include/linux/device/driver.h
 @@ -126,7 +126,7 @@ int __must_check driver_register(struct
  void driver_unregister(struct device_driver *drv);
  
@@ -797,3 +797,16 @@ Index: kernel-rpi-6_1/include/linux/device/driver.h
  void wait_for_device_probe(void);
  void __init wait_for_init_devices_probe(void);
  
+Index: v6.6-rpi/include/linux/blkdev.h
+===================================================================
+--- v6.6-rpi.orig/include/linux/blkdev.h
++++ v6.6-rpi/include/linux/blkdev.h
+@@ -1525,7 +1525,7 @@ int sync_blockdev_nowait(struct block_de
+ void sync_bdevs(bool wait);
+ void bdev_statx_dioalign(struct inode *inode, struct kstat *stat);
+ void printk_all_partitions(void);
+-int __init early_lookup_bdev(const char *pathname, dev_t *dev);
++int early_lookup_bdev(const char *pathname, dev_t *dev);
+ #else
+ static inline void invalidate_bdev(struct block_device *bdev)
+ {

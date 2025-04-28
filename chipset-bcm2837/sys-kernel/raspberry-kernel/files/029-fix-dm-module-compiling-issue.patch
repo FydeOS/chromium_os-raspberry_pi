@@ -47,6 +47,15 @@ Index: kernel-rpi-6_1/block/early-lookup.c
  {
  	dev_t devt = MKDEV(0, 0);
  	struct class_dev_iter iter;
+@@ -150,7 +150,7 @@ static dev_t __init blk_lookup_devt(cons
+ 	return devt;
+ }
+ 
+-static int __init devt_from_devname(const char *name, dev_t *devt)
++static int devt_from_devname(const char *name, dev_t *devt)
+ {
+ 	int part;
+ 	char s[32];
 @@ -194,7 +194,7 @@ static int __init devt_from_devname(cons
  	return -ENODEV;
  }
