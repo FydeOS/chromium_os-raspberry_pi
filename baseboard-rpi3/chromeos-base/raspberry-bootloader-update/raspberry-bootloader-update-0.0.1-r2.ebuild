@@ -15,7 +15,7 @@ RDEPEND=""
 
 DEPEND="${RDEPEND}
   sys-kernel/raspberry-kernel
-  chromeos-base/rpi-boot-bin
+  sys-boot/raspi-firmware
   "
 
 S=${WORKDIR}
@@ -26,5 +26,5 @@ src_install() {
   doins ${ROOT}/usr/src/linux/arch/arm64/boot/dts/broadcom/*.dtb
   insinto /usr/share/raspberry-boot/overlays
   doins ${ROOT}/usr/src/linux/arch/arm64/boot/dts/overlays/*.dtbo
-  
+
 }

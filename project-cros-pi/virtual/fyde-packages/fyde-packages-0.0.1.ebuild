@@ -9,7 +9,7 @@ HOMEPAGE="https://fydeos.io"
 LICENSE="BSD"
 SLOT="0"
 KEYWORDS="*"
-IUSE="kiosk_demo fyde_extension ota_update_boot_firmware"
+IUSE="kiosk_demo fyde_extension"
 
 RDEPEND="
   chromeos-base/auto-expand-partition
@@ -18,7 +18,6 @@ RDEPEND="
   kiosk_demo? ( chromeos-base/fyde-kiosk-demo )
   fyde_extension? ( chromeos-base/fyde-shell-daemon-bin )
   chromeos-base/edit-pi-config
-  ota_update_boot_firmware? ( chromeos-base/raspberry-bootloader-update )
 "
 
 DEPEND="${RDEPEND}"

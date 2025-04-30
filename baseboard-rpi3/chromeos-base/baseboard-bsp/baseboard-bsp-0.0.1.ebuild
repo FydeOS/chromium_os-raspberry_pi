@@ -9,13 +9,14 @@ HOMEPAGE="https://fydeos.io"
 LICENSE="BSD-Fyde"
 SLOT="0"
 KEYWORDS="*"
-IUSE=""
+IUSE="ota_update_boot_firmware"
 
 RDEPEND="
   sys-boot/raspi-firmware
   sys-kernel/raspi-accessory-firmware
   dev-embedded/raspberrypi-utils
   sys-apps/haveged
+  ota_update_boot_firmware? ( chromeos-base/raspberry-bootloader-update )
 "
 
 DEPEND="${RDEPEND}"
