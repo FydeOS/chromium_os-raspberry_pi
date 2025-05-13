@@ -17,11 +17,11 @@ Index: kernel-rpi-6_6/drivers/gpu/drm/v3d/v3d_gem.c
 +    spin_lock_irqsave(&v3d->latest_job_lock, irqflags);
 +    if (v3d->latest_job
 +          && v3d->latest_job->done_fence
-+          && dma_fence_get_rcu(v3d->latest_job->done_fence)) {
++          && (kref_read(&v3d->latest_job->done_fence->refcount) > 0)) {
 +      ret = drm_sched_job_add_dependency(&bin->base.base,
-+        v3d->latest_job->done_fence);
++        dma_fence_get(v3d->latest_job->done_fence));
 +      if (ret)
-+        DRM_ERROR("falied to binding bin job to last render job\n");
++        DRM_ERROR("falied to binding bin job to last render job: %d\n", ret);
 +    }
 +    spin_unlock_irqrestore(&v3d->latest_job_lock, irqflags);
  		bin->base.perfmon = render->base.perfmon;
