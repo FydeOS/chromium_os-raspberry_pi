@@ -1,18 +1,14 @@
-Index: v6.6-rpi/drivers/gpu/drm/v3d/v3d_gem.c
+Index: kernel-rpi-6_6/drivers/gpu/drm/v3d/v3d_gem.c
 ===================================================================
---- v6.6-rpi.orig/drivers/gpu/drm/v3d/v3d_gem.c
-+++ v6.6-rpi/drivers/gpu/drm/v3d/v3d_gem.c
-@@ -684,10 +684,11 @@ v3d_get_extensions(struct drm_file *file
- 		   void *data)
- {
- 	struct drm_v3d_extension __user *user_ext;
--	int ret;
-+	int ret, counter = 0;
+--- kernel-rpi-6_6.orig/drivers/gpu/drm/v3d/v3d_gem.c
++++ kernel-rpi-6_6/drivers/gpu/drm/v3d/v3d_gem.c
+@@ -702,8 +702,7 @@ v3d_get_extensions(struct drm_file *file
+ 				return ret;
+ 			break;
+ 		default:
+-			DRM_DEBUG_DRIVER("Unknown extension id: %d\n", ext.id);
+-			return -EINVAL;
++			DRM_ERROR("Unknown extension id: %d\n", ext.id);
+ 		}
  
- 	user_ext = u64_to_user_ptr(ext_handles);
--	while (user_ext) {
-+	while (user_ext && counter < 2) {
-+    counter++;
- 		struct drm_v3d_extension ext;
- 
- 		if (copy_from_user(&ext, user_ext, sizeof(ext))) {
+ 		user_ext = u64_to_user_ptr(ext.next);

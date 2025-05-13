@@ -10,7 +10,7 @@ LICENSE="BSD-Google"
 SLOT="0"
 KEYWORDS="*"
 IUSE=""
-SRC_URI="https://github.com/raspberrypi/firmware/releases/download/1.20250326/raspi-firmware_1.20250326.orig.tar.xz"
+SRC_URI="https://github.com/raspberrypi/firmware/releases/download/1.20250430/raspi-firmware_1.20250430.orig.tar.xz"
 RESTRICT="mirror"
 
 RDEPEND="!chromeos-base/rpi-boot-bin"
