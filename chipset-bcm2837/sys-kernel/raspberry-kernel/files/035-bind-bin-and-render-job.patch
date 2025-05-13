@@ -121,18 +121,6 @@ Index: kernel-rpi-6_6/drivers/gpu/drm/v3d/v3d_sched.c
  	return NULL;
  }
  
-Index: kernel-rpi-6_6/drivers/gpu/drm/v3d/v3d_drv.c
-===================================================================
---- kernel-rpi-6_6.orig/drivers/gpu/drm/v3d/v3d_drv.c
-+++ kernel-rpi-6_6/drivers/gpu/drm/v3d/v3d_drv.c
-@@ -374,7 +374,6 @@ static int v3d_platform_drm_probe(struct
- 	ret = clk_set_min_rate(v3d->clk, v3d->clk_down_rate);
- 	WARN_ON_ONCE(ret != 0);
- 
--  DRM_INFO("v3d probe version:1.0.3\n");
- 	return 0;
- 
- irq_disable:
 Index: kernel-rpi-6_6/drivers/gpu/drm/v3d/v3d_drv.h
 ===================================================================
 --- kernel-rpi-6_6.orig/drivers/gpu/drm/v3d/v3d_drv.h
