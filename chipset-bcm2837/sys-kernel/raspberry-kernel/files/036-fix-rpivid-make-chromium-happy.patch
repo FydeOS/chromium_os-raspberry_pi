@@ -1,0 +1,89 @@
+Index: kernel-rpi-6_6/drivers/staging/media/rpivid/rpivid_video.c
+===================================================================
+--- kernel-rpi-6_6.orig/drivers/staging/media/rpivid/rpivid_video.c
++++ kernel-rpi-6_6/drivers/staging/media/rpivid/rpivid_video.c
+@@ -315,7 +315,9 @@ static int rpivid_enum_fmt_vid_cap(struc
+ 	if (pf == 0)
+ 		return -EINVAL;
+
+-	f->pixelformat = pf;
++  dev_info(ctx->dev->dev, "enum fmt cap:%s", pf == V4L2_PIX_FMT_NV12_COL128 ? "V4L2_PIX_FMT_NV12_COL128" : "V4L2_PIX_FMT_NV12_10_COL128");
++
++	f->pixelformat = V4L2_PIX_FMT_NV12;
+ 	return 0;
+ }
+
+@@ -373,11 +375,16 @@ static int rpivid_try_fmt_vid_cap(struct
+
+ 	// We don't have any way of finding out colourspace so believe
+ 	// anything we are told - take anything set in src as a default
++#if 0
+ 	if (f->fmt.pix_mp.colorspace == V4L2_COLORSPACE_DEFAULT)
+ 		copy_color(&f->fmt.pix_mp, &ctx->src_fmt);
++#else
++    f->fmt.pix_mp.colorspace = V4L2_COLORSPACE_REC709;
++#endif
+
+ 	f->fmt.pix_mp.pixelformat = pixelformat;
+ 	rpivid_prepare_dst_format(&f->fmt.pix_mp);
++  f->fmt.pix_mp.pixelformat = V4L2_PIX_FMT_NV12;
+ 	return 0;
+ }
+
+@@ -394,18 +401,23 @@ static int rpivid_s_fmt_vid_cap(struct f
+ 	struct rpivid_ctx *ctx = rpivid_file2ctx(file);
+ 	struct vb2_queue *vq;
+ 	int ret;
+-
++  if (f->fmt.pix_mp.pixelformat == V4L2_PIX_FMT_NV12)
++    f->fmt.pix_mp.pixelformat = V4L2_PIX_FMT_NV12_COL128;
+ 	vq = v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type);
++#if 0
+ 	if (vb2_is_busy(vq))
+ 		return -EBUSY;
+-
++#endif
+ 	ret = rpivid_try_fmt_vid_cap(file, priv, f);
+ 	if (ret)
+ 		return ret;
+
++  if (f->fmt.pix_mp.pixelformat == V4L2_PIX_FMT_NV12)
++    f->fmt.pix_mp.pixelformat = V4L2_PIX_FMT_NV12_COL128;
+ 	ctx->dst_fmt = f->fmt.pix_mp;
+ 	ctx->dst_fmt_set = 1;
+-
++// make chromium happy
++  f->fmt.pix_mp.pixelformat = V4L2_PIX_FMT_NV12;
+ 	return 0;
+ }
+
+@@ -417,9 +429,10 @@ static int rpivid_s_fmt_vid_out(struct f
+ 	int ret;
+
+ 	vq = v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type);
++#if 0
+ 	if (vb2_is_busy(vq))
+ 		return -EBUSY;
+-
++#endif
+ 	ret = rpivid_try_fmt_vid_out(file, priv, f);
+ 	if (ret)
+ 		return ret;
+@@ -442,11 +455,17 @@ const struct v4l2_ioctl_ops rpivid_ioctl
+ 	.vidioc_g_fmt_vid_cap_mplane	= rpivid_g_fmt_vid_cap,
+ 	.vidioc_try_fmt_vid_cap_mplane	= rpivid_try_fmt_vid_cap,
+ 	.vidioc_s_fmt_vid_cap_mplane	= rpivid_s_fmt_vid_cap,
++  .vidioc_g_fmt_vid_cap = rpivid_g_fmt_vid_cap,
++  .vidioc_try_fmt_vid_cap = rpivid_try_fmt_vid_cap,
++  .vidioc_s_fmt_vid_cap = rpivid_s_fmt_vid_cap,
+
+ 	.vidioc_enum_fmt_vid_out	= rpivid_enum_fmt_vid_out,
+ 	.vidioc_g_fmt_vid_out_mplane	= rpivid_g_fmt_vid_out,
+ 	.vidioc_try_fmt_vid_out_mplane	= rpivid_try_fmt_vid_out,
+ 	.vidioc_s_fmt_vid_out_mplane	= rpivid_s_fmt_vid_out,
++	.vidioc_g_fmt_vid_out = rpivid_g_fmt_vid_out,
++  .vidioc_try_fmt_vid_out = rpivid_try_fmt_vid_out,
++  .vidioc_s_fmt_vid_out = rpivid_s_fmt_vid_out,
+
+ 	.vidioc_reqbufs			= v4l2_m2m_ioctl_reqbufs,
+ 	.vidioc_querybuf		= v4l2_m2m_ioctl_querybuf,
