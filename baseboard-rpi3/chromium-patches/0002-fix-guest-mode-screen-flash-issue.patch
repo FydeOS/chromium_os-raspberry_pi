@@ -1,8 +1,6 @@
-Index: src/chrome/browser/ash/login/chrome_restart_request.cc
-===================================================================
---- src.orig/chrome/browser/ash/login/chrome_restart_request.cc
-+++ src/chrome/browser/ash/login/chrome_restart_request.cc
-@@ -73,6 +73,11 @@ using ::content::BrowserThread;
+--- a/chrome/browser/ash/login/chrome_restart_request.cc
++++ b/chrome/browser/ash/login/chrome_restart_request.cc
+@@ -73,6 +73,11 @@
  
  // Increase logging level for Guest mode to avoid INFO messages in logs.
  const char kGuestModeLoggingLevel[] = "1";
@@ -14,10 +12,10 @@ Index: src/chrome/browser/ash/login/chrome_restart_request.cc
  
  bool IsRunningTest() {
    const base::CommandLine* current_command_line =
-@@ -158,6 +163,12 @@ void DeriveCommandLine(const GURL& start
-       ::switches::kEnableUnsafeWebGPU,
+@@ -156,6 +161,12 @@
        ::switches::kEnableWebGPUDeveloperFeatures,
        ::switches::kOzonePlatform,
+       ::switches::kRenderNodeOverride,
 +      ::switches::kDisableExplicitDmaFences,
 +      kDisableBufferBwCompression,
 +      kFydeOSAccelConfig,
@@ -25,5 +23,5 @@ Index: src/chrome/browser/ash/login/chrome_restart_request.cc
 +      kFydeOSAccelRevertY,
 +      kFydeOSAccelRevertZ,
        switches::kAshClearFastInkBuffer,
-       switches::kAshEnablePaletteOnAllDisplays,
-       switches::kAshEnableTabletMode,
+       switches::kAshConstrainPointerToRoot,
+       switches::kAshDebugShortcuts,
