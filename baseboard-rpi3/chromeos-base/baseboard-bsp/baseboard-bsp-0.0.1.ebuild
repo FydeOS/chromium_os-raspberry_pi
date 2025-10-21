@@ -24,6 +24,8 @@ DEPEND="${RDEPEND}"
 S=$WORKDIR
 
 src_install() {
+  insinto /etc
+  doins ${FILESDIR}/cpufreq.conf
   insinto /etc/init
   doins ${FILESDIR}/powerd/never-suspend.conf
 }
