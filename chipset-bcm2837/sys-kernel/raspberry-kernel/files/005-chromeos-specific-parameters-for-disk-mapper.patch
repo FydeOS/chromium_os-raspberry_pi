@@ -1,28 +1,27 @@
-Index: v6.6-rpi/drivers/md/dm-verity-target.c
+Index: kernel-rpi/drivers/md/dm-verity-target.c
 ===================================================================
---- v6.6-rpi.orig/drivers/md/dm-verity-target.c
-+++ v6.6-rpi/drivers/md/dm-verity-target.c
-@@ -22,6 +22,8 @@
+--- kernel-rpi.orig/drivers/md/dm-verity-target.c
++++ kernel-rpi/drivers/md/dm-verity-target.c
+@@ -17,8 +17,10 @@
+ #include "dm-verity-fec.h"
+ #include "dm-verity-verify-sig.h"
+ #include "dm-audit.h"
++#include <linux/delay.h>
+ #include <linux/module.h>
+ #include <linux/reboot.h>
++#include <crypto/hash.h>
  #include <linux/scatterlist.h>
  #include <linux/string.h>
  #include <linux/jump_label.h>
-+#include <linux/delay.h>
-+#include <crypto/hash.h>
- 
- #define DM_MSG_PREFIX			"verity"
- 
-@@ -38,8 +40,9 @@
+@@ -41,6 +43,7 @@
  #define DM_VERITY_OPT_IGN_ZEROES	"ignore_zero_blocks"
  #define DM_VERITY_OPT_AT_MOST_ONCE	"check_at_most_once"
  #define DM_VERITY_OPT_TASKLET_VERIFY	"try_verify_in_tasklet"
 +#define DM_VERITY_OPT_ERROR_BEHAVIOR	"error_behavior"
  
--#define DM_VERITY_OPTS_MAX		(4 + DM_VERITY_OPTS_FEC + \
-+#define DM_VERITY_OPTS_MAX		(5 + DM_VERITY_OPTS_FEC + \
+ #define DM_VERITY_OPTS_MAX		(5 + DM_VERITY_OPTS_FEC + \
  					 DM_VERITY_ROOT_HASH_VERIFICATION_OPTS)
- 
- static unsigned int dm_verity_prefetch_cluster = DM_VERITY_DEFAULT_PREFETCH_SIZE;
-@@ -55,6 +58,122 @@ struct dm_verity_prefetch_work {
+@@ -62,6 +65,143 @@ struct dm_verity_prefetch_work {
  	unsigned int n_blocks;
  };
  
@@ -57,6 +56,26 @@ Index: v6.6-rpi/drivers/md/dm-verity-target.c
 +	return blocking_notifier_chain_unregister(&verity_error_notifier, nb);
 +}
 +EXPORT_SYMBOL_GPL(dm_verity_unregister_error_notifier);
++
++/*
++ * Make two different leaf functions to be able to separately query transient
++ * and non-transient verity failures in crash analysis tool.
++ */
++static noinline
++void verity_transient_error_panic(dev_t devt, blk_status_t status,
++				  u64 block, const char *message)
++{
++	panic("dm-verity transient failure: device:%u:%u status:%d block:%llu message:%s",
++	      MAJOR(devt), MINOR(devt), status, (u64)block, message);
++}
++
++static noinline
++void verity_integrity_error_panic(dev_t devt, blk_status_t status,
++				  u64 block, const char *message)
++{
++	panic("dm-verity integrity failure: device:%u:%u status:%d block:%llu message:%s",
++	      MAJOR(devt), MINOR(devt), status, (u64)block, message);
++}
 +
 +/* If the request is not successful, this handler takes action.
 + * TODO make this call a registered handler.
@@ -113,9 +132,10 @@ Index: v6.6-rpi/drivers/md/dm-verity-target.c
 +	return;
 +
 +do_panic:
-+	panic("dm-verity failure: "
-+	      "device:%u:%u status:%d block:%llu message:%s",
-+	      MAJOR(devt), MINOR(devt), status, (u64)block, message);
++	if (transient)
++		verity_transient_error_panic(devt, status, block, message);
++	else
++		verity_integrity_error_panic(devt, status, block, message);
 +}
 +
 +/**
@@ -145,16 +165,7 @@ Index: v6.6-rpi/drivers/md/dm-verity-target.c
  /*
   * Auxiliary structure appended to each dm-bufio buffer. If the value
   * hash_verified is nonzero, hash of the block has been verified.
-@@ -587,7 +706,7 @@ static int verity_verify_io(struct dm_ve
- 		sector_t cur_block = io->block + b;
- 		struct ahash_request *req = verity_io_hash_req(v, io);
- 
--		if (v->validated_blocks && bio->bi_status == BLK_STS_OK &&
-+		if (v->validated_blocks &&
- 		    likely(test_bit(cur_block, v->validated_blocks))) {
- 			verity_bv_skip_block(v, io, iter);
- 			continue;
-@@ -683,6 +802,8 @@ static void verity_finish_io(struct dm_v
+@@ -599,6 +739,8 @@ static void verity_finish_io(struct dm_v
  	struct dm_verity *v = io->v;
  	struct bio *bio = dm_bio_from_per_bio_data(io, v->ti->per_io_data_size);
  
@@ -163,8 +174,28 @@ Index: v6.6-rpi/drivers/md/dm-verity-target.c
  	bio->bi_end_io = io->orig_bi_end_io;
  	bio->bi_status = status;
  
-@@ -1163,6 +1284,22 @@ static int verity_parse_opt_args(struct
- 			static_branch_inc(&use_tasklet_enabled);
+@@ -841,6 +983,9 @@ static void verity_status(struct dm_targ
+ 			args++;
+ 		if (v->error_mode != DM_VERITY_MODE_EIO)
+ 			args++;
++		if (v->error_behavior >= DM_VERITY_ERROR_BEHAVIOR_EIO &&
++		    v->error_behavior <= DM_VERITY_ERROR_BEHAVIOR_NOTIFY)
++			args += 2;
+ 		if (verity_fec_is_enabled(v))
+ 			args += DM_VERITY_OPTS_FEC;
+ 		if (v->zero_digest)
+@@ -883,6 +1028,9 @@ static void verity_status(struct dm_targ
+ 				BUG();
+ 			}
+ 		}
++		if (v->error_behavior >= DM_VERITY_ERROR_BEHAVIOR_EIO &&
++		    v->error_behavior <= DM_VERITY_ERROR_BEHAVIOR_NOTIFY)
++			DMEMIT(" " DM_VERITY_OPT_ERROR_BEHAVIOR " %d", v->error_behavior);
+ 		if (v->zero_digest)
+ 			DMEMIT(" " DM_VERITY_OPT_IGN_ZEROES);
+ 		if (v->validated_blocks)
+@@ -1242,6 +1390,22 @@ static int verity_parse_opt_args(struct
+ 			static_branch_inc(&use_bh_wq_enabled);
  			continue;
  
 +		} else if (!strcasecmp(arg_name, DM_VERITY_OPT_ERROR_BEHAVIOR)) {
@@ -186,11 +217,14 @@ Index: v6.6-rpi/drivers/md/dm-verity-target.c
  		} else if (verity_is_fec_opt_arg(arg_name)) {
  			if (only_modifier_opts)
  				continue;
-@@ -1199,6 +1336,135 @@ static int verity_parse_opt_args(struct
- 	return r;
+@@ -1386,6 +1550,139 @@ static int verity_setup_salt_and_hashsta
  }
  
-+static int verity_get_device(struct dm_target *ti, const char *devname,
+ /*
++ * This function is marked __ref because it calls the __init marked
++ * early_lookup_bdev when called from the early boot code.
++ */
++static int __ref verity_get_device(struct dm_target *ti, const char *devname,
 +			     struct dm_dev **dm_dev)
 +{
 +	do {
@@ -319,10 +353,11 @@ Index: v6.6-rpi/drivers/md/dm-verity-target.c
 +	}
 +}
 +
- /*
++/*
   * Target parameters:
   *	<version>	The current format is version 1.
-@@ -1225,10 +1491,19 @@ static int verity_ctr(struct dm_target *
+  *			Vsn 0 is compatible with original Chromium OS releases.
+@@ -1411,10 +1708,19 @@ static int verity_ctr(struct dm_target *
  	sector_t hash_position;
  	char dummy;
  	char *root_hash_digest_to_validate;
@@ -342,7 +377,7 @@ Index: v6.6-rpi/drivers/md/dm-verity-target.c
  		return -ENOMEM;
  	}
  	ti->private = v;
-@@ -1267,13 +1542,13 @@ static int verity_ctr(struct dm_target *
+@@ -1453,13 +1759,13 @@ static int verity_ctr(struct dm_target *
  	}
  	v->version = num;
  
@@ -358,28 +393,28 @@ Index: v6.6-rpi/drivers/md/dm-verity-target.c
  	if (r) {
  		ti->error = "Hash device lookup failed";
  		goto bad;
-@@ -1499,7 +1774,7 @@ static int verity_ctr(struct dm_target *
+@@ -1650,7 +1956,7 @@ static int verity_ctr(struct dm_target *
  	verity_verify_sig_opts_cleanup(&verify_args);
  
  	dm_audit_log_ctr(DM_MSG_PREFIX, ti, 1);
 -
-+  free_chromeos_argv(chromeos_argv);
++	free_chromeos_argv(chromeos_argv);
  	return 0;
  
  bad:
-@@ -1507,7 +1782,7 @@ bad:
+@@ -1658,7 +1964,7 @@ bad:
  	verity_verify_sig_opts_cleanup(&verify_args);
  	dm_audit_log_ctr(DM_MSG_PREFIX, ti, 0);
  	verity_dtr(ti);
 -
-+  free_chromeos_argv(chromeos_argv);
++	free_chromeos_argv(chromeos_argv);
  	return r;
  }
  
-Index: v6.6-rpi/drivers/md/dm-verity.h
+Index: kernel-rpi/drivers/md/dm-verity.h
 ===================================================================
---- v6.6-rpi.orig/drivers/md/dm-verity.h
-+++ v6.6-rpi/drivers/md/dm-verity.h
+--- kernel-rpi.orig/drivers/md/dm-verity.h
++++ kernel-rpi/drivers/md/dm-verity.h
 @@ -16,6 +16,7 @@
  #include <linux/device-mapper.h>
  #include <linux/interrupt.h>
@@ -388,15 +423,15 @@ Index: v6.6-rpi/drivers/md/dm-verity.h
  
  #define DM_VERITY_MAX_LEVELS		63
  
-@@ -59,6 +60,7 @@ struct dm_verity {
- 	unsigned int ahash_reqsize;/* the size of temporary space for crypto */
+@@ -66,6 +67,7 @@ struct dm_verity {
  	enum verity_mode mode;	/* mode for handling verification errors */
+ 	enum verity_mode error_mode;/* mode for handling I/O errors */
  	unsigned int corrupted_errs;/* Number of errors for corrupted blocks */
 +	int error_behavior;	/* selects error behavior on io errors */
  
  	struct workqueue_struct *verify_wq;
  
-@@ -102,6 +104,40 @@ struct dm_verity_io {
+@@ -108,6 +110,40 @@ struct dm_verity_io {
  	 */
  };
  
@@ -434,14 +469,14 @@ Index: v6.6-rpi/drivers/md/dm-verity.h
 +int dm_verity_register_error_notifier(struct notifier_block *nb);
 +int dm_verity_unregister_error_notifier(struct notifier_block *nb);
 +
- static inline struct ahash_request *verity_io_hash_req(struct dm_verity *v,
- 						     struct dm_verity_io *io)
+ static inline void *verity_io_hash_req(struct dm_verity *v,
+ 				       struct dm_verity_io *io)
  {
-Index: v6.6-rpi/drivers/md/dm-verity-chromeos.c
+Index: kernel-rpi/drivers/md/dm-verity-chromeos.c
 ===================================================================
 --- /dev/null
-+++ v6.6-rpi/drivers/md/dm-verity-chromeos.c
-@@ -0,0 +1,289 @@
++++ kernel-rpi/drivers/md/dm-verity-chromeos.c
+@@ -0,0 +1,565 @@
 +/*
 + * Copyright (C) 2010 The Chromium OS Authors <chromium-os-dev@chromium.org>
 + *                    All Rights Reserved.
@@ -462,8 +497,10 @@ Index: v6.6-rpi/drivers/md/dm-verity-chromeos.c
 + */
 +#include <linux/bio.h>
 +#include <linux/blkdev.h>
++#include <linux/crc32.h>
 +#include <linux/device.h>
 +#include <linux/device-mapper.h>
++#include <linux/efi.h>
 +#include <linux/err.h>
 +#include <linux/kernel.h>
 +#include <linux/mm.h>
@@ -478,6 +515,50 @@ Index: v6.6-rpi/drivers/md/dm-verity-chromeos.c
 +#define DM_MSG_PREFIX "verity-chromeos"
 +#define DMVERROR "DMVERROR"
 +
++#define GPT_TABLE_PAGE_NUM_ORDER 2
++#define GPT_TABLE_SIZE ((1 << GPT_TABLE_PAGE_NUM_ORDER) * 4096)
++
++struct gpt_header {
++	__le64 signature;
++	__le32 revision;
++	__le32 header_size;
++	__le32 header_crc32;
++	__le32 reserved1;
++	__le64 my_lba;
++	__le64 alternate_lba;
++	__le64 first_usable_lba;
++	__le64 last_usable_lba;
++	efi_guid_t disk_guid;
++	__le64 partition_entry_lba;
++	__le32 num_partition_entries;
++	__le32 sizeof_partition_entry;
++	__le32 partition_entry_array_crc32;
++
++	/* The rest of the logical block is reserved by UEFI and must be zero.
++	 * EFI standard handles this by:
++	 *
++	 * uint8_t		reserved2[ BlockSize - 92 ];
++	 */
++} __packed;
++
++struct chromeos_kernel_gpt_attributes {
++	u64 efi_spec:48;
++	u64 priority:4;
++	u64 tries:4;
++	u64 success:1;
++	u64 verity_error_counter:1;
++	u64 unused:6;
++} __packed;
++
++struct gpt_entry {
++	efi_guid_t partition_type_guid;
++	efi_guid_t unique_partition_guid;
++	__le64 starting_lba;
++	__le64 ending_lba;
++	struct chromeos_kernel_gpt_attributes attributes;
++	__le16 partition_name[72/sizeof(__le16)];
++} __packed;
++
 +static void chromeos_invalidate_kernel_endio(struct bio *bio)
 +{
 +	if (bio->bi_status) {
@@ -488,29 +569,22 @@ Index: v6.6-rpi/drivers/md/dm-verity-chromeos.c
 +}
 +
 +static int chromeos_invalidate_kernel_submit(struct bio *bio,
-+					     struct block_device *bdev,
-+					     unsigned int op,
-+					     unsigned int op_flags,
++					     sector_t sector,
++					     unsigned int len_byte,
 +					     struct page *page)
 +{
 +	DECLARE_COMPLETION_ONSTACK(wait);
-+	unsigned int block_size = bdev_logical_block_size(bdev);
-+
-+	if (block_size > page_size(page))
-+		panic("dm-verity failed to override signature");
 +
 +	bio->bi_private = &wait;
 +	bio->bi_end_io = chromeos_invalidate_kernel_endio;
-+	bio_set_dev(bio, bdev);
 +
-+	bio->bi_iter.bi_sector = 0;
++	bio->bi_iter.bi_sector = sector;
 +	bio->bi_vcnt = 1;
 +	bio->bi_iter.bi_idx = 0;
-+	bio->bi_iter.bi_size = block_size;
++	bio->bi_iter.bi_size = len_byte;
 +	bio->bi_iter.bi_bvec_done = 0;
-+	bio->bi_opf =  op | op_flags;
 +	bio->bi_io_vec[0].bv_page = page;
-+	bio->bi_io_vec[0].bv_len = block_size;
++	bio->bi_io_vec[0].bv_len = len_byte;
 +	bio->bi_io_vec[0].bv_offset = 0;
 +
 +	submit_bio(bio);
@@ -524,7 +598,7 @@ Index: v6.6-rpi/drivers/md/dm-verity-chromeos.c
 +{
 +	/* Very basic sanity checking. This should be better. */
 +	if (!root_bdev || MAJOR(root_bdev->bd_dev) == 254 ||
-+	    root_bdev->bd_partno <= 1) {
++	    bdev_partno(root_bdev) <= 1) {
 +		return 0;
 +	}
 +	return MKDEV(MAJOR(root_bdev->bd_dev), MINOR(root_bdev->bd_dev) - 1);
@@ -580,7 +654,8 @@ Index: v6.6-rpi/drivers/md/dm-verity-chromeos.c
 +static int chromeos_invalidate_kernel_bio(struct block_device *root_bdev)
 +{
 +	int ret = 0;
-+	struct block_device *bdev;
++	unsigned int bdev_bsize;
++	struct file *bdev_file;
 +	struct bio *bio;
 +	struct page *page;
 +	dev_t devt;
@@ -595,16 +670,17 @@ Index: v6.6-rpi/drivers/md/dm-verity-chromeos.c
 +
 +	/* First we open the device for reading. */
 +	dev_mode = BLK_OPEN_READ | BLK_OPEN_EXCL;
-+	bdev = blkdev_get_by_dev(devt, dev_mode,
++	bdev_file = bdev_file_open_by_dev(devt, dev_mode,
 +				 chromeos_invalidate_kernel_bio, NULL);
-+	if (IS_ERR(bdev)) {
++	if (IS_ERR(bdev_file)) {
 +		DMERR("invalidate_kernel: could not open device for reading");
 +		dev_mode = 0;
 +		ret = -1;
 +		goto failed_to_read;
 +	}
 +
-+	bio = bio_alloc(NULL, 1, 0, GFP_NOIO);
++	bio = bio_alloc(file_bdev(bdev_file), 1, REQ_OP_READ | REQ_SYNC,
++			GFP_NOIO);
 +	if (!bio) {
 +		ret = -1;
 +		goto failed_bio_alloc;
@@ -616,9 +692,19 @@ Index: v6.6-rpi/drivers/md/dm-verity-chromeos.c
 +		goto failed_to_alloc_page;
 +	}
 +
-+	if (chromeos_invalidate_kernel_submit(bio, bdev,
-+					      REQ_OP_READ,
-+					      REQ_SYNC,
++	bdev_bsize = bdev_logical_block_size(file_bdev(bdev_file));
++	if (bdev_bsize > page_size(page)) {
++		ret = -1;
++		goto failed_to_submit_read;
++	}
++
++	/*
++	 * Request read operation with REQ_PREFLUSH flag to ensure that the
++	 * cache of non-volatile storage device has been flushed before read is
++	 * started.
++	 */
++	if (chromeos_invalidate_kernel_submit(bio, 0,
++					      bdev_bsize,
 +					      page)) {
 +		ret = -1;
 +		goto failed_to_submit_read;
@@ -637,11 +723,11 @@ Index: v6.6-rpi/drivers/md/dm-verity-chromeos.c
 +	memcpy(page_address(page), DMVERROR, strlen(DMVERROR));
 +
 +	/* The block dev was being changed on read. Let's reopen here. */
-+	blkdev_put(bdev, chromeos_invalidate_kernel_bio);
++	fput(bdev_file);
 +	dev_mode = BLK_OPEN_WRITE | BLK_OPEN_EXCL;
-+	bdev = blkdev_get_by_dev(devt, dev_mode,
++	bdev_file = bdev_file_open_by_dev(devt, dev_mode,
 +				 chromeos_invalidate_kernel_bio, NULL);
-+	if (IS_ERR(bdev)) {
++	if (IS_ERR(bdev_file)) {
 +		DMERR("invalidate_kernel: could not open device for writing");
 +		dev_mode = 0;
 +		ret = -1;
@@ -651,15 +737,18 @@ Index: v6.6-rpi/drivers/md/dm-verity-chromeos.c
 +	/* We re-use the same bio to do the write after the read. Need to reset
 +	 * it to initialize bio->bi_remaining.
 +	 */
-+	bio_reset(bio, NULL, 0);
++	bio_reset(bio, file_bdev(bdev_file), REQ_OP_WRITE | REQ_SYNC | REQ_FUA);
++
++	bdev_bsize = bdev_logical_block_size(file_bdev(bdev_file));
 +
 +	/*
 +	 * Request write operation with REQ_FUA flag to ensure that I/O
 +	 * completion for the write is signaled only after the data has been
 +	 * committed to non-volatile storage.
 +	 */
-+	if (chromeos_invalidate_kernel_submit(bio, bdev, REQ_OP_WRITE,
-+					      REQ_SYNC | REQ_FUA, page)) {
++	if (chromeos_invalidate_kernel_submit(bio, 0,
++					      bdev_bsize,
++					      page)) {
 +		ret = -1;
 +		goto failed_to_submit_write;
 +	}
@@ -678,8 +767,226 @@ Index: v6.6-rpi/drivers/md/dm-verity-chromeos.c
 +	bio_put(bio);
 +failed_bio_alloc:
 +	if (dev_mode)
-+		blkdev_put(bdev, chromeos_invalidate_kernel_bio);
++		fput(bdev_file);
 +failed_to_read:
++	return ret;
++}
++
++static inline __le32
++efi_crc32(const void *buf, unsigned long len)
++{
++	return cpu_to_le32(crc32(~0L, buf, len) ^ ~0L);
++}
++
++static int chromeos_gpt_io_submit(struct bio *bio,
++				  struct block_device *bdev,
++				  unsigned int op,
++				  unsigned int op_flags,
++				  sector_t hdr_lba,
++				  struct page *hdr_page,
++				  struct page *tbl_pages)
++{
++	size_t block_size = bdev_logical_block_size(bdev);
++	size_t sectors_per_lba = block_size >> SECTOR_SHIFT;
++	int tbl_sector;
++	struct gpt_header *header;
++
++	if (bdev_logical_block_size(bdev) > page_size(hdr_page))
++		return -1;
++
++	bio_reset(bio, bdev, op | op_flags);
++	if (chromeos_invalidate_kernel_submit(bio,
++					      hdr_lba * sectors_per_lba,
++					      block_size,
++					      hdr_page)) {
++		return  -1;
++	}
++
++	header = page_address(hdr_page);
++	tbl_sector = le64_to_cpu(header->partition_entry_lba) * sectors_per_lba;
++
++	bio_reset(bio, bdev, op | op_flags);
++	if (chromeos_invalidate_kernel_submit(bio,
++					      tbl_sector,
++					      GPT_TABLE_SIZE,
++					      tbl_pages)) {
++		return  -1;
++	}
++
++	return 0;
++}
++
++static int chromeos_increment_gpt_err_count(struct page *hdr_page,
++					    struct page *tbl_pages,
++					    u8 active_gpt_entry_id)
++{
++	struct gpt_header *header = page_address(hdr_page);
++	struct gpt_entry *entries = page_address(tbl_pages);
++	struct gpt_entry *active_entry = &entries[active_gpt_entry_id];
++	u64 gpt_table_size =
++		(u64)le32_to_cpu(header->num_partition_entries) *
++		le32_to_cpu(header->sizeof_partition_entry);
++
++	if (gpt_table_size > GPT_TABLE_SIZE)
++		return -1;
++
++	if (active_entry->attributes.verity_error_counter == 1)
++		return -1;
++
++	active_entry->attributes.verity_error_counter = 1;
++	header->partition_entry_array_crc32 =
++		efi_crc32((const unsigned char *) (entries),
++		gpt_table_size);
++	header->header_crc32 = 0;
++	header->header_crc32 = efi_crc32((const unsigned char *) (header),
++		le32_to_cpu(header->header_size));
++
++	return 0;
++}
++
++static int chromeos_handle_retries(struct bio *bio,
++				   dev_t devt,
++				   u8 active_gpt_entry_id,
++				   sector_t hdr_lba,
++				   struct page *hdr_page,
++				   struct page *tbl_pages)
++{
++	struct file *bdev_file;
++	fmode_t dev_mode = 0;
++	int ret = 0;
++
++	dev_mode = FMODE_READ;
++	bdev_file = bdev_file_open_by_dev(devt, dev_mode,
++					  chromeos_handle_retries, NULL);
++	if (IS_ERR(bdev_file)) {
++		DMERR("update_tries: could not open device for reading: %ld",
++		      PTR_ERR(bdev_file));
++		dev_mode = 0;
++		ret = -1;
++		goto failed;
++	}
++
++	/*
++	 * Request read operation with REQ_PREFLUSH flag to ensure that the
++	 * cache of non-volatile storage device has been flushed before read is
++	 * started.
++	 */
++	if (chromeos_gpt_io_submit(bio, file_bdev(bdev_file), REQ_OP_READ,
++				   REQ_SYNC | REQ_PREFLUSH, hdr_lba,
++				   hdr_page, tbl_pages)) {
++		DMERR("update_tries: failed reading %s GPT",
++		      hdr_lba == 1 ? "primary" : "secondary");
++		ret = -1;
++		goto failed;
++	}
++
++	if (chromeos_increment_gpt_err_count(hdr_page, tbl_pages,
++					     active_gpt_entry_id)) {
++		DMERR("update_tries: retries exceeded");
++		ret = -1;
++		goto failed;
++	}
++
++	/* The block dev was being changed on read. Let's reopen here. */
++	fput(bdev_file);
++	dev_mode = FMODE_WRITE;
++	bdev_file = bdev_file_open_by_dev(devt, dev_mode,
++					  chromeos_handle_retries, NULL);
++	if (IS_ERR(bdev_file)) {
++		DMERR("update_tries: could not open device for writing");
++		dev_mode = 0;
++		ret = -1;
++		goto failed;
++	}
++
++	/*
++	 * Request write operation with REQ_FUA flag to ensure that I/O
++	 * completion for the write is signaled only after the data has been
++	 * committed to non-volatile storage.
++	 */
++	if (chromeos_gpt_io_submit(bio, file_bdev(bdev_file), REQ_OP_WRITE,
++				   REQ_SYNC | REQ_FUA, hdr_lba,
++				   hdr_page, tbl_pages)) {
++		DMERR("update_tries: failed writing %s GPT",
++		      hdr_lba == 1 ? "primary" : "secondary");
++		ret = -1;
++		goto failed;
++	}
++
++failed:
++	if (dev_mode)
++		fput(bdev_file);
++
++	if (!ret)
++		DMERR("update_tries: updated %s GPT",
++		      hdr_lba == 1 ? "primary" : "secondary");
++
++	return ret;
++}
++
++static int chromeos_update_tries(struct block_device *root_bdev)
++{
++	int ret = 0;
++	struct bio *bio;
++	struct page *hdr_page = NULL;
++	struct page *tbl_pages = NULL;
++	struct gpt_header *header;
++	dev_t gpt_devt =
++		disk_devt(dev_to_disk(&root_bdev->bd_disk->part0->bd_device));
++	dev_t kernel_devt =
++		get_boot_dev() ?: get_boot_dev_from_root_dev(root_bdev);
++	struct file *kernel_bdev_file;
++	u8 kernel_gpt_entry_id;
++
++	if (!gpt_devt)
++		return -EINVAL;
++
++	/* Get block device to get the partno. */
++	kernel_bdev_file = bdev_file_open_by_dev(kernel_devt, FMODE_READ,
++				 chromeos_update_tries, NULL);
++	if (IS_ERR(kernel_bdev_file))
++		return PTR_ERR(kernel_bdev_file);
++	/*
++	 * GPT entry offset is 0 based, and partno, represented by MINOR,
++	 * is 1 based, so subtract 1.
++	 */
++	kernel_gpt_entry_id = bdev_partno(file_bdev(kernel_bdev_file)) - 1;
++	fput(kernel_bdev_file);
++
++	bio = bio_alloc(root_bdev, 1, 0, GFP_NOIO);
++	if (!bio) {
++		ret = -1;
++		goto failed_bio_alloc;
++	}
++
++	hdr_page = alloc_page(GFP_NOIO);
++	tbl_pages = alloc_pages(GFP_NOIO, GPT_TABLE_PAGE_NUM_ORDER);
++	if (!hdr_page || !tbl_pages) {
++		ret = -ENOMEM;
++		goto failed;
++	}
++
++	header = page_address(hdr_page);
++
++	if (chromeos_handle_retries(bio, gpt_devt, kernel_gpt_entry_id, 1,
++				    hdr_page, tbl_pages) ||
++	    chromeos_handle_retries(bio, gpt_devt, kernel_gpt_entry_id,
++				    le64_to_cpu(header->alternate_lba),
++				    hdr_page, tbl_pages)) {
++		DMERR("update_tries: retry failed, will invalidated kernel");
++		ret = -1;
++		goto failed;
++	}
++
++	DMERR("update_tries: completed");
++	ret = 0;
++failed:
++	if (hdr_page)
++		__free_page(hdr_page);
++	if (tbl_pages)
++		__free_pages(tbl_pages, GPT_TABLE_PAGE_NUM_ORDER);
++	bio_put(bio);
++failed_bio_alloc:
 +	return ret;
 +}
 +
@@ -690,6 +997,10 @@ Index: v6.6-rpi/drivers/md/dm-verity-chromeos.c
 +		(struct dm_verity_error_state *) opaque_err;
 +	err->behavior = DM_VERITY_ERROR_BEHAVIOR_PANIC;
 +	if (transient)
++		return 0;
++
++	// Do not invalidate kernel if successfully updated try count.
++	if (!chromeos_update_tries(err->dev))
 +		return 0;
 +
 +	/* Mark the kernel partition as invalid. */
@@ -731,11 +1042,19 @@ Index: v6.6-rpi/drivers/md/dm-verity-chromeos.c
 +#undef MODULE_PARAM_PREFIX
 +#define MODULE_PARAM_PREFIX	""
 +module_param_string(kern_guid, kern_guid, sizeof(kern_guid), 0);
-Index: v6.6-rpi/drivers/md/Makefile
+Index: kernel-rpi/drivers/md/Makefile
 ===================================================================
---- v6.6-rpi.orig/drivers/md/Makefile
-+++ v6.6-rpi/drivers/md/Makefile
-@@ -84,6 +84,7 @@ obj-$(CONFIG_DM_INTEGRITY)	+= dm-integri
+--- kernel-rpi.orig/drivers/md/Makefile
++++ kernel-rpi/drivers/md/Makefile
+@@ -53,6 +53,7 @@ obj-$(CONFIG_DM_UNSTRIPED)	+= dm-unstrip
+ obj-$(CONFIG_DM_BUFIO)		+= dm-bufio.o
+ obj-$(CONFIG_DM_BIO_PRISON)	+= dm-bio-prison.o
+ obj-$(CONFIG_DM_CRYPT)		+= dm-crypt.o
++obj-$(CONFIG_DM_DEFAULT_KEY)  += dm-default-key.o
+ obj-$(CONFIG_DM_DELAY)		+= dm-delay.o
+ obj-$(CONFIG_DM_DUST)		+= dm-dust.o
+ obj-$(CONFIG_DM_FLAKEY)		+= dm-flakey.o
+@@ -81,6 +82,7 @@ obj-$(CONFIG_DM_INTEGRITY)	+= dm-integri
  obj-$(CONFIG_DM_ZONED)		+= dm-zoned.o
  obj-$(CONFIG_DM_WRITECACHE)	+= dm-writecache.o
  obj-$(CONFIG_SECURITY_LOADPIN_VERITY)	+= dm-verity-loadpin.o
@@ -743,11 +1062,11 @@ Index: v6.6-rpi/drivers/md/Makefile
  
  ifeq ($(CONFIG_DM_INIT),y)
  dm-mod-objs			+= dm-init.o
-Index: v6.6-rpi/drivers/md/Kconfig
+Index: kernel-rpi/drivers/md/Kconfig
 ===================================================================
---- v6.6-rpi.orig/drivers/md/Kconfig
-+++ v6.6-rpi/drivers/md/Kconfig
-@@ -304,6 +304,16 @@ config DM_CRYPT
+--- kernel-rpi.orig/drivers/md/Kconfig
++++ kernel-rpi/drivers/md/Kconfig
+@@ -283,6 +283,37 @@ config DM_CRYPT
  
  	  If unsure, say N.
  
@@ -761,14 +1080,35 @@ Index: v6.6-rpi/drivers/md/Kconfig
 +
 +	  If unsure, say N.
 +
++config DM_DEFAULT_KEY
++  tristate "Default-key target support"
++  depends on BLK_DEV_DM
++  depends on BLK_INLINE_ENCRYPTION
++  # dm-default-key doesn't require -o inlinecrypt, but it does currently
++  # rely on the inline encryption hooks being built into the kernel.
++  depends on FS_ENCRYPTION_INLINE_CRYPT
++  help
++    This device-mapper target allows you to create a device that
++    assigns a default encryption key to bios that aren't for the
++    contents of an encrypted file.
++
++    This ensures that all blocks on-disk will be encrypted with
++    some key, without the performance hit of file contents being
++    encrypted twice when fscrypt (File-Based Encryption) is used.
++
++    It is only appropriate to use dm-default-key when key
++    configuration is tightly controlled, like it is in Android,
++    such that all fscrypt keys are at least as hard to compromise
++    as the default key.
++
  config DM_SNAPSHOT
         tristate "Snapshot target"
         depends on BLK_DEV_DM
-Index: v6.6-rpi/drivers/base/dd.c
+Index: kernel-rpi/drivers/base/dd.c
 ===================================================================
---- v6.6-rpi.orig/drivers/base/dd.c
-+++ v6.6-rpi/drivers/base/dd.c
-@@ -753,13 +753,14 @@ static int really_probe_debug(struct dev
+--- kernel-rpi.orig/drivers/base/dd.c
++++ kernel-rpi/drivers/base/dd.c
+@@ -752,13 +752,14 @@ static int really_probe_debug(struct dev
   *
   * Should somehow figure out how to use a semaphore, not an atomic variable...
   */
@@ -784,10 +1124,10 @@ Index: v6.6-rpi/drivers/base/dd.c
  
  /**
   * wait_for_device_probe
-Index: v6.6-rpi/include/linux/device/driver.h
+Index: kernel-rpi/include/linux/device/driver.h
 ===================================================================
---- v6.6-rpi.orig/include/linux/device/driver.h
-+++ v6.6-rpi/include/linux/device/driver.h
+--- kernel-rpi.orig/include/linux/device/driver.h
++++ kernel-rpi/include/linux/device/driver.h
 @@ -126,7 +126,7 @@ int __must_check driver_register(struct
  void driver_unregister(struct device_driver *drv);
  
@@ -797,16 +1137,603 @@ Index: v6.6-rpi/include/linux/device/driver.h
  void wait_for_device_probe(void);
  void __init wait_for_init_devices_probe(void);
  
-Index: v6.6-rpi/include/linux/blkdev.h
+Index: kernel-rpi/include/linux/blkdev.h
 ===================================================================
---- v6.6-rpi.orig/include/linux/blkdev.h
-+++ v6.6-rpi/include/linux/blkdev.h
-@@ -1525,7 +1525,7 @@ int sync_blockdev_nowait(struct block_de
+--- kernel-rpi.orig/include/linux/blkdev.h
++++ kernel-rpi/include/linux/blkdev.h
+@@ -1688,7 +1688,7 @@ int sync_blockdev_nowait(struct block_de
  void sync_bdevs(bool wait);
- void bdev_statx_dioalign(struct inode *inode, struct kstat *stat);
+ void bdev_statx(struct path *, struct kstat *, u32);
  void printk_all_partitions(void);
 -int __init early_lookup_bdev(const char *pathname, dev_t *dev);
 +int early_lookup_bdev(const char *pathname, dev_t *dev);
  #else
  static inline void invalidate_bdev(struct block_device *bdev)
  {
+Index: kernel-rpi/drivers/md/dm-default-key.c
+===================================================================
+--- /dev/null
++++ kernel-rpi/drivers/md/dm-default-key.c
+@@ -0,0 +1,412 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (C) 2017 Google, Inc.
++ */
++
++#include <linux/blk-crypto.h>
++#include <linux/device-mapper.h>
++#include <linux/module.h>
++
++#define DM_MSG_PREFIX		"default-key"
++
++#define DM_DEFAULT_KEY_MAX_KEY_SIZE	64
++
++static const struct dm_default_key_cipher {
++	const char *name;
++	enum blk_crypto_mode_num mode_num;
++	int key_size;
++} dm_default_key_ciphers[] = {
++	{
++		.name = "aes-xts-plain64",
++		.mode_num = BLK_ENCRYPTION_MODE_AES_256_XTS,
++		.key_size = 64,
++	}, {
++		.name = "xchacha12,aes-adiantum-plain64",
++		.mode_num = BLK_ENCRYPTION_MODE_ADIANTUM,
++		.key_size = 32,
++	},
++};
++
++/**
++ * struct dm_default_c - private data of a default-key target
++ * @dev: the underlying device
++ * @start: starting sector of the range of @dev which this target actually maps.
++ *	   For this purpose a "sector" is 512 bytes.
++ * @cipher_string: the name of the encryption algorithm being used
++ * @iv_offset: starting offset for IVs.  IVs are generated as if the target were
++ *	       preceded by @iv_offset 512-byte sectors.
++ * @sector_size: crypto sector size in bytes (usually 4096)
++ * @sector_bits: log2(sector_size)
++ * @key: the encryption key to use
++ * @max_dun: the maximum DUN that may be used (computed from other params)
++ */
++struct default_key_c {
++	struct dm_dev *dev;
++	sector_t start;
++	const char *cipher_string;
++	u64 iv_offset;
++	unsigned int sector_size;
++	unsigned int sector_bits;
++	struct blk_crypto_key key;
++	u64 max_dun;
++};
++
++static const struct dm_default_key_cipher *
++lookup_cipher(const char *cipher_string)
++{
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(dm_default_key_ciphers); i++) {
++		if (strcmp(cipher_string, dm_default_key_ciphers[i].name) == 0)
++			return &dm_default_key_ciphers[i];
++	}
++	return NULL;
++}
++
++static void default_key_dtr(struct dm_target *ti)
++{
++	struct default_key_c *dkc = ti->private;
++	struct blk_crypto_key *blk_key = &dkc->key;
++
++	if (dkc->dev) {
++		if (blk_key->size > 0)
++			blk_crypto_evict_key(dkc->dev->bdev, blk_key);
++		dm_put_device(ti, dkc->dev);
++	}
++	kfree_sensitive(dkc->cipher_string);
++	kfree_sensitive(dkc);
++}
++
++static int default_key_ctr_optional(struct dm_target *ti,
++				    unsigned int argc, char **argv)
++{
++	struct default_key_c *dkc = ti->private;
++	struct dm_arg_set as;
++	static const struct dm_arg _args[] = {
++		{0, 3, "Invalid number of feature args"},
++	};
++	unsigned int opt_params;
++	const char *opt_string;
++	bool iv_large_sectors = false;
++	char dummy;
++	int err;
++
++	as.argc = argc;
++	as.argv = argv;
++
++	err = dm_read_arg_group(_args, &as, &opt_params, &ti->error);
++	if (err)
++		return err;
++
++	while (opt_params--) {
++		opt_string = dm_shift_arg(&as);
++		if (!opt_string) {
++			ti->error = "Not enough feature arguments";
++			return -EINVAL;
++		}
++		if (!strcmp(opt_string, "allow_discards")) {
++			ti->num_discard_bios = 1;
++		} else if (sscanf(opt_string, "sector_size:%u%c",
++				  &dkc->sector_size, &dummy) == 1) {
++			if (dkc->sector_size < SECTOR_SIZE ||
++			    dkc->sector_size > 4096 ||
++			    !is_power_of_2(dkc->sector_size)) {
++				ti->error = "Invalid sector_size";
++				return -EINVAL;
++			}
++		} else if (!strcmp(opt_string, "iv_large_sectors")) {
++			iv_large_sectors = true;
++		} else {
++			ti->error = "Invalid feature arguments";
++			return -EINVAL;
++		}
++	}
++
++	/* dm-default-key doesn't implement iv_large_sectors=false. */
++	if (dkc->sector_size != SECTOR_SIZE && !iv_large_sectors) {
++		ti->error = "iv_large_sectors must be specified";
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++/*
++ * Construct a default-key mapping:
++ * <cipher> <key> <iv_offset> <dev_path> <start>
++ *
++ * This syntax matches dm-crypt's, but lots of unneeded functionality has been
++ * removed.  Also, dm-default-key requires that the "iv_large_sectors" option be
++ * given whenever a non-default sector size is used.
++ */
++static int default_key_ctr(struct dm_target *ti, unsigned int argc, char **argv)
++{
++	struct default_key_c *dkc;
++	const struct dm_default_key_cipher *cipher;
++	u8 raw_key[DM_DEFAULT_KEY_MAX_KEY_SIZE];
++	unsigned int dun_bytes;
++	unsigned long long tmpll;
++	char dummy;
++	int err;
++
++	if (argc < 5) {
++		ti->error = "Not enough arguments";
++		return -EINVAL;
++	}
++
++	dkc = kzalloc(sizeof(*dkc), GFP_KERNEL);
++	if (!dkc) {
++		ti->error = "Out of memory";
++		return -ENOMEM;
++	}
++	ti->private = dkc;
++
++	/* <cipher> */
++	dkc->cipher_string = kstrdup(argv[0], GFP_KERNEL);
++	if (!dkc->cipher_string) {
++		ti->error = "Out of memory";
++		err = -ENOMEM;
++		goto bad;
++	}
++	cipher = lookup_cipher(dkc->cipher_string);
++	if (!cipher) {
++		ti->error = "Unsupported cipher";
++		err = -EINVAL;
++		goto bad;
++	}
++
++	/* <key> */
++	if (strlen(argv[1]) != 2 * cipher->key_size) {
++		ti->error = "Incorrect key size for cipher";
++		err = -EINVAL;
++		goto bad;
++	}
++	if (hex2bin(raw_key, argv[1], cipher->key_size) != 0) {
++		ti->error = "Malformed key string";
++		err = -EINVAL;
++		goto bad;
++	}
++
++	/* <iv_offset> */
++	if (sscanf(argv[2], "%llu%c", &dkc->iv_offset, &dummy) != 1) {
++		ti->error = "Invalid iv_offset sector";
++		err = -EINVAL;
++		goto bad;
++	}
++
++	/* <dev_path> */
++	err = dm_get_device(ti, argv[3], dm_table_get_mode(ti->table),
++			    &dkc->dev);
++	if (err) {
++		ti->error = "Device lookup failed";
++		goto bad;
++	}
++
++	/* <start> */
++	if (sscanf(argv[4], "%llu%c", &tmpll, &dummy) != 1 ||
++	    tmpll != (sector_t)tmpll) {
++		ti->error = "Invalid start sector";
++		err = -EINVAL;
++		goto bad;
++	}
++	dkc->start = tmpll;
++
++	/* optional arguments */
++	dkc->sector_size = SECTOR_SIZE;
++	if (argc > 5) {
++		err = default_key_ctr_optional(ti, argc - 5, &argv[5]);
++		if (err)
++			goto bad;
++	}
++	dkc->sector_bits = ilog2(dkc->sector_size);
++	if (ti->len & ((dkc->sector_size >> SECTOR_SHIFT) - 1)) {
++		ti->error = "Device size is not a multiple of sector_size";
++		err = -EINVAL;
++		goto bad;
++	}
++
++	dkc->max_dun = (dkc->iv_offset + ti->len - 1) >>
++		       (dkc->sector_bits - SECTOR_SHIFT);
++	dun_bytes = DIV_ROUND_UP(fls64(dkc->max_dun), 8);
++
++	err = blk_crypto_init_key(&dkc->key, raw_key, cipher->mode_num,
++				  dun_bytes, dkc->sector_size);
++	if (err) {
++		ti->error = "Error initializing blk-crypto key";
++		goto bad;
++	}
++
++	err = blk_crypto_start_using_key(dkc->dev->bdev, &dkc->key);
++	if (err) {
++		ti->error = "Error starting to use blk-crypto";
++		goto bad;
++	}
++
++	ti->num_flush_bios = 1;
++
++	err = 0;
++	goto out;
++
++bad:
++	default_key_dtr(ti);
++out:
++	memzero_explicit(raw_key, sizeof(raw_key));
++	return err;
++}
++
++static int default_key_map(struct dm_target *ti, struct bio *bio)
++{
++	const struct default_key_c *dkc = ti->private;
++	sector_t sector_in_target;
++	u64 dun[BLK_CRYPTO_DUN_ARRAY_SIZE] = { 0 };
++
++	bio_set_dev(bio, dkc->dev->bdev);
++
++	/*
++	 * If the bio is a device-level request which doesn't target a specific
++	 * sector, there's nothing more to do.
++	 */
++	if (bio_sectors(bio) == 0)
++		return DM_MAPIO_REMAPPED;
++
++	/* Map the bio's sector to the underlying device. (512-byte sectors) */
++	sector_in_target = dm_target_offset(ti, bio->bi_iter.bi_sector);
++	bio->bi_iter.bi_sector = dkc->start + sector_in_target;
++
++	/*
++	 * If the bio should skip dm-default-key (i.e. if it's for an encrypted
++	 * file's contents), or if it doesn't have any data (e.g. if it's a
++	 * DISCARD request), there's nothing more to do.
++	 */
++	if (bio_should_skip_dm_default_key(bio) || !bio_has_data(bio))
++		return DM_MAPIO_REMAPPED;
++
++	/*
++	 * Else, dm-default-key needs to set this bio's encryption context.
++	 * It must not already have one.
++	 */
++	if (WARN_ON_ONCE(bio_has_crypt_ctx(bio)))
++		return DM_MAPIO_KILL;
++
++	/* Calculate the DUN and enforce data-unit (crypto sector) alignment. */
++	dun[0] = dkc->iv_offset + sector_in_target; /* 512-byte sectors */
++	if (dun[0] & ((dkc->sector_size >> SECTOR_SHIFT) - 1))
++		return DM_MAPIO_KILL;
++	dun[0] >>= dkc->sector_bits - SECTOR_SHIFT; /* crypto sectors */
++
++	/*
++	 * This check isn't necessary as we should have calculated max_dun
++	 * correctly, but be safe.
++	 */
++	if (WARN_ON_ONCE(dun[0] > dkc->max_dun))
++		return DM_MAPIO_KILL;
++
++	bio_crypt_set_ctx(bio, &dkc->key, dun, GFP_NOIO);
++
++	return DM_MAPIO_REMAPPED;
++}
++
++static void default_key_status(struct dm_target *ti, status_type_t type,
++			       unsigned int status_flags, char *result,
++			       unsigned int maxlen)
++{
++	const struct default_key_c *dkc = ti->private;
++	unsigned int sz = 0;
++	int num_feature_args = 0;
++
++	switch (type) {
++	case STATUSTYPE_INFO:
++	case STATUSTYPE_IMA:
++		result[0] = '\0';
++		break;
++
++	case STATUSTYPE_TABLE:
++		/* Omit the key for now. */
++		DMEMIT("%s - %llu %s %llu", dkc->cipher_string, dkc->iv_offset,
++		       dkc->dev->name, (unsigned long long)dkc->start);
++
++		num_feature_args += !!ti->num_discard_bios;
++		if (dkc->sector_size != SECTOR_SIZE)
++			num_feature_args += 2;
++		if (num_feature_args != 0) {
++			DMEMIT(" %d", num_feature_args);
++			if (ti->num_discard_bios)
++				DMEMIT(" allow_discards");
++			if (dkc->sector_size != SECTOR_SIZE) {
++				DMEMIT(" sector_size:%u", dkc->sector_size);
++				DMEMIT(" iv_large_sectors");
++			}
++		}
++		break;
++	}
++}
++
++static int default_key_prepare_ioctl(struct dm_target *ti,
++				     struct block_device **bdev)
++{
++	const struct default_key_c *dkc = ti->private;
++	const struct dm_dev *dev = dkc->dev;
++
++	*bdev = dev->bdev;
++
++	/* Only pass ioctls through if the device sizes match exactly. */
++	if (dkc->start != 0 ||
++	    ti->len != bdev_nr_sectors(dev->bdev))
++		return 1;
++	return 0;
++}
++
++static int default_key_iterate_devices(struct dm_target *ti,
++				       iterate_devices_callout_fn fn,
++				       void *data)
++{
++	const struct default_key_c *dkc = ti->private;
++
++	return fn(ti, dkc->dev, dkc->start, ti->len, data);
++}
++
++static void default_key_io_hints(struct dm_target *ti,
++				 struct queue_limits *limits)
++{
++	const struct default_key_c *dkc = ti->private;
++	const unsigned int sector_size = dkc->sector_size;
++
++	limits->logical_block_size =
++		max_t(unsigned int, limits->logical_block_size, sector_size);
++	limits->physical_block_size =
++		max_t(unsigned int, limits->physical_block_size, sector_size);
++	limits->io_min = max_t(unsigned int, limits->io_min, sector_size);
++}
++
++static struct target_type default_key_target = {
++	.name			= "default-key",
++	.version		= {2, 0, 0},
++	.features		= DM_TARGET_PASSES_CRYPTO,
++	.module			= THIS_MODULE,
++	.ctr			= default_key_ctr,
++	.dtr			= default_key_dtr,
++	.map			= default_key_map,
++	.status			= default_key_status,
++	.prepare_ioctl		= default_key_prepare_ioctl,
++	.iterate_devices	= default_key_iterate_devices,
++	.io_hints		= default_key_io_hints,
++};
++
++static int __init dm_default_key_init(void)
++{
++	return dm_register_target(&default_key_target);
++}
++
++static void __exit dm_default_key_exit(void)
++{
++	dm_unregister_target(&default_key_target);
++}
++
++module_init(dm_default_key_init);
++module_exit(dm_default_key_exit);
++
++MODULE_AUTHOR("Paul Lawrence <paullawrence@google.com>");
++MODULE_AUTHOR("Paul Crowley <paulcrowley@google.com>");
++MODULE_AUTHOR("Eric Biggers <ebiggers@google.com>");
++MODULE_DESCRIPTION(DM_NAME " target for encrypting filesystem metadata");
++MODULE_LICENSE("GPL");
+Index: kernel-rpi/block/bio.c
+===================================================================
+--- kernel-rpi.orig/block/bio.c
++++ kernel-rpi/block/bio.c
+@@ -269,6 +269,9 @@ void bio_init(struct bio *bio, struct bl
+ #endif
+ #ifdef CONFIG_BLK_INLINE_ENCRYPTION
+ 	bio->bi_crypt_context = NULL;
++#if IS_ENABLED(CONFIG_DM_DEFAULT_KEY)
++  bio->bi_skip_dm_default_key = false;
++#endif
+ #endif
+ #ifdef CONFIG_BLK_DEV_INTEGRITY
+ 	bio->bi_integrity = NULL;
+Index: kernel-rpi/fs/crypto/inline_crypt.c
+===================================================================
+--- kernel-rpi.orig/fs/crypto/inline_crypt.c
++++ kernel-rpi/fs/crypto/inline_crypt.c
+@@ -270,6 +270,9 @@ void fscrypt_set_bio_crypt_ctx(struct bi
+ 	const struct fscrypt_inode_info *ci;
+ 	u64 dun[BLK_CRYPTO_DUN_ARRAY_SIZE];
+ 
++  if (fscrypt_inode_should_skip_dm_default_key(inode))
++    bio_set_skip_dm_default_key(bio);
++
+ 	if (!fscrypt_inode_uses_inline_crypto(inode))
+ 		return;
+ 	ci = inode->i_crypt_info;
+@@ -354,6 +357,9 @@ bool fscrypt_mergeable_bio(struct bio *b
+ 
+ 	if (!!bc != fscrypt_inode_uses_inline_crypto(inode))
+ 		return false;
++  if (bio_should_skip_dm_default_key(bio) !=
++      fscrypt_inode_should_skip_dm_default_key(inode))
++    return false;
+ 	if (!bc)
+ 		return true;
+ 
+Index: kernel-rpi/include/linux/blk-crypto.h
+===================================================================
+--- kernel-rpi.orig/include/linux/blk-crypto.h
++++ kernel-rpi/include/linux/blk-crypto.h
+@@ -132,4 +132,36 @@ static inline int bio_crypt_clone(struct
+ 	return 0;
+ }
+ 
++#if IS_ENABLED(CONFIG_DM_DEFAULT_KEY)
++static inline void bio_set_skip_dm_default_key(struct bio *bio)
++{
++  bio->bi_skip_dm_default_key = true;
++}
++
++static inline bool bio_should_skip_dm_default_key(const struct bio *bio)
++{
++  return bio->bi_skip_dm_default_key;
++}
++
++static inline void bio_clone_skip_dm_default_key(struct bio *dst,
++             const struct bio *src)
++{
++  dst->bi_skip_dm_default_key = src->bi_skip_dm_default_key;
++}
++#else /* CONFIG_DM_DEFAULT_KEY */
++static inline void bio_set_skip_dm_default_key(struct bio *bio)
++{
++}
++
++static inline bool bio_should_skip_dm_default_key(const struct bio *bio)
++{
++  return false;
++}
++
++static inline void bio_clone_skip_dm_default_key(struct bio *dst,
++             const struct bio *src)
++{
++}
++#endif /* !CONFIG_DM_DEFAULT_KEY */
++
+ #endif /* __LINUX_BLK_CRYPTO_H */
+Index: kernel-rpi/include/linux/blk_types.h
+===================================================================
+--- kernel-rpi.orig/include/linux/blk_types.h
++++ kernel-rpi/include/linux/blk_types.h
+@@ -249,6 +249,9 @@ struct bio {
+ 
+ #ifdef CONFIG_BLK_INLINE_ENCRYPTION
+ 	struct bio_crypt_ctx	*bi_crypt_context;
++#if IS_ENABLED(CONFIG_DM_DEFAULT_KEY)
++  bool      bi_skip_dm_default_key;
++#endif
+ #endif
+ 
+ #if defined(CONFIG_BLK_DEV_INTEGRITY)
+Index: kernel-rpi/include/linux/fscrypt.h
+===================================================================
+--- kernel-rpi.orig/include/linux/fscrypt.h
++++ kernel-rpi/include/linux/fscrypt.h
+@@ -892,6 +892,20 @@ static inline u64 fscrypt_limit_io_block
+ }
+ #endif /* !CONFIG_FS_ENCRYPTION_INLINE_CRYPT */
+ 
++#if IS_ENABLED(CONFIG_FS_ENCRYPTION) && IS_ENABLED(CONFIG_DM_DEFAULT_KEY)
++static inline bool
++fscrypt_inode_should_skip_dm_default_key(const struct inode *inode)
++{
++  return IS_ENCRYPTED(inode) && S_ISREG(inode->i_mode);
++}
++#else
++static inline bool
++fscrypt_inode_should_skip_dm_default_key(const struct inode *inode)
++{
++  return false;
++}
++#endif
++
+ /**
+  * fscrypt_inode_uses_inline_crypto() - test whether an inode uses inline
+  *					encryption
+Index: kernel-rpi/fs/f2fs/data.c
+===================================================================
+--- kernel-rpi.orig/fs/f2fs/data.c
++++ kernel-rpi/fs/f2fs/data.c
+@@ -486,6 +486,8 @@ static void f2fs_set_bio_crypt_ctx(struc
+ 	 */
+ 	if (!fio || !fio->encrypted_page)
+ 		fscrypt_set_bio_crypt_ctx(bio, inode, first_idx, gfp_mask);
++  else if (fscrypt_inode_should_skip_dm_default_key(inode))
++    bio_set_skip_dm_default_key(bio);
+ }
+ 
+ static bool f2fs_crypt_mergeable_bio(struct bio *bio, const struct inode *inode,
+@@ -497,7 +499,9 @@ static bool f2fs_crypt_mergeable_bio(str
+ 	 * read/write raw data without encryption.
+ 	 */
+ 	if (fio && fio->encrypted_page)
+-		return !bio_has_crypt_ctx(bio);
++		return !bio_has_crypt_ctx(bio) &&
++      (bio_should_skip_dm_default_key(bio) ==
++       fscrypt_inode_should_skip_dm_default_key(inode));
+ 
+ 	return fscrypt_mergeable_bio(bio, inode, next_idx);
+ }
+Index: kernel-rpi/block/blk-crypto.c
+===================================================================
+--- kernel-rpi.orig/block/blk-crypto.c
++++ kernel-rpi/block/blk-crypto.c
+@@ -106,6 +106,7 @@ void bio_crypt_set_ctx(struct bio *bio,
+ 
+ 	bio->bi_crypt_context = bc;
+ }
++EXPORT_SYMBOL_GPL(bio_crypt_set_ctx);
+ 
+ void __bio_crypt_free_ctx(struct bio *bio)
+ {
+@@ -356,6 +357,7 @@ int blk_crypto_init_key(struct blk_crypt
+ 
+ 	return 0;
+ }
++EXPORT_SYMBOL_GPL(blk_crypto_init_key);
+ 
+ bool blk_crypto_config_supported_natively(struct block_device *bdev,
+ 					  const struct blk_crypto_config *cfg)
+@@ -398,6 +400,7 @@ int blk_crypto_start_using_key(struct bl
+ 		return 0;
+ 	return blk_crypto_fallback_start_using_mode(key->crypto_cfg.crypto_mode);
+ }
++EXPORT_SYMBOL_GPL(blk_crypto_start_using_key);
+ 
+ /**
+  * blk_crypto_evict_key() - Evict a blk_crypto_key from a block_device

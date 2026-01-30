@@ -1,8 +1,8 @@
-Index: kernel-rpi-6_1/security/selinux/hooks.c
+Index: kernel-rpi/security/selinux/hooks.c
 ===================================================================
---- kernel-rpi-6_1.orig/security/selinux/hooks.c
-+++ kernel-rpi-6_1/security/selinux/hooks.c
-@@ -103,6 +103,9 @@
+--- kernel-rpi.orig/security/selinux/hooks.c
++++ kernel-rpi/security/selinux/hooks.c
+@@ -105,6 +105,9 @@
  #include "netlabel.h"
  #include "audit.h"
  #include "avc_ss.h"
@@ -12,7 +12,7 @@ Index: kernel-rpi-6_1/security/selinux/hooks.c
  
  #define SELINUX_INODE_INIT_XATTRS 1
  
-@@ -465,10 +468,36 @@ static int selinux_is_genfs_special_hand
+@@ -472,10 +475,36 @@ static int selinux_is_genfs_special_hand
  		  !strcmp(sb->s_type->name, "cgroup2")));
  }
  
@@ -49,7 +49,7 @@ Index: kernel-rpi-6_1/security/selinux/hooks.c
  	/*
  	 * IMPORTANT: Double-check logic in this function when adding a new
  	 * SECURITY_FS_USE_* definition!
-@@ -3427,7 +3456,14 @@ static int selinux_inode_getsecurity(str
+@@ -3441,7 +3470,14 @@ static int selinux_inode_getsecurity(str
  	 * and lack of permission just means that we fall back to the
  	 * in-core context value, not a denial.
  	 */
@@ -64,7 +64,7 @@ Index: kernel-rpi-6_1/security/selinux/hooks.c
  	if (has_cap_mac_admin(false))
  		error = security_sid_to_context_force(isec->sid, &context,
  						      &size);
-@@ -3456,8 +3492,18 @@ static int selinux_inode_setsecurity(str
+@@ -3470,8 +3506,18 @@ static int selinux_inode_setsecurity(str
  
  	if (strcmp(name, XATTR_SELINUX_SUFFIX))
  		return -EOPNOTSUPP;

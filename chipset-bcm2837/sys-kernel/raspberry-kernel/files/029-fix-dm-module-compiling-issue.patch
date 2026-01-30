@@ -1,7 +1,7 @@
-Index: kernel-rpi-6_1/block/early-lookup.c
+Index: kernel-rpi/block/early-lookup.c
 ===================================================================
---- kernel-rpi-6_1.orig/block/early-lookup.c
-+++ kernel-rpi-6_1/block/early-lookup.c
+--- kernel-rpi.orig/block/early-lookup.c
++++ kernel-rpi/block/early-lookup.c
 @@ -18,7 +18,7 @@ struct uuidcmp {
   *
   * Returns 1 if the device matches, and 0 otherwise.

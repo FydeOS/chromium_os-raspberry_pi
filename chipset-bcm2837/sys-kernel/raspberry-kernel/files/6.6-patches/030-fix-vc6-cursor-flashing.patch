@@ -1,0 +1,295 @@
+Index: kernel-rpi-6_6/drivers/gpu/drm/vc4/vc4_hvs.c
+===================================================================
+--- kernel-rpi-6_6.orig/drivers/gpu/drm/vc4/vc4_hvs.c
++++ kernel-rpi-6_6/drivers/gpu/drm/vc4/vc4_hvs.c
+@@ -1453,10 +1453,8 @@ void vc4_hvs_atomic_flush(struct drm_crt
+ 
+ 	WARN_ON_ONCE(vc4->gen > VC4_GEN_6);
+ 
+-	if (!drm_dev_enter(dev, &idx)) {
+-		vc4_crtc_send_vblank(crtc);
+-		return;
+-	}
++	if (!drm_dev_enter(dev, &idx))
++    goto end;
+ 
+ 	if (vc4_state->assigned_channel == VC4_HVS_CHANNEL_DISABLED)
+ 		goto exit;
+@@ -1501,7 +1499,6 @@ void vc4_hvs_atomic_flush(struct drm_crt
+ 
+ 	writel(SCALER_CTL0_END, dlist_next);
+ 	dlist_next++;
+-
+ 	WARN_ON(!vc4_state->mm);
+ 	WARN_ON_ONCE(dlist_next - dlist_start != vc4_state->mm->mm_node.size);
+ 
+@@ -1567,6 +1564,8 @@ void vc4_hvs_atomic_flush(struct drm_crt
+ 
+ exit:
+ 	drm_dev_exit(idx);
++end:
++	vc4_crtc_send_vblank(crtc);
+ }
+ 
+ void vc4_hvs_mask_underrun(struct vc4_hvs *hvs, int channel)
+@@ -2164,6 +2163,7 @@ static int vc4_hvs_cob_init(struct vc4_h
+ 		#define VC6_COB_LINE_WIDTH	3840
+ 		#define VC6_COB_NUM_LINES	4
+ 		reg = 0;
++    base = 0;
+ 		top = 3840;
+ 
+ 		HVS_WRITE(SCALER6(DISP2_COB),
+Index: kernel-rpi-6_6/drivers/gpu/drm/vc4/vc4_plane.c
+===================================================================
+--- kernel-rpi-6_6.orig/drivers/gpu/drm/vc4/vc4_plane.c
++++ kernel-rpi-6_6/drivers/gpu/drm/vc4/vc4_plane.c
+@@ -2278,8 +2278,7 @@ u32 vc4_plane_write_dlist(struct drm_pla
+ 
+ 	/* Can't memcpy_toio() because it needs to be 32-bit writes. */
+ 	for (i = 0; i < vc4_state->dlist_count; i++)
+-		writel(vc4_state->dlist[i], &dlist[i]);
+-
++	  writel(vc4_state->dlist[i], &dlist[i]);
+ 	drm_dev_exit(idx);
+ 
+ out:
+@@ -2347,66 +2346,82 @@ void vc4_plane_async_set_fb(struct drm_p
+ 	drm_dev_exit(idx);
+ }
+ 
++static void init_commit(struct drm_crtc_commit *commit, struct drm_crtc *crtc)
++{
++	init_completion(&commit->flip_done);
++	init_completion(&commit->hw_done);
++	init_completion(&commit->cleanup_done);
++	INIT_LIST_HEAD(&commit->commit_entry);
++	kref_init(&commit->ref);
++	commit->crtc = crtc;
++}
++
++static int vc4_async_setup_commit(struct drm_plane *plane) {
++  struct drm_crtc_commit *commit;
++  commit = kzalloc(sizeof(*commit), GFP_KERNEL);
++  if (!commit)
++    return -ENOMEM;
++  init_commit(commit, NULL);
++  drm_crtc_commit_get(commit);
++  plane->state->commit = commit;
++  return 0;
++}
++
++static void vc4_async_complete_commit(struct drm_plane *plane, int delay) {
++  struct drm_crtc_commit *commit;
++  commit = plane->state->commit;
++  if (commit && plane->state->visible) {
++    mdelay(delay);
++    complete_all(&commit->hw_done);
++    complete_all(&commit->flip_done);
++  }
++}
++
++#define ASYNC_UPDATE_DELAY 10
++#define TOP_CURSOR_STRIP_DELAY 3
++#define MIN_UPDATE_INTERVAL 15
++
+ static void vc4_plane_atomic_async_update(struct drm_plane *plane,
+ 					  struct drm_atomic_state *state)
+ {
+-	struct drm_plane_state *new_plane_state = drm_atomic_get_new_plane_state(state,
+-										 plane);
+-	struct vc4_plane_state *vc4_state, *new_vc4_state;
++  struct drm_plane_state *old_plane_state, *new_plane_state;
++	struct vc4_plane_state *vc4_state;
++  struct drm_crtc_commit *commit;
+ 	int idx;
++  int i = drm_plane_index(plane);
++  int delay = ASYNC_UPDATE_DELAY;
++  int ret = 0;
+ 
+ 	if (!drm_dev_enter(plane->dev, &idx))
+ 		return;
+-
+-	swap(plane->state->fb, new_plane_state->fb);
+-	plane->state->crtc_x = new_plane_state->crtc_x;
+-	plane->state->crtc_y = new_plane_state->crtc_y;
+-	plane->state->crtc_w = new_plane_state->crtc_w;
+-	plane->state->crtc_h = new_plane_state->crtc_h;
+-	plane->state->src_x = new_plane_state->src_x;
+-	plane->state->src_y = new_plane_state->src_y;
+-	plane->state->src_w = new_plane_state->src_w;
+-	plane->state->src_h = new_plane_state->src_h;
+-	plane->state->alpha = new_plane_state->alpha;
+-	plane->state->pixel_blend_mode = new_plane_state->pixel_blend_mode;
+-	plane->state->rotation = new_plane_state->rotation;
+-	plane->state->zpos = new_plane_state->zpos;
+-	plane->state->normalized_zpos = new_plane_state->normalized_zpos;
+-	plane->state->color_encoding = new_plane_state->color_encoding;
+-	plane->state->color_range = new_plane_state->color_range;
+-	plane->state->src = new_plane_state->src;
+-	plane->state->dst = new_plane_state->dst;
+-	plane->state->visible = new_plane_state->visible;
+-
+-	new_vc4_state = to_vc4_plane_state(new_plane_state);
+-	vc4_state = to_vc4_plane_state(plane->state);
+-
+-	vc4_state->crtc_x = new_vc4_state->crtc_x;
+-	vc4_state->crtc_y = new_vc4_state->crtc_y;
+-	vc4_state->crtc_h = new_vc4_state->crtc_h;
+-	vc4_state->crtc_w = new_vc4_state->crtc_w;
+-	vc4_state->src_x = new_vc4_state->src_x;
+-	vc4_state->src_y = new_vc4_state->src_y;
+-	memcpy(vc4_state->src_w, new_vc4_state->src_w,
+-	       sizeof(vc4_state->src_w));
+-	memcpy(vc4_state->src_h, new_vc4_state->src_h,
+-	       sizeof(vc4_state->src_h));
+-	memcpy(vc4_state->x_scaling, new_vc4_state->x_scaling,
+-	       sizeof(vc4_state->x_scaling));
+-	memcpy(vc4_state->y_scaling, new_vc4_state->y_scaling,
+-	       sizeof(vc4_state->y_scaling));
+-	vc4_state->is_unity = new_vc4_state->is_unity;
+-	vc4_state->is_yuv = new_vc4_state->is_yuv;
+-	vc4_state->needs_bg_fill = new_vc4_state->needs_bg_fill;
+-
+-	/* Update the current vc4_state pos0, pos2 and ptr0 dlist entries. */
+-	vc4_state->dlist[vc4_state->pos0_offset] =
+-		new_vc4_state->dlist[vc4_state->pos0_offset];
+-	vc4_state->dlist[vc4_state->pos2_offset] =
+-		new_vc4_state->dlist[vc4_state->pos2_offset];
+-	vc4_state->dlist[vc4_state->ptr0_offset[0]] =
+-		new_vc4_state->dlist[vc4_state->ptr0_offset[0]];
+-
++  new_plane_state = state->planes[i].new_state;
++  old_plane_state = state->planes[i].old_state;
++  commit = old_plane_state->commit;
++  old_plane_state->state = state;
++  new_plane_state->state = NULL;
++  plane->state = new_plane_state;
++  state->planes[i].state = old_plane_state;
++  vc4_state = to_vc4_plane_state(old_plane_state);
++  if (ktime_before(ktime_get(),
++      ktime_add_ms(vc4_state->update_time, MIN_UPDATE_INTERVAL))) {
++    if (commit) {
++      old_plane_state->commit = NULL;
++      new_plane_state->commit = commit;
++    }
++    goto end;
++  }
++  ret = vc4_async_setup_commit(plane);
++  if (ret)
++    drm_err(plane->dev, "Failed to alloc commit.");
++  vc4_state = to_vc4_plane_state(plane->state);
++  vc4_state->update_time = ktime_get();
++  /* I really hate this stdupid delay, but it fixed the cursor's
++  *  flashing on the top of screen for raspberry pi 5.
++  */
++  if (vc4_state->crtc_y < vc4_state->crtc_h){
++    mdelay(TOP_CURSOR_STRIP_DELAY);
++    delay -= TOP_CURSOR_STRIP_DELAY;
++  }
+ 	/* Note that we can't just call vc4_plane_write_dlist()
+ 	 * because that would smash the context data that the HVS is
+ 	 * currently using.
+@@ -2417,7 +2432,8 @@ static void vc4_plane_atomic_async_updat
+ 	       &vc4_state->hw_dlist[vc4_state->pos2_offset]);
+ 	writel(vc4_state->dlist[vc4_state->ptr0_offset[0]],
+ 	       &vc4_state->hw_dlist[vc4_state->ptr0_offset[0]]);
+-
++  vc4_async_complete_commit(plane, delay);
++end:
+ 	drm_dev_exit(idx);
+ }
+ 
+@@ -2426,18 +2442,9 @@ static int vc4_plane_atomic_async_check(
+ {
+ 	struct drm_plane_state *new_plane_state = drm_atomic_get_new_plane_state(state,
+ 										 plane);
+-	struct vc4_dev *vc4 = to_vc4_dev(plane->dev);
+ 	struct vc4_plane_state *old_vc4_state, *new_vc4_state;
+-	int ret;
+ 	u32 i;
+ 
+-	if (vc4->gen >= VC4_GEN_6)
+-		ret = vc6_plane_mode_set(plane, new_plane_state);
+-	else
+-		ret = vc4_plane_mode_set(plane, new_plane_state);
+-	if (ret)
+-		return ret;
+-
+ 	old_vc4_state = to_vc4_plane_state(plane->state);
+ 	new_vc4_state = to_vc4_plane_state(new_plane_state);
+ 
+@@ -2465,7 +2472,6 @@ static int vc4_plane_atomic_async_check(
+ 		if (new_vc4_state->dlist[i] != old_vc4_state->dlist[i])
+ 			return -EINVAL;
+ 	}
+-
+ 	return 0;
+ }
+ 
+Index: kernel-rpi-6_6/drivers/gpu/drm/vc4/vc4_crtc.c
+===================================================================
+--- kernel-rpi-6_6.orig/drivers/gpu/drm/vc4/vc4_crtc.c
++++ kernel-rpi-6_6/drivers/gpu/drm/vc4/vc4_crtc.c
+@@ -932,9 +932,7 @@ vc4_async_page_flip_complete(struct vc4_
+ {
+ 	struct drm_crtc *crtc = flip_state->crtc;
+ 	struct drm_device *dev = crtc->dev;
+-	struct drm_plane *plane = crtc->primary;
+ 
+-	vc4_plane_async_set_fb(plane, flip_state->fb);
+ 	if (flip_state->event) {
+ 		unsigned long flags;
+ 
+Index: kernel-rpi-6_6/drivers/gpu/drm/vc4/vc4_kms.c
+===================================================================
+--- kernel-rpi-6_6.orig/drivers/gpu/drm/vc4/vc4_kms.c
++++ kernel-rpi-6_6/drivers/gpu/drm/vc4/vc4_kms.c
+@@ -266,7 +266,7 @@ static void vc5_hvs_pv_muxing_commit(str
+ 	struct vc4_hvs *hvs = vc4->hvs;
+ 	struct drm_crtc_state *crtc_state;
+ 	struct drm_crtc *crtc;
+-	unsigned char mux;
++	unsigned char mux = 0;
+ 	unsigned int i;
+ 	u32 reg;
+ 
+@@ -350,7 +350,7 @@ static void vc6_hvs_pv_muxing_commit(str
+ 		struct vc4_crtc_state *vc4_state = to_vc4_crtc_state(crtc_state);
+ 		struct vc4_encoder *vc4_encoder;
+ 		struct drm_encoder *encoder;
+-		unsigned char mux;
++		unsigned char mux = 0;
+ 		u32 reg;
+ 
+ 		if (!vc4_state->update_muxing)
+@@ -511,8 +511,6 @@ static void vc4_atomic_commit_tail(struc
+ 
+ static int vc4_atomic_commit_setup(struct drm_atomic_state *state)
+ {
+-	struct drm_device *dev = state->dev;
+-	struct vc4_dev *vc4 = to_vc4_dev(dev);
+ 	struct drm_crtc_state *crtc_state;
+ 	struct vc4_hvs_state *hvs_state;
+ 	struct drm_crtc *crtc;
+@@ -523,8 +521,6 @@ static int vc4_atomic_commit_setup(struc
+ 	 * drm_atomic_helper_setup_commit() from auto-completing
+ 	 * commit->flip_done.
+ 	 */
+-	if (!vc4->firmware_kms)
+-		state->legacy_cursor_update = false;
+ 	hvs_state = vc4_hvs_get_new_global_state(state);
+ 	if (WARN_ON(IS_ERR(hvs_state)))
+ 		return PTR_ERR(hvs_state);
+Index: kernel-rpi-6_6/drivers/gpu/drm/vc4/vc4_drv.h
+===================================================================
+--- kernel-rpi-6_6.orig/drivers/gpu/drm/vc4/vc4_drv.h
++++ kernel-rpi-6_6/drivers/gpu/drm/vc4/vc4_drv.h
+@@ -505,6 +505,7 @@ struct vc4_plane_state {
+ 	 * bytes/sec.
+ 	 */
+ 	u64 membus_load;
++  ktime_t update_time;
+ };
+ 
+ #define to_vc4_plane_state(_state)				\

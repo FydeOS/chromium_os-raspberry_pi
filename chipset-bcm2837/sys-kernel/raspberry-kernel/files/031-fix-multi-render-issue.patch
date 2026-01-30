@@ -1,9 +1,9 @@
-Index: kernel-rpi-6_6/drivers/gpu/drm/v3d/v3d_gem.c
+Index: kernel-rpi/drivers/gpu/drm/v3d/v3d_submit.c
 ===================================================================
---- kernel-rpi-6_6.orig/drivers/gpu/drm/v3d/v3d_gem.c
-+++ kernel-rpi-6_6/drivers/gpu/drm/v3d/v3d_gem.c
-@@ -702,8 +702,7 @@ v3d_get_extensions(struct drm_file *file
- 				return ret;
+--- kernel-rpi.orig/drivers/gpu/drm/v3d/v3d_submit.c
++++ kernel-rpi/drivers/gpu/drm/v3d/v3d_submit.c
+@@ -923,8 +923,7 @@ v3d_get_extensions(struct drm_file *file
+ 			ret = v3d_get_cpu_copy_performance_query_params(file_priv, user_ext, job);
  			break;
  		default:
 -			DRM_DEBUG_DRIVER("Unknown extension id: %d\n", ext.id);
@@ -11,4 +11,11 @@ Index: kernel-rpi-6_6/drivers/gpu/drm/v3d/v3d_gem.c
 +			DRM_ERROR("Unknown extension id: %d\n", ext.id);
  		}
  
- 		user_ext = u64_to_user_ptr(ext.next);
+ 		if (ret)
+@@ -1477,4 +1476,4 @@ void v3d_submit_init(struct drm_device *
+ 	/* kick the clock so firmware knows we are using firmware clock interface */
+ 	v3d_clock_up_get(v3d);
+ 	v3d_clock_up_put(v3d);
+-}
+\ No newline at end of file
++}

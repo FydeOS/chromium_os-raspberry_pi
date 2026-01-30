@@ -1,0 +1,48 @@
+Index: kernel-rpi/drivers/net/wireless/broadcom/brcm80211/brcmfmac/fweh.h
+===================================================================
+--- kernel-rpi.orig/drivers/net/wireless/broadcom/brcm80211/brcmfmac/fweh.h
++++ kernel-rpi/drivers/net/wireless/broadcom/brcm80211/brcmfmac/fweh.h
+@@ -293,7 +293,7 @@ enum event_msgs_ext_command {
+ };
+ 
+ #define EVENTMSGS_VER 1
+-#define EVENTMSGS_EXT_STRUCT_SIZE	offsetof(struct eventmsgs_ext, mask[0])
++#define EVENTMSGS_EXT_STRUCT_SIZE	offsetof(struct eventmsgs_ext, mask)
+ 
+ /* len-	for SET it would be mask size from the application to the firmware */
+ /*		for GET it would be actual firmware mask size */
+@@ -304,7 +304,7 @@ struct eventmsgs_ext {
+ 	u8	command;
+ 	u8	len;
+ 	u8	maxgetsize;
+-	u8	mask[1];
++	u8	mask[];
+ };
+ 
+ typedef int (*brcmf_fweh_handler_t)(struct brcmf_if *ifp,
+Index: kernel-rpi/drivers/net/wireless/broadcom/brcm80211/brcmfmac/fwil_types.h
+===================================================================
+--- kernel-rpi.orig/drivers/net/wireless/broadcom/brcm80211/brcmfmac/fwil_types.h
++++ kernel-rpi/drivers/net/wireless/broadcom/brcm80211/brcmfmac/fwil_types.h
+@@ -641,7 +641,7 @@ struct brcmf_mf_params_le {
+ 	u8 da[ETH_ALEN];
+ 	u8 bssid[ETH_ALEN];
+ 	__le32 packet_id;
+-	u8 data[1];
++	u8 data[];
+ };
+ 
+ /* Used to get specific STA parameters */
+Index: kernel-rpi/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
+===================================================================
+--- kernel-rpi.orig/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
++++ kernel-rpi/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
+@@ -6906,7 +6906,7 @@ brcmf_notify_auth_frame_rx(struct brcmf_
+ 	brcmf_fil_cmd_data_get(ifp, BRCMF_C_GET_BSSID, mgmt_frame->bssid,
+ 			       ETH_ALEN);
+ 	frame += offsetof(struct ieee80211_mgmt, u);
+-	memcpy(&mgmt_frame->u, frame,
++	memcpy((u8 *)mgmt_frame + offsetof(struct ieee80211_mgmt, u), frame,
+ 	       mgmt_frame_len - offsetof(struct ieee80211_mgmt, u));
+ 
+ 	freq = ieee80211_channel_to_frequency(ch.control_ch_num,

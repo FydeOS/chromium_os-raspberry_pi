@@ -1,28 +1,31 @@
-Index: v6.6-rpi/arch/arm64/Kconfig
+Index: kernel-rpi/arch/arm64/Kconfig
 ===================================================================
---- v6.6-rpi.orig/arch/arm64/Kconfig
-+++ v6.6-rpi/arch/arm64/Kconfig
-@@ -25,6 +25,7 @@ config ARM64
- 	select ARCH_HAS_DEBUG_VM_PGTABLE
+--- kernel-rpi.orig/arch/arm64/Kconfig
++++ kernel-rpi/arch/arm64/Kconfig
+@@ -27,6 +27,7 @@ config ARM64
+ 	select ARCH_HAS_DMA_OPS if XEN
  	select ARCH_HAS_DMA_PREP_COHERENT
  	select ARCH_HAS_ACPI_TABLE_UPGRADE if ACPI
 +  select ARCH_HAS_ALT_SYSCALL
  	select ARCH_HAS_FAST_MULTIPLIER
  	select ARCH_HAS_FORTIFY_SOURCE
  	select ARCH_HAS_GCOV_PROFILE_ALL
-Index: v6.6-rpi/arch/arm64/include/asm/thread_info.h
+Index: kernel-rpi/arch/arm64/include/asm/thread_info.h
 ===================================================================
---- v6.6-rpi.orig/arch/arm64/include/asm/thread_info.h
-+++ v6.6-rpi/arch/arm64/include/asm/thread_info.h
-@@ -17,6 +17,7 @@ struct task_struct;
+--- kernel-rpi.orig/arch/arm64/include/asm/thread_info.h
++++ kernel-rpi/arch/arm64/include/asm/thread_info.h
+@@ -17,6 +17,10 @@ struct task_struct;
  #include <asm/memory.h>
  #include <asm/stack_pointer.h>
  #include <asm/types.h>
 +#include <asm/unistd.h>
++#ifdef CONFIG_COMPAT
++#include <asm/unistd_compat_32.h>
++#endif
  
  /*
   * low level task data that entry.S needs immediate access to.
-@@ -43,8 +44,32 @@ struct thread_info {
+@@ -43,8 +47,32 @@ struct thread_info {
  	void			*scs_sp;
  #endif
  	u32			cpu;
@@ -39,7 +42,7 @@ Index: v6.6-rpi/arch/arm64/include/asm/thread_info.h
 +#ifdef CONFIG_ALT_SYSCALL
 +#ifdef CONFIG_COMPAT
 +#define INIT_THREAD_INFO_SYSCALL_COMPAT       \
-+  .compat_nr_syscalls = __NR_compat_syscalls,   \
++  .compat_nr_syscalls = __NR_compat32_syscalls,   \
 +  .compat_sys_call_table  = &compat_sys_call_table,
 +#else
 +#define INIT_THREAD_INFO_SYSCALL_COMPAT
@@ -55,7 +58,7 @@ Index: v6.6-rpi/arch/arm64/include/asm/thread_info.h
  #define thread_saved_pc(tsk)	\
  	((unsigned long)(tsk->thread.cpu_context.pc))
  #define thread_saved_sp(tsk)	\
-@@ -119,6 +144,7 @@ void arch_setup_new_exec(void);
+@@ -122,6 +150,7 @@ void arch_setup_new_exec(void);
  	.flags		= _TIF_FOREIGN_FPSTATE,				\
  	.preempt_count	= INIT_PREEMPT_COUNT,				\
  	INIT_SCS							\
@@ -63,373 +66,380 @@ Index: v6.6-rpi/arch/arm64/include/asm/thread_info.h
  }
  
  #endif /* __ASM_THREAD_INFO_H */
-Index: v6.6-rpi/arch/arm64/include/asm/unistd.h
+Index: kernel-rpi/arch/arm64/include/asm/unistd.h
 ===================================================================
---- v6.6-rpi.orig/arch/arm64/include/asm/unistd.h
-+++ v6.6-rpi/arch/arm64/include/asm/unistd.h
-@@ -21,13 +21,349 @@
-  */
- #define __NR_compat_restart_syscall	0
- #define __NR_compat_exit		1
-+#define __NR_compat_fork		2
- #define __NR_compat_read		3
- #define __NR_compat_write		4
-+#define __NR_compat_open		5
-+#define __NR_compat_close		6
-+#define __NR_compat_creat		8
-+#define __NR_compat_link		9
-+#define __NR_compat_unlink		10
-+#define __NR_compat_execve		11
-+#define __NR_compat_chdir		12
-+#define __NR_compat_mknod		14
-+#define __NR_compat_chmod		15
-+#define __NR_compat_lchown		16
-+#define __NR_compat_lseek		19
-+#define __NR_compat_getpid		20
-+#define __NR_compat_mount		21
-+#define __NR_compat_setuid		23
-+#define __NR_compat_getuid		24
-+#define __NR_compat_ptrace		26
-+#define __NR_compat_pause		29
-+#define __NR_compat_access		33
-+#define __NR_compat_nice		34
-+#define __NR_compat_sync		36
-+#define __NR_compat_kill		37
-+#define __NR_compat_rename		38
-+#define __NR_compat_mkdir		39
-+#define __NR_compat_rmdir		40
-+#define __NR_compat_dup			41
-+#define __NR_compat_pipe		42
-+#define __NR_compat_times		43
-+#define __NR_compat_brk			45
-+#define __NR_compat_setgid		46
-+#define __NR_compat_getgid		47
-+#define __NR_compat_geteuid		49
-+#define __NR_compat_getegid		50
-+#define __NR_compat_acct		51
-+#define __NR_compat_umount2		52
-+#define __NR_compat_ioctl		54
-+#define __NR_compat_fcntl		55
-+#define __NR_compat_setpgid		57
-+#define __NR_compat_umask		60
-+#define __NR_compat_chroot		61
-+#define __NR_compat_ustat		62
-+#define __NR_compat_dup2		63
-+#define __NR_compat_getppid		64
-+#define __NR_compat_getpgrp		65
-+#define __NR_compat_setsid		66
-+#define __NR_compat_sigaction		67
-+#define __NR_compat_setreuid		70
-+#define __NR_compat_setregid		71
-+#define __NR_compat_sigsuspend		72
-+#define __NR_compat_sigpending		73
-+#define __NR_compat_sethostname		74
-+#define __NR_compat_setrlimit		75
-+#define __NR_compat_getrusage		77
- #define __NR_compat_gettimeofday	78
-+#define __NR_compat_settimeofday	79
-+#define __NR_compat_getgroups		80
-+#define __NR_compat_setgroups		81
-+#define __NR_compat_symlink		83
-+#define __NR_compat_readlink		85
-+#define __NR_compat_uselib		86
-+#define __NR_compat_swapon		87
-+#define __NR_compat_reboot		88
-+#define __NR_compat_munmap		91
-+#define __NR_compat_truncate		92
-+#define __NR_compat_ftruncate		93
-+#define __NR_compat_fchmod		94
-+#define __NR_compat_fchown		95
-+#define __NR_compat_getpriority		96
-+#define __NR_compat_setpriority		97
-+#define __NR_compat_statfs		99
-+#define __NR_compat_fstatfs		100
-+#define __NR_compat_syslog		103
-+#define __NR_compat_setitimer		104
-+#define __NR_compat_getitimer		105
-+#define __NR_compat_stat		106
-+#define __NR_compat_lstat		107
-+#define __NR_compat_fstat		108
-+#define __NR_compat_vhangup		111
-+#define __NR_compat_wait4		114
-+#define __NR_compat_swapoff		115
-+#define __NR_compat_sysinfo		116
-+#define __NR_compat_fsync		118
- #define __NR_compat_sigreturn		119
-+#define __NR_compat_clone		120
-+#define __NR_compat_setdomainname	121
-+#define __NR_compat_uname		122
-+#define __NR_compat_adjtimex		124
-+#define __NR_compat_mprotect		125
-+#define __NR_compat_sigprocmask		126
-+#define __NR_compat_init_module		128
-+#define __NR_compat_delete_module	129
-+#define __NR_compat_quotactl		131
-+#define __NR_compat_getpgid		132
-+#define __NR_compat_fchdir		133
-+#define __NR_compat_bdflush		134
-+#define __NR_compat_sysfs		135
-+#define __NR_compat_personality		136
-+#define __NR_compat_setfsuid		138
-+#define __NR_compat_setfsgid		139
-+#define __NR_compat__llseek		140
-+#define __NR_compat_getdents		141
-+#define __NR_compat__newselect		142
-+#define __NR_compat_flock		143
-+#define __NR_compat_msync		144
-+#define __NR_compat_readv		145
-+#define __NR_compat_writev		146
-+#define __NR_compat_getsid		147
-+#define __NR_compat_fdatasync		148
-+#define __NR_compat__sysctl		149
-+#define __NR_compat_mlock		150
-+#define __NR_compat_munlock		151
-+#define __NR_compat_mlockall		152
-+#define __NR_compat_munlockall		153
-+#define __NR_compat_sched_setparam	154
-+#define __NR_compat_sched_getparam	155
-+#define __NR_compat_sched_setscheduler	156
-+#define __NR_compat_sched_getscheduler	157
-+#define __NR_compat_sched_yield		158
-+#define __NR_compat_sched_get_priority_max	159
-+#define __NR_compat_sched_get_priority_min	160
-+#define __NR_compat_sched_rr_get_interval	161
-+#define __NR_compat_nanosleep		162
-+#define __NR_compat_mremap		163
-+#define __NR_compat_setresuid		164
-+#define __NR_compat_getresuid		165
-+#define __NR_compat_poll		168
-+#define __NR_compat_nfsservctl		169
-+#define __NR_compat_setresgid		170
-+#define __NR_compat_getresgid		171
-+#define __NR_compat_prctl		172
- #define __NR_compat_rt_sigreturn	173
-+#define __NR_compat_rt_sigaction	174
-+#define __NR_compat_rt_sigprocmask	175
-+#define __NR_compat_rt_sigpending	176
-+#define __NR_compat_rt_sigtimedwait	177
-+#define __NR_compat_rt_sigqueueinfo	178
-+#define __NR_compat_rt_sigsuspend	179
-+#define __NR_compat_pread64		180
-+#define __NR_compat_pwrite64		181
-+#define __NR_compat_chown		182
-+#define __NR_compat_getcwd		183
-+#define __NR_compat_capget		184
-+#define __NR_compat_capset		185
-+#define __NR_compat_sigaltstack		186
-+#define __NR_compat_sendfile		187
-+#define __NR_compat_vfork		190
-+#define __NR_compat_ugetrlimit		191
-+#define __NR_compat_mmap2		192
-+#define __NR_compat_truncate64		193
-+#define __NR_compat_ftruncate64		194
-+#define __NR_compat_stat64		195
-+#define __NR_compat_lstat64		196
-+#define __NR_compat_fstat64		197
-+#define __NR_compat_lchown32		198
-+#define __NR_compat_getuid32		199
-+#define __NR_compat_getgid32		200
-+#define __NR_compat_geteuid32		201
-+#define __NR_compat_getegid32		202
-+#define __NR_compat_setreuid32		203
-+#define __NR_compat_setregid32		204
-+#define __NR_compat_getgroups32		205
-+#define __NR_compat_setgroups32		206
-+#define __NR_compat_fchown32		207
-+#define __NR_compat_setresuid32		208
-+#define __NR_compat_getresuid32		209
-+#define __NR_compat_setresgid32		210
-+#define __NR_compat_getresgid32		211
-+#define __NR_compat_chown32		212
-+#define __NR_compat_setuid32		213
-+#define __NR_compat_setgid32		214
-+#define __NR_compat_setfsuid32		215
-+#define __NR_compat_setfsgid32		216
-+#define __NR_compat_getdents64		217
-+#define __NR_compat_pivot_root		218
-+#define __NR_compat_mincore		219
-+#define __NR_compat_madvise		220
-+#define __NR_compat_fcntl64		221
-+#define __NR_compat_gettid		224
-+#define __NR_compat_readahead		225
-+#define __NR_compat_setxattr		226
-+#define __NR_compat_lsetxattr		227
-+#define __NR_compat_fsetxattr		228
-+#define __NR_compat_getxattr		229
-+#define __NR_compat_lgetxattr		230
-+#define __NR_compat_fgetxattr		231
-+#define __NR_compat_listxattr		232
-+#define __NR_compat_llistxattr		233
-+#define __NR_compat_flistxattr		234
-+#define __NR_compat_removexattr		235
-+#define __NR_compat_lremovexattr	236
-+#define __NR_compat_fremovexattr	237
-+#define __NR_compat_tkill		238
-+#define __NR_compat_sendfile64		239
-+#define __NR_compat_futex		240
-+#define __NR_compat_sched_setaffinity	241
-+#define __NR_compat_sched_getaffinity	242
-+#define __NR_compat_io_setup		243
-+#define __NR_compat_io_destroy		244
-+#define __NR_compat_io_getevents	245
-+#define __NR_compat_io_submit		246
-+#define __NR_compat_io_cancel		247
-+#define __NR_compat_exit_group		248
-+#define __NR_compat_lookup_dcookie	249
-+#define __NR_compat_epoll_create	250
-+#define __NR_compat_epoll_ctl		251
-+#define __NR_compat_epoll_wait		252
-+#define __NR_compat_remap_file_pages	253
-+#define __NR_compat_set_tid_address	256
-+#define __NR_compat_timer_create	257
-+#define __NR_compat_timer_settime	258
-+#define __NR_compat_timer_gettime	259
-+#define __NR_compat_timer_getoverrun	260
-+#define __NR_compat_timer_delete	261
-+#define __NR_compat_clock_settime	262
- #define __NR_compat_clock_gettime	263
- #define __NR_compat_clock_getres	264
-+#define __NR_compat_clock_nanosleep	265
-+#define __NR_compat_statfs64		266
-+#define __NR_compat_fstatfs64		267
-+#define __NR_compat_tgkill		268
-+#define __NR_compat_utimes		269
-+#define __NR_compat_arm_fadvise64_64	270
-+#define __NR_compat_pciconfig_iobase	271
-+#define __NR_compat_pciconfig_read	272
-+#define __NR_compat_pciconfig_write	273
-+#define __NR_compat_mq_open		274
-+#define __NR_compat_mq_unlink		275
-+#define __NR_compat_mq_timedsend	276
-+#define __NR_compat_mq_timedreceive	277
-+#define __NR_compat_mq_notify		278
-+#define __NR_compat_mq_getsetattr	279
-+#define __NR_compat_waitid		280
-+#define __NR_compat_socket		281
-+#define __NR_compat_bind		282
-+#define __NR_compat_connect		283
-+#define __NR_compat_listen		284
-+#define __NR_compat_accept		285
-+#define __NR_compat_getsockname		286
-+#define __NR_compat_getpeername		287
-+#define __NR_compat_socketpair		288
-+#define __NR_compat_send		289
-+#define __NR_compat_sendto		290
-+#define __NR_compat_recv		291
-+#define __NR_compat_recvfrom		292
-+#define __NR_compat_shutdown		293
-+#define __NR_compat_setsockopt		294
-+#define __NR_compat_getsockopt		295
-+#define __NR_compat_sendmsg		296
-+#define __NR_compat_recvmsg		297
-+#define __NR_compat_semop		298
-+#define __NR_compat_semget		299
-+#define __NR_compat_semctl		300
-+#define __NR_compat_msgsnd		301
-+#define __NR_compat_msgrcv		302
-+#define __NR_compat_msgget		303
-+#define __NR_compat_msgctl		304
-+#define __NR_compat_shmat		305
-+#define __NR_compat_shmdt		306
-+#define __NR_compat_shmget		307
-+#define __NR_compat_shmctl		308
-+#define __NR_compat_add_key		309
-+#define __NR_compat_request_key		310
-+#define __NR_compat_keyctl		311
-+#define __NR_compat_semtimedop		312
-+#define __NR_compat_vserver		313
-+#define __NR_compat_ioprio_set		314
-+#define __NR_compat_ioprio_get		315
-+#define __NR_compat_inotify_init	316
-+#define __NR_compat_inotify_add_watch	317
-+#define __NR_compat_inotify_rm_watch	318
-+#define __NR_compat_mbind		319
-+#define __NR_compat_get_mempolicy	320
-+#define __NR_compat_set_mempolicy	321
-+#define __NR_compat_openat		322
-+#define __NR_compat_mkdirat		323
-+#define __NR_compat_mknodat		324
-+#define __NR_compat_fchownat		325
-+#define __NR_compat_futimesat		326
-+#define __NR_compat_fstatat64		327
-+#define __NR_compat_unlinkat		328
-+#define __NR_compat_renameat		329
-+#define __NR_compat_linkat		330
-+#define __NR_compat_symlinkat		331
-+#define __NR_compat_readlinkat		332
-+#define __NR_compat_fchmodat		333
-+#define __NR_compat_faccessat		334
-+#define __NR_compat_pselect6		335
-+#define __NR_compat_ppoll		336
-+#define __NR_compat_unshare		337
-+#define __NR_compat_set_robust_list	338
-+#define __NR_compat_get_robust_list	339
-+#define __NR_compat_splice		340
-+#define __NR_compat_sync_file_range2	341
-+#define __NR_compat_tee			342
-+#define __NR_compat_vmsplice		343
-+#define __NR_compat_move_pages		344
-+#define __NR_compat_getcpu		345
-+#define __NR_compat_epoll_pwait		346
-+#define __NR_compat_kexec_load		347
-+#define __NR_compat_utimensat		348
-+#define __NR_compat_signalfd		349
-+#define __NR_compat_timerfd_create	350
-+#define __NR_compat_eventfd		351
-+#define __NR_compat_fallocate		352
-+#define __NR_compat_timerfd_settime	353
-+#define __NR_compat_timerfd_gettime	354
-+#define __NR_compat_signalfd4		355
-+#define __NR_compat_eventfd2		356
-+#define __NR_compat_epoll_create1	357
-+#define __NR_compat_dup3		358
-+#define __NR_compat_pipe2		359
-+#define __NR_compat_inotify_init1	360
-+#define __NR_compat_preadv		361
-+#define __NR_compat_pwritev		362
-+#define __NR_compat_rt_tgsigqueueinfo	363
-+#define __NR_compat_perf_event_open	364
-+#define __NR_compat_recvmmsg		365
-+#define __NR_compat_accept4		366
-+#define __NR_compat_fanotify_init	367
-+#define __NR_compat_fanotify_mark	368
-+#define __NR_compat_prlimit64		369
-+#define __NR_compat_name_to_handle_at	370
-+#define __NR_compat_open_by_handle_at	371
-+#define __NR_compat_clock_adjtime	372
-+#define __NR_compat_syncfs		373
-+#define __NR_compat_sendmmsg		374
-+#define __NR_compat_setns		375
-+#define __NR_compat_process_vm_readv	376
-+#define __NR_compat_process_vm_writev	377
-+#define __NR_compat_kcmp		378
-+#define __NR_compat_finit_module	379
-+#define __NR_compat_sched_setattr	380
-+#define __NR_compat_sched_getattr	381
-+#define __NR_compat_renameat2		382
-+#define __NR_compat_seccomp		383
-+#define __NR_compat_getrandom		384
-+#define __NR_compat_memfd_create	385
-+#define __NR_compat_bpf			386
-+#define __NR_compat_execveat		387
-+#define __NR_compat_userfaultfd		388
-+#define __NR_compat_membarrier		389
- #define __NR_compat_clock_gettime64	403
- #define __NR_compat_clock_getres_time64	406
+--- kernel-rpi.orig/arch/arm64/include/asm/unistd.h
++++ kernel-rpi/arch/arm64/include/asm/unistd.h
+@@ -17,6 +17,357 @@
+ #define __ARCH_WANT_SYS_VFORK
  
-Index: v6.6-rpi/arch/arm64/kernel/syscall.c
+ /*
++ * Compat syscall numbers used by the AArch64 kernel.
++ */
++#define __NR_compat_restart_syscall 0
++#define __NR_compat_exit    1
++#define __NR_compat_fork    2
++#define __NR_compat_read    3
++#define __NR_compat_write   4
++#define __NR_compat_open    5
++#define __NR_compat_close   6
++#define __NR_compat_creat   8
++#define __NR_compat_link    9
++#define __NR_compat_unlink    10
++#define __NR_compat_execve    11
++#define __NR_compat_chdir   12
++#define __NR_compat_mknod   14
++#define __NR_compat_chmod   15
++#define __NR_compat_lchown    16
++#define __NR_compat_lseek   19
++#define __NR_compat_getpid    20
++#define __NR_compat_mount   21
++#define __NR_compat_setuid    23
++#define __NR_compat_getuid    24
++#define __NR_compat_ptrace    26
++#define __NR_compat_pause   29
++#define __NR_compat_access    33
++#define __NR_compat_nice    34
++#define __NR_compat_sync    36
++#define __NR_compat_kill    37
++#define __NR_compat_rename    38
++#define __NR_compat_mkdir   39
++#define __NR_compat_rmdir   40
++#define __NR_compat_dup     41
++#define __NR_compat_pipe    42
++#define __NR_compat_times   43
++#define __NR_compat_brk     45
++#define __NR_compat_setgid    46
++#define __NR_compat_getgid    47
++#define __NR_compat_geteuid   49
++#define __NR_compat_getegid   50
++#define __NR_compat_acct    51
++#define __NR_compat_umount2   52
++#define __NR_compat_ioctl   54
++#define __NR_compat_fcntl   55
++#define __NR_compat_setpgid   57
++#define __NR_compat_umask   60
++#define __NR_compat_chroot    61
++#define __NR_compat_ustat   62
++#define __NR_compat_dup2    63
++#define __NR_compat_getppid   64
++#define __NR_compat_getpgrp   65
++#define __NR_compat_setsid    66
++#define __NR_compat_sigaction   67
++#define __NR_compat_setreuid    70
++#define __NR_compat_setregid    71
++#define __NR_compat_sigsuspend    72
++#define __NR_compat_sigpending    73
++#define __NR_compat_sethostname   74
++#define __NR_compat_setrlimit   75
++#define __NR_compat_getrusage   77
++#define __NR_compat_gettimeofday  78
++#define __NR_compat_settimeofday  79
++#define __NR_compat_getgroups   80
++#define __NR_compat_setgroups   81
++#define __NR_compat_symlink   83
++#define __NR_compat_readlink    85
++#define __NR_compat_uselib    86
++#define __NR_compat_swapon    87
++#define __NR_compat_reboot    88
++#define __NR_compat_munmap    91
++#define __NR_compat_truncate    92
++#define __NR_compat_ftruncate   93
++#define __NR_compat_fchmod    94
++#define __NR_compat_fchown    95
++#define __NR_compat_getpriority   96
++#define __NR_compat_setpriority   97
++#define __NR_compat_statfs    99
++#define __NR_compat_fstatfs   100
++#define __NR_compat_syslog    103
++#define __NR_compat_setitimer   104
++#define __NR_compat_getitimer   105
++#define __NR_compat_stat    106
++#define __NR_compat_lstat   107
++#define __NR_compat_fstat   108
++#define __NR_compat_vhangup   111
++#define __NR_compat_wait4   114
++#define __NR_compat_swapoff   115
++#define __NR_compat_sysinfo   116
++#define __NR_compat_fsync   118
++#define __NR_compat_sigreturn   119
++#define __NR_compat_clone   120
++#define __NR_compat_setdomainname 121
++#define __NR_compat_uname   122
++#define __NR_compat_adjtimex    124
++#define __NR_compat_mprotect    125
++#define __NR_compat_sigprocmask   126
++#define __NR_compat_init_module   128
++#define __NR_compat_delete_module 129
++#define __NR_compat_quotactl    131
++#define __NR_compat_getpgid   132
++#define __NR_compat_fchdir    133
++#define __NR_compat_bdflush   134
++#define __NR_compat_sysfs   135
++#define __NR_compat_personality   136
++#define __NR_compat_setfsuid    138
++#define __NR_compat_setfsgid    139
++#define __NR_compat__llseek   140
++#define __NR_compat_getdents    141
++#define __NR_compat__newselect    142
++#define __NR_compat_flock   143
++#define __NR_compat_msync   144
++#define __NR_compat_readv   145
++#define __NR_compat_writev    146
++#define __NR_compat_getsid    147
++#define __NR_compat_fdatasync   148
++#define __NR_compat__sysctl   149
++#define __NR_compat_mlock   150
++#define __NR_compat_munlock   151
++#define __NR_compat_mlockall    152
++#define __NR_compat_munlockall    153
++#define __NR_compat_sched_setparam  154
++#define __NR_compat_sched_getparam  155
++#define __NR_compat_sched_setscheduler  156
++#define __NR_compat_sched_getscheduler  157
++#define __NR_compat_sched_yield   158
++#define __NR_compat_sched_get_priority_max  159
++#define __NR_compat_sched_get_priority_min  160
++#define __NR_compat_sched_rr_get_interval 161
++#define __NR_compat_nanosleep   162
++#define __NR_compat_mremap    163
++#define __NR_compat_setresuid   164
++#define __NR_compat_getresuid   165
++#define __NR_compat_poll    168
++#define __NR_compat_nfsservctl    169
++#define __NR_compat_setresgid   170
++#define __NR_compat_getresgid   171
++#define __NR_compat_prctl   172
++#define __NR_compat_rt_sigreturn  173
++#define __NR_compat_rt_sigaction  174
++#define __NR_compat_rt_sigprocmask  175
++#define __NR_compat_rt_sigpending 176
++#define __NR_compat_rt_sigtimedwait 177
++#define __NR_compat_rt_sigqueueinfo 178
++#define __NR_compat_rt_sigsuspend 179
++#define __NR_compat_pread64   180
++#define __NR_compat_pwrite64    181
++#define __NR_compat_chown   182
++#define __NR_compat_getcwd    183
++#define __NR_compat_capget    184
++#define __NR_compat_capset    185
++#define __NR_compat_sigaltstack   186
++#define __NR_compat_sendfile    187
++#define __NR_compat_vfork   190
++#define __NR_compat_ugetrlimit    191
++#define __NR_compat_mmap2   192
++#define __NR_compat_truncate64    193
++#define __NR_compat_ftruncate64   194
++#define __NR_compat_stat64    195
++#define __NR_compat_lstat64   196
++#define __NR_compat_fstat64   197
++#define __NR_compat_lchown32    198
++#define __NR_compat_getuid32    199
++#define __NR_compat_getgid32    200
++#define __NR_compat_geteuid32   201
++#define __NR_compat_getegid32   202
++#define __NR_compat_setreuid32    203
++#define __NR_compat_setregid32    204
++#define __NR_compat_getgroups32   205
++#define __NR_compat_setgroups32   206
++#define __NR_compat_fchown32    207
++#define __NR_compat_setresuid32   208
++#define __NR_compat_getresuid32   209
++#define __NR_compat_setresgid32   210
++#define __NR_compat_getresgid32   211
++#define __NR_compat_chown32   212
++#define __NR_compat_setuid32    213
++#define __NR_compat_setgid32    214
++#define __NR_compat_setfsuid32    215
++#define __NR_compat_setfsgid32    216
++#define __NR_compat_getdents64    217
++#define __NR_compat_pivot_root    218
++#define __NR_compat_mincore   219
++#define __NR_compat_madvise   220
++#define __NR_compat_fcntl64   221
++#define __NR_compat_gettid    224
++#define __NR_compat_readahead   225
++#define __NR_compat_setxattr    226
++#define __NR_compat_lsetxattr   227
++#define __NR_compat_fsetxattr   228
++#define __NR_compat_getxattr    229
++#define __NR_compat_lgetxattr   230
++#define __NR_compat_fgetxattr   231
++#define __NR_compat_listxattr   232
++#define __NR_compat_llistxattr    233
++#define __NR_compat_flistxattr    234
++#define __NR_compat_removexattr   235
++#define __NR_compat_lremovexattr  236
++#define __NR_compat_fremovexattr  237
++#define __NR_compat_tkill   238
++#define __NR_compat_sendfile64    239
++#define __NR_compat_futex   240
++#define __NR_compat_sched_setaffinity 241
++#define __NR_compat_sched_getaffinity 242
++#define __NR_compat_io_setup    243
++#define __NR_compat_io_destroy    244
++#define __NR_compat_io_getevents  245
++#define __NR_compat_io_submit   246
++#define __NR_compat_io_cancel   247
++#define __NR_compat_exit_group    248
++#define __NR_compat_lookup_dcookie  249
++#define __NR_compat_epoll_create  250
++#define __NR_compat_epoll_ctl   251
++#define __NR_compat_epoll_wait    252
++#define __NR_compat_remap_file_pages  253
++#define __NR_compat_set_tid_address 256
++#define __NR_compat_timer_create  257
++#define __NR_compat_timer_settime 258
++#define __NR_compat_timer_gettime 259
++#define __NR_compat_timer_getoverrun  260
++#define __NR_compat_timer_delete  261
++#define __NR_compat_clock_settime 262
++#define __NR_compat_clock_gettime 263
++#define __NR_compat_clock_getres  264
++#define __NR_compat_clock_nanosleep 265
++#define __NR_compat_statfs64    266
++#define __NR_compat_fstatfs64   267
++#define __NR_compat_tgkill    268
++#define __NR_compat_utimes    269
++#define __NR_compat_arm_fadvise64_64  270
++#define __NR_compat_pciconfig_iobase  271
++#define __NR_compat_pciconfig_read  272
++#define __NR_compat_pciconfig_write 273
++#define __NR_compat_mq_open   274
++#define __NR_compat_mq_unlink   275
++#define __NR_compat_mq_timedsend  276
++#define __NR_compat_mq_timedreceive 277
++#define __NR_compat_mq_notify   278
++#define __NR_compat_mq_getsetattr 279
++#define __NR_compat_waitid    280
++#define __NR_compat_socket    281
++#define __NR_compat_bind    282
++#define __NR_compat_connect   283
++#define __NR_compat_listen    284
++#define __NR_compat_accept    285
++#define __NR_compat_getsockname   286
++#define __NR_compat_getpeername   287
++#define __NR_compat_socketpair    288
++#define __NR_compat_send    289
++#define __NR_compat_sendto    290
++#define __NR_compat_recv    291
++#define __NR_compat_recvfrom    292
++#define __NR_compat_shutdown    293
++#define __NR_compat_setsockopt    294
++#define __NR_compat_getsockopt    295
++#define __NR_compat_sendmsg   296
++#define __NR_compat_recvmsg   297
++#define __NR_compat_semop   298
++#define __NR_compat_semget    299
++#define __NR_compat_semctl    300
++#define __NR_compat_msgsnd    301
++#define __NR_compat_msgrcv    302
++#define __NR_compat_msgget    303
++#define __NR_compat_msgctl    304
++#define __NR_compat_shmat   305
++#define __NR_compat_shmdt   306
++#define __NR_compat_shmget    307
++#define __NR_compat_shmctl    308
++#define __NR_compat_add_key   309
++#define __NR_compat_request_key   310
++#define __NR_compat_keyctl    311
++#define __NR_compat_semtimedop    312
++#define __NR_compat_vserver   313
++#define __NR_compat_ioprio_set    314
++#define __NR_compat_ioprio_get    315
++#define __NR_compat_inotify_init  316
++#define __NR_compat_inotify_add_watch 317
++#define __NR_compat_inotify_rm_watch  318
++#define __NR_compat_mbind   319
++#define __NR_compat_get_mempolicy 320
++#define __NR_compat_set_mempolicy 321
++#define __NR_compat_openat    322
++#define __NR_compat_mkdirat   323
++#define __NR_compat_mknodat   324
++#define __NR_compat_fchownat    325
++#define __NR_compat_futimesat   326
++#define __NR_compat_fstatat64   327
++#define __NR_compat_unlinkat    328
++#define __NR_compat_renameat    329
++#define __NR_compat_linkat    330
++#define __NR_compat_symlinkat   331
++#define __NR_compat_readlinkat    332
++#define __NR_compat_fchmodat    333
++#define __NR_compat_faccessat   334
++#define __NR_compat_pselect6    335
++#define __NR_compat_ppoll   336
++#define __NR_compat_unshare   337
++#define __NR_compat_set_robust_list 338
++#define __NR_compat_get_robust_list 339
++#define __NR_compat_splice    340
++#define __NR_compat_sync_file_range2  341
++#define __NR_compat_tee     342
++#define __NR_compat_vmsplice    343
++#define __NR_compat_move_pages    344
++#define __NR_compat_getcpu    345
++#define __NR_compat_epoll_pwait   346
++#define __NR_compat_kexec_load    347
++#define __NR_compat_utimensat   348
++#define __NR_compat_signalfd    349
++#define __NR_compat_timerfd_create  350
++#define __NR_compat_eventfd   351
++#define __NR_compat_fallocate   352
++#define __NR_compat_timerfd_settime 353
++#define __NR_compat_timerfd_gettime 354
++#define __NR_compat_signalfd4   355
++#define __NR_compat_eventfd2    356
++#define __NR_compat_epoll_create1 357
++#define __NR_compat_dup3    358
++#define __NR_compat_pipe2   359
++#define __NR_compat_inotify_init1 360
++#define __NR_compat_preadv    361
++#define __NR_compat_pwritev   362
++#define __NR_compat_rt_tgsigqueueinfo 363
++#define __NR_compat_perf_event_open 364
++#define __NR_compat_recvmmsg    365
++#define __NR_compat_accept4   366
++#define __NR_compat_fanotify_init 367
++#define __NR_compat_fanotify_mark 368
++#define __NR_compat_prlimit64   369
++#define __NR_compat_name_to_handle_at 370
++#define __NR_compat_open_by_handle_at 371
++#define __NR_compat_clock_adjtime 372
++#define __NR_compat_syncfs    373
++#define __NR_compat_sendmmsg    374
++#define __NR_compat_setns   375
++#define __NR_compat_process_vm_readv  376
++#define __NR_compat_process_vm_writev 377
++#define __NR_compat_kcmp    378
++#define __NR_compat_finit_module  379
++#define __NR_compat_sched_setattr 380
++#define __NR_compat_sched_getattr 381
++#define __NR_compat_renameat2   382
++#define __NR_compat_seccomp   383
++#define __NR_compat_getrandom   384
++#define __NR_compat_memfd_create  385
++#define __NR_compat_bpf     386
++#define __NR_compat_execveat    387
++#define __NR_compat_userfaultfd   388
++#define __NR_compat_membarrier    389
++#define __NR_compat_clock_gettime64 403
++#define __NR_compat_clock_getres_time64 406
++
++/*
+  * The following SVCs are ARM private.
+  */
+ #define __ARM_NR_COMPAT_BASE		0x0f0000
+Index: kernel-rpi/arch/arm64/kernel/syscall.c
 ===================================================================
---- v6.6-rpi.orig/arch/arm64/kernel/syscall.c
-+++ v6.6-rpi/arch/arm64/kernel/syscall.c
-@@ -150,13 +150,26 @@ trace_exit:
+--- kernel-rpi.orig/arch/arm64/kernel/syscall.c
++++ kernel-rpi/arch/arm64/kernel/syscall.c
+@@ -148,13 +148,25 @@ trace_exit:
  
  void do_el0_svc(struct pt_regs *regs)
  {
-+  struct thread_info __maybe_unused *ti;
 +#ifdef CONFIG_ALT_SYSCALL
-+  ti = current_thread_info();
++  struct thread_info *ti = current_thread_info();
 +  el0_svc_common(regs, regs->regs[8], ti->nr_syscalls,
-+            ti->sys_call_table);
++          ti->sys_call_table);
 +#else
  	el0_svc_common(regs, regs->regs[8], __NR_syscalls, sys_call_table);
 +#endif
@@ -438,22 +448,20 @@ Index: v6.6-rpi/arch/arm64/kernel/syscall.c
  #ifdef CONFIG_COMPAT
  void do_el0_svc_compat(struct pt_regs *regs)
  {
--	el0_svc_common(regs, regs->regs[7], __NR_compat_syscalls,
--		       compat_sys_call_table);
 +#ifdef CONFIG_ALT_SYSCALL
 +  struct thread_info *ti = current_thread_info();
 +  el0_svc_common(regs, regs->regs[7], ti->compat_nr_syscalls,
-+           ti->compat_sys_call_table);
++          ti->compat_sys_call_table);
 +#else
-+  el0_svc_common(regs, regs->regs[7], __NR_compat_syscalls,
-+           compat_sys_call_table);
+ 	el0_svc_common(regs, regs->regs[7], __NR_compat32_syscalls,
+ 		       compat_sys_call_table);
 +#endif
  }
  #endif
-Index: v6.6-rpi/include/linux/alt-syscall.h
+Index: kernel-rpi/include/linux/alt-syscall.h
 ===================================================================
 --- /dev/null
-+++ v6.6-rpi/include/linux/alt-syscall.h
++++ kernel-rpi/include/linux/alt-syscall.h
 @@ -0,0 +1,60 @@
 +#ifndef _ALT_SYSCALL_H
 +#define _ALT_SYSCALL_H
@@ -515,10 +523,10 @@ Index: v6.6-rpi/include/linux/alt-syscall.h
 +#endif
 +
 +#endif /* _ALT_SYSCALL_H */
-Index: v6.6-rpi/include/linux/android_aid.h
+Index: kernel-rpi/include/linux/android_aid.h
 ===================================================================
 --- /dev/null
-+++ v6.6-rpi/include/linux/android_aid.h
++++ kernel-rpi/include/linux/android_aid.h
 @@ -0,0 +1,28 @@
 +/* include/linux/android_aid.h
 + *
@@ -548,23 +556,23 @@ Index: v6.6-rpi/include/linux/android_aid.h
 +#define AID_NET_BW_ACCT  (3007)  /* change bandwidth statistics accounting */
 +
 +#endif
-Index: v6.6-rpi/include/net/netns/core.h
+Index: kernel-rpi/include/net/netns/core.h
 ===================================================================
---- v6.6-rpi.orig/include/net/netns/core.h
-+++ v6.6-rpi/include/net/netns/core.h
-@@ -13,6 +13,7 @@ struct netns_core {
- 	struct ctl_table_header	*sysctl_hdr;
+--- kernel-rpi.orig/include/net/netns/core.h
++++ kernel-rpi/include/net/netns/core.h
+@@ -14,6 +14,7 @@ struct netns_core {
  
  	int	sysctl_somaxconn;
-+	int	sysctl_android_paranoid;
+ 	int	sysctl_optmem_max;
++  int sysctl_android_paranoid;
  	u8	sysctl_txrehash;
  
  #ifdef CONFIG_PROC_FS
-Index: v6.6-rpi/include/net/sock.h
+Index: kernel-rpi/include/net/sock.h
 ===================================================================
---- v6.6-rpi.orig/include/net/sock.h
-+++ v6.6-rpi/include/net/sock.h
-@@ -2941,6 +2941,8 @@ bool sk_ns_capable(const struct sock *sk
+--- kernel-rpi.orig/include/net/sock.h
++++ kernel-rpi/include/net/sock.h
+@@ -2855,6 +2855,8 @@ bool sk_ns_capable(const struct sock *sk
  		   struct user_namespace *user_ns, int cap);
  bool sk_capable(const struct sock *sk, int cap);
  bool sk_net_capable(const struct sock *sk, int cap);
@@ -573,10 +581,10 @@ Index: v6.6-rpi/include/net/sock.h
  
  void sk_get_meminfo(const struct sock *sk, u32 *meminfo);
  
-Index: v6.6-rpi/net/core/sock.c
+Index: kernel-rpi/net/core/sock.c
 ===================================================================
---- v6.6-rpi.orig/net/core/sock.c
-+++ v6.6-rpi/net/core/sock.c
+--- kernel-rpi.orig/net/core/sock.c
++++ kernel-rpi/net/core/sock.c
 @@ -118,6 +118,9 @@
  #include <linux/mroute.h>
  #include <linux/mroute6.h>
@@ -587,7 +595,7 @@ Index: v6.6-rpi/net/core/sock.c
  
  #include <linux/uaccess.h>
  
-@@ -202,6 +205,40 @@ bool sk_net_capable(const struct sock *s
+@@ -204,6 +207,40 @@ bool sk_net_capable(const struct sock *s
  }
  EXPORT_SYMBOL(sk_net_capable);
  
@@ -628,7 +636,7 @@ Index: v6.6-rpi/net/core/sock.c
  /*
   * Each address family might have different locking rules, so we have
   * one slock key per address family and separate keys for internal and
-@@ -636,7 +673,7 @@ static int sock_bindtoindex_locked(struc
+@@ -633,7 +670,7 @@ static int sock_bindtoindex_locked(struc
  
  	/* Sorry... */
  	ret = -EPERM;
@@ -637,7 +645,7 @@ Index: v6.6-rpi/net/core/sock.c
  		goto out;
  
  	ret = -EINVAL;
-@@ -1378,6 +1415,11 @@ set_sndbuf:
+@@ -1519,6 +1556,11 @@ set_sndbuf:
  		__sock_set_mark(sk, val);
  		break;
  	case SO_RCVMARK:
@@ -649,10 +657,10 @@ Index: v6.6-rpi/net/core/sock.c
  		sock_valbool_flag(sk, SOCK_RCVMARK, valbool);
  		break;
  
-Index: v6.6-rpi/net/ipv4/af_inet.c
+Index: kernel-rpi/net/ipv4/af_inet.c
 ===================================================================
---- v6.6-rpi.orig/net/ipv4/af_inet.c
-+++ v6.6-rpi/net/ipv4/af_inet.c
+--- kernel-rpi.orig/net/ipv4/af_inet.c
++++ kernel-rpi/net/ipv4/af_inet.c
 @@ -85,6 +85,7 @@
  #include <linux/netfilter_ipv4.h>
  #include <linux/random.h>
@@ -661,7 +669,7 @@ Index: v6.6-rpi/net/ipv4/af_inet.c
  
  #include <linux/uaccess.h>
  
-@@ -262,6 +263,9 @@ static int inet_create(struct net *net,
+@@ -263,6 +264,9 @@ static int inet_create(struct net *net,
  	if (protocol < 0 || protocol >= IPPROTO_MAX)
  		return -EINVAL;
  
@@ -671,7 +679,7 @@ Index: v6.6-rpi/net/ipv4/af_inet.c
  	sock->state = SS_UNCONNECTED;
  
  	/* Look for the requested type/protocol pair. */
-@@ -311,7 +315,7 @@ lookup_protocol:
+@@ -312,7 +316,7 @@ lookup_protocol:
  
  	err = -EPERM;
  	if (sock->type == SOCK_RAW && !kern &&
@@ -680,11 +688,11 @@ Index: v6.6-rpi/net/ipv4/af_inet.c
  		goto out_rcu_unlock;
  
  	sock->ops = answer->ops;
-Index: v6.6-rpi/net/socket.c
+Index: kernel-rpi/net/socket.c
 ===================================================================
---- v6.6-rpi.orig/net/socket.c
-+++ v6.6-rpi/net/socket.c
-@@ -369,7 +369,7 @@ static const struct dentry_operations so
+--- kernel-rpi.orig/net/socket.c
++++ kernel-rpi/net/socket.c
+@@ -368,7 +368,7 @@ static const struct dentry_operations so
  
  static int sockfs_xattr_get(const struct xattr_handler *handler,
  			    struct dentry *dentry, struct inode *inode,
@@ -693,25 +701,26 @@ Index: v6.6-rpi/net/socket.c
  {
  	if (value) {
  		if (dentry->d_name.len + 1 > size)
-Index: v6.6-rpi/security/Kconfig
+Index: kernel-rpi/security/Kconfig
 ===================================================================
---- v6.6-rpi.orig/security/Kconfig
-+++ v6.6-rpi/security/Kconfig
-@@ -226,11 +226,13 @@ source "security/yama/Kconfig"
+--- kernel-rpi.orig/security/Kconfig
++++ kernel-rpi/security/Kconfig
+@@ -224,12 +224,14 @@ source "security/yama/Kconfig"
  source "security/safesetid/Kconfig"
  source "security/lockdown/Kconfig"
  source "security/landlock/Kconfig"
 +source "security/chromiumos/Kconfig"
+ source "security/ipe/Kconfig"
  
  source "security/integrity/Kconfig"
  
  choice
  	prompt "First legacy 'major LSM' to be initialized"
-+	default DEFAULT_SECURITY_CHROMIUMOS if SECURITY_CHROMIUMOS
++  default DEFAULT_SECURITY_CHROMIUMOS if SECURITY_CHROMIUMOS
  	default DEFAULT_SECURITY_SELINUX if SECURITY_SELINUX
  	default DEFAULT_SECURITY_SMACK if SECURITY_SMACK
  	default DEFAULT_SECURITY_TOMOYO if SECURITY_TOMOYO
-@@ -246,6 +248,9 @@ choice
+@@ -245,6 +247,9 @@ choice
  	  Selects the legacy "major security module" that will be
  	  initialized first. Overridden by non-default CONFIG_LSM.
  
@@ -722,11 +731,11 @@ Index: v6.6-rpi/security/Kconfig
  		bool "SELinux" if SECURITY_SELINUX=y
  
 @@ -269,6 +274,7 @@ config LSM
- 	default "landlock,lockdown,yama,loadpin,safesetid,apparmor,selinux,smack,tomoyo,bpf" if DEFAULT_SECURITY_APPARMOR
- 	default "landlock,lockdown,yama,loadpin,safesetid,tomoyo,bpf" if DEFAULT_SECURITY_TOMOYO
- 	default "landlock,lockdown,yama,loadpin,safesetid,bpf" if DEFAULT_SECURITY_DAC
+ 	default "landlock,lockdown,yama,loadpin,safesetid,apparmor,selinux,smack,tomoyo,ipe,bpf" if DEFAULT_SECURITY_APPARMOR
+ 	default "landlock,lockdown,yama,loadpin,safesetid,tomoyo,ipe,bpf" if DEFAULT_SECURITY_TOMOYO
+ 	default "landlock,lockdown,yama,loadpin,safesetid,ipe,bpf" if DEFAULT_SECURITY_DAC
 +  default "landlock,lockdown,yama,loadpin,safesetid,integrity,chromiumos,selinux,bpf" if DEFAULT_SECURITY_CHROMIUMOS
- 	default "landlock,lockdown,yama,loadpin,safesetid,selinux,smack,tomoyo,apparmor,bpf"
+ 	default "landlock,lockdown,yama,loadpin,safesetid,selinux,smack,tomoyo,apparmor,ipe,bpf"
  	help
  	  A comma-separated list of LSMs, in initialization order.
 @@ -281,5 +287,13 @@ config LSM
@@ -744,10 +753,10 @@ Index: v6.6-rpi/security/Kconfig
 +	  Allow syscall table to be swapped on a running process.
 +
 +endmenu
-Index: v6.6-rpi/fs/ecryptfs/inode.c
+Index: kernel-rpi/fs/ecryptfs/inode.c
 ===================================================================
---- v6.6-rpi.orig/fs/ecryptfs/inode.c
-+++ v6.6-rpi/fs/ecryptfs/inode.c
+--- kernel-rpi.orig/fs/ecryptfs/inode.c
++++ kernel-rpi/fs/ecryptfs/inode.c
 @@ -392,39 +392,54 @@ static struct dentry *ecryptfs_lookup(st
  				      unsigned int flags)
  {
@@ -822,7 +831,7 @@ Index: v6.6-rpi/fs/ecryptfs/inode.c
  	kfree(encrypted_and_encoded_name);
  	return res;
  }
-@@ -800,6 +815,12 @@ static int truncate_upper(struct dentry
+@@ -802,6 +817,12 @@ static int truncate_upper(struct dentry
  			       "rc = [%d]\n", rc);
  			goto out;
  		}
@@ -835,7 +844,7 @@ Index: v6.6-rpi/fs/ecryptfs/inode.c
  		/* We are reducing the size of the ecryptfs file, and need to
  		 * know if we need to reduce the size of the lower file. */
  		lower_size_before_truncate =
-@@ -1069,7 +1090,8 @@ ecryptfs_getxattr_lower(struct dentry *l
+@@ -1071,7 +1092,8 @@ ecryptfs_getxattr_lower(struct dentry *l
  		goto out;
  	}
  	inode_lock(lower_inode);
@@ -845,7 +854,7 @@ Index: v6.6-rpi/fs/ecryptfs/inode.c
  	inode_unlock(lower_inode);
  out:
  	return rc;
-@@ -1201,7 +1223,8 @@ const struct inode_operations ecryptfs_m
+@@ -1203,7 +1225,8 @@ const struct inode_operations ecryptfs_m
  
  static int ecryptfs_xattr_get(const struct xattr_handler *handler,
  			      struct dentry *dentry, struct inode *inode,
@@ -855,11 +864,11 @@ Index: v6.6-rpi/fs/ecryptfs/inode.c
  {
  	return ecryptfs_getxattr(dentry, inode, name, buffer, size);
  }
-Index: v6.6-rpi/security/Makefile
+Index: kernel-rpi/security/Makefile
 ===================================================================
---- v6.6-rpi.orig/security/Makefile
-+++ v6.6-rpi/security/Makefile
-@@ -12,6 +12,7 @@ obj-$(CONFIG_MMU)			+= min_addr.o
+--- kernel-rpi.orig/security/Makefile
++++ kernel-rpi/security/Makefile
+@@ -13,6 +13,7 @@ obj-$(CONFIG_MMU)			+= min_addr.o
  # Object file lists
  obj-$(CONFIG_SECURITY)			+= security.o
  obj-$(CONFIG_SECURITYFS)		+= inode.o
@@ -867,10 +876,10 @@ Index: v6.6-rpi/security/Makefile
  obj-$(CONFIG_SECURITY_SELINUX)		+= selinux/
  obj-$(CONFIG_SECURITY_SMACK)		+= smack/
  obj-$(CONFIG_SECURITY)			+= lsm_audit.o
-Index: v6.6-rpi/fs/ecryptfs/mmap.c
+Index: kernel-rpi/fs/ecryptfs/mmap.c
 ===================================================================
---- v6.6-rpi.orig/fs/ecryptfs/mmap.c
-+++ v6.6-rpi/fs/ecryptfs/mmap.c
+--- kernel-rpi.orig/fs/ecryptfs/mmap.c
++++ kernel-rpi/fs/ecryptfs/mmap.c
 @@ -422,8 +422,9 @@ static int ecryptfs_write_inode_size_to_
  		goto out;
  	}
@@ -883,11 +892,11 @@ Index: v6.6-rpi/fs/ecryptfs/mmap.c
  	if (size < 0)
  		size = 8;
  	put_unaligned_be64(i_size_read(ecryptfs_inode), xattr_virt);
-Index: v6.6-rpi/fs/xattr.c
+Index: kernel-rpi/fs/xattr.c
 ===================================================================
---- v6.6-rpi.orig/fs/xattr.c
-+++ v6.6-rpi/fs/xattr.c
-@@ -391,7 +391,7 @@ vfs_getxattr_alloc(struct mnt_idmap *idm
+--- kernel-rpi.orig/fs/xattr.c
++++ kernel-rpi/fs/xattr.c
+@@ -390,7 +390,7 @@ vfs_getxattr_alloc(struct mnt_idmap *idm
  		return PTR_ERR(handler);
  	if (!handler->get)
  		return -EOPNOTSUPP;
@@ -896,7 +905,7 @@ Index: v6.6-rpi/fs/xattr.c
  	if (error < 0)
  		return error;
  
-@@ -402,59 +402,60 @@ vfs_getxattr_alloc(struct mnt_idmap *idm
+@@ -401,59 +401,60 @@ vfs_getxattr_alloc(struct mnt_idmap *idm
  		memset(value, 0, error + 1);
  	}
  
@@ -996,10 +1005,10 @@ Index: v6.6-rpi/fs/xattr.c
  }
  EXPORT_SYMBOL_GPL(vfs_getxattr);
  
-Index: v6.6-rpi/include/uapi/linux/xattr.h
+Index: kernel-rpi/include/uapi/linux/xattr.h
 ===================================================================
---- v6.6-rpi.orig/include/uapi/linux/xattr.h
-+++ v6.6-rpi/include/uapi/linux/xattr.h
+--- kernel-rpi.orig/include/uapi/linux/xattr.h
++++ kernel-rpi/include/uapi/linux/xattr.h
 @@ -20,6 +20,9 @@
  
  #define XATTR_CREATE	0x1	/* set value, fail if attr already exists */
@@ -1010,10 +1019,10 @@ Index: v6.6-rpi/include/uapi/linux/xattr.h
  #endif
  
  /* Namespaces */
-Index: v6.6-rpi/net/ipv6/af_inet6.c
+Index: kernel-rpi/net/ipv6/af_inet6.c
 ===================================================================
---- v6.6-rpi.orig/net/ipv6/af_inet6.c
-+++ v6.6-rpi/net/ipv6/af_inet6.c
+--- kernel-rpi.orig/net/ipv6/af_inet6.c
++++ kernel-rpi/net/ipv6/af_inet6.c
 @@ -39,6 +39,7 @@
  #include <linux/netdevice.h>
  #include <linux/icmpv6.h>
@@ -1022,7 +1031,7 @@ Index: v6.6-rpi/net/ipv6/af_inet6.c
  
  #include <net/ip.h>
  #include <net/ipv6.h>
-@@ -131,6 +132,8 @@ static int inet6_create(struct net *net,
+@@ -132,6 +133,8 @@ static int inet6_create(struct net *net,
  	if (protocol < 0 || protocol >= IPPROTO_MAX)
  		return -EINVAL;
  
@@ -1031,7 +1040,7 @@ Index: v6.6-rpi/net/ipv6/af_inet6.c
  	/* Look for the requested type/protocol pair. */
  lookup_protocol:
  	err = -ESOCKTNOSUPPORT;
-@@ -178,7 +181,7 @@ lookup_protocol:
+@@ -179,7 +182,7 @@ lookup_protocol:
  
  	err = -EPERM;
  	if (sock->type == SOCK_RAW && !kern &&
@@ -1040,11 +1049,11 @@ Index: v6.6-rpi/net/ipv6/af_inet6.c
  		goto out_rcu_unlock;
  
  	sock->ops = answer->ops;
-Index: v6.6-rpi/security/commoncap.c
+Index: kernel-rpi/security/commoncap.c
 ===================================================================
---- v6.6-rpi.orig/security/commoncap.c
-+++ v6.6-rpi/security/commoncap.c
-@@ -84,7 +84,7 @@ int cap_capable(const struct cred *cred,
+--- kernel-rpi.orig/security/commoncap.c
++++ kernel-rpi/security/commoncap.c
+@@ -85,7 +85,7 @@ int cap_capable(const struct cred *cred,
  		if (ns->level <= cred->user_ns->level)
  			return -EPERM;
  
@@ -1053,7 +1062,7 @@ Index: v6.6-rpi/security/commoncap.c
  		 * The owner of the user namespace in the parent of the
  		 * user namespace has all caps.
  		 */
-@@ -298,7 +298,8 @@ int cap_inode_need_killpriv(struct dentr
+@@ -299,7 +299,8 @@ int cap_inode_need_killpriv(struct dentr
  	struct inode *inode = d_backing_inode(dentry);
  	int error;
  
@@ -1063,7 +1072,7 @@ Index: v6.6-rpi/security/commoncap.c
  	return error > 0;
  }
  
-@@ -651,8 +652,9 @@ int get_vfs_caps_from_disk(struct mnt_id
+@@ -652,8 +653,9 @@ int get_vfs_caps_from_disk(struct mnt_id
  		return -ENODATA;
  
  	fs_ns = inode->i_sb->s_user_ns;
@@ -1075,11 +1084,11 @@ Index: v6.6-rpi/security/commoncap.c
  	if (size == -ENODATA || size == -EOPNOTSUPP)
  		/* no data, that's ok */
  		return -ENODATA;
-Index: v6.6-rpi/security/integrity/evm/evm_main.c
+Index: kernel-rpi/security/integrity/evm/evm_main.c
 ===================================================================
---- v6.6-rpi.orig/security/integrity/evm/evm_main.c
-+++ v6.6-rpi/security/integrity/evm/evm_main.c
-@@ -140,7 +140,7 @@ static int evm_find_protected_xattrs(str
+--- kernel-rpi.orig/security/integrity/evm/evm_main.c
++++ kernel-rpi/security/integrity/evm/evm_main.c
+@@ -139,7 +139,7 @@ static int evm_find_protected_xattrs(str
  		return -EOPNOTSUPP;
  
  	list_for_each_entry_lockless(xattr, &evm_config_xattrnames, list) {
@@ -1088,7 +1097,7 @@ Index: v6.6-rpi/security/integrity/evm/evm_main.c
  		if (error < 0) {
  			if (error == -ENODATA)
  				continue;
-@@ -337,8 +337,8 @@ int evm_read_protected_xattrs(struct den
+@@ -355,8 +355,8 @@ int evm_read_protected_xattrs(struct den
  	int rc, size, total_size = 0;
  
  	list_for_each_entry_lockless(xattr, &evm_config_xattrnames, list) {
@@ -1099,7 +1108,7 @@ Index: v6.6-rpi/security/integrity/evm/evm_main.c
  		if (rc < 0 && rc == -ENODATA)
  			continue;
  		else if (rc < 0)
-@@ -366,10 +366,10 @@ int evm_read_protected_xattrs(struct den
+@@ -384,10 +384,10 @@ int evm_read_protected_xattrs(struct den
  		case 'v':
  			size = rc;
  			if (buffer) {
@@ -1112,10 +1121,10 @@ Index: v6.6-rpi/security/integrity/evm/evm_main.c
  				if (rc < 0)
  					return rc;
  			}
-Index: v6.6-rpi/security/selinux/Kconfig
+Index: kernel-rpi/security/selinux/Kconfig
 ===================================================================
---- v6.6-rpi.orig/security/selinux/Kconfig
-+++ v6.6-rpi/security/selinux/Kconfig
+--- kernel-rpi.orig/security/selinux/Kconfig
++++ kernel-rpi/security/selinux/Kconfig
 @@ -37,6 +37,16 @@ config SECURITY_SELINUX_DEVELOP
  	  permissive mode (if permitted by the policy) via
  	  /sys/fs/selinux/enforce.
@@ -1133,11 +1142,11 @@ Index: v6.6-rpi/security/selinux/Kconfig
  config SECURITY_SELINUX_AVC_STATS
  	bool "SELinux AVC Statistics"
  	depends on SECURITY_SELINUX
-Index: v6.6-rpi/security/selinux/avc.c
+Index: kernel-rpi/security/selinux/avc.c
 ===================================================================
---- v6.6-rpi.orig/security/selinux/avc.c
-+++ v6.6-rpi/security/selinux/avc.c
-@@ -763,6 +763,15 @@ noinline int slow_avc_audit(u32 ssid, u3
+--- kernel-rpi.orig/security/selinux/avc.c
++++ kernel-rpi/security/selinux/avc.c
+@@ -755,6 +755,15 @@ noinline int slow_avc_audit(u32 ssid, u3
  	if (WARN_ON(!tclass || tclass >= ARRAY_SIZE(secclass_map)))
  		return -EINVAL;
  
@@ -1153,11 +1162,11 @@ Index: v6.6-rpi/security/selinux/avc.c
  	if (!a) {
  		a = &stack_data;
  		a->type = LSM_AUDIT_DATA_NONE;
-Index: v6.6-rpi/security/selinux/hooks.c
+Index: kernel-rpi/security/selinux/hooks.c
 ===================================================================
---- v6.6-rpi.orig/security/selinux/hooks.c
-+++ v6.6-rpi/security/selinux/hooks.c
-@@ -514,7 +514,7 @@ static int sb_check_xattr_support(struct
+--- kernel-rpi.orig/security/selinux/hooks.c
++++ kernel-rpi/security/selinux/hooks.c
+@@ -521,7 +521,7 @@ static int sb_check_xattr_support(struct
  		goto fallback;
  	}
  
@@ -1166,7 +1175,7 @@ Index: v6.6-rpi/security/selinux/hooks.c
  	if (rc < 0 && rc != -ENODATA) {
  		if (rc == -EOPNOTSUPP) {
  			pr_warn("SELinux: (dev %s, type %s) has no security xattr handler\n",
-@@ -1356,12 +1356,12 @@ static int inode_doinit_use_xattr(struct
+@@ -1363,12 +1363,12 @@ static int inode_doinit_use_xattr(struct
  		return -ENOMEM;
  
  	context[len] = '\0';
@@ -1181,7 +1190,7 @@ Index: v6.6-rpi/security/selinux/hooks.c
  		if (rc < 0)
  			return rc;
  
-@@ -1371,8 +1371,8 @@ static int inode_doinit_use_xattr(struct
+@@ -1378,8 +1378,8 @@ static int inode_doinit_use_xattr(struct
  			return -ENOMEM;
  
  		context[len] = '\0';
@@ -1192,24 +1201,10 @@ Index: v6.6-rpi/security/selinux/hooks.c
  	}
  	if (rc < 0) {
  		kfree(context);
-Index: v6.6-rpi/security/selinux/include/classmap.h
+Index: kernel-rpi/security/selinux/include/security.h
 ===================================================================
---- v6.6-rpi.orig/security/selinux/include/classmap.h
-+++ v6.6-rpi/security/selinux/include/classmap.h
-@@ -117,7 +117,8 @@ const struct security_class_mapping secc
- 	  { COMMON_IPC_PERMS, NULL } },
- 	{ "netlink_route_socket",
- 	  { COMMON_SOCK_PERMS,
--	    "nlmsg_read", "nlmsg_write", NULL } },
-+	    "nlmsg_read", "nlmsg_write", "nlmsg_readpriv", "nlmsg_getneigh",
-+	    NULL } },
- 	{ "netlink_tcpdiag_socket",
- 	  { COMMON_SOCK_PERMS,
- 	    "nlmsg_read", "nlmsg_write", NULL } },
-Index: v6.6-rpi/security/selinux/include/security.h
-===================================================================
---- v6.6-rpi.orig/security/selinux/include/security.h
-+++ v6.6-rpi/security/selinux/include/security.h
+--- kernel-rpi.orig/security/selinux/include/security.h
++++ kernel-rpi/security/selinux/include/security.h
 @@ -95,6 +95,8 @@ struct selinux_state {
  #endif
  	bool initialized;
@@ -1219,44 +1214,38 @@ Index: v6.6-rpi/security/selinux/include/security.h
  
  	struct page *status_page;
  	struct mutex status_lock;
-@@ -183,12 +185,26 @@ static inline bool selinux_policycap_gen
- 		selinux_state.policycap[POLICYDB_CAP_GENFS_SECLABEL_SYMLINKS]);
+@@ -195,6 +197,20 @@ static inline bool selinux_policycap_use
+ 		selinux_state.policycap[POLICYDB_CAP_USERSPACE_INITIAL_CONTEXT]);
  }
  
 +static inline bool selinux_android_nlroute_getlink(void)
 +{
-+	struct selinux_state *state = &selinux_state;
++ struct selinux_state *state = &selinux_state;
 +
-+	return state->android_netlink_route;
++ return state->android_netlink_route;
 +}
 +
- static inline bool selinux_policycap_ioctl_skip_cloexec(void)
- {
- 	return READ_ONCE(
- 		selinux_state.policycap[POLICYDB_CAP_IOCTL_SKIP_CLOEXEC]);
- }
- 
 +static inline bool selinux_android_nlroute_getneigh(void)
 +{
-+	struct selinux_state *state = &selinux_state;
++ struct selinux_state *state = &selinux_state;
 +
-+	return state->android_netlink_getneigh;
++ return state->android_netlink_getneigh;
 +}
 +
  struct selinux_policy_convert_data;
  
  struct selinux_load_state {
-@@ -381,5 +397,6 @@ extern void avtab_cache_init(void);
+@@ -382,5 +398,6 @@ extern void avtab_cache_init(void);
  extern void ebitmap_cache_init(void);
  extern void hashtab_cache_init(void);
  extern int security_sidtab_hash_stats(char *page);
 +extern void selinux_nlmsg_init(void);
  
  #endif /* _SELINUX_SECURITY_H_ */
-Index: v6.6-rpi/security/selinux/nlmsgtab.c
+Index: kernel-rpi/security/selinux/nlmsgtab.c
 ===================================================================
---- v6.6-rpi.orig/security/selinux/nlmsgtab.c
-+++ v6.6-rpi/security/selinux/nlmsgtab.c
+--- kernel-rpi.orig/security/selinux/nlmsgtab.c
++++ kernel-rpi/security/selinux/nlmsgtab.c
 @@ -25,7 +25,8 @@ struct nlmsg_perm {
  	u32	perm;
  };
@@ -1311,11 +1300,11 @@ Index: v6.6-rpi/security/selinux/nlmsgtab.c
 +					RTM_GETNEIGHTBL);
 +	}
 +}
-Index: v6.6-rpi/security/selinux/ss/policydb.c
+Index: kernel-rpi/security/selinux/ss/policydb.c
 ===================================================================
---- v6.6-rpi.orig/security/selinux/ss/policydb.c
-+++ v6.6-rpi/security/selinux/ss/policydb.c
-@@ -2009,7 +2009,6 @@ static int filename_trans_read_helper(st
+--- kernel-rpi.orig/security/selinux/ss/policydb.c
++++ kernel-rpi/security/selinux/ss/policydb.c
+@@ -2039,7 +2039,6 @@ static int filename_trans_read_helper(st
  		if (!datum)
  			goto out;
  
@@ -1323,7 +1312,7 @@ Index: v6.6-rpi/security/selinux/ss/policydb.c
  		*dst = datum;
  
  		/* ebitmap_read() will at least init the bitmap */
-@@ -2022,6 +2021,7 @@ static int filename_trans_read_helper(st
+@@ -2052,6 +2051,7 @@ static int filename_trans_read_helper(st
  			goto out;
  
  		datum->otype = le32_to_cpu(buf[0]);
@@ -1331,7 +1320,7 @@ Index: v6.6-rpi/security/selinux/ss/policydb.c
  
  		dst = &datum->next;
  	}
-@@ -2494,6 +2494,14 @@ int policydb_read(struct policydb *p, vo
+@@ -2534,6 +2534,14 @@ int policydb_read(struct policydb *p, vo
  	p->reject_unknown = !!(le32_to_cpu(buf[1]) & REJECT_UNKNOWN);
  	p->allow_unknown = !!(le32_to_cpu(buf[1]) & ALLOW_UNKNOWN);
  
@@ -1346,11 +1335,11 @@ Index: v6.6-rpi/security/selinux/ss/policydb.c
  	if (p->policyvers >= POLICYDB_VERSION_POLCAP) {
  		rc = ebitmap_read(&p->policycaps, fp);
  		if (rc)
-Index: v6.6-rpi/security/selinux/ss/policydb.h
+Index: kernel-rpi/security/selinux/ss/policydb.h
 ===================================================================
---- v6.6-rpi.orig/security/selinux/ss/policydb.h
-+++ v6.6-rpi/security/selinux/ss/policydb.h
-@@ -238,6 +238,8 @@ struct genfs {
+--- kernel-rpi.orig/security/selinux/ss/policydb.h
++++ kernel-rpi/security/selinux/ss/policydb.h
+@@ -235,6 +235,8 @@ struct genfs {
  /* The policy database */
  struct policydb {
  	int mls_enabled;
@@ -1359,20 +1348,20 @@ Index: v6.6-rpi/security/selinux/ss/policydb.h
  
  	/* symbol tables */
  	struct symtab symtab[SYM_NUM];
-@@ -334,6 +336,8 @@ extern struct role_trans_datum *policydb
- 	struct policydb *p, struct role_trans_key *key);
+@@ -331,6 +333,8 @@ extern struct role_trans_datum *
+ policydb_roletr_search(struct policydb *p, struct role_trans_key *key);
  
- #define POLICYDB_CONFIG_MLS    1
+ #define POLICYDB_CONFIG_MLS 1
 +#define POLICYDB_CONFIG_ANDROID_NETLINK_ROUTE    (1 << 31)
 +#define POLICYDB_CONFIG_ANDROID_NETLINK_GETNEIGH (1 << 30)
  
  /* the config flags related to unknown classes/perms are bits 2 and 3 */
- #define REJECT_UNKNOWN	0x00000002
-Index: v6.6-rpi/security/selinux/ss/services.c
+ #define REJECT_UNKNOWN 0x00000002
+Index: kernel-rpi/security/selinux/ss/services.c
 ===================================================================
---- v6.6-rpi.orig/security/selinux/ss/services.c
-+++ v6.6-rpi/security/selinux/ss/services.c
-@@ -956,10 +956,7 @@ void services_compute_xperms_decision(st
+--- kernel-rpi.orig/security/selinux/ss/services.c
++++ kernel-rpi/security/selinux/ss/services.c
+@@ -955,10 +955,7 @@ void services_compute_xperms_decision(st
  					xpermd->driver))
  			return;
  	} else {
@@ -1384,7 +1373,7 @@ Index: v6.6-rpi/security/selinux/ss/services.c
  	}
  
  	if (node->key.specified == AVTAB_XPERMS_ALLOWED) {
-@@ -996,8 +993,7 @@ void services_compute_xperms_decision(st
+@@ -995,8 +992,7 @@ void services_compute_xperms_decision(st
  					node->datum.u.xperms->perms.p[i];
  		}
  	} else {
@@ -1394,7 +1383,7 @@ Index: v6.6-rpi/security/selinux/ss/services.c
  	}
  }
  
-@@ -2126,6 +2122,10 @@ static void security_load_policycaps(str
+@@ -2144,6 +2140,10 @@ static void security_load_policycaps(str
  			pr_info("SELinux:  unknown policy capability %u\n",
  				i);
  	}
@@ -1405,7 +1394,7 @@ Index: v6.6-rpi/security/selinux/ss/services.c
  }
  
  static int security_preserve_bools(struct selinux_policy *oldpolicy,
-@@ -3501,8 +3501,7 @@ void selinux_audit_rule_free(void *vrule
+@@ -3519,8 +3519,7 @@ void selinux_audit_rule_free(void *vrule
  	}
  }
  
@@ -1415,11 +1404,11 @@ Index: v6.6-rpi/security/selinux/ss/services.c
  {
  	struct selinux_state *state = &selinux_state;
  	struct selinux_policy *policy;
-Index: v6.6-rpi/security/smack/smack_lsm.c
+Index: kernel-rpi/security/smack/smack_lsm.c
 ===================================================================
---- v6.6-rpi.orig/security/smack/smack_lsm.c
-+++ v6.6-rpi/security/smack/smack_lsm.c
-@@ -301,7 +301,7 @@ static struct smack_known *smk_fetch(con
+--- kernel-rpi.orig/security/smack/smack_lsm.c
++++ kernel-rpi/security/smack/smack_lsm.c
+@@ -303,7 +303,7 @@ static struct smack_known *smk_fetch(con
  	if (buffer == NULL)
  		return ERR_PTR(-ENOMEM);
  
@@ -1428,7 +1417,7 @@ Index: v6.6-rpi/security/smack/smack_lsm.c
  	if (rc < 0)
  		skp = ERR_PTR(rc);
  	else if (rc == 0)
-@@ -3597,9 +3597,9 @@ static void smack_d_instantiate(struct d
+@@ -3675,9 +3675,9 @@ static void smack_d_instantiate(struct d
  			 * If there is a transmute attribute on the
  			 * directory mark the inode.
  			 */
@@ -1440,11 +1429,11 @@ Index: v6.6-rpi/security/smack/smack_lsm.c
  			if (rc >= 0 && strncmp(trattr, TRANS_TRUE,
  					       TRANS_TRUE_SIZE) != 0)
  				rc = -EINVAL;
-Index: v6.6-rpi/drivers/net/tun.c
+Index: kernel-rpi/drivers/net/tun.c
 ===================================================================
---- v6.6-rpi.orig/drivers/net/tun.c
-+++ v6.6-rpi/drivers/net/tun.c
-@@ -3096,6 +3096,12 @@ static long __tun_chr_ioctl(struct file
+--- kernel-rpi.orig/drivers/net/tun.c
++++ kernel-rpi/drivers/net/tun.c
+@@ -3099,6 +3099,12 @@ static long __tun_chr_ioctl(struct file
  	int ret;
  	bool do_notify = false;
  
@@ -1457,7 +1446,7 @@ Index: v6.6-rpi/drivers/net/tun.c
  	if (cmd == TUNSETIFF || cmd == TUNSETQUEUE ||
  	    (_IOC_TYPE(cmd) == SOCK_IOC_TYPE && cmd != SIOCGSKNS)) {
  		if (copy_from_user(&ifr, argp, ifreq_len))
-@@ -3489,7 +3495,7 @@ static int tun_chr_open(struct inode *in
+@@ -3498,7 +3504,7 @@ static int tun_chr_open(struct inode *in
  	tfile->socket.file = file;
  	tfile->socket.ops = &tun_socket_ops;
  
@@ -1466,10 +1455,10 @@ Index: v6.6-rpi/drivers/net/tun.c
  
  	tfile->sk.sk_write_space = tun_sock_write_space;
  	tfile->sk.sk_sndbuf = INT_MAX;
-Index: v6.6-rpi/fs/ext4/xattr_security.c
+Index: kernel-rpi/fs/ext4/xattr_security.c
 ===================================================================
---- v6.6-rpi.orig/fs/ext4/xattr_security.c
-+++ v6.6-rpi/fs/ext4/xattr_security.c
+--- kernel-rpi.orig/fs/ext4/xattr_security.c
++++ kernel-rpi/fs/ext4/xattr_security.c
 @@ -15,7 +15,7 @@
  static int
  ext4_xattr_security_get(const struct xattr_handler *handler,
@@ -1479,10 +1468,10 @@ Index: v6.6-rpi/fs/ext4/xattr_security.c
  {
  	return ext4_xattr_get(inode, EXT4_XATTR_INDEX_SECURITY,
  			      name, buffer, size);
-Index: v6.6-rpi/fs/fuse/xattr.c
+Index: kernel-rpi/fs/fuse/xattr.c
 ===================================================================
---- v6.6-rpi.orig/fs/fuse/xattr.c
-+++ v6.6-rpi/fs/fuse/xattr.c
+--- kernel-rpi.orig/fs/fuse/xattr.c
++++ kernel-rpi/fs/fuse/xattr.c
 @@ -180,7 +180,7 @@ int fuse_removexattr(struct inode *inode
  
  static int fuse_xattr_get(const struct xattr_handler *handler,
@@ -1492,23 +1481,10 @@ Index: v6.6-rpi/fs/fuse/xattr.c
  {
  	if (fuse_is_bad(inode))
  		return -EIO;
-Index: v6.6-rpi/fs/overlayfs/inode.c
+Index: kernel-rpi/fs/squashfs/xattr.c
 ===================================================================
---- v6.6-rpi.orig/fs/overlayfs/inode.c
-+++ v6.6-rpi/fs/overlayfs/inode.c
-@@ -402,7 +402,7 @@ out:
- }
- 
- int ovl_xattr_get(struct dentry *dentry, struct inode *inode, const char *name,
--		  void *value, size_t size)
-+		  void *value, size_t size, int flags)
- {
- 	ssize_t res;
- 	const struct cred *old_cred;
-Index: v6.6-rpi/fs/squashfs/xattr.c
-===================================================================
---- v6.6-rpi.orig/fs/squashfs/xattr.c
-+++ v6.6-rpi/fs/squashfs/xattr.c
+--- kernel-rpi.orig/fs/squashfs/xattr.c
++++ kernel-rpi/fs/squashfs/xattr.c
 @@ -204,7 +204,7 @@ static int squashfs_xattr_handler_get(co
  				      struct dentry *unused,
  				      struct inode *inode,
@@ -1518,10 +1494,10 @@ Index: v6.6-rpi/fs/squashfs/xattr.c
  {
  	return squashfs_xattr_get(inode, handler->flags, name,
  		buffer, size);
-Index: v6.6-rpi/net/ipv4/devinet.c
+Index: kernel-rpi/net/ipv4/devinet.c
 ===================================================================
---- v6.6-rpi.orig/net/ipv4/devinet.c
-+++ v6.6-rpi/net/ipv4/devinet.c
+--- kernel-rpi.orig/net/ipv4/devinet.c
++++ kernel-rpi/net/ipv4/devinet.c
 @@ -61,6 +61,7 @@
  #include <net/rtnetlink.h>
  #include <net/net_namespace.h>
@@ -1530,7 +1506,7 @@ Index: v6.6-rpi/net/ipv4/devinet.c
  
  #define IPV6ONLY_FLAGS	\
  		(IFA_F_NODAD | IFA_F_OPTIMISTIC | IFA_F_DADFAILED | \
-@@ -1080,7 +1081,7 @@ int devinet_ioctl(struct net *net, unsig
+@@ -1089,7 +1090,7 @@ int devinet_ioctl(struct net *net, unsig
  
  	case SIOCSIFFLAGS:
  		ret = -EPERM;
@@ -1539,7 +1515,7 @@ Index: v6.6-rpi/net/ipv4/devinet.c
  			goto out;
  		break;
  	case SIOCSIFADDR:	/* Set interface address (and family) */
-@@ -1088,7 +1089,7 @@ int devinet_ioctl(struct net *net, unsig
+@@ -1097,7 +1098,7 @@ int devinet_ioctl(struct net *net, unsig
  	case SIOCSIFDSTADDR:	/* Set the destination address */
  	case SIOCSIFNETMASK: 	/* Set the netmask for the interface */
  		ret = -EPERM;
@@ -1548,11 +1524,11 @@ Index: v6.6-rpi/net/ipv4/devinet.c
  			goto out;
  		ret = -EINVAL;
  		if (sin->sin_family != AF_INET)
-Index: v6.6-rpi/security/chromiumos/Kconfig
+Index: kernel-rpi/security/chromiumos/Kconfig
 ===================================================================
 --- /dev/null
-+++ v6.6-rpi/security/chromiumos/Kconfig
-@@ -0,0 +1,45 @@
++++ kernel-rpi/security/chromiumos/Kconfig
+@@ -0,0 +1,37 @@
 +config SECURITY_CHROMIUMOS
 +	bool "Chromium OS Security Module"
 +	depends on SECURITY
@@ -1584,35 +1560,27 @@ Index: v6.6-rpi/security/chromiumos/Kconfig
 +	  in the init namespace.
 +
 +config ALT_SYSCALL_CHROMIUMOS
-+	bool "Chromium OS Alt-Syscall Tables"
-+	depends on ALT_SYSCALL
-+	help
-+	  Register restricted, alternate syscall tables used by Chromium OS
-+	  using the alt-syscall infrastructure.  Alternate syscall tables
-+	  can be selected with prctl(PR_ALT_SYSCALL).
-+
-+config SECURITY_CHROMIUMOS_READONLY_PROC_SELF_MEM
-+	bool "Force /proc/<pid>/mem paths to be read-only"
-+	default y
-+	help
-+	  When enabled, attempts to open /proc/self/mem for write access
-+	  will always fail.  Write access to this file allows bypassing
-+	  of memory map permissions (such as modifying read-only code).
-Index: v6.6-rpi/security/chromiumos/Makefile
++  bool "Chromium OS Alt-Syscall Tables"
++  depends on ALT_SYSCALL
++  help
++    Register restricted, alternate syscall tables used by Chromium OS
++    using the alt-syscall infrastructure.  Alternate syscall tables
++    can be selected with prctl(PR_ALT_SYSCALL).
+Index: kernel-rpi/security/chromiumos/Makefile
 ===================================================================
 --- /dev/null
-+++ v6.6-rpi/security/chromiumos/Makefile
++++ kernel-rpi/security/chromiumos/Makefile
 @@ -0,0 +1,5 @@
 +obj-$(CONFIG_SECURITY_CHROMIUMOS) := chromiumos_lsm.o
 +
 +chromiumos_lsm-y := inode_mark.o lsm.o securityfs.o utils.o
 +
 +obj-$(CONFIG_ALT_SYSCALL_CHROMIUMOS) += alt-syscall.o
-Index: v6.6-rpi/security/chromiumos/alt-syscall.c
+Index: kernel-rpi/security/chromiumos/alt-syscall.c
 ===================================================================
 --- /dev/null
-+++ v6.6-rpi/security/chromiumos/alt-syscall.c
-@@ -0,0 +1,557 @@
++++ kernel-rpi/security/chromiumos/alt-syscall.c
+@@ -0,0 +1,558 @@
 +/*
 + * Chromium OS alt-syscall tables
 + *
@@ -1647,12 +1615,12 @@ Index: v6.6-rpi/security/chromiumos/alt-syscall.c
 +#include "third_party_whitelists.h"
 +
 +/* Intercept and log blocked syscalls. */
-+static asmlinkage long block_syscall(struct pt_regs *regs)
++static asmlinkage long block_syscall(const struct pt_regs *regs)
 +{
 +	struct task_struct *task = current;
 +
 +	pr_warn_ratelimited("[%d] %s: blocked syscall %d\n", task_pid_nr(task),
-+		task->comm, syscall_get_nr(task, regs));
++		task->comm, syscall_get_nr(task, (struct pt_regs *)regs));
 +
 +	return -ENOSYS;
 +}
@@ -1662,10 +1630,10 @@ Index: v6.6-rpi/security/chromiumos/alt-syscall.c
 + * it to go through.  Note that since we don't have an easy way to map from
 + * syscall to number of arguments, we pass the maximum (6).
 + */
-+static asmlinkage long warn_syscall(struct pt_regs *regs)
++static asmlinkage long warn_syscall(const struct pt_regs *regs)
 +{
 +	struct task_struct *task = current;
-+	int nr = syscall_get_nr(task, regs);
++	int nr = syscall_get_nr(task, (struct pt_regs *)regs);
 +	sys_call_ptr_t fn = (sys_call_ptr_t)default_table.table[nr];
 +
 +	pr_warn_ratelimited("[%d] %s: syscall %d not whitelisted\n",
@@ -1675,10 +1643,10 @@ Index: v6.6-rpi/security/chromiumos/alt-syscall.c
 +}
 +
 +#ifdef CONFIG_COMPAT
-+static asmlinkage long warn_compat_syscall(struct pt_regs *regs)
++static asmlinkage long warn_compat_syscall(const struct pt_regs *regs)
 +{
 +	struct task_struct *task = current;
-+	int nr = syscall_get_nr(task, regs);
++	int nr = syscall_get_nr(task, (struct pt_regs *)regs);
 +	sys_call_ptr_t fn = (sys_call_ptr_t)default_table.compat_table[nr];
 +
 +	pr_warn_ratelimited("[%d] %s: compat syscall %d not whitelisted\n",
@@ -1688,12 +1656,12 @@ Index: v6.6-rpi/security/chromiumos/alt-syscall.c
 +}
 +#endif /* CONFIG_COMPAT */
 +
-+static asmlinkage long alt_sys_prctl(struct pt_regs *regs)
++static asmlinkage long alt_sys_prctl(const struct pt_regs *regs)
 +{
 +	struct task_struct *task = current;
 +	unsigned long args[6];
 +
-+	syscall_get_arguments(task, regs, args);
++	syscall_get_arguments(task, (struct pt_regs *)regs, args);
 +
 +	if (args[0] == PR_ALT_SYSCALL &&
 +	    args[1] == PR_ALT_SYSCALL_SET_SYSCALL_TABLE)
@@ -1722,14 +1690,14 @@ Index: v6.6-rpi/security/chromiumos/alt-syscall.c
 + * TODO(mortonm): Move the implementation of these Android-specific
 + * alt-syscalls (starting with android_*) to their own .c file.
 + */
-+static asmlinkage long android_getpriority(struct pt_regs *regs)
++static asmlinkage long android_getpriority(const struct pt_regs *regs)
 +{
 +	struct task_struct *task = current;
 +	long prio, nice;
 +	unsigned long args[6];
 +	int which, who;
 +
-+	syscall_get_arguments(task, regs, args);
++	syscall_get_arguments(task, (struct pt_regs *)regs, args);
 +	which = args[0];
 +	who = args[1];
 +
@@ -1762,13 +1730,13 @@ Index: v6.6-rpi/security/chromiumos/alt-syscall.c
 +	return -nice + 20;
 +}
 +
-+static asmlinkage long android_keyctl(struct pt_regs *regs)
++static asmlinkage long android_keyctl(const struct pt_regs *regs)
 +{
 +	return -EACCES;
 +}
 +
 +#ifdef CONFIG_KCMP
-+static asmlinkage long android_kcmp(struct pt_regs *regs)
++static asmlinkage long android_kcmp(const struct pt_regs *regs)
 +{
 +	struct task_struct *task = current;
 +	unsigned long args[6];
@@ -1776,7 +1744,7 @@ Index: v6.6-rpi/security/chromiumos/alt-syscall.c
 +	int type;
 +	unsigned long idx1, idx2;
 +
-+	syscall_get_arguments(task, regs, args);
++	syscall_get_arguments(task, (struct pt_regs *)regs, args);
 +	type = args[2];
 +	if (type == KCMP_SYSVSEM)
 +		return -ENOSYS;
@@ -1789,13 +1757,13 @@ Index: v6.6-rpi/security/chromiumos/alt-syscall.c
 +}
 +#endif
 +
-+static asmlinkage long android_setpriority(struct pt_regs *regs)
++static asmlinkage long android_setpriority(const struct pt_regs *regs)
 +{
 +	struct task_struct *task = current;
 +	unsigned long args[6];
 +	int which, who, niceval;
 +
-+	syscall_get_arguments(task, regs, args);
++	syscall_get_arguments(task, (struct pt_regs *)regs, args);
 +	which = args[0];
 +	who = args[1];
 +	niceval = args[2];
@@ -1855,7 +1823,7 @@ Index: v6.6-rpi/security/chromiumos/alt-syscall.c
 +}
 +
 +static asmlinkage long
-+android_sched_setscheduler(struct pt_regs *regs)
++android_sched_setscheduler(const struct pt_regs *regs)
 +{
 +	struct task_struct *task = current;
 +	unsigned long args[6];
@@ -1863,7 +1831,7 @@ Index: v6.6-rpi/security/chromiumos/alt-syscall.c
 +	int policy;
 +	struct sched_param __user *param;
 +
-+	syscall_get_arguments(task, regs, args);
++	syscall_get_arguments(task, (struct pt_regs *)regs, args);
 +	pid = args[0];
 +	policy = args[1];
 +	param = (struct sched_param __user *)args[2];
@@ -1880,27 +1848,27 @@ Index: v6.6-rpi/security/chromiumos/alt-syscall.c
 + */
 +#define SETPARAM_POLICY -1
 +
-+static asmlinkage long android_sched_setparam(struct pt_regs *regs)
++static asmlinkage long android_sched_setparam(const struct pt_regs *regs)
 +{
 +	struct task_struct *task = current;
 +	unsigned long args[6];
 +	pid_t pid;
 +	struct sched_param __user *param;
 +
-+	syscall_get_arguments(task, regs, args);
++	syscall_get_arguments(task, (struct pt_regs *)regs, args);
 +	pid = args[0];
 +	param = (struct sched_param __user *)args[1];
 +
 +        return do_android_sched_setscheduler(pid, SETPARAM_POLICY, param);
 +}
 +
-+static asmlinkage long __maybe_unused android_socket(struct pt_regs *regs)
++static asmlinkage long __maybe_unused android_socket(const struct pt_regs *regs)
 +{
 +	struct task_struct *task = current;
 +	unsigned long args[6];
 +	int domain, type, socket;
 +
-+	syscall_get_arguments(task, regs, args);
++	syscall_get_arguments(task, (struct pt_regs *)regs, args);
 +	domain = args[0];
 +	type = args[1];
 +	socket = args[2];
@@ -1910,7 +1878,7 @@ Index: v6.6-rpi/security/chromiumos/alt-syscall.c
 +	return __sys_socket(domain, type, socket);
 +}
 +
-+static asmlinkage long android_perf_event_open(struct pt_regs *regs)
++static asmlinkage long android_perf_event_open(const struct pt_regs *regs)
 +{
 +	struct task_struct *task = current;
 +	unsigned long args[6];
@@ -1922,7 +1890,7 @@ Index: v6.6-rpi/security/chromiumos/alt-syscall.c
 +	if (!allow_devmode_syscalls)
 +		return -EACCES;
 +
-+	syscall_get_arguments(task, regs, args);
++	syscall_get_arguments(task, (struct pt_regs *)regs, args);
 +	attr_uptr = (struct perf_event_attr __user *)args[0];
 +	pid = args[1];
 +	cpu = args[2];
@@ -1932,14 +1900,14 @@ Index: v6.6-rpi/security/chromiumos/alt-syscall.c
 +	return ksys_perf_event_open(attr_uptr, pid, cpu, group_fd, flags);
 +}
 +
-+static asmlinkage long android_adjtimex(struct pt_regs *regs)
++static asmlinkage long android_adjtimex(const struct pt_regs *regs)
 +{
 +	struct task_struct *task = current;
 +	struct __kernel_timex kbuf;
 +	struct __kernel_timex __user *buf;
 +	unsigned long args[6];
 +
-+	syscall_get_arguments(task, regs, args);
++	syscall_get_arguments(task, (struct pt_regs *)regs, args);
 +	buf = (struct __kernel_timex __user *)args[0];
 +
 +	/* adjtimex() is allowed only for read. */
@@ -1950,7 +1918,7 @@ Index: v6.6-rpi/security/chromiumos/alt-syscall.c
 +	return ksys_adjtimex(buf);
 +}
 +
-+static asmlinkage long android_clock_adjtime(struct pt_regs *regs)
++static asmlinkage long android_clock_adjtime(const struct pt_regs *regs)
 +{
 +	struct task_struct *task = current;
 +	struct __kernel_timex kbuf;
@@ -1958,7 +1926,7 @@ Index: v6.6-rpi/security/chromiumos/alt-syscall.c
 +	clockid_t which_clock;
 +	struct __kernel_timex __user *buf;
 +
-+	syscall_get_arguments(task, regs, args);
++	syscall_get_arguments(task, (struct pt_regs *)regs, args);
 +	which_clock = args[0];
 +	buf = (struct __kernel_timex __user *)args[1];
 +
@@ -1970,7 +1938,7 @@ Index: v6.6-rpi/security/chromiumos/alt-syscall.c
 +	return ksys_clock_adjtime(which_clock, buf);
 +}
 +
-+static asmlinkage long android_getcpu(struct pt_regs *regs)
++static asmlinkage long android_getcpu(const struct pt_regs *regs)
 +{
 +	struct task_struct *task = current;
 +	unsigned long args[6];
@@ -1978,7 +1946,7 @@ Index: v6.6-rpi/security/chromiumos/alt-syscall.c
 +	unsigned __user *node;
 +	struct getcpu_cache __user *tcache;
 +
-+	syscall_get_arguments(task, regs, args);
++	syscall_get_arguments(task, (struct pt_regs *)regs, args);
 +	cpu = (unsigned __user *)args[0];
 +	node = (unsigned __user *)args[1];
 +	tcache = (struct getcpu_cache __user *)args[2];
@@ -1989,14 +1957,14 @@ Index: v6.6-rpi/security/chromiumos/alt-syscall.c
 +}
 +
 +#ifdef CONFIG_COMPAT
-+static asmlinkage long android_compat_adjtimex(struct pt_regs *regs)
++static asmlinkage long android_compat_adjtimex(const struct pt_regs *regs)
 +{
 +	struct task_struct *task = current;
 +	struct old_timex32 kbuf;
 +	struct old_timex32 __user *buf;
 +	unsigned long args[6];
 +
-+	syscall_get_arguments(task, regs, args);
++	syscall_get_arguments(task, (struct pt_regs *)regs, args);
 +	buf = (struct old_timex32 __user *)args[0];
 +
 +	/* adjtimex() is allowed only for read. */
@@ -2008,7 +1976,7 @@ Index: v6.6-rpi/security/chromiumos/alt-syscall.c
 +}
 +
 +static asmlinkage long
-+android_compat_clock_adjtime(struct pt_regs *regs)
++android_compat_clock_adjtime(const struct pt_regs *regs)
 +{
 +	struct task_struct *task = current;
 +	struct old_timex32 kbuf;
@@ -2016,7 +1984,7 @@ Index: v6.6-rpi/security/chromiumos/alt-syscall.c
 +	clockid_t which_clock;
 +	struct old_timex32 __user *buf;
 +
-+	syscall_get_arguments(task, regs, args);
++	syscall_get_arguments(task, (struct pt_regs *)regs, args);
 +	which_clock = args[0];
 +	buf = (struct old_timex32 __user *)args[1];
 +
@@ -2152,8 +2120,9 @@ Index: v6.6-rpi/security/chromiumos/alt-syscall.c
 +	int err;
 +
 +#ifdef CONFIG_SYSCTL
-+	register_sysctl_init("kernel/chromiumos/alt_syscall",
-+			     chromiumos_sysctl_table);
++	if (!register_sysctl("kernel/chromiumos/alt_syscall",
++			     chromiumos_sysctl_table))
++		pr_warn("Failed to register sysctl\n");
 +#endif
 +
 +	err = arch_dup_sys_call_table(&default_table);
@@ -2170,11 +2139,11 @@ Index: v6.6-rpi/security/chromiumos/alt-syscall.c
 +	return 0;
 +}
 +module_init(chromiumos_alt_syscall_init);
-Index: v6.6-rpi/security/chromiumos/alt-syscall.h
+Index: kernel-rpi/security/chromiumos/alt-syscall.h
 ===================================================================
 --- /dev/null
-+++ v6.6-rpi/security/chromiumos/alt-syscall.h
-@@ -0,0 +1,379 @@
++++ kernel-rpi/security/chromiumos/alt-syscall.h
+@@ -0,0 +1,378 @@
 +/*
 + * Linux Security Module for Chromium OS
 + *
@@ -2219,7 +2188,6 @@ Index: v6.6-rpi/security/chromiumos/alt-syscall.h
 +                .extra1         = &zero,
 +                .extra2         = &one,
 +        },
-+        { }
 +};
 +#endif
 +
@@ -2258,7 +2226,7 @@ Index: v6.6-rpi/security/chromiumos/alt-syscall.h
 + * If an alt_syscall table allows prctl(), override it to prevent a process
 + * from changing its syscall table.
 + */
-+static asmlinkage long alt_sys_prctl(struct pt_regs *regs);
++static asmlinkage long alt_sys_prctl(const struct pt_regs *regs);
 +
 +#ifdef CONFIG_COMPAT
 +#define SYSCALL_WHITELIST_COMPAT(x)                                     \
@@ -2554,10 +2522,10 @@ Index: v6.6-rpi/security/chromiumos/alt-syscall.h
 +#endif
 +
 +#endif /* ALT_SYSCALL_H */
-Index: v6.6-rpi/security/chromiumos/android_whitelists.h
+Index: kernel-rpi/security/chromiumos/android_whitelists.h
 ===================================================================
 --- /dev/null
-+++ v6.6-rpi/security/chromiumos/android_whitelists.h
++++ kernel-rpi/security/chromiumos/android_whitelists.h
 @@ -0,0 +1,653 @@
 +/*
 + * Linux Security Module for Chromium OS
@@ -2597,25 +2565,25 @@ Index: v6.6-rpi/security/chromiumos/android_whitelists.h
 + * Note that the prio returned by getpriority has been offset by 20.
 + * (returns 40..1 instead of -20..19)
 + */
-+static asmlinkage long android_getpriority(struct pt_regs *regs);
++static asmlinkage long android_getpriority(const struct pt_regs *regs);
 +/* Android does not get to call keyctl. */
-+static asmlinkage long android_keyctl(struct pt_regs *regs);
++static asmlinkage long android_keyctl(const struct pt_regs *regs);
 +#ifdef CONFIG_KCMP
 +/* Android does not get to call kcmp with type==KCMP_SYSVEM. */
-+static asmlinkage long android_kcmp(struct pt_regs *regs);
++static asmlinkage long android_kcmp(const struct pt_regs *regs);
 +#endif
 +/* Make sure nothing sets a nice value more favorable than -10. */
-+static asmlinkage long android_setpriority(struct pt_regs *regs);
-+static asmlinkage long android_sched_setscheduler(struct pt_regs *regs);
-+static asmlinkage long android_sched_setparam(struct pt_regs *regs);
-+static asmlinkage long __maybe_unused android_socket(struct pt_regs *regs);
-+static asmlinkage long android_perf_event_open(struct pt_regs *regs);
-+static asmlinkage long android_adjtimex(struct pt_regs *regs);
-+static asmlinkage long android_clock_adjtime(struct pt_regs *regs);
-+static asmlinkage long android_getcpu(struct pt_regs *regs);
++static asmlinkage long android_setpriority(const struct pt_regs *regs);
++static asmlinkage long android_sched_setscheduler(const struct pt_regs *regs);
++static asmlinkage long android_sched_setparam(const struct pt_regs *regs);
++static asmlinkage long __maybe_unused android_socket(const struct pt_regs *regs);
++static asmlinkage long android_perf_event_open(const struct pt_regs *regs);
++static asmlinkage long android_adjtimex(const struct pt_regs *regs);
++static asmlinkage long android_clock_adjtime(const struct pt_regs *regs);
++static asmlinkage long android_getcpu(const struct pt_regs *regs);
 +#ifdef CONFIG_COMPAT
-+static asmlinkage long android_compat_adjtimex(struct pt_regs *regs);
-+static asmlinkage long android_compat_clock_adjtime(struct pt_regs *regs);
++static asmlinkage long android_compat_adjtimex(const struct pt_regs *regs);
++static asmlinkage long android_compat_clock_adjtime(const struct pt_regs *regs);
 +#endif /* CONFIG_COMPAT */
 +
 +static const struct syscall_whitelist_entry android_whitelist[] __initconst = {
@@ -3212,10 +3180,10 @@ Index: v6.6-rpi/security/chromiumos/android_whitelists.h
 +#endif /* CONFIG_COMPAT */
 +
 +#endif /* ANDROID_WHITELISTS_H */
-Index: v6.6-rpi/security/chromiumos/complete_whitelists.h
+Index: kernel-rpi/security/chromiumos/complete_whitelists.h
 ===================================================================
 --- /dev/null
-+++ v6.6-rpi/security/chromiumos/complete_whitelists.h
++++ kernel-rpi/security/chromiumos/complete_whitelists.h
 @@ -0,0 +1,373 @@
 +/*
 + * Linux Security Module for Chromium OS
@@ -3590,11 +3558,11 @@ Index: v6.6-rpi/security/chromiumos/complete_whitelists.h
 +#endif /* CONFIG_COMPAT */
 +
 +#endif /* COMPLETE_WHITELISTS_H */
-Index: v6.6-rpi/security/chromiumos/inode_mark.c
+Index: kernel-rpi/security/chromiumos/inode_mark.c
 ===================================================================
 --- /dev/null
-+++ v6.6-rpi/security/chromiumos/inode_mark.c
-@@ -0,0 +1,353 @@
++++ kernel-rpi/security/chromiumos/inode_mark.c
+@@ -0,0 +1,350 @@
 +/*
 + * Linux Security Module for Chromium OS
 + *
@@ -3759,10 +3727,8 @@ Index: v6.6-rpi/security/chromiumos/inode_mark.c
 +	sbm->sb = sb;
 +	sbm->fsn_group = fsnotify_alloc_group(&chromiumos_fsn_ops, 0);
 +	if (IS_ERR(sbm->fsn_group)) {
-+		int ret = PTR_ERR(sbm->fsn_group);
-+
 +		kfree(sbm);
-+		return ERR_PTR(ret);
++		return ERR_CAST(sbm->fsn_group);
 +	}
 +	sbm->fsn_group->private = sbm;
 +	hlist_add_head_rcu(&sbm->node, hlist);
@@ -3817,8 +3783,7 @@ Index: v6.6-rpi/security/chromiumos/inode_mark.c
 +		inode_mark->policies[i] = CHROMIUMOS_INODE_POLICY_INHERIT;
 +
 +	inode_mark->policies[type] = policy;
-+	ret = fsnotify_add_mark_locked(&inode_mark->mark, &inode->i_fsnotify_marks,
-+				       type, false, NULL);
++	ret = fsnotify_add_inode_mark_locked(&inode_mark->mark, inode, 0);
 +	if (ret)
 +		goto out;
 +
@@ -3845,9 +3810,9 @@ Index: v6.6-rpi/security/chromiumos/inode_mark.c
 +	if (IS_ERR(sbm))
 +		return PTR_ERR(sbm);
 +
-+	mutex_lock(&sbm->fsn_group->mark_mutex);
++	fsnotify_group_lock(sbm->fsn_group);
 +
-+	mark = fsnotify_find_mark(&inode->i_fsnotify_marks, sbm->fsn_group);
++	mark = fsnotify_find_mark(inode, FSNOTIFY_OBJ_TYPE_INODE, sbm->fsn_group);
 +	if (mark) {
 +		WRITE_ONCE(chromiumos_to_inode_mark(mark)->policies[type],
 +				   policy);
@@ -3870,7 +3835,7 @@ Index: v6.6-rpi/security/chromiumos/inode_mark.c
 +		ret = chromiumos_inode_mark_create(sbm, inode, type, policy);
 +	}
 +
-+	mutex_unlock(&sbm->fsn_group->mark_mutex);
++	fsnotify_group_unlock(sbm->fsn_group);
 +	chromiumos_super_block_put(sbm);
 +
 +	/* This must happen after dropping the mark mutex. */
@@ -3922,7 +3887,7 @@ Index: v6.6-rpi/security/chromiumos/inode_mark.c
 +	rcu_read_lock();
 +	while (1) {
 +		struct fsnotify_mark *mark = fsnotify_find_mark(
-+			&inode->i_fsnotify_marks, sbm->fsn_group);
++			inode, FSNOTIFY_OBJ_TYPE_INODE, sbm->fsn_group);
 +		if (mark) {
 +			struct chromiumos_inode_mark *inode_mark =
 +				chromiumos_to_inode_mark(mark);
@@ -3948,10 +3913,10 @@ Index: v6.6-rpi/security/chromiumos/inode_mark.c
 +
 +	return policy;
 +}
-Index: v6.6-rpi/security/chromiumos/inode_mark.h
+Index: kernel-rpi/security/chromiumos/inode_mark.h
 ===================================================================
 --- /dev/null
-+++ v6.6-rpi/security/chromiumos/inode_mark.h
++++ kernel-rpi/security/chromiumos/inode_mark.h
 @@ -0,0 +1,47 @@
 +/*
 + * Linux Security Module for Chromium OS
@@ -4000,11 +3965,11 @@ Index: v6.6-rpi/security/chromiumos/inode_mark.h
 +chromiumos_get_inode_security_policy(
 +	struct dentry *dentry, struct inode *inode,
 +	enum chromiumos_inode_security_policy_type type);
-Index: v6.6-rpi/security/chromiumos/lsm.c
+Index: kernel-rpi/security/chromiumos/lsm.c
 ===================================================================
 --- /dev/null
-+++ v6.6-rpi/security/chromiumos/lsm.c
-@@ -0,0 +1,341 @@
++++ kernel-rpi/security/chromiumos/lsm.c
+@@ -0,0 +1,335 @@
 +/*
 + * Linux Security Module for Chromium OS
 + *
@@ -4034,7 +3999,6 @@ Index: v6.6-rpi/security/chromiumos/lsm.c
 +#include <linux/fs_parser.h>
 +#include <linux/fs_struct.h>
 +#include <linux/lsm_hooks.h>
-+#include <linux/mm.h>
 +#include <linux/module.h>
 +#include <linux/mount.h>
 +#include <linux/namei.h>	/* for nameidata_get_total_link_count */
@@ -4045,9 +4009,19 @@ Index: v6.6-rpi/security/chromiumos/lsm.c
 +#include <linux/security.h>
 +#include <linux/shmem_fs.h>
 +#include <uapi/linux/mount.h>
++#include <uapi/linux/lsm.h>
 +
 +#include "inode_mark.h"
 +#include "utils.h"
++
++static int allow_overlayfs;
++
++static int __init allow_overlayfs_set(char *__unused)
++{
++	allow_overlayfs = 1;
++	return 1;
++}
++__setup("chromiumos.allow_overlayfs", allow_overlayfs_set);
 +
 +#if defined(CONFIG_SECURITY_CHROMIUMOS_NO_UNPRIVILEGED_UNSAFE_MOUNTS) || \
 +	defined(CONFIG_SECURITY_CHROMIUMOS_NO_SYMLINK_MOUNT)
@@ -4083,6 +4057,8 @@ Index: v6.6-rpi/security/chromiumos/lsm.c
 +	kfree(cmdline);
 +	kfree(alloced);
 +}
++#else
++static void report(const char *origin, const struct path *path, char *operation) { }
 +#endif
 +
 +static int chromiumos_security_sb_mount(const char *dev_name,
@@ -4090,6 +4066,13 @@ Index: v6.6-rpi/security/chromiumos/lsm.c
 +					const char *type, unsigned long flags,
 +					void *data)
 +{
++	if (!allow_overlayfs && type && !strcmp(type, "overlay")) {
++		report("sb_mount", path, "Overlayfs mounts prohibited");
++		pr_notice("sb_mount dev=%s type=%s flags=%#lx\n",
++			  dev_name, type, flags);
++		return -EPERM;
++	}
++
 +#ifdef CONFIG_SECURITY_CHROMIUMOS_NO_SYMLINK_MOUNT
 +	if (!(path->link_count & PATH_LINK_COUNT_VALID)) {
 +		WARN(1, "No link count available");
@@ -4295,32 +4278,6 @@ Index: v6.6-rpi/security/chromiumos/lsm.c
 +	return 0;
 +}
 +
-+#ifdef CONFIG_BPF_SYSCALL
-+
-+static const char secagentd[] = "/usr/sbin/secagentd";
-+
-+static int chromiumos_bpf(int cmd, union bpf_attr *attr, unsigned int size)
-+{
-+	char buf[128];
-+	int res;
-+	int len;
-+
-+	len = strlen(secagentd);
-+	res = get_cmdline(current, buf, sizeof(buf));
-+	if (res > 0 && buf[res - 1] == '\0') {
-+		// null terminated.
-+		res = res - 1;
-+	}
-+
-+	if (res < len || strncmp(buf, secagentd, len)) {
-+		pr_notice_ratelimited("bpf syscall blocked\n");
-+		return -EACCES;
-+	}
-+
-+	return 0;
-+}
-+#endif
-+
 +static struct security_hook_list chromiumos_security_hooks[] = {
 +	LSM_HOOK_INIT(sb_mount, chromiumos_security_sb_mount),
 +	LSM_HOOK_INIT(inode_follow_link, chromiumos_security_inode_follow_link),
@@ -4328,15 +4285,17 @@ Index: v6.6-rpi/security/chromiumos/lsm.c
 +	LSM_HOOK_INIT(sb_eat_lsm_opts, chromiumos_sb_eat_lsm_opts),
 +	LSM_HOOK_INIT(bprm_creds_for_exec, chromiumos_bprm_creds_for_exec),
 +	LSM_HOOK_INIT(locked_down, chromiumos_locked_down),
-+#ifdef CONFIG_BPF_SYSCALL
-+	LSM_HOOK_INIT(bpf, chromiumos_bpf),
-+#endif
++};
++
++static const struct lsm_id chromiumos_lsmid = {
++       .name = "chromiumos",
++       .id = LSM_ID_CHROMIUMOS,
 +};
 +
 +static int __init chromiumos_security_init(void)
 +{
 +	security_add_hooks(chromiumos_security_hooks,
-+			   ARRAY_SIZE(chromiumos_security_hooks), "chromiumos");
++			   ARRAY_SIZE(chromiumos_security_hooks), &chromiumos_lsmid);
 +
 +	pr_info("enabled");
 +
@@ -4346,10 +4305,10 @@ Index: v6.6-rpi/security/chromiumos/lsm.c
 +	.name = "chromiumos",
 +	.init = chromiumos_security_init
 +};
-Index: v6.6-rpi/security/chromiumos/read_write_test_whitelists.h
+Index: kernel-rpi/security/chromiumos/read_write_test_whitelists.h
 ===================================================================
 --- /dev/null
-+++ v6.6-rpi/security/chromiumos/read_write_test_whitelists.h
++++ kernel-rpi/security/chromiumos/read_write_test_whitelists.h
 @@ -0,0 +1,56 @@
 +/*
 + * Linux Security Module for Chromium OS
@@ -4407,10 +4366,10 @@ Index: v6.6-rpi/security/chromiumos/read_write_test_whitelists.h
 +#endif /* CONFIG_COMPAT */
 +
 +#endif /* READ_WRITE_TESTS_WHITELISTS_H */
-Index: v6.6-rpi/security/chromiumos/securityfs.c
+Index: kernel-rpi/security/chromiumos/securityfs.c
 ===================================================================
 --- /dev/null
-+++ v6.6-rpi/security/chromiumos/securityfs.c
++++ kernel-rpi/security/chromiumos/securityfs.c
 @@ -0,0 +1,241 @@
 +/*
 + * Linux Security Module for Chromium OS
@@ -4653,10 +4612,10 @@ Index: v6.6-rpi/security/chromiumos/securityfs.c
 +	return ret;
 +}
 +fs_initcall(chromiumos_init_securityfs);
-Index: v6.6-rpi/security/chromiumos/third_party_whitelists.h
+Index: kernel-rpi/security/chromiumos/third_party_whitelists.h
 ===================================================================
 --- /dev/null
-+++ v6.6-rpi/security/chromiumos/third_party_whitelists.h
++++ kernel-rpi/security/chromiumos/third_party_whitelists.h
 @@ -0,0 +1,252 @@
 +/*
 + * Linux Security Module for Chromium OS
@@ -4910,10 +4869,10 @@ Index: v6.6-rpi/security/chromiumos/third_party_whitelists.h
 +#endif /* CONFIG_COMPAT */
 +
 +#endif /* THIRD_PARTY_WHITELISTS_H */
-Index: v6.6-rpi/security/chromiumos/utils.c
+Index: kernel-rpi/security/chromiumos/utils.c
 ===================================================================
 --- /dev/null
-+++ v6.6-rpi/security/chromiumos/utils.c
++++ kernel-rpi/security/chromiumos/utils.c
 @@ -0,0 +1,157 @@
 +/*
 + * Utilities for the Linux Security Module for Chromium OS
@@ -5072,10 +5031,10 @@ Index: v6.6-rpi/security/chromiumos/utils.c
 +out:
 +	return buffer;
 +}
-Index: v6.6-rpi/security/chromiumos/utils.h
+Index: kernel-rpi/security/chromiumos/utils.h
 ===================================================================
 --- /dev/null
-+++ v6.6-rpi/security/chromiumos/utils.h
++++ kernel-rpi/security/chromiumos/utils.h
 @@ -0,0 +1,30 @@
 +/*
 + * Utilities for the Linux Security Module for Chromium OS
@@ -5107,11 +5066,11 @@ Index: v6.6-rpi/security/chromiumos/utils.h
 +char *printable_cmdline(struct task_struct *task);
 +
 +#endif /* _SECURITY_CHROMIUMOS_UTILS_H */
-Index: v6.6-rpi/net/core/sysctl_net_core.c
+Index: kernel-rpi/net/core/sysctl_net_core.c
 ===================================================================
---- v6.6-rpi.orig/net/core/sysctl_net_core.c
-+++ v6.6-rpi/net/core/sysctl_net_core.c
-@@ -678,6 +678,15 @@ static struct ctl_table netns_core_table
+--- kernel-rpi.orig/net/core/sysctl_net_core.c
++++ kernel-rpi/net/core/sysctl_net_core.c
+@@ -645,6 +645,15 @@ static struct ctl_table netns_core_table
  	},
  #endif
  	{
@@ -5127,19 +5086,19 @@ Index: v6.6-rpi/net/core/sysctl_net_core.c
  		.procname	= "somaxconn",
  		.data		= &init_net.core.sysctl_somaxconn,
  		.maxlen		= sizeof(int),
-@@ -714,6 +723,8 @@ static __net_init int sysctl_core_net_in
- {
- 	struct ctl_table *tbl, *tmp;
+@@ -724,6 +733,8 @@ static __net_init int sysctl_core_net_in
+ 	size_t table_size = ARRAY_SIZE(netns_core_table);
+ 	struct ctl_table *tbl;
  
 +	net->core.sysctl_android_paranoid = 0;
 +
  	tbl = netns_core_table;
  	if (!net_eq(net, &init_net)) {
- 		tbl = kmemdup(tbl, sizeof(netns_core_table), GFP_KERNEL);
-Index: v6.6-rpi/arch/arm64/include/asm/syscall.h
+ 		int i;
+Index: kernel-rpi/arch/arm64/include/asm/syscall.h
 ===================================================================
---- v6.6-rpi.orig/arch/arm64/include/asm/syscall.h
-+++ v6.6-rpi/arch/arm64/include/asm/syscall.h
+--- kernel-rpi.orig/arch/arm64/include/asm/syscall.h
++++ kernel-rpi/arch/arm64/include/asm/syscall.h
 @@ -17,6 +17,8 @@ extern const syscall_fn_t sys_call_table
  extern const syscall_fn_t compat_sys_call_table[];
  #endif
@@ -5149,11 +5108,11 @@ Index: v6.6-rpi/arch/arm64/include/asm/syscall.h
  static inline int syscall_get_nr(struct task_struct *task,
  				 struct pt_regs *regs)
  {
-Index: v6.6-rpi/arch/arm64/kernel/Makefile
+Index: kernel-rpi/arch/arm64/kernel/Makefile
 ===================================================================
---- v6.6-rpi.orig/arch/arm64/kernel/Makefile
-+++ v6.6-rpi/arch/arm64/kernel/Makefile
-@@ -79,6 +79,8 @@ CFLAGS_patch-scs.o			+= -mbranch-protect
+--- kernel-rpi.orig/arch/arm64/kernel/Makefile
++++ kernel-rpi/arch/arm64/kernel/Makefile
+@@ -75,6 +75,8 @@ obj-$(CONFIG_COMPAT_VDSO)		+= vdso32-wra
  $(obj)/vdso-wrap.o: $(obj)/vdso/vdso.so
  $(obj)/vdso32-wrap.o: $(obj)/vdso32/vdso.so
  
@@ -5162,11 +5121,11 @@ Index: v6.6-rpi/arch/arm64/kernel/Makefile
  obj-y					+= probes/
  obj-y					+= head.o
  extra-y					+= vmlinux.lds
-Index: v6.6-rpi/arch/arm64/kernel/alt-syscall.c
+Index: kernel-rpi/arch/arm64/kernel/alt-syscall.c
 ===================================================================
 --- /dev/null
-+++ v6.6-rpi/arch/arm64/kernel/alt-syscall.c
-@@ -0,0 +1,78 @@
++++ kernel-rpi/arch/arm64/kernel/alt-syscall.c
+@@ -0,0 +1,81 @@
 +/*
 + * AArch64 alt-syscall implementation
 + *
@@ -5183,6 +5142,9 @@ Index: v6.6-rpi/arch/arm64/kernel/alt-syscall.c
 +#include <linux/syscalls.h>
 +
 +#include <asm/syscall.h>
++#ifdef CONFIG_COMPAT
++#include <asm/unistd_compat_32.h>
++#endif
 +
 +int __init arch_dup_sys_call_table(struct alt_sys_call_table *entry)
 +{
@@ -5207,7 +5169,7 @@ Index: v6.6-rpi/arch/arm64/kernel/alt-syscall.c
 +	       entry->size * sizeof(sys_call_ptr_t));
 +
 +#ifdef CONFIG_COMPAT
-+	entry->compat_size = __NR_compat_syscalls;
++	entry->compat_size = __NR_compat32_syscalls;
 +	entry->compat_table = kcalloc(entry->compat_size,
 +				      sizeof(sys_call_ptr_t), GFP_KERNEL);
 +	if (!entry->compat_table) {
@@ -5245,11 +5207,11 @@ Index: v6.6-rpi/arch/arm64/kernel/alt-syscall.c
 +
 +	return 0;
 +}
-Index: v6.6-rpi/include/linux/syscalls.h
+Index: kernel-rpi/include/linux/syscalls.h
 ===================================================================
---- v6.6-rpi.orig/include/linux/syscalls.h
-+++ v6.6-rpi/include/linux/syscalls.h
-@@ -1277,4 +1277,24 @@ int __sys_getsockopt(int fd, int level,
+--- kernel-rpi.orig/include/linux/syscalls.h
++++ kernel-rpi/include/linux/syscalls.h
+@@ -1303,4 +1303,24 @@ int __sys_getsockopt(int fd, int level,
  		int __user *optlen);
  int __sys_setsockopt(int fd, int level, int optname, char __user *optval,
  		int optlen);
@@ -5274,10 +5236,10 @@ Index: v6.6-rpi/include/linux/syscalls.h
 +int ksys_adjtimex_time32(struct old_timex32 __user *utp);
 +
  #endif
-Index: v6.6-rpi/include/uapi/linux/prctl.h
+Index: kernel-rpi/include/uapi/linux/prctl.h
 ===================================================================
---- v6.6-rpi.orig/include/uapi/linux/prctl.h
-+++ v6.6-rpi/include/uapi/linux/prctl.h
+--- kernel-rpi.orig/include/uapi/linux/prctl.h
++++ kernel-rpi/include/uapi/linux/prctl.h
 @@ -155,6 +155,9 @@ struct prctl_mm_map {
  #define PR_SET_PTRACER 0x59616d61
  # define PR_SET_PTRACER_ANY ((unsigned long)-1)
@@ -5288,10 +5250,10 @@ Index: v6.6-rpi/include/uapi/linux/prctl.h
  #define PR_SET_CHILD_SUBREAPER	36
  #define PR_GET_CHILD_SUBREAPER	37
  
-Index: v6.6-rpi/kernel/Makefile
+Index: kernel-rpi/kernel/Makefile
 ===================================================================
---- v6.6-rpi.orig/kernel/Makefile
-+++ v6.6-rpi/kernel/Makefile
+--- kernel-rpi.orig/kernel/Makefile
++++ kernel-rpi/kernel/Makefile
 @@ -52,6 +52,8 @@ obj-y += dma/
  obj-y += entry/
  obj-$(CONFIG_MODULES) += module/
@@ -5301,10 +5263,10 @@ Index: v6.6-rpi/kernel/Makefile
  obj-$(CONFIG_KCMP) += kcmp.o
  obj-$(CONFIG_FREEZER) += freezer.o
  obj-$(CONFIG_PROFILING) += profile.o
-Index: v6.6-rpi/kernel/alt-syscall.c
+Index: kernel-rpi/kernel/alt-syscall.c
 ===================================================================
 --- /dev/null
-+++ v6.6-rpi/kernel/alt-syscall.c
++++ kernel-rpi/kernel/alt-syscall.c
 @@ -0,0 +1,65 @@
 +/*
 + * Alternate Syscall Table Infrastructure
@@ -5371,10 +5333,10 @@ Index: v6.6-rpi/kernel/alt-syscall.c
 +
 +	return -ENOENT;
 +}
-Index: v6.6-rpi/kernel/sys.c
+Index: kernel-rpi/kernel/sys.c
 ===================================================================
---- v6.6-rpi.orig/kernel/sys.c
-+++ v6.6-rpi/kernel/sys.c
+--- kernel-rpi.orig/kernel/sys.c
++++ kernel-rpi/kernel/sys.c
 @@ -48,6 +48,7 @@
  
  #include <linux/compat.h>
@@ -5383,7 +5345,7 @@ Index: v6.6-rpi/kernel/sys.c
  #include <linux/kprobes.h>
  #include <linux/user_namespace.h>
  #include <linux/time_namespace.h>
-@@ -215,7 +216,7 @@ out:
+@@ -224,7 +225,7 @@ out:
  	return error;
  }
  
@@ -5392,7 +5354,7 @@ Index: v6.6-rpi/kernel/sys.c
  {
  	struct task_struct *g, *p;
  	struct user_struct *user;
-@@ -279,13 +280,18 @@ out:
+@@ -288,13 +289,18 @@ out:
  	return error;
  }
  
@@ -5412,7 +5374,7 @@ Index: v6.6-rpi/kernel/sys.c
  {
  	struct task_struct *g, *p;
  	struct user_struct *user;
-@@ -350,6 +356,11 @@ out_unlock:
+@@ -359,6 +365,11 @@ out_unlock:
  	return retval;
  }
  
@@ -5424,7 +5386,7 @@ Index: v6.6-rpi/kernel/sys.c
  /*
   * Unprivileged users may change the real gid to the effective gid
   * or vice versa.  (BSD-style)
-@@ -671,7 +682,6 @@ long __sys_setresuid(uid_t ruid, uid_t e
+@@ -680,7 +691,6 @@ long __sys_setresuid(uid_t ruid, uid_t e
  	struct cred *new;
  	int retval;
  	kuid_t kruid, keuid, ksuid;
@@ -5432,7 +5394,7 @@ Index: v6.6-rpi/kernel/sys.c
  
  	kruid = make_kuid(ns, ruid);
  	keuid = make_kuid(ns, euid);
-@@ -686,29 +696,25 @@ long __sys_setresuid(uid_t ruid, uid_t e
+@@ -695,29 +705,25 @@ long __sys_setresuid(uid_t ruid, uid_t e
  	if ((suid != (uid_t) -1) && !uid_valid(ksuid))
  		return -EINVAL;
  
@@ -5477,7 +5439,7 @@ Index: v6.6-rpi/kernel/sys.c
  	if (ruid != (uid_t) -1) {
  		new->uid = kruid;
  		if (!uid_eq(kruid, old->uid)) {
-@@ -773,7 +779,6 @@ long __sys_setresgid(gid_t rgid, gid_t e
+@@ -782,7 +788,6 @@ long __sys_setresgid(gid_t rgid, gid_t e
  	struct cred *new;
  	int retval;
  	kgid_t krgid, kegid, ksgid;
@@ -5485,7 +5447,7 @@ Index: v6.6-rpi/kernel/sys.c
  
  	krgid = make_kgid(ns, rgid);
  	kegid = make_kgid(ns, egid);
-@@ -786,28 +791,23 @@ long __sys_setresgid(gid_t rgid, gid_t e
+@@ -795,28 +800,23 @@ long __sys_setresgid(gid_t rgid, gid_t e
  	if ((sgid != (gid_t) -1) && !gid_valid(ksgid))
  		return -EINVAL;
  
@@ -5528,7 +5490,7 @@ Index: v6.6-rpi/kernel/sys.c
  
  	if (rgid != (gid_t) -1)
  		new->gid = krgid;
-@@ -2432,8 +2432,8 @@ static int prctl_get_auxv(void __user *a
+@@ -2472,8 +2472,8 @@ static int prctl_get_auxv(void __user *a
  	return sizeof(mm->saved_auxv);
  }
  
@@ -5539,7 +5501,7 @@ Index: v6.6-rpi/kernel/sys.c
  {
  	struct task_struct *me = current;
  	unsigned char comm[sizeof(me->comm)];
-@@ -2516,6 +2516,12 @@ SYSCALL_DEFINE5(prctl, int, option, unsi
+@@ -2556,6 +2556,12 @@ SYSCALL_DEFINE5(prctl, int, option, unsi
  	case PR_SET_SECCOMP:
  		error = prctl_set_seccomp(arg2, (char __user *)arg3);
  		break;
@@ -5552,7 +5514,7 @@ Index: v6.6-rpi/kernel/sys.c
  	case PR_GET_TSC:
  		error = GET_TSC_CTL(arg2);
  		break;
-@@ -2754,8 +2760,14 @@ SYSCALL_DEFINE5(prctl, int, option, unsi
+@@ -2809,8 +2815,14 @@ SYSCALL_DEFINE5(prctl, int, option, unsi
  	return error;
  }
  
@@ -5569,7 +5531,7 @@ Index: v6.6-rpi/kernel/sys.c
  {
  	int err = 0;
  	int cpu = raw_smp_processor_id();
-@@ -2767,6 +2779,12 @@ SYSCALL_DEFINE3(getcpu, unsigned __user
+@@ -2822,6 +2834,12 @@ SYSCALL_DEFINE3(getcpu, unsigned __user
  	return err ? -EFAULT : 0;
  }
  
@@ -5582,11 +5544,11 @@ Index: v6.6-rpi/kernel/sys.c
  /**
   * do_sysinfo - fill in sysinfo struct
   * @info: pointer to buffer to fill
-Index: v6.6-rpi/security/security.c
+Index: kernel-rpi/security/security.c
 ===================================================================
---- v6.6-rpi.orig/security/security.c
-+++ v6.6-rpi/security/security.c
-@@ -1246,6 +1246,7 @@ void security_sb_free(struct super_block
+--- kernel-rpi.orig/security/security.c
++++ kernel-rpi/security/security.c
+@@ -1436,6 +1436,7 @@ void security_sb_free(struct super_block
  	kfree(sb->s_security);
  	sb->s_security = NULL;
  }
@@ -5594,10 +5556,10 @@ Index: v6.6-rpi/security/security.c
  
  /**
   * security_free_mnt_opts() - Free memory associated with mount options
-Index: v6.6-rpi/kernel/time/time.c
+Index: kernel-rpi/kernel/time/time.c
 ===================================================================
---- v6.6-rpi.orig/kernel/time/time.c
-+++ v6.6-rpi/kernel/time/time.c
+--- kernel-rpi.orig/kernel/time/time.c
++++ kernel-rpi/kernel/time/time.c
 @@ -266,7 +266,7 @@ COMPAT_SYSCALL_DEFINE2(settimeofday, str
  #endif
  
@@ -5641,11 +5603,11 @@ Index: v6.6-rpi/kernel/time/time.c
  #endif
  
  /**
-Index: v6.6-rpi/kernel/time/posix-timers.c
+Index: kernel-rpi/kernel/time/posix-timers.c
 ===================================================================
---- v6.6-rpi.orig/kernel/time/posix-timers.c
-+++ v6.6-rpi/kernel/time/posix-timers.c
-@@ -1159,8 +1159,8 @@ int do_clock_adjtime(const clockid_t whi
+--- kernel-rpi.orig/kernel/time/posix-timers.c
++++ kernel-rpi/kernel/time/posix-timers.c
+@@ -1182,8 +1182,8 @@ int do_clock_adjtime(const clockid_t whi
  	return kc->clock_adj(which_clock, ktx);
  }
  
@@ -5656,7 +5618,7 @@ Index: v6.6-rpi/kernel/time/posix-timers.c
  {
  	struct __kernel_timex ktx;
  	int err;
-@@ -1176,6 +1176,12 @@ SYSCALL_DEFINE2(clock_adjtime, const clo
+@@ -1199,6 +1199,12 @@ SYSCALL_DEFINE2(clock_adjtime, const clo
  	return err;
  }
  
@@ -5669,7 +5631,7 @@ Index: v6.6-rpi/kernel/time/posix-timers.c
  /**
   * sys_clock_getres - Get the resolution of a clock
   * @which_clock:	The clock to get the resolution for
-@@ -1302,8 +1308,7 @@ SYSCALL_DEFINE2(clock_gettime32, clockid
+@@ -1325,8 +1331,7 @@ SYSCALL_DEFINE2(clock_gettime32, clockid
  	return err;
  }
  
@@ -5679,7 +5641,7 @@ Index: v6.6-rpi/kernel/time/posix-timers.c
  {
  	struct __kernel_timex ktx;
  	int err;
-@@ -1320,6 +1325,12 @@ SYSCALL_DEFINE2(clock_adjtime32, clockid
+@@ -1343,6 +1348,12 @@ SYSCALL_DEFINE2(clock_adjtime32, clockid
  	return err;
  }
  
@@ -5692,11 +5654,11 @@ Index: v6.6-rpi/kernel/time/posix-timers.c
  SYSCALL_DEFINE2(clock_getres_time32, clockid_t, which_clock,
  		struct old_timespec32 __user *, tp)
  {
-Index: v6.6-rpi/fs/overlayfs/overlayfs.h
+Index: kernel-rpi/fs/overlayfs/overlayfs.h
 ===================================================================
---- v6.6-rpi.orig/fs/overlayfs/overlayfs.h
-+++ v6.6-rpi/fs/overlayfs/overlayfs.h
-@@ -258,12 +258,13 @@ static inline int ovl_do_symlink(struct
+--- kernel-rpi.orig/fs/overlayfs/overlayfs.h
++++ kernel-rpi/fs/overlayfs/overlayfs.h
+@@ -273,12 +273,13 @@ static inline int ovl_do_symlink(struct
  static inline ssize_t ovl_do_getxattr(const struct path *path, const char *name,
  				      void *value, size_t size)
  {
@@ -5712,19 +5674,10 @@ Index: v6.6-rpi/fs/overlayfs/overlayfs.h
  	len = (value && err > 0) ? err : 0;
  
  	pr_debug("getxattr(%pd2, \"%s\", \"%*pE\", %zu, 0) = %i\n",
-@@ -701,7 +702,7 @@ int ovl_permission(struct mnt_idmap *idm
- int ovl_xattr_set(struct dentry *dentry, struct inode *inode, const char *name,
- 		  const void *value, size_t size, int flags);
- int ovl_xattr_get(struct dentry *dentry, struct inode *inode, const char *name,
--		  void *value, size_t size);
-+		  void *value, size_t size, int flags);
- ssize_t ovl_listxattr(struct dentry *dentry, char *list, size_t size);
- 
- #ifdef CONFIG_FS_POSIX_ACL
-Index: v6.6-rpi/include/linux/xattr.h
+Index: kernel-rpi/include/linux/xattr.h
 ===================================================================
---- v6.6-rpi.orig/include/linux/xattr.h
-+++ v6.6-rpi/include/linux/xattr.h
+--- kernel-rpi.orig/include/linux/xattr.h
++++ kernel-rpi/include/linux/xattr.h
 @@ -40,7 +40,7 @@ struct xattr_handler {
  	bool (*list)(struct dentry *dentry);
  	int (*get)(const struct xattr_handler *, struct dentry *dentry,
@@ -5744,35 +5697,10 @@ Index: v6.6-rpi/include/linux/xattr.h
  ssize_t vfs_getxattr(struct mnt_idmap *, struct dentry *, const char *,
  		     void *, size_t);
  ssize_t vfs_listxattr(struct dentry *d, char *list, size_t size);
-Index: v6.6-rpi/fs/overlayfs/super.c
+Index: kernel-rpi/fs/kernfs/inode.c
 ===================================================================
---- v6.6-rpi.orig/fs/overlayfs/super.c
-+++ v6.6-rpi/fs/overlayfs/super.c
-@@ -439,7 +439,7 @@ static bool ovl_workdir_ok(struct dentry
- 
- static int ovl_own_xattr_get(const struct xattr_handler *handler,
- 			     struct dentry *dentry, struct inode *inode,
--			     const char *name, void *buffer, size_t size)
-+			     const char *name, void *buffer, size_t size, int flags)
- {
- 	return -EOPNOTSUPP;
- }
-@@ -455,9 +455,9 @@ static int ovl_own_xattr_set(const struc
- 
- static int ovl_other_xattr_get(const struct xattr_handler *handler,
- 			       struct dentry *dentry, struct inode *inode,
--			       const char *name, void *buffer, size_t size)
-+			       const char *name, void *buffer, size_t size, int flags)
- {
--	return ovl_xattr_get(dentry, inode, name, buffer, size);
-+	return ovl_xattr_get(dentry, inode, name, buffer, size, flags);
- }
- 
- static int ovl_other_xattr_set(const struct xattr_handler *handler,
-Index: v6.6-rpi/fs/kernfs/inode.c
-===================================================================
---- v6.6-rpi.orig/fs/kernfs/inode.c
-+++ v6.6-rpi/fs/kernfs/inode.c
+--- kernel-rpi.orig/fs/kernfs/inode.c
++++ kernel-rpi/fs/kernfs/inode.c
 @@ -320,7 +320,8 @@ int kernfs_xattr_set(struct kernfs_node
  
  static int kernfs_vfs_xattr_get(const struct xattr_handler *handler,
@@ -5783,10 +5711,10 @@ Index: v6.6-rpi/fs/kernfs/inode.c
  {
  	const char *name = xattr_full_name(handler, suffix);
  	struct kernfs_node *kn = inode->i_private;
-Index: v6.6-rpi/fs/ext4/xattr_trusted.c
+Index: kernel-rpi/fs/ext4/xattr_trusted.c
 ===================================================================
---- v6.6-rpi.orig/fs/ext4/xattr_trusted.c
-+++ v6.6-rpi/fs/ext4/xattr_trusted.c
+--- kernel-rpi.orig/fs/ext4/xattr_trusted.c
++++ kernel-rpi/fs/ext4/xattr_trusted.c
 @@ -22,7 +22,7 @@ ext4_xattr_trusted_list(struct dentry *d
  static int
  ext4_xattr_trusted_get(const struct xattr_handler *handler,
@@ -5796,10 +5724,10 @@ Index: v6.6-rpi/fs/ext4/xattr_trusted.c
  {
  	return ext4_xattr_get(inode, EXT4_XATTR_INDEX_TRUSTED,
  			      name, buffer, size);
-Index: v6.6-rpi/fs/ext4/xattr_user.c
+Index: kernel-rpi/fs/ext4/xattr_user.c
 ===================================================================
---- v6.6-rpi.orig/fs/ext4/xattr_user.c
-+++ v6.6-rpi/fs/ext4/xattr_user.c
+--- kernel-rpi.orig/fs/ext4/xattr_user.c
++++ kernel-rpi/fs/ext4/xattr_user.c
 @@ -21,7 +21,7 @@ ext4_xattr_user_list(struct dentry *dent
  static int
  ext4_xattr_user_get(const struct xattr_handler *handler,
@@ -5809,10 +5737,10 @@ Index: v6.6-rpi/fs/ext4/xattr_user.c
  {
  	if (!test_opt(inode->i_sb, XATTR_USER))
  		return -EOPNOTSUPP;
-Index: v6.6-rpi/fs/ecryptfs/ecryptfs_kernel.h
+Index: kernel-rpi/fs/ecryptfs/ecryptfs_kernel.h
 ===================================================================
---- v6.6-rpi.orig/fs/ecryptfs/ecryptfs_kernel.h
-+++ v6.6-rpi/fs/ecryptfs/ecryptfs_kernel.h
+--- kernel-rpi.orig/fs/ecryptfs/ecryptfs_kernel.h
++++ kernel-rpi/fs/ecryptfs/ecryptfs_kernel.h
 @@ -662,6 +662,7 @@ int ecryptfs_read_lower_page_segment(str
  				     pgoff_t page_index,
  				     size_t offset_in_page, size_t size,
@@ -5821,10 +5749,10 @@ Index: v6.6-rpi/fs/ecryptfs/ecryptfs_kernel.h
  struct page *ecryptfs_get_locked_page(struct inode *inode, loff_t index);
  int ecryptfs_parse_packet_length(unsigned char *data, size_t *size,
  				 size_t *length_size);
-Index: v6.6-rpi/fs/ecryptfs/read_write.c
+Index: kernel-rpi/fs/ecryptfs/read_write.c
 ===================================================================
---- v6.6-rpi.orig/fs/ecryptfs/read_write.c
-+++ v6.6-rpi/fs/ecryptfs/read_write.c
+--- kernel-rpi.orig/fs/ecryptfs/read_write.c
++++ kernel-rpi/fs/ecryptfs/read_write.c
 @@ -261,3 +261,25 @@ int ecryptfs_read_lower_page_segment(str
  	flush_dcache_page(page_for_ecryptfs);
  	return rc;
@@ -5851,10 +5779,10 @@ Index: v6.6-rpi/fs/ecryptfs/read_write.c
 +		return 0;
 +	return vfs_fsync(lower_file, datasync);
 +}
-Index: v6.6-rpi/fs/ext4/xattr_hurd.c
+Index: kernel-rpi/fs/ext4/xattr_hurd.c
 ===================================================================
---- v6.6-rpi.orig/fs/ext4/xattr_hurd.c
-+++ v6.6-rpi/fs/ext4/xattr_hurd.c
+--- kernel-rpi.orig/fs/ext4/xattr_hurd.c
++++ kernel-rpi/fs/ext4/xattr_hurd.c
 @@ -21,7 +21,8 @@ ext4_xattr_hurd_list(struct dentry *dent
  static int
  ext4_xattr_hurd_get(const struct xattr_handler *handler,
@@ -5865,11 +5793,11 @@ Index: v6.6-rpi/fs/ext4/xattr_hurd.c
  {
  	if (!test_opt(inode->i_sb, XATTR_USER))
  		return -EOPNOTSUPP;
-Index: v6.6-rpi/mm/shmem.c
+Index: kernel-rpi/mm/shmem.c
 ===================================================================
---- v6.6-rpi.orig/mm/shmem.c
-+++ v6.6-rpi/mm/shmem.c
-@@ -3663,7 +3663,7 @@ static int shmem_initxattrs(struct inode
+--- kernel-rpi.orig/mm/shmem.c
++++ kernel-rpi/mm/shmem.c
+@@ -4001,7 +4001,7 @@ static int shmem_initxattrs(struct inode
  
  static int shmem_xattr_handler_get(const struct xattr_handler *handler,
  				   struct dentry *unused, struct inode *inode,
@@ -5878,11 +5806,11 @@ Index: v6.6-rpi/mm/shmem.c
  {
  	struct shmem_inode_info *info = SHMEM_I(inode);
  
-Index: v6.6-rpi/kernel/events/core.c
+Index: kernel-rpi/kernel/events/core.c
 ===================================================================
---- v6.6-rpi.orig/kernel/events/core.c
-+++ v6.6-rpi/kernel/events/core.c
-@@ -12452,9 +12452,8 @@ perf_check_permission(struct perf_event_
+--- kernel-rpi.orig/kernel/events/core.c
++++ kernel-rpi/kernel/events/core.c
+@@ -12820,9 +12820,8 @@ perf_check_permission(struct perf_event_
   * @group_fd:		group leader event fd
   * @flags:		perf event open flags
   */
@@ -5894,7 +5822,7 @@ Index: v6.6-rpi/kernel/events/core.c
  {
  	struct perf_event *group_leader = NULL, *output_event = NULL;
  	struct perf_event_pmu_context *pmu_ctx;
-@@ -12846,6 +12845,12 @@ err_fd:
+@@ -13214,6 +13213,12 @@ err_fd:
  	return err;
  }
  
@@ -5907,11 +5835,11 @@ Index: v6.6-rpi/kernel/events/core.c
  /**
   * perf_event_create_kernel_counter
   *
-Index: v6.6-rpi/kernel/kcmp.c
+Index: kernel-rpi/kernel/kcmp.c
 ===================================================================
---- v6.6-rpi.orig/kernel/kcmp.c
-+++ v6.6-rpi/kernel/kcmp.c
-@@ -132,8 +132,8 @@ static int kcmp_epoll_target(struct task
+--- kernel-rpi.orig/kernel/kcmp.c
++++ kernel-rpi/kernel/kcmp.c
+@@ -134,8 +134,8 @@ static int kcmp_epoll_target(struct task
  }
  #endif
  
@@ -5922,7 +5850,7 @@ Index: v6.6-rpi/kernel/kcmp.c
  {
  	struct task_struct *task1, *task2;
  	int ret;
-@@ -225,6 +225,12 @@ err_no_task:
+@@ -227,6 +227,12 @@ err_no_task:
  	return -ESRCH;
  }
  
@@ -5935,31 +5863,11 @@ Index: v6.6-rpi/kernel/kcmp.c
  static __init int kcmp_cookies_init(void)
  {
  	int i;
-Index: v6.6-rpi/security/selinux/include/audit.h
+Index: kernel-rpi/fs/nfs/nfs4proc.c
 ===================================================================
---- v6.6-rpi.orig/security/selinux/include/audit.h
-+++ v6.6-rpi/security/selinux/include/audit.h
-@@ -21,14 +21,12 @@
-  *	@op: the operator the rule uses
-  *	@rulestr: the text "target" of the rule
-  *	@rule: pointer to the new rule structure returned via this
-- *	@gfp: GFP flag used for kmalloc
-  *
-  *	Returns 0 if successful, -errno if not.  On success, the rule structure
-  *	will be allocated internally.  The caller must free this structure with
-  *	selinux_audit_rule_free() after use.
-  */
--int selinux_audit_rule_init(u32 field, u32 op, char *rulestr, void **rule,
--			    gfp_t gfp);
-+int selinux_audit_rule_init(u32 field, u32 op, char *rulestr, void **rule, gfp_t gfp);
- 
- /**
-  *	selinux_audit_rule_free - free an selinux audit rule structure.
-Index: v6.6-rpi/fs/nfs/nfs4proc.c
-===================================================================
---- v6.6-rpi.orig/fs/nfs/nfs4proc.c
-+++ v6.6-rpi/fs/nfs/nfs4proc.c
-@@ -328,7 +328,7 @@ static void nfs4_setup_readdir(u64 cooki
+--- kernel-rpi.orig/fs/nfs/nfs4proc.c
++++ kernel-rpi/fs/nfs/nfs4proc.c
+@@ -340,7 +340,7 @@ static void nfs4_setup_readdir(u64 cooki
  	memset(&readdir->verifier, 0, sizeof(readdir->verifier));
  	if (cookie == 2)
  		return;
@@ -5968,7 +5876,7 @@ Index: v6.6-rpi/fs/nfs/nfs4proc.c
  	/*
  	 * NFSv4 servers do not return entries for '.' and '..'
  	 * Therefore, we fake these entries here.  We let '.'
-@@ -337,7 +337,7 @@ static void nfs4_setup_readdir(u64 cooki
+@@ -349,7 +349,7 @@ static void nfs4_setup_readdir(u64 cooki
  	 * instead of 1 or 2.
  	 */
  	start = p = kmap_atomic(*readdir->pages);
@@ -5977,7 +5885,7 @@ Index: v6.6-rpi/fs/nfs/nfs4proc.c
  	if (cookie == 0) {
  		*p++ = xdr_one;                                  /* next */
  		*p++ = xdr_zero;                   /* cookie, first word */
-@@ -351,7 +351,7 @@ static void nfs4_setup_readdir(u64 cooki
+@@ -363,7 +363,7 @@ static void nfs4_setup_readdir(u64 cooki
  		*p++ = htonl(NF4DIR);
  		p = xdr_encode_hyper(p, NFS_FILEID(d_inode(dentry)));
  	}
@@ -5986,7 +5894,7 @@ Index: v6.6-rpi/fs/nfs/nfs4proc.c
  	*p++ = xdr_one;                                  /* next */
  	*p++ = xdr_zero;                   /* cookie, first word */
  	*p++ = xdr_two;                   /* cookie, second word */
-@@ -2150,7 +2150,7 @@ static int nfs4_open_recover_helper(stru
+@@ -2229,7 +2229,7 @@ static int nfs4_open_recover_helper(stru
  	nfs4_init_opendata_res(opendata);
  	ret = _nfs4_recover_proc_open(opendata);
  	if (ret != 0)
@@ -5995,7 +5903,7 @@ Index: v6.6-rpi/fs/nfs/nfs4proc.c
  	newstate = nfs4_opendata_to_nfs4_state(opendata);
  	if (IS_ERR(newstate))
  		return PTR_ERR(newstate);
-@@ -3718,13 +3718,13 @@ static const struct rpc_call_ops nfs4_cl
+@@ -3810,13 +3810,13 @@ static const struct rpc_call_ops nfs4_cl
  	.rpc_release = nfs4_free_closedata,
  };
  
@@ -6014,7 +5922,7 @@ Index: v6.6-rpi/fs/nfs/nfs4proc.c
   * stateid's in the inode.
   *
   * NOTE: Caller must be holding the sp->so_owner semaphore!
-@@ -4365,7 +4365,7 @@ int nfs4_proc_getattr(struct nfs_server
+@@ -4497,7 +4497,7 @@ int nfs4_proc_getattr(struct nfs_server
  	return err;
  }
  
@@ -6023,7 +5931,7 @@ Index: v6.6-rpi/fs/nfs/nfs4proc.c
   * The file is not closed if it is opened due to the a request to change
   * the size of the file. The open call will not be needed once the
   * VFS layer lookup-intents are implemented.
-@@ -4397,7 +4397,7 @@ nfs4_proc_setattr(struct dentry *dentry,
+@@ -4529,7 +4529,7 @@ nfs4_proc_setattr(struct dentry *dentry,
  		pnfs_commit_and_return_layout(inode);
  
  	nfs_fattr_init(fattr);
@@ -6032,7 +5940,7 @@ Index: v6.6-rpi/fs/nfs/nfs4proc.c
  	/* Deal with open(O_TRUNC) */
  	if (sattr->ia_valid & ATTR_OPEN)
  		sattr->ia_valid &= ~(ATTR_MTIME|ATTR_CTIME);
-@@ -5054,7 +5054,7 @@ static int _nfs4_proc_symlink(struct ino
+@@ -5191,7 +5191,7 @@ static int _nfs4_proc_symlink(struct ino
  	data->arg.u.symlink.pages = &page;
  	data->arg.u.symlink.len = len;
  	data->arg.label = label;
@@ -6041,7 +5949,7 @@ Index: v6.6-rpi/fs/nfs/nfs4proc.c
  	status = nfs4_do_create(dir, dentry, data);
  
  	nfs4_free_createdata(data);
-@@ -7741,7 +7741,7 @@ static int nfs4_xattr_set_nfs4_acl(const
+@@ -7949,7 +7949,7 @@ static int nfs4_xattr_set_nfs4_acl(const
  
  static int nfs4_xattr_get_nfs4_acl(const struct xattr_handler *handler,
  				   struct dentry *unused, struct inode *inode,
@@ -6050,3 +5958,108 @@ Index: v6.6-rpi/fs/nfs/nfs4proc.c
  {
  	return nfs4_proc_get_acl(inode, buf, buflen, NFS4ACL_ACL);
  }
+Index: kernel-rpi/fs/overlayfs/xattrs.c
+===================================================================
+--- kernel-rpi.orig/fs/overlayfs/xattrs.c
++++ kernel-rpi/fs/overlayfs/xattrs.c
+@@ -82,7 +82,7 @@ out:
+ }
+ 
+ static int ovl_xattr_get(struct dentry *dentry, struct inode *inode, const char *name,
+-			 void *value, size_t size)
++			 void *value, size_t size, int flags)
+ {
+ 	ssize_t res;
+ 	const struct cred *old_cred;
+@@ -90,7 +90,8 @@ static int ovl_xattr_get(struct dentry *
+ 
+ 	ovl_i_path_real(inode, &realpath);
+ 	old_cred = ovl_override_creds(dentry->d_sb);
+-	res = vfs_getxattr(mnt_idmap(realpath.mnt), realpath.dentry, name, value, size);
++	res = __vfs_getxattr(mnt_idmap(realpath.mnt), realpath.dentry,
++                       d_inode(realpath.dentry), name, value, size, flags);
+ 	revert_creds(old_cred);
+ 	return res;
+ }
+@@ -181,7 +182,7 @@ static char *ovl_xattr_escape_name(const
+ 
+ static int ovl_own_xattr_get(const struct xattr_handler *handler,
+ 			     struct dentry *dentry, struct inode *inode,
+-			     const char *name, void *buffer, size_t size)
++			     const char *name, void *buffer, size_t size, int flags)
+ {
+ 	char *escaped;
+ 	int r;
+@@ -190,7 +191,7 @@ static int ovl_own_xattr_get(const struc
+ 	if (IS_ERR(escaped))
+ 		return PTR_ERR(escaped);
+ 
+-	r = ovl_xattr_get(dentry, inode, escaped, buffer, size);
++	r = ovl_xattr_get(dentry, inode, escaped, buffer, size, flags);
+ 
+ 	kfree(escaped);
+ 
+@@ -219,9 +220,9 @@ static int ovl_own_xattr_set(const struc
+ 
+ static int ovl_other_xattr_get(const struct xattr_handler *handler,
+ 			       struct dentry *dentry, struct inode *inode,
+-			       const char *name, void *buffer, size_t size)
++			       const char *name, void *buffer, size_t size, int flags)
+ {
+-	return ovl_xattr_get(dentry, inode, name, buffer, size);
++	return ovl_xattr_get(dentry, inode, name, buffer, size, flags);
+ }
+ 
+ static int ovl_other_xattr_set(const struct xattr_handler *handler,
+Index: kernel-rpi/security/selinux/include/classmap.h
+===================================================================
+--- kernel-rpi.orig/security/selinux/include/classmap.h
++++ kernel-rpi/security/selinux/include/classmap.h
+@@ -96,7 +96,7 @@ const struct security_class_mapping secc
+ 	{ "shm", { COMMON_IPC_PERMS, "lock", NULL } },
+ 	{ "ipc", { COMMON_IPC_PERMS, NULL } },
+ 	{ "netlink_route_socket",
+-	  { COMMON_SOCK_PERMS, "nlmsg_read", "nlmsg_write", NULL } },
++	  { COMMON_SOCK_PERMS, "nlmsg_read", "nlmsg_write", "nlmsg_readpriv", "nlmsg_getneigh", NULL } },
+ 	{ "netlink_tcpdiag_socket",
+ 	  { COMMON_SOCK_PERMS, "nlmsg_read", "nlmsg_write", NULL } },
+ 	{ "netlink_nflog_socket", { COMMON_SOCK_PERMS, NULL } },
+Index: kernel-rpi/include/uapi/linux/lsm.h
+===================================================================
+--- kernel-rpi.orig/include/uapi/linux/lsm.h
++++ kernel-rpi/include/uapi/linux/lsm.h
+@@ -51,6 +51,7 @@ struct lsm_ctx {
+  * future use.
+  */
+ #define LSM_ID_UNDEF		0
++#define LSM_ID_CHROMIUMOS       99
+ #define LSM_ID_CAPABILITY	100
+ #define LSM_ID_SELINUX		101
+ #define LSM_ID_SMACK		102
+Index: kernel-rpi/include/linux/lsm_count.h
+===================================================================
+--- kernel-rpi.orig/include/linux/lsm_count.h
++++ kernel-rpi/include/linux/lsm_count.h
+@@ -102,6 +102,12 @@
+ #define IPE_ENABLED
+ #endif
+ 
++#if IS_ENABLED(CONFIG_SECURITY_CHROMIUMOS)
++#define CHROMIUMOS_ENABLED 1,
++#else
++#define CHROMIUMOS_ENABLED
++#endif
++
+ /*
+  *  There is a trailing comma that we need to be accounted for. This is done by
+  *  using a skipped argument in __COUNT_LSMS
+@@ -124,7 +130,8 @@
+ 		LANDLOCK_ENABLED	\
+ 		IMA_ENABLED		\
+ 		EVM_ENABLED		\
+-		IPE_ENABLED)
++		IPE_ENABLED		\
++		CHROMIUMOS_ENABLED)
+ 
+ #else
+ 

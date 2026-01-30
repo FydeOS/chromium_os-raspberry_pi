@@ -1,7 +1,7 @@
-Index: kernel-rpi-6_1/drivers/staging/android/Kconfig
+Index: kernel-rpi/drivers/staging/android/Kconfig
 ===================================================================
 --- /dev/null
-+++ kernel-rpi-6_1/drivers/staging/android/Kconfig
++++ kernel-rpi/drivers/staging/android/Kconfig
 @@ -0,0 +1,15 @@
 +# SPDX-License-Identifier: GPL-2.0
 +menu "Android"
@@ -18,20 +18,20 @@ Index: kernel-rpi-6_1/drivers/staging/android/Kconfig
 +	  because it can discard shared memory units when under memory pressure.
 +
 +endmenu
-Index: kernel-rpi-6_1/drivers/staging/android/Makefile
+Index: kernel-rpi/drivers/staging/android/Makefile
 ===================================================================
 --- /dev/null
-+++ kernel-rpi-6_1/drivers/staging/android/Makefile
++++ kernel-rpi/drivers/staging/android/Makefile
 @@ -0,0 +1,4 @@
 +# SPDX-License-Identifier: GPL-2.0
 +ccflags-y += -I$(src)			# needed for trace events
 +
 +obj-$(CONFIG_ASHMEM)			+= ashmem.o
-Index: kernel-rpi-6_1/drivers/staging/android/ashmem.c
+Index: kernel-rpi/drivers/staging/android/ashmem.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi-6_1/drivers/staging/android/ashmem.c
-@@ -0,0 +1,970 @@
++++ kernel-rpi/drivers/staging/android/ashmem.c
+@@ -0,0 +1,964 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/* mm/ashmem.c
 + *
@@ -406,7 +406,7 @@ Index: kernel-rpi-6_1/drivers/staging/android/ashmem.c
 +				unsigned long len, unsigned long pgoff,
 +				unsigned long flags)
 +{
-+	return current->mm->get_unmapped_area(file, addr, len, pgoff, flags);
++	return get_unmapped_area(file, addr, len, pgoff, flags);
 +}
 +
 +static int ashmem_mmap(struct file *file, struct vm_area_struct *vma)
@@ -435,7 +435,7 @@ Index: kernel-rpi-6_1/drivers/staging/android/ashmem.c
 +		ret = -EPERM;
 +		goto out;
 +	}
-+  vm_flags_clear(vma, calc_vm_may_flags(~asma->prot_mask));
++	vm_flags_clear(vma, calc_vm_may_flags(~asma->prot_mask));
 +
 +	if (!asma->file) {
 +		char *name = ASHMEM_NAME_DEF;
@@ -982,18 +982,12 @@ Index: kernel-rpi-6_1/drivers/staging/android/ashmem.c
 +		goto out_free2;
 +	}
 +
-+	ret = register_shrinker(&ashmem_shrinker, "ashmem");
-+	if (ret) {
-+		pr_err("failed to register shrinker!\n");
-+		goto out_demisc;
-+	}
++	shrinker_register(&ashmem_shrinker);
 +
 +	pr_info("initialized\n");
 +
 +	return 0;
 +
-+out_demisc:
-+	misc_deregister(&ashmem_misc);
 +out_free2:
 +	kmem_cache_destroy(ashmem_range_cachep);
 +out_free1:
@@ -1002,10 +996,10 @@ Index: kernel-rpi-6_1/drivers/staging/android/ashmem.c
 +	return ret;
 +}
 +device_initcall(ashmem_init);
-Index: kernel-rpi-6_1/drivers/staging/android/ashmem.h
+Index: kernel-rpi/drivers/staging/android/ashmem.h
 ===================================================================
 --- /dev/null
-+++ kernel-rpi-6_1/drivers/staging/android/ashmem.h
++++ kernel-rpi/drivers/staging/android/ashmem.h
 @@ -0,0 +1,24 @@
 +/* SPDX-License-Identifier: GPL-2.0 OR Apache-2.0 */
 +/*
@@ -1031,10 +1025,10 @@ Index: kernel-rpi-6_1/drivers/staging/android/ashmem.h
 +#endif
 +
 +#endif	/* _LINUX_ASHMEM_H */
-Index: kernel-rpi-6_1/drivers/staging/android/uapi/ashmem.h
+Index: kernel-rpi/drivers/staging/android/uapi/ashmem.h
 ===================================================================
 --- /dev/null
-+++ kernel-rpi-6_1/drivers/staging/android/uapi/ashmem.h
++++ kernel-rpi/drivers/staging/android/uapi/ashmem.h
 @@ -0,0 +1,43 @@
 +/* SPDX-License-Identifier: GPL-2.0 OR Apache-2.0 */
 +/*
@@ -1079,28 +1073,25 @@ Index: kernel-rpi-6_1/drivers/staging/android/uapi/ashmem.h
 +#define ASHMEM_PURGE_ALL_CACHES	_IO(__ASHMEMIOC, 10)
 +
 +#endif	/* _UAPI_LINUX_ASHMEM_H */
-Index: kernel-rpi-6_1/drivers/staging/Kconfig
+Index: kernel-rpi/drivers/staging/Kconfig
 ===================================================================
---- kernel-rpi-6_1.orig/drivers/staging/Kconfig
-+++ kernel-rpi-6_1/drivers/staging/Kconfig
-@@ -56,6 +56,8 @@ source "drivers/staging/media/Kconfig"
+--- kernel-rpi.orig/drivers/staging/Kconfig
++++ kernel-rpi/drivers/staging/Kconfig
+@@ -46,6 +46,8 @@ source "drivers/staging/nvec/Kconfig"
  
- source "drivers/staging/board/Kconfig"
+ source "drivers/staging/media/Kconfig"
  
 +source "drivers/staging/android/Kconfig"
 +
  source "drivers/staging/gdm724x/Kconfig"
  
  source "drivers/staging/fbtft/Kconfig"
-Index: kernel-rpi-6_1/drivers/staging/Makefile
+Index: kernel-rpi/drivers/staging/Makefile
 ===================================================================
---- kernel-rpi-6_1.orig/drivers/staging/Makefile
-+++ kernel-rpi-6_1/drivers/staging/Makefile
-@@ -17,6 +17,7 @@ obj-$(CONFIG_IIO)		+= iio/
- obj-$(CONFIG_FB_SM750)		+= sm750fb/
- obj-$(CONFIG_USB_EMXX)		+= emxx_udc/
- obj-$(CONFIG_MFD_NVEC)		+= nvec/
+--- kernel-rpi.orig/drivers/staging/Makefile
++++ kernel-rpi/drivers/staging/Makefile
+@@ -20,3 +20,4 @@ obj-$(CONFIG_GREYBUS)		+= greybus/
+ obj-$(CONFIG_BCM2835_VCHIQ)	+= vc04_services/
+ obj-$(CONFIG_XIL_AXIS_FIFO)	+= axis-fifo/
+ obj-$(CONFIG_FIELDBUS_DEV)     += fieldbus/
 +obj-$(CONFIG_ASHMEM)   += android/
- obj-$(CONFIG_STAGING_BOARD)	+= board/
- obj-$(CONFIG_LTE_GDM724X)	+= gdm724x/
- obj-$(CONFIG_FB_TFT)		+= fbtft/

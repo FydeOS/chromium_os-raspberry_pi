@@ -1,8 +1,8 @@
-Index: kernel-rpi-6_1/virt/kvm/Kconfig
+Index: kernel-rpi/virt/kvm/Kconfig
 ===================================================================
---- kernel-rpi-6_1.orig/virt/kvm/Kconfig
-+++ kernel-rpi-6_1/virt/kvm/Kconfig
-@@ -70,7 +70,7 @@ config KVM_GENERIC_DIRTYLOG_READ_PROTECT
+--- kernel-rpi.orig/virt/kvm/Kconfig
++++ kernel-rpi/virt/kvm/Kconfig
+@@ -72,7 +72,7 @@ config KVM_GENERIC_PRE_FAULT_MEMORY
  
  config KVM_COMPAT
         def_bool y
@@ -10,4 +10,4 @@ Index: kernel-rpi-6_1/virt/kvm/Kconfig
 +       depends on KVM && COMPAT && !(S390 || RISCV)
  
  config HAVE_KVM_IRQ_BYPASS
-        bool
+        tristate

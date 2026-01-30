@@ -1,8 +1,8 @@
-Index: kernel-rpi-6_1/drivers/gpu/drm/drm_auth.c
+Index: kernel-rpi/drivers/gpu/drm/drm_auth.c
 ===================================================================
---- kernel-rpi-6_1.orig/drivers/gpu/drm/drm_auth.c
-+++ kernel-rpi-6_1/drivers/gpu/drm/drm_auth.c
-@@ -236,7 +236,8 @@ static int
+--- kernel-rpi.orig/drivers/gpu/drm/drm_auth.c
++++ kernel-rpi/drivers/gpu/drm/drm_auth.c
+@@ -234,7 +234,8 @@ static int
  drm_master_check_perm(struct drm_device *dev, struct drm_file *file_priv)
  {
  	if (file_priv->was_master &&
@@ -12,11 +12,11 @@ Index: kernel-rpi-6_1/drivers/gpu/drm/drm_auth.c
  		return 0;
  
  	if (!capable(CAP_SYS_ADMIN))
-Index: kernel-rpi-6_1/drivers/gpu/drm/drm_drv.c
+Index: kernel-rpi/drivers/gpu/drm/drm_drv.c
 ===================================================================
---- kernel-rpi-6_1.orig/drivers/gpu/drm/drm_drv.c
-+++ kernel-rpi-6_1/drivers/gpu/drm/drm_drv.c
-@@ -1058,6 +1058,8 @@ out:
+--- kernel-rpi.orig/drivers/gpu/drm/drm_drv.c
++++ kernel-rpi/drivers/gpu/drm/drm_drv.c
+@@ -1056,6 +1056,8 @@ out:
  	return err;
  }
  
@@ -25,7 +25,7 @@ Index: kernel-rpi-6_1/drivers/gpu/drm/drm_drv.c
  static const struct file_operations drm_stub_fops = {
  	.owner = THIS_MODULE,
  	.open = drm_stub_open,
-@@ -1090,6 +1092,9 @@ static int __init drm_core_init(void)
+@@ -1089,6 +1091,9 @@ static int __init drm_core_init(void)
  
  	drm_debugfs_root = debugfs_create_dir("dri", NULL);
  
@@ -35,11 +35,11 @@ Index: kernel-rpi-6_1/drivers/gpu/drm/drm_drv.c
  	ret = register_chrdev(DRM_MAJOR, "drm", &drm_stub_fops);
  	if (ret < 0)
  		goto error;
-Index: kernel-rpi-6_1/include/drm/drm_drv.h
+Index: kernel-rpi/include/drm/drm_drv.h
 ===================================================================
---- kernel-rpi-6_1.orig/include/drm/drm_drv.h
-+++ kernel-rpi-6_1/include/drm/drm_drv.h
-@@ -467,6 +467,8 @@ void *__devm_drm_dev_alloc(struct device
+--- kernel-rpi.orig/include/drm/drm_drv.h
++++ kernel-rpi/include/drm/drm_drv.h
+@@ -438,6 +438,8 @@ void *__devm_drm_dev_alloc(struct device
  			   const struct drm_driver *driver,
  			   size_t size, size_t offset);
  

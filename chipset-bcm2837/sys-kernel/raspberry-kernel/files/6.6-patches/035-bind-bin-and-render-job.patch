@@ -1,0 +1,280 @@
+Index: kernel-rpi-6_6/drivers/gpu/drm/v3d/v3d_gem.c
+===================================================================
+--- kernel-rpi-6_6.orig/drivers/gpu/drm/v3d/v3d_gem.c
++++ kernel-rpi-6_6/drivers/gpu/drm/v3d/v3d_gem.c
+@@ -381,14 +381,18 @@ v3d_job_free(struct kref *ref)
+ {
+ 	struct v3d_job *job = container_of(ref, struct v3d_job, refcount);
+ 	struct v3d_dev *v3d = job->v3d;
++  unsigned long irqflags;
+ 	int i;
+ 
++  spin_lock_irqsave(&v3d->latest_job_lock, irqflags);
++  if (v3d->latest_job == job)
++    v3d->latest_job = NULL;
++  spin_unlock_irqrestore(&v3d->latest_job_lock, irqflags);
+ 	if (job->bo) {
+ 		for (i = 0; i < job->bo_count; i++)
+ 			drm_gem_object_put(job->bo[i]);
+ 		kvfree(job->bo);
+ 	}
+-
+ 	dma_fence_put(job->irq_fence);
+ 	dma_fence_put(job->done_fence);
+ 
+@@ -396,7 +400,6 @@ v3d_job_free(struct kref *ref)
+ 
+ 	if (job->perfmon)
+ 		v3d_perfmon_put(job->perfmon);
+-
+ 	kfree(job);
+ }
+ 
+@@ -737,6 +740,7 @@ v3d_submit_cl_ioctl(struct drm_device *d
+ 	struct v3d_job *last_job;
+ 	struct ww_acquire_ctx acquire_ctx;
+ 	int ret = 0;
++  unsigned long irqflags;
+ 
+ 	trace_v3d_submit_cl_ioctl(&v3d->drm, args->rcl_start, args->rcl_end);
+ 
+@@ -813,6 +817,18 @@ v3d_submit_cl_ioctl(struct drm_device *d
+ 
+ 	mutex_lock(&v3d->sched_lock);
+ 	if (bin) {
++  #if 1
++    spin_lock_irqsave(&v3d->latest_job_lock, irqflags);
++    if (v3d->latest_job
++          && v3d->latest_job->done_fence
++          && !dma_fence_is_signaled(v3d->latest_job->done_fence)) {
++      ret = drm_sched_job_add_dependency(&bin->base.base,
++        dma_fence_get(v3d->latest_job->done_fence));
++      if (ret)
++        DRM_ERROR("falied to binding bin job to last render job: %d\n", ret);
++    }
++    spin_unlock_irqrestore(&v3d->latest_job_lock, irqflags);
++ #endif
+ 		bin->base.perfmon = render->base.perfmon;
+ 		v3d_perfmon_get(bin->base.perfmon);
+ 		v3d_push_job(&bin->base);
+@@ -846,6 +862,11 @@ v3d_submit_cl_ioctl(struct drm_device *d
+ 						 &se,
+ 						 last_job->done_fence);
+ 
++#if 1
++  spin_lock_irqsave(&v3d->latest_job_lock, irqflags);
++  v3d->latest_job = last_job;
++  spin_unlock_irqrestore(&v3d->latest_job_lock, irqflags);
++#endif
+ 	if (bin)
+ 		v3d_job_put(&bin->base);
+ 	v3d_job_put(&render->base);
+@@ -1084,6 +1105,7 @@ v3d_gem_init(struct drm_device *dev)
+ 
+ 	spin_lock_init(&v3d->mm_lock);
+ 	spin_lock_init(&v3d->job_lock);
++  spin_lock_init(&v3d->latest_job_lock);
+ 	ret = drmm_mutex_init(dev, &v3d->bo_lock);
+ 	if (ret)
+ 		return ret;
+Index: kernel-rpi-6_6/drivers/gpu/drm/v3d/v3d_sched.c
+===================================================================
+--- kernel-rpi-6_6.orig/drivers/gpu/drm/v3d/v3d_sched.c
++++ kernel-rpi-6_6/drivers/gpu/drm/v3d/v3d_sched.c
+@@ -25,6 +25,28 @@
+ #include "v3d_regs.h"
+ #include "v3d_trace.h"
+ 
++struct v3d_seq_struct {
++  struct v3d_job *job;
++  struct dma_fence_cb cb;
++};
++
++static void v3d_job_seq_cb(struct dma_fence *fence,
++                              struct dma_fence_cb *cb)
++{
++  struct v3d_seq_struct *v3d_seq_cb;
++  struct v3d_dev *v3d;
++  unsigned long irqflags;
++  v3d_seq_cb = container_of(cb, typeof(*v3d_seq_cb), cb);
++  v3d = v3d_seq_cb->job->v3d;
++  spin_lock_irqsave(&v3d->latest_job_lock, irqflags);
++  if (v3d_seq_cb->job == v3d->latest_job) {
++    v3d->latest_job = NULL;
++  }
++  spin_unlock_irqrestore(&v3d->latest_job_lock, irqflags);
++  kfree(v3d_seq_cb);
++  dma_fence_put(fence);
++}
++
+ static struct v3d_job *
+ to_v3d_job(struct drm_sched_job *sched_job)
+ {
+@@ -247,6 +269,7 @@ static struct dma_fence *v3d_render_job_
+ 	struct v3d_dev *v3d = job->base.v3d;
+ 	struct drm_device *dev = &v3d->drm;
+ 	struct dma_fence *fence;
++  struct v3d_seq_struct *v3d_seq_cb;
+ 
+ 	if (unlikely(job->base.base.s_fence->finished.error)) {
+ 		v3d->render_job = NULL;
+@@ -266,7 +289,16 @@ static struct dma_fence *v3d_render_job_
+ 	fence = v3d_fence_create(v3d, V3D_RENDER);
+ 	if (IS_ERR(fence))
+ 		return NULL;
+-
++  v3d_seq_cb = kmalloc(sizeof(*v3d_seq_cb), GFP_KERNEL);
++  if (!v3d_seq_cb) {
++    DRM_ERROR("no memory for seq struct.\n");
++    return NULL;
++  }
++  v3d_seq_cb->job = &job->base;
++  if (dma_fence_add_callback(dma_fence_get(fence), &v3d_seq_cb->cb, v3d_job_seq_cb)) {
++    DRM_WARN("failed to add callback to fence:%p\n", fence);
++    kfree(v3d_seq_cb);
++  }
+ 	if (job->base.irq_fence)
+ 		dma_fence_put(job->base.irq_fence);
+ 	job->base.irq_fence = dma_fence_get(fence);
+@@ -382,12 +414,16 @@ v3d_cache_clean_job_run(struct drm_sched
+ {
+ 	struct v3d_job *job = to_v3d_job(sched_job);
+ 	struct v3d_dev *v3d = job->v3d;
+-
++  unsigned long irqflags;
+ 	v3d_sched_stats_add_job(&v3d->gpu_queue_stats[V3D_CACHE_CLEAN],
+ 				sched_job);
+ 	v3d_clean_caches(v3d);
+ 	v3d->gpu_queue_stats[V3D_CACHE_CLEAN].last_exec_end = local_clock();
+-
++	spin_lock_irqsave(&v3d->latest_job_lock, irqflags);
++  if (job == v3d->latest_job) {
++    v3d->latest_job = NULL;
++  }
++  spin_unlock_irqrestore(&v3d->latest_job_lock, irqflags);
+ 	return NULL;
+ }
+ 
+@@ -488,7 +524,21 @@ v3d_csd_job_timedout(struct drm_sched_jo
+ 
+ 	return v3d_gpu_reset_for_timeout(v3d, sched_job);
+ }
+-
++#if 0
++#define MAX_TIMEOUT_SEQ 10
++static struct dma_fence *
++v3d_sched_job_prepare_job(struct drm_sched_job *sched_job,
++        struct drm_sched_entity *s_entity)
++{
++  u64 current_seq = atomic_read(&s_entity->fence_seq);
++  u64 job_seq = sched_job->s_fence->finished.seqno;
++  if (current_seq > job_seq + MAX_TIMEOUT_SEQ) {
++    dma_fence_set_error(&sched_job->s_fence->finished, -ECANCELED);
++    pr_info("%s, set s_fence cancel\n", __func__);
++  }
++  return NULL;
++}
++#endif
+ static const struct drm_sched_backend_ops v3d_bin_sched_ops = {
+ 	.run_job = v3d_bin_job_run,
+ 	.timedout_job = v3d_bin_job_timedout,
+@@ -510,13 +560,13 @@ static const struct drm_sched_backend_op
+ static const struct drm_sched_backend_ops v3d_csd_sched_ops = {
+ 	.run_job = v3d_csd_job_run,
+ 	.timedout_job = v3d_csd_job_timedout,
+-	.free_job = v3d_sched_job_free
++	.free_job = v3d_sched_job_free,
+ };
+ 
+ static const struct drm_sched_backend_ops v3d_cache_clean_sched_ops = {
+ 	.run_job = v3d_cache_clean_job_run,
+ 	.timedout_job = v3d_generic_job_timedout,
+-	.free_job = v3d_sched_job_free
++	.free_job = v3d_sched_job_free,
+ };
+ 
+ int
+Index: kernel-rpi-6_6/drivers/gpu/drm/v3d/v3d_drv.h
+===================================================================
+--- kernel-rpi-6_6.orig/drivers/gpu/drm/v3d/v3d_drv.h
++++ kernel-rpi-6_6/drivers/gpu/drm/v3d/v3d_drv.h
+@@ -171,6 +171,8 @@ struct v3d_dev {
+ 
+ 	struct v3d_bin_job *bin_job;
+ 	struct v3d_render_job *render_job;
++  struct v3d_job *latest_job;
++  spinlock_t latest_job_lock;
+ 	struct v3d_tfu_job *tfu_job;
+ 	struct v3d_csd_job *csd_job;
+ 
+Index: kernel-rpi-6_6/drivers/gpu/drm/scheduler/sched_entity.c
+===================================================================
+--- kernel-rpi-6_6.orig/drivers/gpu/drm/scheduler/sched_entity.c
++++ kernel-rpi-6_6/drivers/gpu/drm/scheduler/sched_entity.c
+@@ -450,7 +450,19 @@ drm_sched_job_dependency(struct drm_sche
+ 
+ 	return NULL;
+ }
++#if 0
++#define MAX_TIMEOUT_SEQ 30
+ 
++void check_job_dep_timeout(struct drm_sched_job *sched_job,
++        struct drm_sched_entity *s_entity)
++{
++  u64 current_seq = atomic_read(&s_entity->fence_seq);
++	u64 job_seq = sched_job->s_fence->finished.seqno;
++	if (current_seq > job_seq + MAX_TIMEOUT_SEQ) {
++    dma_fence_set_error(&sched_job->s_fence->finished, -ECANCELED);
++  }
++}
++#endif
+ struct drm_sched_job *drm_sched_entity_pop_job(struct drm_sched_entity *entity)
+ {
+ 	struct drm_sched_job *sched_job;
+@@ -462,7 +474,9 @@ struct drm_sched_job *drm_sched_entity_p
+ 	while ((entity->dependency =
+ 			drm_sched_job_dependency(sched_job, entity))) {
+ 		trace_drm_sched_job_wait_dep(sched_job, entity->dependency);
+-
++#if 0
++		check_job_dep_timeout(sched_job, entity);
++#endif
+ 		if (drm_sched_entity_add_dependency_cb(entity))
+ 			return NULL;
+ 	}
+Index: kernel-rpi-6_6/drivers/gpu/drm/v3d/v3d_drv.c
+===================================================================
+--- kernel-rpi-6_6.orig/drivers/gpu/drm/v3d/v3d_drv.c
++++ kernel-rpi-6_6/drivers/gpu/drm/v3d/v3d_drv.c
+@@ -100,6 +100,8 @@ static int v3d_get_param_ioctl(struct dr
+ 	}
+ }
+ 
++const kuid_t arc_root = KUIDT_INIT(656360);
++
+ static int
+ v3d_open(struct drm_device *dev, struct drm_file *file)
+ {
+@@ -107,7 +109,12 @@ v3d_open(struct drm_device *dev, struct
+ 	struct v3d_file_priv *v3d_priv;
+ 	struct drm_gpu_scheduler *sched;
+ 	int i;
+-
++  const struct cred *cred = current_cred();
++  int priority = DRM_SCHED_PRIORITY_NORMAL;
++#if 0
++  if (uid_gte(cred->uid, arc_root))
++    priority = DRM_SCHED_PRIORITY_MIN;
++#endif
+ 	v3d_priv = kzalloc(sizeof(*v3d_priv), GFP_KERNEL);
+ 	if (!v3d_priv)
+ 		return -ENOMEM;
+@@ -117,7 +124,7 @@ v3d_open(struct drm_device *dev, struct
+ 	for (i = 0; i < V3D_MAX_QUEUES; i++) {
+ 		sched = &v3d->queue[i].sched;
+ 		drm_sched_entity_init(&v3d_priv->sched_entity[i],
+-				      DRM_SCHED_PRIORITY_NORMAL, &sched,
++				      priority, &sched,
+ 				      1, NULL);
+ 	}
+ 

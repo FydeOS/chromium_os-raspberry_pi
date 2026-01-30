@@ -1,6 +1,8 @@
---- a/chrome/browser/ash/login/chrome_restart_request.cc
-+++ b/chrome/browser/ash/login/chrome_restart_request.cc
-@@ -73,6 +73,11 @@
+Index: src/chrome/browser/ash/login/chrome_restart_request.cc
+===================================================================
+--- src.orig/chrome/browser/ash/login/chrome_restart_request.cc
++++ src/chrome/browser/ash/login/chrome_restart_request.cc
+@@ -75,6 +75,11 @@ using ::content::BrowserThread;
  
  // Increase logging level for Guest mode to avoid INFO messages in logs.
  const char kGuestModeLoggingLevel[] = "1";
@@ -12,7 +14,7 @@
  
  bool IsRunningTest() {
    const base::CommandLine* current_command_line =
-@@ -156,6 +161,12 @@
+@@ -156,6 +161,12 @@ void DeriveCommandLine(const GURL& start
        ::switches::kEnableWebGPUDeveloperFeatures,
        ::switches::kOzonePlatform,
        ::switches::kRenderNodeOverride,

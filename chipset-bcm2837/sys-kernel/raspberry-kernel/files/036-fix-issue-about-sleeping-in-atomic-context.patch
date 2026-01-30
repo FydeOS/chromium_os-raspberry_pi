@@ -1,0 +1,153 @@
+Index: kernel-rpi/drivers/iommu/bcm2712-iommu.c
+===================================================================
+--- kernel-rpi.orig/drivers/iommu/bcm2712-iommu.c
++++ kernel-rpi/drivers/iommu/bcm2712-iommu.c
+@@ -14,6 +14,7 @@
+ #include <linux/minmax.h>
+ #include <linux/of_platform.h>
+ #include <linux/platform_device.h>
++#include <linux/slab.h>
+ #include <linux/spinlock.h>
+ 
+ #define MMU_WR(off, val)   writel(val, mmu->reg_base + (off))
+@@ -121,9 +122,10 @@
+  * for IOMMU tables is always a physical address -- this is true for BCM2712.
+  * Note that iommu_alloc_page() will zero the page contents.
+  */
+-static u32 bcm2712_iommu_get_page(struct bcm2712_iommu *mmu, u32 **ptr)
++static u32 bcm2712_iommu_get_page(struct bcm2712_iommu *mmu, u32 **ptr,
++				  gfp_t gfp)
+ {
+-	*ptr = iommu_alloc_page(GFP_KERNEL);
++	*ptr = iommu_alloc_page(gfp);
+ 	if (*ptr) {
+ 		dma_addr_t dma = dma_map_single(mmu->dev, *ptr,
+ 						PAGE_SIZE, DMA_TO_DEVICE);
+@@ -207,12 +209,12 @@ static int bcm2712_iommu_init(struct bcm
+ 	 * the aperture does not start from zero), and of the default page.
+ 	 * For simplicity, both these regions are whole Linux pages.
+ 	 */
+-	u = bcm2712_iommu_get_page(mmu, &mmu->top_table);
++	u = bcm2712_iommu_get_page(mmu, &mmu->top_table, GFP_KERNEL);
+ 	if (!u)
+ 		return -ENOMEM;
+ 	MMU_WR(MMMU_PT_PA_BASE_OFFSET,
+ 	       u - ((mmu->aperture_base - mmu->dma_iova_offset) >> L1_AP_BASE_SHIFT));
+-	u = bcm2712_iommu_get_page(mmu, &mmu->default_page);
++	u = bcm2712_iommu_get_page(mmu, &mmu->default_page, GFP_KERNEL);
+ 	if (!u) {
+ 		bcm2712_iommu_free_page(mmu, mmu->top_table);
+ 		return -ENOMEM;
+@@ -263,8 +265,11 @@ static int bcm2712_iommu_map(struct iomm
+ 	u32 entry = MMMU_PTE_VALID | (pa >> IOMMU_PAGE_SHIFT);
+ 	u32 align = (u32)(iova | pa | bytes);
+ 	unsigned long flags;
+-	unsigned int p, p_last, lxp;
++	unsigned int p, p_last, lxp, lxp_start, lxp_end, lxp_idx;
++	unsigned int num_new_tables = 0;
+ 	bool dirty_top = false;
++	u32 **new_tables = NULL;
++	u32 *new_dma_addrs = NULL;
+ 
+ 	/* Reject if not entirely within our aperture (should never happen) */
+ 	bytes *= count;
+@@ -277,22 +282,64 @@ static int bcm2712_iommu_map(struct iomm
+ 	iova -= mmu->aperture_base;
+ 	p = iova >> IOMMU_PAGE_SHIFT;
+ 	p_last = (iova + bytes - 1) >> IOMMU_PAGE_SHIFT;
++	lxp_start = p >> LX_PAGEWORDS_SHIFT;
++	lxp_end = p_last >> LX_PAGEWORDS_SHIFT;
+ 
+ 	/*
+-	 * Check we have allocated the required Level-2 tables (in units of
+-	 * whole Linux pages, each covering one or more IOMMU-table pages).
+-	 * Any new L2 pages need to be linked to the top-level table.
+-	 * A failure here will cause the entire map_pages() call to fail.
++	 * Pre-allocate any required Level-2 tables BEFORE taking the spinlock.
++	 * This avoids sleeping in atomic context. We allocate for all indices
++	 * where mmu->tables[lxp] is currently NULL. If another thread races
++	 * and allocates the same table, we'll free the duplicate later.
++	 */
++	for (lxp = lxp_start; lxp <= lxp_end; lxp++) {
++		if (!mmu->tables[lxp])
++			num_new_tables++;
++	}
++
++	if (num_new_tables > 0) {
++		new_tables = kcalloc(num_new_tables, sizeof(u32 *), gfp);
++		new_dma_addrs = kcalloc(num_new_tables, sizeof(u32), gfp);
++		if (!new_tables || !new_dma_addrs) {
++			kfree(new_tables);
++			kfree(new_dma_addrs);
++			*mapped = 0;
++			return -ENOMEM;
++		}
++
++		for (lxp_idx = 0; lxp_idx < num_new_tables; lxp_idx++) {
++			new_dma_addrs[lxp_idx] = bcm2712_iommu_get_page(mmu,
++						&new_tables[lxp_idx], gfp);
++			if (!new_dma_addrs[lxp_idx]) {
++				/* Free already allocated pages */
++				while (lxp_idx > 0) {
++					lxp_idx--;
++					bcm2712_iommu_free_page(mmu, new_tables[lxp_idx]);
++				}
++				kfree(new_tables);
++				kfree(new_dma_addrs);
++				*mapped = 0;
++				return -ENOMEM;
++			}
++		}
++	}
++
++	/*
++	 * Now take the spinlock and install any newly allocated tables.
++	 * If another thread already allocated a table for an index, free ours.
+ 	 */
+ 	spin_lock_irqsave(&mmu->hw_lock, flags);
+-	for (lxp = (p >> LX_PAGEWORDS_SHIFT);
+-	     lxp <= (p_last >> LX_PAGEWORDS_SHIFT); lxp++) {
++	lxp_idx = 0;
++	for (lxp = lxp_start; lxp <= lxp_end; lxp++) {
+ 		if (!mmu->tables[lxp]) {
+-			unsigned int i, u;
++			unsigned int i;
++			u32 u;
++
++			/* Use pre-allocated page */
++			mmu->tables[lxp] = new_tables[lxp_idx];
++			u = new_dma_addrs[lxp_idx];
++			new_tables[lxp_idx] = NULL; /* Mark as used */
++			lxp_idx++;
+ 
+-			u = bcm2712_iommu_get_page(mmu, &mmu->tables[lxp]);
+-			if (!u)
+-				break;
+ 			u |= MMMU_PTE_VALID;
+ 			if (!dirty_top) {
+ 				dma_sync_single_for_cpu(mmu->dev, virt_to_phys(mmu->top_table),
+@@ -308,12 +355,20 @@ static int bcm2712_iommu_map(struct iomm
+ 	if (dirty_top)
+ 		dma_sync_single_for_device(mmu->dev, virt_to_phys(mmu->top_table),
+ 					   PAGE_SIZE, DMA_TO_DEVICE);
+-	if (lxp <= (p_last >> LX_PAGEWORDS_SHIFT)) {
+-		spin_unlock_irqrestore(&mmu->hw_lock, flags);
+-		*mapped = 0;
+-		return -ENOMEM;
++	spin_unlock_irqrestore(&mmu->hw_lock, flags);
++
++	/* Free any unused pre-allocated pages (race condition case) */
++	if (new_tables) {
++		for (lxp_idx = 0; lxp_idx < num_new_tables; lxp_idx++) {
++			if (new_tables[lxp_idx])
++				bcm2712_iommu_free_page(mmu, new_tables[lxp_idx]);
++		}
++		kfree(new_tables);
++		kfree(new_dma_addrs);
+ 	}
+ 
++	spin_lock_irqsave(&mmu->hw_lock, flags);
++
+ 	/* large page and write enable flags */
+ 	if (!(align & ((1 << IOMMU_HUGEPAGE_SHIFT) - 1)))
+ 		entry |= FIELD_PREP(MMMU_PTE_PAGESIZE_MASK, 3);

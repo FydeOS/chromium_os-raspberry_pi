@@ -1,8 +1,8 @@
-Index: kernel-rpi-6_1/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
+Index: kernel-rpi/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
 ===================================================================
---- kernel-rpi-6_1.orig/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
-+++ kernel-rpi-6_1/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
-@@ -2422,7 +2422,22 @@ static int bcm2835_codec_s_ctrl(struct v
+--- kernel-rpi.orig/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
++++ kernel-rpi/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
+@@ -2423,7 +2423,22 @@ static int bcm2835_codec_s_ctrl(struct v
  	case V4L2_CID_MPEG_VIDEO_B_FRAMES:
  		ret = 0;
  		break;
@@ -48,11 +48,11 @@ Index: kernel-rpi-6_1/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-c
  		if (hdl->error) {
  			rc = hdl->error;
  			goto free_ctrl_handler;
-Index: kernel-rpi-6_1/drivers/staging/media/rpivid/rpivid.c
+Index: kernel-rpi/drivers/media/platform/raspberrypi/hevc_dec/hevc_d.c
 ===================================================================
---- kernel-rpi-6_1.orig/drivers/staging/media/rpivid/rpivid.c
-+++ kernel-rpi-6_1/drivers/staging/media/rpivid/rpivid.c
-@@ -89,6 +89,23 @@ static const struct rpivid_control rpivi
+--- kernel-rpi.orig/drivers/media/platform/raspberrypi/hevc_dec/hevc_d.c
++++ kernel-rpi/drivers/media/platform/raspberrypi/hevc_dec/hevc_d.c
+@@ -83,6 +83,23 @@ static const struct hevc_d_control hevc_
  		},
  		.required	= false,
  	},
@@ -60,7 +60,7 @@ Index: kernel-rpi-6_1/drivers/staging/media/rpivid/rpivid.c
 +    .cfg = {
 +      .id = V4L2_CID_MPEG_VIDEO_HEVC_PROFILE,
 +      .min = V4L2_MPEG_VIDEO_HEVC_PROFILE_MAIN,
-+      .max = V4L2_MPEG_VIDEO_HEVC_PROFILE_MAIN_10,
++      .max = V4L2_MPEG_VIDEO_HEVC_PROFILE_MAIN,
 +      .def = V4L2_MPEG_VIDEO_HEVC_PROFILE_MAIN,
 +    },
 +    .required = false,
@@ -75,4 +75,129 @@ Index: kernel-rpi-6_1/drivers/staging/media/rpivid/rpivid.c
 +  },
  };
  
- #define rpivid_ctrls_COUNT	ARRAY_SIZE(rpivid_ctrls)
+ #define HEVC_D_CTRLS_COUNT	ARRAY_SIZE(hevc_d_ctrls)
+Index: kernel-rpi/drivers/media/platform/raspberrypi/hevc_dec/hevc_d_video.c
+===================================================================
+--- kernel-rpi.orig/drivers/media/platform/raspberrypi/hevc_dec/hevc_d_video.c
++++ kernel-rpi/drivers/media/platform/raspberrypi/hevc_dec/hevc_d_video.c
+@@ -284,30 +284,21 @@ static u32 pixelformat_from_sps(const st
+ 				const int index)
+ {
+ 	static const u32 all_formats[] = {
+-		//V4L2_PIX_FMT_NV12MT_COL128,
+-		//V4L2_PIX_FMT_NV12MT_10_COL128,
+ 		V4L2_PIX_FMT_NV12_COL128,
+-		V4L2_PIX_FMT_NV12_10_COL128,
++		/* 10-bit format disabled until Chrome GL shader support is added:
++		 * V4L2_PIX_FMT_NV12_10_COL128,
++		 */
+ 	};
+ 	u32 pf = 0;
+ 
+ 	if (!is_sps_set(sps) || !hevc_d_hevc_validate_sps(sps)) {
+-		/* Treat this as an error? For now return both */
+-
++		/* Treat this as an error? For now return 8-bit only */
+ 		if (index < ARRAY_SIZE(all_formats))
+ 			pf = all_formats[index];
+ 	} else {
+ 		if (index == 0) {
+-/*			if (sps->bit_depth_luma_minus8 == 0)
+-				pf = V4L2_PIX_FMT_NV12MT_COL128;
+-			else if (sps->bit_depth_luma_minus8 == 2)
+-				pf = V4L2_PIX_FMT_NV12MT_10_COL128;
+-		} else if (index == 1) {
+-			*/
+-			if (sps->bit_depth_luma_minus8 == 0)
+-				pf = V4L2_PIX_FMT_NV12_COL128;
+-			else if (sps->bit_depth_luma_minus8 == 2)
+-				pf = V4L2_PIX_FMT_NV12_10_COL128;
++			/* Only 8-bit format supported for now */
++			pf = V4L2_PIX_FMT_NV12_COL128;
+ 		}
+ 	}
+ 
+@@ -432,12 +423,12 @@ static int hevc_d_s_fmt_vid_cap(struct f
+ 				struct v4l2_format *f)
+ {
+ 	struct hevc_d_ctx *ctx = hevc_d_file2ctx(file);
+-	struct vb2_queue *vq;
+ 	int ret;
+ 
+-	vq = v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type);
+-	if (vb2_is_busy(vq))
+-		return -EBUSY;
++	/*
++	 * Stateless decoders allow format changes during resolution changes,
++	 * so don't check vb2_is_busy here.
++	 */
+ 
+ 	ret = hevc_d_try_fmt_vid_cap(file, priv, f);
+ 	if (ret)
+@@ -453,12 +444,12 @@ static int hevc_d_s_fmt_vid_out(struct f
+ 				struct v4l2_format *f)
+ {
+ 	struct hevc_d_ctx *ctx = hevc_d_file2ctx(file);
+-	struct vb2_queue *vq;
+ 	int ret;
+ 
+-	vq = v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type);
+-	if (vb2_is_busy(vq))
+-		return -EBUSY;
++	/*
++	 * Stateless decoders allow format changes during resolution changes,
++	 * so don't check vb2_is_busy here.
++	 */
+ 
+ 	ret = hevc_d_try_fmt_vid_out(file, priv, f);
+ 	if (ret)
+@@ -472,19 +463,49 @@ static int hevc_d_s_fmt_vid_out(struct f
+ 	return 0;
+ }
+ 
++static int hevc_d_enum_framesizes(struct file *file, void *priv,
++				  struct v4l2_frmsizeenum *fsize)
++{
++	if (fsize->index != 0)
++		return -EINVAL;
++
++	/* Only support HEVC slice format for OUTPUT queue */
++	if (fsize->pixel_format != V4L2_PIX_FMT_HEVC_SLICE)
++		return -EINVAL;
++
++	fsize->type = V4L2_FRMSIZE_TYPE_STEPWISE;
++	fsize->stepwise.min_width = HEVC_D_MIN_WIDTH;
++	fsize->stepwise.max_width = HEVC_D_MAX_WIDTH;
++	fsize->stepwise.step_width = 1;
++	fsize->stepwise.min_height = HEVC_D_MIN_HEIGHT;
++	fsize->stepwise.max_height = HEVC_D_MAX_HEIGHT;
++	fsize->stepwise.step_height = 1;
++
++	return 0;
++}
++
+ const struct v4l2_ioctl_ops hevc_d_ioctl_ops = {
+ 	.vidioc_querycap		= hevc_d_querycap,
+ 
+ 	.vidioc_enum_fmt_vid_cap	= hevc_d_enum_fmt_vid_cap,
++	.vidioc_enum_framesizes		= hevc_d_enum_framesizes,
+ 	.vidioc_g_fmt_vid_cap_mplane	= hevc_d_g_fmt_vid_cap,
+ 	.vidioc_try_fmt_vid_cap_mplane	= hevc_d_try_fmt_vid_cap,
+ 	.vidioc_s_fmt_vid_cap_mplane	= hevc_d_s_fmt_vid_cap,
+ 
++  .vidioc_g_fmt_vid_cap = hevc_d_g_fmt_vid_cap,
++  .vidioc_try_fmt_vid_cap = hevc_d_try_fmt_vid_cap,
++  .vidioc_s_fmt_vid_cap = hevc_d_s_fmt_vid_cap,
++
+ 	.vidioc_enum_fmt_vid_out	= hevc_d_enum_fmt_vid_out,
+ 	.vidioc_g_fmt_vid_out_mplane	= hevc_d_g_fmt_vid_out,
+ 	.vidioc_try_fmt_vid_out_mplane	= hevc_d_try_fmt_vid_out,
+ 	.vidioc_s_fmt_vid_out_mplane	= hevc_d_s_fmt_vid_out,
+ 
++  .vidioc_g_fmt_vid_out = hevc_d_g_fmt_vid_out,
++  .vidioc_try_fmt_vid_out = hevc_d_try_fmt_vid_out,
++  .vidioc_s_fmt_vid_out = hevc_d_s_fmt_vid_out,
++
+ 	.vidioc_reqbufs			= v4l2_m2m_ioctl_reqbufs,
+ 	.vidioc_querybuf		= v4l2_m2m_ioctl_querybuf,
+ 	.vidioc_qbuf			= v4l2_m2m_ioctl_qbuf,

@@ -1,8 +1,8 @@
-Index: kernel-rpi-6_1/fs/exec.c
+Index: kernel-rpi/fs/exec.c
 ===================================================================
---- kernel-rpi-6_1.orig/fs/exec.c
-+++ kernel-rpi-6_1/fs/exec.c
-@@ -71,6 +71,7 @@
+--- kernel-rpi.orig/fs/exec.c
++++ kernel-rpi/fs/exec.c
+@@ -73,6 +73,7 @@
  #include <asm/mmu_context.h>
  #include <asm/tlb.h>
  
@@ -10,22 +10,22 @@ Index: kernel-rpi-6_1/fs/exec.c
  #include <trace/events/task.h>
  #include "internal.h"
  
-@@ -939,6 +940,10 @@ static struct file *do_open_execat(int f
+@@ -915,7 +916,9 @@ static struct file *do_open_execat(int f
+ 	err = deny_write_access(file);
  	if (err)
- 		goto exit;
- 
+ 		return ERR_PTR(err);
+-
 +  if (name->name[0] != '\0') {
-+    fsnotify_open(file);
 +    trace_open_exec(name->name);
 +  }
- 	return file;
+ 	return no_free_ptr(file);
+ }
  
- exit:
-Index: kernel-rpi-6_1/fs/open.c
+Index: kernel-rpi/fs/open.c
 ===================================================================
---- kernel-rpi-6_1.orig/fs/open.c
-+++ kernel-rpi-6_1/fs/open.c
-@@ -37,6 +37,9 @@
+--- kernel-rpi.orig/fs/open.c
++++ kernel-rpi/fs/open.c
+@@ -36,6 +36,9 @@
  
  #include "internal.h"
  
@@ -35,16 +35,7 @@ Index: kernel-rpi-6_1/fs/open.c
  int do_truncate(struct mnt_idmap *idmap, struct dentry *dentry,
  		loff_t length, unsigned int time_attrs, struct file *filp)
  {
-@@ -1379,7 +1382,7 @@ struct file *filp_open(const char *filen
- {
- 	struct filename *name = getname_kernel(filename);
- 	struct file *file = ERR_CAST(name);
--	
-+
- 	if (!IS_ERR(name)) {
- 		file = file_open_name(name, flags, mode);
- 		putname(name);
-@@ -1422,6 +1425,7 @@ static long do_sys_openat2(int dfd, cons
+@@ -1420,6 +1423,7 @@ static long do_sys_openat2(int dfd, cons
  			fd = PTR_ERR(f);
  		} else {
  			fd_install(fd, f);
@@ -52,10 +43,10 @@ Index: kernel-rpi-6_1/fs/open.c
  		}
  	}
  	putname(tmp);
-Index: kernel-rpi-6_1/include/trace/events/fs_trace.h
+Index: kernel-rpi/include/trace/events/fs_trace.h
 ===================================================================
 --- /dev/null
-+++ kernel-rpi-6_1/include/trace/events/fs_trace.h
++++ kernel-rpi/include/trace/events/fs_trace.h
 @@ -0,0 +1,55 @@
 +#undef TRACE_SYSTEM
 +#define TRACE_SYSTEM fs
@@ -81,7 +72,7 @@ Index: kernel-rpi-6_1/include/trace/events/fs_trace.h
 +	),
 +
 +	TP_fast_assign(
-+		__assign_str(filename, filename);
++		__assign_str(filename);
 +		__entry->flags = flags;
 +		__entry->mode = mode;
 +	),
@@ -101,7 +92,7 @@ Index: kernel-rpi-6_1/include/trace/events/fs_trace.h
 +	),
 +
 +	TP_fast_assign(
-+		__assign_str(filename, filename);
++		__assign_str(filename);
 +	),
 +
 +	TP_printk("\"%s\"",

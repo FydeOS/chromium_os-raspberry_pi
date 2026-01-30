@@ -1,0 +1,14 @@
+Index: kernel-rpi/fs/bpf_fs_kfuncs.c
+===================================================================
+--- kernel-rpi.orig/fs/bpf_fs_kfuncs.c
++++ kernel-rpi/fs/bpf_fs_kfuncs.c
+@@ -128,7 +128,8 @@ __bpf_kfunc int bpf_get_dentry_xattr(str
+ 	ret = inode_permission(&nop_mnt_idmap, inode, MAY_READ);
+ 	if (ret)
+ 		return ret;
+-	return __vfs_getxattr(dentry, inode, name__str, value, value_len);
++	return __vfs_getxattr(&nop_mnt_idmap, dentry, inode, name__str, value,
++			      value_len, XATTR_NOSECURITY);
+ }
+ 
+ /**

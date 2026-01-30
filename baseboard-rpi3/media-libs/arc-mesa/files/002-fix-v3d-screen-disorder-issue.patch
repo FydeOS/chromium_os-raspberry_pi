@@ -1,1 +1,23 @@
-../../mesa/files/002-fix-v3d-screen-disorder-issue.patch
+Index: mesa/src/gallium/drivers/v3d/v3d_resource.c
+===================================================================
+--- mesa.orig/src/gallium/drivers/v3d/v3d_resource.c
++++ mesa/src/gallium/drivers/v3d/v3d_resource.c
+@@ -908,7 +908,6 @@ v3d_resource_from_handle(struct pipe_scr
+ 
+         if (!rsc)
+                 return NULL;
+-
+         switch (whandle->modifier) {
+         case DRM_FORMAT_MOD_LINEAR:
+                 rsc->tiled = false;
+@@ -943,6 +942,10 @@ v3d_resource_from_handle(struct pipe_scr
+                 rsc->bo = v3d_bo_open_name(screen, whandle->handle);
+                 break;
+         case WINSYS_HANDLE_TYPE_FD:
++                if (usage == PIPE_HANDLE_USAGE_FRAMEBUFFER_WRITE) {
++                  whandle->modifier = DRM_FORMAT_MOD_LINEAR;
++                  rsc->tiled = false;
++                }
+                 rsc->bo = v3d_bo_open_dmabuf(screen, whandle->handle);
+                 break;
+         default:

@@ -2,7 +2,7 @@ Index: src/content/common/gpu_pre_sandbox_hook_linux.cc
 ===================================================================
 --- src.orig/content/common/gpu_pre_sandbox_hook_linux.cc
 +++ src/content/common/gpu_pre_sandbox_hook_linux.cc
-@@ -437,7 +437,7 @@ void AddVulkanICDPermissions(std::vector
+@@ -440,7 +440,7 @@ void AddVulkanICDPermissions(std::vector
  
    static const char* const kReadOnlyICDList[] = {
        "intel_icd.x86_64.json", "nvidia_icd.json", "radeon_icd.x86_64.json",
@@ -11,7 +11,7 @@ Index: src/content/common/gpu_pre_sandbox_hook_linux.cc
  
    for (std::string prefix : kReadOnlyICDPrefixes) {
      permissions->push_back(BrokerFilePermission::ReadOnly(prefix));
-@@ -637,6 +637,7 @@ void LoadVulkanLibraries() {
+@@ -590,6 +590,7 @@ void LoadVulkanLibraries() {
    dlopen("libvulkan_intel.so", dlopen_flag);
    dlopen("libGLX_nvidia.so.0", dlopen_flag);
    dlopen("libvulkan_freedreno.so", dlopen_flag);

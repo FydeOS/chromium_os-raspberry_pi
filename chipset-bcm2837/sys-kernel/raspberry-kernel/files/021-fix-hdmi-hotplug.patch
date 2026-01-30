@@ -1,7 +1,7 @@
-Index: kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_hdmi.h
+Index: kernel-rpi/drivers/gpu/drm/vc4/vc4_hdmi.h
 ===================================================================
---- kernel-rpi-6_1.orig/drivers/gpu/drm/vc4/vc4_hdmi.h
-+++ kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_hdmi.h
+--- kernel-rpi.orig/drivers/gpu/drm/vc4/vc4_hdmi.h
++++ kernel-rpi/drivers/gpu/drm/vc4/vc4_hdmi.h
 @@ -7,6 +7,8 @@
  #include <sound/dmaengine_pcm.h>
  #include <sound/hdmi-codec.h>
@@ -11,7 +11,15 @@ Index: kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_hdmi.h
  
  #include "vc4_drv.h"
  
-@@ -266,6 +268,8 @@ struct vc4_hdmi {
+@@ -112,6 +114,7 @@ struct vc4_hdmi_audio {
+ 	struct snd_dmaengine_dai_dma_data dma_data;
+ 	struct hdmi_audio_infoframe infoframe;
+ 	struct platform_device *codec_pdev;
++	unsigned int channels;
+ 	bool streaming;
+ };
+ 
+@@ -244,6 +247,8 @@ struct vc4_hdmi {
  	 * ALSA jack detection.
  	 */
  	struct snd_soc_jack hdmi_jack;
@@ -20,45 +28,103 @@ Index: kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_hdmi.h
  };
  
  #define connector_to_vc4_hdmi(_connector)				\
-Index: kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_hdmi.c
+Index: kernel-rpi/drivers/gpu/drm/vc4/vc4_hdmi.c
 ===================================================================
---- kernel-rpi-6_1.orig/drivers/gpu/drm/vc4/vc4_hdmi.c
-+++ kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_hdmi.c
-@@ -123,6 +123,12 @@ static const char * const output_format_
- 	[VC4_HDMI_OUTPUT_YUV444]	= "YUV 4:4:4",
- };
+--- kernel-rpi.orig/drivers/gpu/drm/vc4/vc4_hdmi.c
++++ kernel-rpi/drivers/gpu/drm/vc4/vc4_hdmi.c
+@@ -118,6 +118,12 @@
+ static int force_hotplug;
+ module_param(force_hotplug, int, 0644);
  
 +static void handle_plugged_change(struct vc4_hdmi *hdmi, bool plugged)
 +{
-+	if (hdmi->plugged_cb && hdmi->codec_dev)
-+		hdmi->plugged_cb(hdmi->codec_dev, plugged);
++ if (hdmi->plugged_cb && hdmi->codec_dev)
++   hdmi->plugged_cb(hdmi->codec_dev, plugged);
 +}
 +
- static const char *vc4_hdmi_output_fmt_str(enum vc4_hdmi_output_format fmt)
+ static bool vc4_hdmi_supports_scrambling(struct vc4_hdmi *vc4_hdmi)
  {
- 	if (fmt >= ARRAY_SIZE(output_format_str))
-@@ -461,6 +467,11 @@ static void vc4_hdmi_handle_hotplug(stru
- 
- 	if (!edid)
- 		return;
+ 	struct drm_display_info *display = &vc4_hdmi->connector.display_info;
+@@ -415,11 +421,13 @@ static void vc4_hdmi_handle_hotplug(stru
+ 	 * *after* EDID probing, otherwise userspace might try to bring up
+ 	 * audio before it's ready.
+ 	 */
+-	mutex_lock(&vc4_hdmi->update_plugged_status_lock);
+-	if (vc4_hdmi->plugged_cb && vc4_hdmi->codec_dev)
+-		vc4_hdmi->plugged_cb(vc4_hdmi->codec_dev,
+-				     status != connector_status_disconnected);
+-	mutex_unlock(&vc4_hdmi->update_plugged_status_lock);
 +  if (status != vc4_hdmi->last_connector_result) {
++	  mutex_lock(&vc4_hdmi->update_plugged_status_lock);
 +    dev_dbg(&vc4_hdmi->pdev->dev, "vc4 hdmi connector status:%d", status);
 +    handle_plugged_change(vc4_hdmi, status == connector_status_connected);
 +    vc4_hdmi->last_connector_result = status;
++	  mutex_unlock(&vc4_hdmi->update_plugged_status_lock);
 +  }
  
- 	cec_s_phys_addr_from_edid(vc4_hdmi->cec_adap, edid);
- 	kfree(edid);
-@@ -1926,7 +1937,7 @@ static void vc4_hdmi_encoder_post_crtc_e
- 	spin_lock_irqsave(&vc4_hdmi->hw_lock, flags);
+ 	if (status == connector_status_disconnected) {
+ 		cec_phys_addr_invalidate(vc4_hdmi->cec_adap);
+@@ -2063,6 +2071,49 @@ out:
+ 	mutex_unlock(&vc4_hdmi->mutex);
+ }
  
- 	HDMI_WRITE(HDMI_VID_CTL,
--	   (HDMI_READ(HDMI_VID_CTL) &~ 
-+	   (HDMI_READ(HDMI_VID_CTL) &~
- 	   (VC4_HD_VID_CTL_VSYNC_LOW | VC4_HD_VID_CTL_HSYNC_LOW)) |
- 	   VC4_HD_VID_CTL_ENABLE |
- 	   VC4_HD_VID_CTL_CLRRGB |
-@@ -2780,10 +2791,12 @@ static int vc4_hdmi_audio_hook_plugged_c
++static int vc4_hdmi_audio_mute_stream(struct device *dev, void *data,
++				      bool enable, int direction)
++{
++	struct vc4_hdmi *vc4_hdmi = dev_get_drvdata(dev);
++	struct drm_device *drm = vc4_hdmi->connector.dev;
++	unsigned long flags;
++	int idx;
++
++	if (direction != SNDRV_PCM_STREAM_PLAYBACK)
++		return 0;
++
++	mutex_lock(&vc4_hdmi->mutex);
++
++	if (!drm_dev_enter(drm, &idx))
++		goto out;
++
++	spin_lock_irqsave(&vc4_hdmi->hw_lock, flags);
++
++	if (enable) {
++		/* Mute: disable the MAI and flush */
++		HDMI_WRITE(HDMI_MAI_CTL,
++			   VC4_HD_MAI_CTL_FLUSH |
++			   VC4_HD_MAI_CTL_DLATE |
++			   VC4_HD_MAI_CTL_ERRORE |
++			   VC4_HD_MAI_CTL_ERRORF);
++	} else {
++		/* Unmute: re-enable the MAI */
++		HDMI_WRITE(HDMI_MAI_CTL,
++			   VC4_SET_FIELD(vc4_hdmi->audio.channels,
++					 VC4_HD_MAI_CTL_CHNUM) |
++			   VC4_HD_MAI_CTL_WHOLSMP |
++			   VC4_HD_MAI_CTL_CHALIGN |
++			   VC4_HD_MAI_CTL_ENABLE);
++	}
++
++	spin_unlock_irqrestore(&vc4_hdmi->hw_lock, flags);
++	drm_dev_exit(idx);
++
++out:
++	mutex_unlock(&vc4_hdmi->mutex);
++	return 0;
++}
++
+ static int sample_rate_to_mai_fmt(int samplerate)
+ {
+ 	switch (samplerate) {
+@@ -2137,6 +2188,9 @@ static int vc4_hdmi_audio_prepare(struct
+ 
+ 	vc4_hdmi_audio_set_mai_clock(vc4_hdmi, sample_rate);
+ 
++	/* Store channels for use in mute_stream callback */
++	vc4_hdmi->audio.channels = channels;
++
+ 	spin_lock_irqsave(&vc4_hdmi->hw_lock, flags);
+ 	HDMI_WRITE(HDMI_MAI_CTL,
+ 		   VC4_SET_FIELD(channels, VC4_HD_MAI_CTL_CHNUM) |
+@@ -2277,10 +2331,12 @@ static int vc4_hdmi_audio_hook_plugged_c
  					   struct device *codec_dev)
  {
  	struct vc4_hdmi *vc4_hdmi = dev_get_drvdata(dev);
@@ -72,7 +138,15 @@ Index: kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_hdmi.c
  	mutex_unlock(&vc4_hdmi->update_plugged_status_lock);
  
  	return 0;
-@@ -2827,6 +2840,28 @@ static int vc4_hdmi_codec_init(struct sn
+@@ -2292,6 +2348,7 @@ static const struct hdmi_codec_ops vc4_h
+ 	.prepare = vc4_hdmi_audio_prepare,
+ 	.audio_shutdown = vc4_hdmi_audio_shutdown,
+ 	.audio_startup = vc4_hdmi_audio_startup,
++	.mute_stream = vc4_hdmi_audio_mute_stream,
+ };
+ 
+ static struct hdmi_codec_pdata vc4_hdmi_codec_pdata = {
+@@ -2324,6 +2381,28 @@ static int vc4_hdmi_codec_init(struct sn
  	return snd_soc_component_set_jack(component, &vc4_hdmi->hdmi_jack, NULL);
  }
  
@@ -82,7 +156,7 @@ Index: kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_hdmi.c
 +
 +static int vc4_hdmi_link_init(struct snd_soc_pcm_runtime *runtime) {
 +  struct snd_soc_card *card = runtime->card;
-+  struct snd_soc_dai *codec_dai = asoc_rtd_to_codec(runtime, 0);
++  struct snd_soc_dai *codec_dai = snd_soc_rtd_to_codec(runtime, 0);
 +  struct snd_soc_component *component = codec_dai->component;
 +  struct vc4_hdmi *vc4_hdmi = snd_soc_card_get_drvdata(card);
 +  int ret;
@@ -101,7 +175,7 @@ Index: kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_hdmi.c
  static int vc4_hdmi_audio_init(struct vc4_hdmi *vc4_hdmi)
  {
  	const struct vc4_hdmi_register *mai_data =
-@@ -2940,6 +2975,7 @@ static int vc4_hdmi_audio_init(struct vc
+@@ -2437,6 +2516,7 @@ static int vc4_hdmi_audio_init(struct vc
  	dai_link->cpus		= &vc4_hdmi->audio.cpu;
  	dai_link->codecs	= &vc4_hdmi->audio.codec;
  	dai_link->platforms	= &vc4_hdmi->audio.platform;
@@ -109,7 +183,7 @@ Index: kernel-rpi-6_1/drivers/gpu/drm/vc4/vc4_hdmi.c
  
  	dai_link->num_cpus	= 1;
  	dai_link->num_codecs	= 1;
-@@ -2960,6 +2996,8 @@ static int vc4_hdmi_audio_init(struct vc
+@@ -2457,6 +2537,8 @@ static int vc4_hdmi_audio_init(struct vc
  	card->driver_name = "vc4-hdmi";
  	card->dev = dev;
  	card->owner = THIS_MODULE;

@@ -1,0 +1,1082 @@
+Index: src/media/gpu/chromeos/fourcc.cc
+===================================================================
+--- src.orig/media/gpu/chromeos/fourcc.cc
++++ src/media/gpu/chromeos/fourcc.cc
+@@ -32,6 +32,8 @@ std::optional<Fourcc> Fourcc::FromUint32
+     case YM16:
+     case MT21:
+     case MM21:
++    case NC12:
++    case NC30:
+     case P010:
+     case MT2T:
+     case AR24:
+@@ -183,10 +185,17 @@ VideoPixelFormat Fourcc::ToVideoPixelFor
+     // similar to V4L2_PIX_FMT_MT21C but is not compressed ; thus it can also
+     // be mapped to PIXEL_FORMAT_NV12.
+     case MM21:
++    // V4L2_PIX_FMT_NV12_COL128 is used for Raspberry Pi hardware video
++    // decoder. It is a 128-byte column tiled format that can be mapped to
++    // PIXEL_FORMAT_NV12.
++    case NC12:
+       return PIXEL_FORMAT_NV12;
+     case P010:
+       return PIXEL_FORMAT_P010LE;
+     case MT2T:
++    // V4L2_PIX_FMT_NV12_10_COL128 is used for Raspberry Pi hardware video
++    // decoder for 10-bit content. It is a 128-byte column tiled format.
++    case NC30:
+       return PIXEL_FORMAT_P010LE;
+     case AR24:
+       return PIXEL_FORMAT_ARGB;
+@@ -289,6 +298,8 @@ std::optional<Fourcc> Fourcc::ToSinglePl
+     case NV21:
+     case P010:
+     case MM21:
++    case NC12:
++    case NC30:
+     case MT2T:
+     case AR24:
+       return Fourcc(value_);
+@@ -325,6 +336,8 @@ bool Fourcc::IsMultiPlanar() const {
+     case YU16:
+     case P010:
+     case MT2T:
++    case NC12:
++    case NC30:
+     case AR24:
+     case Q08C:
+     case Q10C:
+@@ -373,5 +386,12 @@ static_assert(Fourcc::Q08C == V4L2_PIX_F
+ #ifdef V4L2_PIX_FMT_QC10C
+ static_assert(Fourcc::Q10C == V4L2_PIX_FMT_QC10C, "Mismatch Fourcc");
+ #endif  // V4L2_PIX_FMT_QC10C
++// Raspberry Pi column formats
++#ifdef V4L2_PIX_FMT_NV12_COL128
++static_assert(Fourcc::NC12 == V4L2_PIX_FMT_NV12_COL128, "Mismatch Fourcc");
++#endif  // V4L2_PIX_FMT_NV12_COL128
++#ifdef V4L2_PIX_FMT_NV12_10_COL128
++static_assert(Fourcc::NC30 == V4L2_PIX_FMT_NV12_10_COL128, "Mismatch Fourcc");
++#endif  // V4L2_PIX_FMT_NV12_10_COL128
+ #endif  // BUILDFLAG(USE_V4L2_CODEC)
+ }  // namespace media
+Index: src/media/gpu/chromeos/fourcc.h
+===================================================================
+--- src.orig/media/gpu/chromeos/fourcc.h
++++ src/media/gpu/chromeos/fourcc.h
+@@ -90,6 +90,14 @@ class MEDIA_GPU_EXPORT Fourcc {
+     // It is used for MT8183 hardware video decoder.
+     MM21 = ComposeFourcc('M', 'M', '2', '1'),
+ 
++    // Maps to V4L2_PIX_FMT_NV12_COL128.
++    // It is used for Raspberry Pi hardware video decoder (128-byte column format).
++    NC12 = ComposeFourcc('N', 'C', '1', '2'),
++
++    // Maps to V4L2_PIX_FMT_NV12_10_COL128.
++    // It is used for Raspberry Pi hardware video decoder (10-bit 128-byte column format).
++    NC30 = ComposeFourcc('N', 'C', '3', '0'),
++
+     // Two-plane 10-bit YUV 4:2:0. Each sample is a two-byte little-endian value
+     // with the bottom six bits ignored.
+     P010 = ComposeFourcc('P', '0', '1', '0'),
+Index: src/media/gpu/chromeos/gl_image_processor_backend.cc
+===================================================================
+--- src.orig/media/gpu/chromeos/gl_image_processor_backend.cc
++++ src/media/gpu/chromeos/gl_image_processor_backend.cc
+@@ -80,7 +80,8 @@ std::unique_ptr<ui::NativePixmapGLBindin
+     GLenum target,
+     GLuint texture_id,
+     bool should_split_planes,
+-    int plane) {
++    int plane,
++    int col_height_override = 0) {
+   CHECK(plane == 0 || plane == 1);
+ 
+   // Note: if this is changed to accept other formats,
+@@ -114,6 +115,30 @@ std::unique_ptr<ui::NativePixmapGLBindin
+         target, texture_id);
+   }
+ 
++  // For NC12 (NV12_COL128) input: import the entire buffer as a single texture
++  // for both Y and UV passes. Each column contains interleaved Y and UV data,
++  // so both planes start at offset 0 and use the full buffer height.
++  if (col_height_override > 0) {
++    // Y: R8 texture, coded_width × col_height
++    // UV: RG88 texture, coded_width/2 × col_height
++    const int tex_width = (plane == 0) ? frame->coded_size().width()
++                                       : frame->coded_size().width() / 2;
++    const gfx::Size tex_size(tex_width, col_height_override);
++    const auto tex_format =
++        plane ? viz::SinglePlaneFormat::kRG_88 : viz::SinglePlaneFormat::kR_8;
++
++    auto native_pixmap = base::MakeRefCounted<gfx::NativePixmapDmaBuf>(
++        tex_size, tex_format,
++        std::move(gpu_memory_buffer_handle).native_pixmap_handle());
++    DCHECK(native_pixmap->AreDmaBufFdsValid());
++
++    // Both planes use BufferPlane::Y since both start at offset 0.
++    return GetCurrentGLOzone().ImportNativePixmap(
++        std::move(native_pixmap), tex_format,
++        gfx::BufferPlane::Y, tex_size,
++        gfx::ColorSpace(), target, texture_id);
++  }
++
+   base::CheckedNumeric<int> uv_width(0);
+   base::CheckedNumeric<int> uv_height(0);
+ 
+@@ -170,45 +195,62 @@ std::string GLImageProcessorBackend::typ
+ 
+ bool GLImageProcessorBackend::IsSupported(const PortConfig& input_config,
+                                           const PortConfig& output_config) {
++  VLOGF(1) << "IsSupported: input_fourcc=" << input_config.fourcc.ToString()
++           << ", input_size=" << input_config.size.ToString()
++           << ", input_visible_rect=" << input_config.visible_rect.ToString()
++           << ", output_fourcc=" << output_config.fourcc.ToString()
++           << ", output_size=" << output_config.size.ToString()
++           << ", output_visible_rect=" << output_config.visible_rect.ToString();
++
+   // Technically speaking GLIPBackend doesn't need Ozone but it
+   // relies on it to initialize GL.
+   if (!ui::OzonePlatform::IsInitialized()) {
+-    VLOGF(2) << "The GLImageProcessorBackend needs Ozone initialized.";
++    VLOGF(1) << "FAILED: The GLImageProcessorBackend needs Ozone initialized.";
+     return false;
+   }
+ 
+   if (input_config.fourcc.ToVideoPixelFormat() != PIXEL_FORMAT_NV12 ||
+       output_config.fourcc.ToVideoPixelFormat() != PIXEL_FORMAT_NV12) {
+-    VLOGF(2) << "The GLImageProcessorBackend only supports NV12.";
++    VLOGF(1) << "FAILED: The GLImageProcessorBackend only supports NV12. "
++             << "input_pixel_format="
++             << VideoPixelFormatToString(input_config.fourcc.ToVideoPixelFormat())
++             << ", output_pixel_format="
++             << VideoPixelFormatToString(output_config.fourcc.ToVideoPixelFormat());
+     return false;
+   }
+ 
+   if (!((input_config.fourcc == Fourcc(Fourcc::MM21) &&
+          output_config.fourcc == Fourcc(Fourcc::NV12)) ||
++        (input_config.fourcc == Fourcc(Fourcc::NC12) &&
++         output_config.fourcc == Fourcc(Fourcc::NV12)) ||
+         (input_config.fourcc == Fourcc(Fourcc::NV12) &&
+          output_config.fourcc == Fourcc(Fourcc::NV12)) ||
+         (input_config.fourcc == Fourcc(Fourcc::NM12) &&
+          output_config.fourcc == Fourcc(Fourcc::NM12)))) {
+-    VLOGF(2) << "The GLImageProcessor only supports MM21->NV12, NV12->NV12, "
+-                "and NM12->NM12.";
++    // Note: NC30 (10-bit COL128) is not yet supported due to complex 10-bit
++    // sample packing requirements in the shader.
++    VLOGF(1) << "FAILED: The GLImageProcessor only supports MM21->NV12, NC12->NV12, "
++                "NV12->NV12, and NM12->NM12.";
+     return false;
+   }
+ 
+   if (input_config.visible_rect != output_config.visible_rect &&
+-      input_config.fourcc == Fourcc(Fourcc::MM21)) {
+-    VLOGF(2)
+-        << "The GLImageProcessorBackend only supports scaling for NV12->NV12.";
++      (input_config.fourcc == Fourcc(Fourcc::MM21) ||
++       input_config.fourcc == Fourcc(Fourcc::NC12))) {
++    VLOGF(1) << "FAILED: The GLImageProcessorBackend only supports scaling for NV12->NV12. "
++             << "input_visible_rect=" << input_config.visible_rect.ToString()
++             << ", output_visible_rect=" << output_config.visible_rect.ToString();
+     return false;
+   }
+ 
+   if (!gfx::Rect(input_config.size).Contains(input_config.visible_rect)) {
+-    VLOGF(2) << "The input frame size (" << input_config.size.ToString()
++    VLOGF(1) << "FAILED: The input frame size (" << input_config.size.ToString()
+              << ") does not contain the input visible rect ("
+              << input_config.visible_rect.ToString() << ")";
+     return false;
+   }
+   if (!gfx::Rect(output_config.size).Contains(output_config.visible_rect)) {
+-    VLOGF(2) << "The output frame size (" << output_config.size.ToString()
++    VLOGF(1) << "FAILED: The output frame size (" << output_config.size.ToString()
+              << ") does not contain the output visible rect ("
+              << output_config.visible_rect.ToString() << ")";
+     return false;
+@@ -217,12 +259,25 @@ bool GLImageProcessorBackend::IsSupporte
+   if (input_config.fourcc == Fourcc(Fourcc::MM21) &&
+       ((input_config.size.width() & (kTileWidth - 1)) ||
+        (input_config.size.height() & (kTileHeight - 1)))) {
+-    VLOGF(2) << "The input frame coded size (" << input_config.size.ToString()
++    VLOGF(1) << "FAILED: The input frame coded size (" << input_config.size.ToString()
+              << ") is not aligned to the MM21 tile dimensions (" << kTileWidth
+              << "x" << kTileHeight << ").";
+     return false;
+   }
+ 
++  // NC12 (NV12_COL128) uses 128-byte columns and 8-row alignment
++  constexpr int kCol128Width = 128;
++  constexpr int kCol128HeightAlign = 8;
++  if (input_config.fourcc == Fourcc(Fourcc::NC12) &&
++      ((input_config.size.width() & (kCol128Width - 1)) ||
++       (input_config.size.height() & (kCol128HeightAlign - 1)))) {
++    VLOGF(1) << "FAILED: The input frame coded size (" << input_config.size.ToString()
++             << ") is not aligned to the NC12 dimensions (" << kCol128Width
++             << "x" << kCol128HeightAlign << ").";
++    return false;
++  }
++
++  VLOGF(1) << "IsSupported: PASSED";
+   return true;
+ }
+ 
+@@ -452,28 +507,96 @@ void GLImageProcessorBackend::Initialize
+     return;
+   }
+ 
++  // NC12 (Raspberry Pi COL128) uses the same two-pass approach as NV12 scaling
++  // since GL_EXT_YUV_target may not be available on all platforms.
+   const bool scaling = (input_config_.fourcc == Fourcc(Fourcc::NV12) &&
+                         output_config_.fourcc == Fourcc(Fourcc::NV12)) ||
+                        (input_config_.fourcc == Fourcc(Fourcc::NM12) &&
+-                        output_config_.fourcc == Fourcc(Fourcc::NM12));
++                        output_config_.fourcc == Fourcc(Fourcc::NM12)) ||
++                       (input_config_.fourcc == Fourcc(Fourcc::NC12) &&
++                        output_config_.fourcc == Fourcc(Fourcc::NV12));
+ 
+   if (scaling) {
+-    // Creates a fragment shader program to do NV12 scaling.
+-    constexpr GLchar kFragmentShader[] =
+-        R"(#version 300 es
+-          precision mediump float;
+-          precision mediump int;
+-          uniform sampler2D videoTexture;
+-          in vec2 texPos;
+-          layout(location=0) out vec4 fragColour;
+-          void main() {
+-            fragColour = texture(videoTexture, texPos);
+-        })";
+-    if (!CreateAndAttachShader(program, GL_FRAGMENT_SHADER, kFragmentShader,
+-                               sizeof(kFragmentShader))) {
+-      LOG(ERROR) << "Could not compile the fragment shader";
+-      done->Signal();
+-      return;
++    if (input_config_.fourcc == Fourcc(Fourcc::NC12)) {
++      // NC12 (NV12_COL128) detiling shader.
++      //
++      // Buffer layout: Y and UV are INTERLEAVED PER COLUMN.
++      // Each column is 128 bytes wide x col_height rows:
++      //   [col0: Y(128xH) + UV(128xH/2)] [col1: Y+UV] ... [colN: Y+UV]
++      //
++      // Texture import: both planes at offset 0 in the DMA-buf.
++      //   Y:  R8,   coded_width x col_height
++      //   UV: RG88, coded_width/2 x col_height
++      //
++      // Uses float multiply-by-reciprocal instead of integer division
++      // (V3D has no hardware int divide). Power-of-2 divides (128, 64)
++      // use bit shifts.
++      constexpr GLchar kFragmentShader[] =
++          R"(#version 300 es
++            precision highp float;
++            precision highp int;
++            uniform sampler2D videoTexture;
++            uniform int plane;
++            uniform int coded_width;
++            uniform int coded_height;
++            uniform int col_height;
++            in vec2 texPos;
++            layout(location=0) out vec4 fragColour;
++            void main() {
++              ivec2 iCoord = ivec2(gl_FragCoord.xy);
++              int x = iCoord.x;
++              int y = iCoord.y;
++              int num_cols = coded_width >> 7;
++              float inv_num_cols = 1.0 / float(num_cols);
++              int linear;
++              int col;
++              int col_offset;
++              int tex_y;
++              int rem;
++              if (plane == 0) {
++                col = x >> 7;
++                col_offset = x & 127;
++                linear = col * col_height + y;
++                tex_y = int(float(linear) * inv_num_cols);
++                if ((tex_y + 1) * num_cols <= linear) tex_y++;
++                rem = linear - tex_y * num_cols;
++                fragColour = texelFetch(videoTexture,
++                    ivec2((rem << 7) + col_offset, tex_y), 0);
++              } else {
++                col = x >> 6;
++                col_offset = x & 63;
++                linear = col * col_height + coded_height + y;
++                tex_y = int(float(linear) * inv_num_cols);
++                if ((tex_y + 1) * num_cols <= linear) tex_y++;
++                rem = linear - tex_y * num_cols;
++                fragColour = texelFetch(videoTexture,
++                    ivec2((rem << 6) + col_offset, tex_y), 0);
++              }
++          })";
++      if (!CreateAndAttachShader(program, GL_FRAGMENT_SHADER, kFragmentShader,
++                                 sizeof(kFragmentShader))) {
++        LOG(ERROR) << "Could not compile the NC12 detiling fragment shader";
++        done->Signal();
++        return;
++      }
++    } else {
++      // Creates a fragment shader program to do NV12 scaling.
++      constexpr GLchar kFragmentShader[] =
++          R"(#version 300 es
++            precision mediump float;
++            precision mediump int;
++            uniform sampler2D videoTexture;
++            in vec2 texPos;
++            layout(location=0) out vec4 fragColour;
++            void main() {
++              fragColour = texture(videoTexture, texPos);
++          })";
++      if (!CreateAndAttachShader(program, GL_FRAGMENT_SHADER, kFragmentShader,
++                                 sizeof(kFragmentShader))) {
++        LOG(ERROR) << "Could not compile the fragment shader";
++        done->Signal();
++        return;
++      }
+     }
+   } else {
+     // The GL_EXT_YUV_target extension is needed for using a YUV texture (target
+@@ -560,6 +683,20 @@ void GLImageProcessorBackend::Initialize
+     return;
+   }
+   glUseProgram(program);
++
++  // Store NC12 uniform locations and set texture uniform
++  if (input_config_.fourcc == Fourcc(Fourcc::NC12)) {
++    nc12_plane_uniform_ = glGetUniformLocation(program, "plane");
++    nc12_coded_width_uniform_ = glGetUniformLocation(program, "coded_width");
++    nc12_coded_height_uniform_ = glGetUniformLocation(program, "coded_height");
++    nc12_col_height_uniform_ = glGetUniformLocation(program, "col_height");
++    glUniform1i(glGetUniformLocation(program, "videoTexture"), 0);
++    VLOGF(1) << "NC12 uniform locations: plane=" << nc12_plane_uniform_
++             << ", coded_width=" << nc12_coded_width_uniform_
++             << ", coded_height=" << nc12_coded_height_uniform_
++             << ", col_height=" << nc12_col_height_uniform_;
++  }
++
+   glDeleteProgram(program);
+ 
+   // Create an input texture. This will be eventually attached to the input
+@@ -568,7 +705,11 @@ void GLImageProcessorBackend::Initialize
+   CHECK_GT(src_texture_id_, 0u);
+   const auto gl_texture_target =
+       scaling ? GL_TEXTURE_2D : GL_TEXTURE_EXTERNAL_OES;
+-  const auto gl_texture_filter = scaling ? GL_LINEAR : GL_NEAREST;
++  // NC12 detiling reads non-adjacent texels from the tiled buffer, so
++  // bilinear filtering would interpolate between unrelated data. Use NEAREST.
++  const bool need_nearest = !scaling ||
++      (input_config_.fourcc == Fourcc(Fourcc::NC12));
++  const auto gl_texture_filter = need_nearest ? GL_NEAREST : GL_LINEAR;
+   glBindTexture(gl_texture_target, src_texture_id_);
+   glTexParameteri(gl_texture_target, GL_TEXTURE_MIN_FILTER, gl_texture_filter);
+   glTexParameteri(gl_texture_target, GL_TEXTURE_MAG_FILTER, gl_texture_filter);
+@@ -577,12 +718,26 @@ void GLImageProcessorBackend::Initialize
+ 
+   if (!scaling) {
+     glUniform1i(glGetUniformLocation(program, "tex"), 0);
+-    glUniform1ui(glGetUniformLocation(program, "width"),
+-                 base::checked_cast<GLuint>(
+-                     ALIGN(output_config_.visible_rect.width(), kTileWidth)));
+-    glUniform1ui(glGetUniformLocation(program, "height"),
+-                 base::checked_cast<GLuint>(
+-                     ALIGN(output_config_.visible_rect.height(), kTileHeight)));
++    // Set width and height uniforms based on format
++    if (input_config_.fourcc == Fourcc(Fourcc::NC12)) {
++      // NC12 uses 128-byte column width and 8-row alignment
++      constexpr int kCol128Width = 128;
++      constexpr int kCol128HeightAlign = 8;
++      glUniform1ui(glGetUniformLocation(program, "width"),
++                   base::checked_cast<GLuint>(
++                       ALIGN(output_config_.visible_rect.width(), kCol128Width)));
++      glUniform1ui(glGetUniformLocation(program, "height"),
++                   base::checked_cast<GLuint>(
++                       ALIGN(output_config_.visible_rect.height(), kCol128HeightAlign)));
++    } else {
++      // MM21 uses kTileWidth x kTileHeight tiles
++      glUniform1ui(glGetUniformLocation(program, "width"),
++                   base::checked_cast<GLuint>(
++                       ALIGN(output_config_.visible_rect.width(), kTileWidth)));
++      glUniform1ui(glGetUniformLocation(program, "height"),
++                   base::checked_cast<GLuint>(
++                       ALIGN(output_config_.visible_rect.height(), kTileHeight)));
++    }
+   }
+ 
+   // Ensure the GLImageProcessorBackend is fully initialized by blocking until
+@@ -694,11 +849,32 @@ void GLImageProcessorBackend::ProcessFra
+   // didn't work: it generates a GL error. I guess this means the texture must
+   // have a valid image prior to attaching it to the framebuffer.
+ 
++  // NC12 (Raspberry Pi COL128) uses the same two-pass approach as NV12 scaling
++  // since GL_EXT_YUV_target may not be available on all platforms.
+   const bool scaling = (input_config_.fourcc == Fourcc(Fourcc::NV12) &&
+                         output_config_.fourcc == Fourcc(Fourcc::NV12)) ||
+                        (input_config_.fourcc == Fourcc(Fourcc::NM12) &&
+-                        output_config_.fourcc == Fourcc(Fourcc::NM12));
+-
++                        output_config_.fourcc == Fourcc(Fourcc::NM12)) ||
++                       (input_config_.fourcc == Fourcc(Fourcc::NC12) &&
++                        output_config_.fourcc == Fourcc(Fourcc::NV12));
++
++  const bool is_nc12 = input_config_.fourcc == Fourcc(Fourcc::NC12);
++  // For NC12, compute the column height from the buffer layout.
++  // col_height = buffer_size / stride = H + H/2 (Y rows + UV rows per column).
++  int nc12_col_height = 0;
++  if (is_nc12) {
++    const auto& planes = input_frame->layout().planes();
++    if (planes[0].stride > 0) {
++      nc12_col_height =
++          static_cast<int>(planes[0].size / static_cast<size_t>(planes[0].stride));
++    }
++    const int nc12_num_cols = input_frame->coded_size().width() / 128;
++    VLOGF(1) << "NC12 col_height=" << nc12_col_height
++             << " coded_size=" << input_frame->coded_size().ToString()
++             << " num_cols=" << nc12_num_cols
++             << " rows_per_col=" << (nc12_num_cols > 0 ? nc12_col_height / nc12_num_cols : 0)
++             << " divisible=" << (nc12_num_cols > 0 && nc12_col_height % nc12_num_cols == 0);
++  }
+   const int num_planes = scaling ? 2 : 1;
+   const auto gl_texture_target =
+       scaling ? GL_TEXTURE_2D : GL_TEXTURE_EXTERNAL_OES;
+@@ -715,6 +891,14 @@ void GLImageProcessorBackend::ProcessFra
+     }
+     glViewport(0, 0, output_width.ValueOrDie(), output_height.ValueOrDie());
+ 
++    // Set NC12 detiling shader uniforms for this pass
++    if (is_nc12) {
++      glUniform1i(nc12_plane_uniform_, plane);
++      glUniform1i(nc12_coded_width_uniform_, input_frame->coded_size().width());
++      glUniform1i(nc12_coded_height_uniform_, input_frame->coded_size().height());
++      glUniform1i(nc12_col_height_uniform_, nc12_col_height);
++    }
++
+     glBindTexture(gl_texture_target, dst_texture_id_);
+     auto output_image_binding = CreateAndBindImage(
+         output_frame.get(), gl_texture_target, dst_texture_id_,
+@@ -743,7 +927,8 @@ void GLImageProcessorBackend::ProcessFra
+ 
+     auto input_image_binding = CreateAndBindImage(
+         input_frame.get(), gl_texture_target, src_texture_id_,
+-        /*should_split_planes=*/scaling, plane);
++        /*should_split_planes=*/scaling, plane,
++        /*col_height_override=*/nc12_col_height);
+     if (!input_image_binding) {
+       LOG(ERROR) << "Could not import the input buffer into GL";
+       error_cb_.Run();
+Index: src/media/gpu/chromeos/image_processor_factory.cc
+===================================================================
+--- src.orig/media/gpu/chromeos/image_processor_factory.cc
++++ src/media/gpu/chromeos/image_processor_factory.cc
+@@ -232,29 +232,60 @@ std::unique_ptr<ImageProcessor> CreateGL
+     scoped_refptr<base::SequencedTaskRunner> client_task_runner,
+     ImageProcessorFactory::PickFormatCB out_format_picker,
+     ImageProcessor::ErrorCB error_cb) {
+-  if (input_candidates.size() != 1)
+-    return nullptr;
++  VLOGF(1) << "CreateGLImageProcessorWithInputCandidates: candidates="
++           << input_candidates.size() << ", input_visible_rect="
++           << input_visible_rect.ToString() << ", output_size="
++           << output_size.ToString() << ", storage_type="
++           << static_cast<int>(output_storage_type);
+ 
+-  if (input_candidates[0].fourcc != Fourcc(Fourcc::MM21) &&
+-      input_candidates[0].fourcc != Fourcc(Fourcc::NV12)) {
++  if (input_candidates.empty()) {
++    VLOGF(1) << "No input candidates";
+     return nullptr;
+   }
+ 
+-  ImageProcessor::PortConfig input_config(
+-      input_candidates[0].fourcc, input_candidates[0].size, /*planes=*/{},
+-      input_visible_rect, VideoFrame::STORAGE_DMABUFS);
+-  ImageProcessor::PortConfig output_config(
+-      Fourcc(Fourcc::NV12), output_size, /*planes=*/{}, gfx::Rect(output_size),
+-      output_storage_type);
++  // Find the first supported input candidate
++  for (const auto& candidate : input_candidates) {
++    VLOGF(1) << "Trying candidate: fourcc=" << candidate.fourcc.ToString()
++             << ", size=" << candidate.size.ToString();
++
++    if (candidate.fourcc != Fourcc(Fourcc::MM21) &&
++        candidate.fourcc != Fourcc(Fourcc::NC12) &&
++        candidate.fourcc != Fourcc(Fourcc::NV12)) {
++      VLOGF(1) << "Skipping unsupported fourcc: " << candidate.fourcc.ToString();
++      continue;
++    }
+ 
+-  if (!GLImageProcessorBackend::IsSupported(input_config, output_config)) {
+-    return nullptr;
++    ImageProcessor::PortConfig input_config(
++        candidate.fourcc, candidate.size, /*planes=*/{},
++        input_visible_rect, VideoFrame::STORAGE_DMABUFS);
++    ImageProcessor::PortConfig output_config(
++        Fourcc(Fourcc::NV12), output_size, /*planes=*/{}, gfx::Rect(output_size),
++        output_storage_type);
++
++    VLOGF(1) << "Checking IsSupported: input_size=" << candidate.size.ToString()
++             << ", input_visible_rect=" << input_visible_rect.ToString()
++             << ", output_size=" << output_size.ToString();
++
++    if (!GLImageProcessorBackend::IsSupported(input_config, output_config)) {
++      VLOGF(1) << "GLImageProcessorBackend::IsSupported returned false";
++      continue;
++    }
++
++    VLOGF(1) << "Creating GLImageProcessor";
++    auto processor = ImageProcessor::Create(
++        base::BindRepeating(&GLImageProcessorBackend::Create), input_config,
++        output_config, ImageProcessor::OutputMode::IMPORT, std::move(error_cb),
++        std::move(client_task_runner));
++    if (processor) {
++      VLOGF(1) << "GLImageProcessor created successfully";
++    } else {
++      VLOGF(1) << "ImageProcessor::Create returned nullptr";
++    }
++    return processor;
+   }
+ 
+-  return ImageProcessor::Create(
+-      base::BindRepeating(&GLImageProcessorBackend::Create), input_config,
+-      output_config, ImageProcessor::OutputMode::IMPORT, std::move(error_cb),
+-      std::move(client_task_runner));
++  VLOGF(1) << "No suitable candidate found";
++  return nullptr;
+ }
+ #endif  // defined(ARCH_CPU_ARM_FAMILY)
+ #endif
+@@ -321,6 +352,14 @@ ImageProcessorFactory::CreateWithInputCa
+     return processor;
+ #elif BUILDFLAG(USE_V4L2_CODEC)
+ #if defined(ARCH_CPU_ARM_FAMILY)
++  VLOGF(1) << "CreateWithInputCandidates: V4L2 ARM path, candidates="
++           << input_candidates.size();
++  for (size_t i = 0; i < input_candidates.size(); i++) {
++    VLOGF(1) << "  candidate[" << i << "]: fourcc="
++             << input_candidates[i].fourcc.ToString()
++             << ", size=" << input_candidates[i].size.ToString();
++  }
++
+   const bool use_gl_scaling =
+       (base::FeatureList::IsEnabled(media::kUseGLForScaling) &&
+        (input_candidates[0].fourcc == Fourcc(Fourcc::NV12) ||
+@@ -328,12 +367,30 @@ ImageProcessorFactory::CreateWithInputCa
+   const bool use_gl_detiling =
+       (base::FeatureList::IsEnabled(media::kPreferGLImageProcessor) &&
+        input_candidates[0].fourcc == Fourcc(Fourcc::MM21));
+-  if (use_gl_scaling || use_gl_detiling) {
++  // NC12 (Raspberry Pi NV12_COL128) requires GL detiling - there's no
++  // alternative image processor that supports this format.
++  // Note: NC30 (10-bit COL128) is not yet supported.
++  bool requires_gl_detiling = false;
++  for (const auto& candidate : input_candidates) {
++    if (candidate.fourcc == Fourcc(Fourcc::NC12)) {
++      requires_gl_detiling = true;
++      break;
++    }
++  }
++  VLOGF(1) << "use_gl_scaling=" << use_gl_scaling
++           << ", use_gl_detiling=" << use_gl_detiling
++           << ", requires_gl_detiling=" << requires_gl_detiling;
++
++  if (use_gl_scaling || use_gl_detiling || requires_gl_detiling) {
++    VLOGF(1) << "Attempting GL image processor";
+     auto processor = CreateGLImageProcessorWithInputCandidates(
+         input_candidates, input_visible_rect, output_size, output_storage_type,
+         client_task_runner, out_format_picker, error_cb);
+-    if (processor)
++    if (processor) {
++      VLOGF(1) << "GL image processor created successfully";
+       return processor;
++    }
++    VLOGF(1) << "GL image processor creation failed";
+   }
+ #endif  // defined(ARCH_CPU_ARM_FAMILY)
+ 
+Index: src/media/gpu/chromeos/platform_video_frame_pool.cc
+===================================================================
+--- src.orig/media/gpu/chromeos/platform_video_frame_pool.cc
++++ src/media/gpu/chromeos/platform_video_frame_pool.cc
+@@ -128,7 +128,9 @@ scoped_refptr<FrameResource> PlatformVid
+             format, coded_size, gfx::Rect(GetRectSizeFromOrigin(visible_rect_)),
+             coded_size, use_protected_, *use_linear_buffers_,
+             frame_layout_->fourcc() == Fourcc(Fourcc::MM21) ||
+-                frame_layout_->fourcc() == Fourcc(Fourcc::MT2T),
++                frame_layout_->fourcc() == Fourcc(Fourcc::MT2T) ||
++                frame_layout_->fourcc() == Fourcc(Fourcc::NC12) ||
++                frame_layout_->fourcc() == Fourcc(Fourcc::NC30),
+             base::TimeDelta());
+     if (!new_frame.has_value()) {
+       // TODO(crbug.com/c/1103510) Push the error up instead of dropping it.
+@@ -240,7 +242,8 @@ CroStatus::Or<GpuBufferLayout> PlatformV
+     auto maybe_frame = create_frame_cb_.Run(
+         format, coded_size, visible_rect, natural_size, use_protected,
+         use_linear_buffers,
+-        fourcc == Fourcc(Fourcc::MM21) || fourcc == Fourcc(Fourcc::MT2T),
++        fourcc == Fourcc(Fourcc::MM21) || fourcc == Fourcc(Fourcc::MT2T) ||
++            fourcc == Fourcc(Fourcc::NC12) || fourcc == Fourcc(Fourcc::NC30),
+         base::TimeDelta());
+     if (!maybe_frame.has_value())
+       return std::move(maybe_frame).error();
+Index: src/media/base/media_switches.cc
+===================================================================
+--- src.orig/media/base/media_switches.cc
++++ src/media/base/media_switches.cc
+@@ -1115,7 +1115,7 @@ BASE_FEATURE(kUseGLForScaling, base::FEA
+ // the hardware accelerated video decoder outputs frames in a format not
+ // understood by the display controller. We usually use LibYUV to convert these
+ // frames. This flag enables an experimental GL-based conversion method.
+-BASE_FEATURE(kPreferGLImageProcessor, base::FEATURE_DISABLED_BY_DEFAULT);
++BASE_FEATURE(kPreferGLImageProcessor, base::FEATURE_ENABLED_BY_DEFAULT);
+ // Experimental support for software based MT21 conversion. On some (older)
+ // architectures, the hardware video decoder outputs frames in a pixel format
+ // known as MT21. Normally a hardware block performs to the conversion between
+Index: src/media/gpu/chromeos/gl_image_processor_backend.h
+===================================================================
+--- src.orig/media/gpu/chromeos/gl_image_processor_backend.h
++++ src/media/gpu/chromeos/gl_image_processor_backend.h
+@@ -67,6 +67,12 @@ class MEDIA_GPU_EXPORT GLImageProcessorB
+   GLuint dst_texture_id_ = 0u;
+   GLuint fb_id_ = 0u;
+ 
++  // Uniform locations for NC12 detiling shader
++  GLint nc12_plane_uniform_ = -1;
++  GLint nc12_coded_width_uniform_ = -1;
++  GLint nc12_coded_height_uniform_ = -1;
++  GLint nc12_col_height_uniform_ = -1;
++
+   const static int kTileWidth = 16;
+   const static int kTileHeight = 32;
+ };
+Index: src/media/gpu/v4l2/v4l2_utils.cc
+===================================================================
+--- src.orig/media/gpu/v4l2/v4l2_utils.cc
++++ src/media/gpu/v4l2/v4l2_utils.cc
+@@ -47,6 +47,11 @@
+ #define V4L2_PIX_FMT_AV1_FRAME v4l2_fourcc('A', 'V', '1', 'F')
+ #endif
+ 
++// Raspberry Pi 128-byte column tiled format for hardware video decoder.
++#ifndef V4L2_PIX_FMT_NV12_COL128
++#define V4L2_PIX_FMT_NV12_COL128 v4l2_fourcc('N', 'C', '1', '2')
++#endif
++
+ #define MAKE_V4L2_CODEC_PAIR(codec, suffix) \
+   std::make_pair(codec##_##suffix, codec)
+ 
+@@ -287,6 +292,31 @@ std::optional<VideoFrameLayout> V4L2Form
+                             y_stride_abs * pix_mp.height / 2);
+         DCHECK_EQ(2u, planes.size());
+         break;
++#ifdef V4L2_PIX_FMT_NV12_COL128
++      case V4L2_PIX_FMT_NV12_COL128: {
++        // NV12_COL128: 128-byte column tiled format (Raspberry Pi).
++        // V4L2 bytesperline = column height (Y height + UV height = H*3/2).
++        // V4L2 sizeimage = bytesperline * width (single plane buffer).
++        //
++        // Each column is 128 bytes wide × col_height rows:
++        //   rows [0, H): Y data
++        //   rows [H, H*3/2): interleaved UV data
++        //
++        // We import the entire buffer for both planes with stride=width,
++        // offset=0. The shader handles Y/UV offset within each column.
++        const int32_t col128_stride =
++            static_cast<int32_t>(pix_mp.width);
++        const size_t col128_stride_abs = static_cast<size_t>(col128_stride);
++        const size_t col_height =
++            static_cast<size_t>(pix_mp.plane_fmt[0].bytesperline);
++        const size_t buffer_size = col128_stride_abs * col_height;
++        // Both planes reference the entire buffer at offset 0.
++        planes[0] = ColorPlaneLayout(col128_stride, 0u, buffer_size);
++        planes.emplace_back(col128_stride, 0u, buffer_size);
++        DCHECK_EQ(2u, planes.size());
++        break;
++      }
++#endif
+       case V4L2_PIX_FMT_YUV420:
+       case V4L2_PIX_FMT_YVU420: {
+         // The spec claims that two Cx rows (including padding) is exactly as
+Index: src/media/gpu/v4l2/v4l2_video_decoder_delegate_h265.cc
+===================================================================
+--- src.orig/media/gpu/v4l2/v4l2_video_decoder_delegate_h265.cc
++++ src/media/gpu/v4l2/v4l2_video_decoder_delegate_h265.cc
+@@ -18,6 +18,36 @@
+ 
+ #include "base/logging.h"
+ #include "base/memory/scoped_refptr.h"
++
++// Raspberry Pi HEVC decoder requires V4L2_CID_STATELESS_HEVC_SLICE_PARAMS.
++// Define if not available in kernel headers.
++#ifndef V4L2_CID_STATELESS_HEVC_SLICE_PARAMS
++#define V4L2_CID_STATELESS_HEVC_SLICE_PARAMS (V4L2_CID_CODEC_STATELESS_BASE + 402)
++#endif
++
++#ifndef V4L2_HEVC_SLICE_PARAMS_FLAG_SLICE_SAO_LUMA
++#define V4L2_HEVC_SLICE_PARAMS_FLAG_SLICE_SAO_LUMA (1ULL << 0)
++#define V4L2_HEVC_SLICE_PARAMS_FLAG_SLICE_SAO_CHROMA (1ULL << 1)
++#define V4L2_HEVC_SLICE_PARAMS_FLAG_SLICE_TEMPORAL_MVP_ENABLED (1ULL << 2)
++#define V4L2_HEVC_SLICE_PARAMS_FLAG_MVD_L1_ZERO (1ULL << 3)
++#define V4L2_HEVC_SLICE_PARAMS_FLAG_CABAC_INIT (1ULL << 4)
++#define V4L2_HEVC_SLICE_PARAMS_FLAG_COLLOCATED_FROM_L0 (1ULL << 5)
++#define V4L2_HEVC_SLICE_PARAMS_FLAG_USE_INTEGER_MV (1ULL << 6)
++#define V4L2_HEVC_SLICE_PARAMS_FLAG_SLICE_DEBLOCKING_FILTER_DISABLED (1ULL << 7)
++#define V4L2_HEVC_SLICE_PARAMS_FLAG_SLICE_LOOP_FILTER_ACROSS_SLICES_ENABLED (1ULL << 8)
++#define V4L2_HEVC_SLICE_PARAMS_FLAG_DEPENDENT_SLICE_SEGMENT (1ULL << 9)
++#endif
++
++// Structure for HEVC slice params if not defined in headers
++#ifndef V4L2_HEVC_SLICE_TYPE_B
++#define V4L2_HEVC_SLICE_TYPE_B 0
++#define V4L2_HEVC_SLICE_TYPE_P 1
++#define V4L2_HEVC_SLICE_TYPE_I 2
++#endif
++
++// v4l2_ctrl_hevc_slice_params structure is expected to be defined in
++// kernel headers that have V4L2_CID_STATELESS_HEVC_SLICE_PARAMS support.
++
+ #include "build/build_config.h"
+ #include "media/gpu/macros.h"
+ #include "media/gpu/v4l2/v4l2_decode_surface.h"
+@@ -510,6 +540,12 @@ V4L2VideoDecoderDelegateH265::SubmitFram
+     return Status::kFail;
+   }
+ 
++  // Cache DPB for per-slice ref_idx mapping in SubmitSlice().
++  // Slice params are accumulated per-slice and submitted in SubmitDecode().
++  cached_decode_params_ = v4l2_decode_param;
++  slice_params_list_.clear();
++  cumulative_byte_offset_ = 0;
++
+   return Status::kOk;
+ }
+ 
+@@ -533,8 +569,115 @@ H265Decoder::H265Accelerator::Status V4L
+   scoped_refptr<V4L2DecodeSurface> dec_surface =
+       H265PictureToV4L2DecodeSurface(pic.get());
+ 
+-  // Add the 3-bytes NAL start code.
+-  // TODO: don't do it here, but have it passed from the parser?
++  // Build per-slice params with correct ref_idx mapping and pred_weight_table.
++  struct v4l2_ctrl_hevc_slice_params v4l2_slice_params;
++  memset(&v4l2_slice_params, 0, sizeof(v4l2_slice_params));
++
++  // bit_size and data_byte_offset are absolute from buffer start.
++  // Chrome prepends a 3-byte start code (00 00 01) before each NALU.
++  v4l2_slice_params.bit_size =
++      static_cast<__u32>((cumulative_byte_offset_ + 3 + size) * 8);
++  v4l2_slice_params.data_byte_offset = static_cast<__u32>(
++      cumulative_byte_offset_ + 3 + slice_hdr->header_size +
++      slice_hdr->header_emulation_prevention_bytes);
++
++  // NAL unit header info
++  v4l2_slice_params.nal_unit_type = slice_hdr->nal_unit_type;
++  v4l2_slice_params.nuh_temporal_id_plus1 = slice_hdr->temporal_id + 1;
++
++  // Slice segment header
++  v4l2_slice_params.slice_type = slice_hdr->slice_type;
++  v4l2_slice_params.colour_plane_id = slice_hdr->colour_plane_id;
++  v4l2_slice_params.slice_pic_order_cnt = pic->pic_order_cnt_val_;
++  v4l2_slice_params.num_ref_idx_l0_active_minus1 =
++      slice_hdr->num_ref_idx_l0_active_minus1;
++  v4l2_slice_params.num_ref_idx_l1_active_minus1 =
++      slice_hdr->num_ref_idx_l1_active_minus1;
++  v4l2_slice_params.collocated_ref_idx = slice_hdr->collocated_ref_idx;
++  v4l2_slice_params.five_minus_max_num_merge_cand =
++      slice_hdr->five_minus_max_num_merge_cand;
++  v4l2_slice_params.slice_qp_delta = slice_hdr->slice_qp_delta;
++  v4l2_slice_params.slice_cb_qp_offset = slice_hdr->slice_cb_qp_offset;
++  v4l2_slice_params.slice_cr_qp_offset = slice_hdr->slice_cr_qp_offset;
++  v4l2_slice_params.slice_beta_offset_div2 = slice_hdr->slice_beta_offset_div2;
++  v4l2_slice_params.slice_tc_offset_div2 = slice_hdr->slice_tc_offset_div2;
++  v4l2_slice_params.slice_segment_addr = slice_hdr->slice_segment_address;
++
++  // Short/long term ref pic set sizes (in bits)
++  v4l2_slice_params.short_term_ref_pic_set_size = slice_hdr->st_rps_bits;
++  v4l2_slice_params.long_term_ref_pic_set_size = slice_hdr->lt_rps_bits;
++
++  // Map per-slice reference picture lists to DPB indices.
++  for (size_t i = 0;
++       i < ref_pic_list0.size() && i < V4L2_HEVC_DPB_ENTRIES_NUM_MAX; i++) {
++    v4l2_slice_params.ref_idx_l0[i] = FindDpbIndex(ref_pic_list0[i]);
++  }
++  for (size_t i = 0;
++       i < ref_pic_list1.size() && i < V4L2_HEVC_DPB_ENTRIES_NUM_MAX; i++) {
++    v4l2_slice_params.ref_idx_l1[i] = FindDpbIndex(ref_pic_list1[i]);
++  }
++
++  // Fill pred_weight_table from slice header.
++  const auto& pwt = slice_hdr->pred_weight_table;
++  auto& v4l2_pwt = v4l2_slice_params.pred_weight_table;
++  v4l2_pwt.luma_log2_weight_denom =
++      static_cast<__u8>(pwt.luma_log2_weight_denom);
++  v4l2_pwt.delta_chroma_log2_weight_denom =
++      static_cast<__s8>(pwt.delta_chroma_log2_weight_denom);
++  for (size_t i = 0; i < kMaxRefIdxActive; i++) {
++    v4l2_pwt.delta_luma_weight_l0[i] =
++        static_cast<__s8>(pwt.delta_luma_weight_l0[i]);
++    v4l2_pwt.luma_offset_l0[i] = static_cast<__s8>(pwt.luma_offset_l0[i]);
++    v4l2_pwt.delta_chroma_weight_l0[i][0] =
++        static_cast<__s8>(pwt.delta_chroma_weight_l0[i][0]);
++    v4l2_pwt.delta_chroma_weight_l0[i][1] =
++        static_cast<__s8>(pwt.delta_chroma_weight_l0[i][1]);
++    v4l2_pwt.chroma_offset_l0[i][0] =
++        static_cast<__s8>(pwt.delta_chroma_offset_l0[i][0]);
++    v4l2_pwt.chroma_offset_l0[i][1] =
++        static_cast<__s8>(pwt.delta_chroma_offset_l0[i][1]);
++    v4l2_pwt.delta_luma_weight_l1[i] =
++        static_cast<__s8>(pwt.delta_luma_weight_l1[i]);
++    v4l2_pwt.luma_offset_l1[i] = static_cast<__s8>(pwt.luma_offset_l1[i]);
++    v4l2_pwt.delta_chroma_weight_l1[i][0] =
++        static_cast<__s8>(pwt.delta_chroma_weight_l1[i][0]);
++    v4l2_pwt.delta_chroma_weight_l1[i][1] =
++        static_cast<__s8>(pwt.delta_chroma_weight_l1[i][1]);
++    v4l2_pwt.chroma_offset_l1[i][0] =
++        static_cast<__s8>(pwt.delta_chroma_offset_l1[i][0]);
++    v4l2_pwt.chroma_offset_l1[i][1] =
++        static_cast<__s8>(pwt.delta_chroma_offset_l1[i][1]);
++  }
++
++  // Slice params flags
++#define SET_FLAG_IF(cond, flag) \
++  v4l2_slice_params.flags |= ((cond) ? (flag) : 0)
++  SET_FLAG_IF(slice_hdr->slice_sao_luma_flag,
++              V4L2_HEVC_SLICE_PARAMS_FLAG_SLICE_SAO_LUMA);
++  SET_FLAG_IF(slice_hdr->slice_sao_chroma_flag,
++              V4L2_HEVC_SLICE_PARAMS_FLAG_SLICE_SAO_CHROMA);
++  SET_FLAG_IF(slice_hdr->slice_temporal_mvp_enabled_flag,
++              V4L2_HEVC_SLICE_PARAMS_FLAG_SLICE_TEMPORAL_MVP_ENABLED);
++  SET_FLAG_IF(slice_hdr->mvd_l1_zero_flag,
++              V4L2_HEVC_SLICE_PARAMS_FLAG_MVD_L1_ZERO);
++  SET_FLAG_IF(slice_hdr->cabac_init_flag,
++              V4L2_HEVC_SLICE_PARAMS_FLAG_CABAC_INIT);
++  SET_FLAG_IF(slice_hdr->collocated_from_l0_flag,
++              V4L2_HEVC_SLICE_PARAMS_FLAG_COLLOCATED_FROM_L0);
++  SET_FLAG_IF(slice_hdr->slice_deblocking_filter_disabled_flag,
++              V4L2_HEVC_SLICE_PARAMS_FLAG_SLICE_DEBLOCKING_FILTER_DISABLED);
++  SET_FLAG_IF(slice_hdr->slice_loop_filter_across_slices_enabled_flag,
++              V4L2_HEVC_SLICE_PARAMS_FLAG_SLICE_LOOP_FILTER_ACROSS_SLICES_ENABLED);
++  SET_FLAG_IF(slice_hdr->dependent_slice_segment_flag,
++              V4L2_HEVC_SLICE_PARAMS_FLAG_DEPENDENT_SLICE_SEGMENT);
++#undef SET_FLAG_IF
++
++  slice_params_list_.push_back(v4l2_slice_params);
++
++  // Update cumulative offset: 3-byte start code + NALU data.
++  cumulative_byte_offset_ += 3 + size;
++
++  // Add the 3-bytes NAL start code and append NALU data to the buffer.
+   const size_t data_copy_size = size + 3;
+   if (dec_surface->secure_handle()) {
+     // The secure world already post-processed the secure buffer so that all of
+@@ -563,6 +706,27 @@ H265Decoder::H265Accelerator::Status V4L
+   scoped_refptr<V4L2DecodeSurface> dec_surface =
+       H265PictureToV4L2DecodeSurface(pic.get());
+ 
++  // Submit accumulated slice params as a dynamic array control.
++  if (!slice_params_list_.empty()) {
++    struct v4l2_ext_control ctrl;
++    memset(&ctrl, 0, sizeof(ctrl));
++    ctrl.id = V4L2_CID_STATELESS_HEVC_SLICE_PARAMS;
++    ctrl.size = static_cast<__u32>(
++        slice_params_list_.size() *
++        sizeof(struct v4l2_ctrl_hevc_slice_params));
++    ctrl.ptr = slice_params_list_.data();
++
++    struct v4l2_ext_controls ext_ctrls;
++    memset(&ext_ctrls, 0, sizeof(ext_ctrls));
++    ext_ctrls.count = 1;
++    ext_ctrls.controls = &ctrl;
++    dec_surface->PrepareSetCtrls(&ext_ctrls);
++    if (device_->Ioctl(VIDIOC_S_EXT_CTRLS, &ext_ctrls) != 0) {
++      VPLOGF(1) << "ioctl() failed: VIDIOC_S_EXT_CTRLS for slice params";
++      return Status::kFail;
++    }
++  }
++
+   DVLOGF(4) << "Submitting decode for surface: " << dec_surface->ToString();
+   surface_handler_->DecodeSurface(dec_surface);
+   return Status::kOk;
+@@ -578,6 +742,9 @@ bool V4L2VideoDecoderDelegateH265::Outpu
+ 
+ void V4L2VideoDecoderDelegateH265::Reset() {
+   drop_frame_ = false;
++  slice_params_list_.clear();
++  cumulative_byte_offset_ = 0;
++  memset(&cached_decode_params_, 0, sizeof(cached_decode_params_));
+ }
+ 
+ bool V4L2VideoDecoderDelegateH265::IsChromaSamplingSupported(
+@@ -592,4 +759,17 @@ V4L2VideoDecoderDelegateH265::H265Pictur
+   return v4l2_pic->dec_surface();
+ }
+ 
++uint8_t V4L2VideoDecoderDelegateH265::FindDpbIndex(
++    const scoped_refptr<H265Picture>& pic) const {
++  if (!pic)
++    return 0;
++  for (uint8_t i = 0; i < cached_decode_params_.num_active_dpb_entries; ++i) {
++    if (cached_decode_params_.dpb[i].pic_order_cnt_val ==
++        pic->pic_order_cnt_val_) {
++      return i;
++    }
++  }
++  return 0;
++}
++
+ }  // namespace media
+Index: src/media/gpu/v4l2/v4l2_video_decoder_delegate_h265.h
+===================================================================
+--- src.orig/media/gpu/v4l2/v4l2_video_decoder_delegate_h265.h
++++ src/media/gpu/v4l2/v4l2_video_decoder_delegate_h265.h
+@@ -5,6 +5,8 @@
+ #ifndef MEDIA_GPU_V4L2_V4L2_VIDEO_DECODER_DELEGATE_H265_H_
+ #define MEDIA_GPU_V4L2_V4L2_VIDEO_DECODER_DELEGATE_H265_H_
+ 
++#include <linux/v4l2-controls.h>
++
+ #include <memory>
+ #include <vector>
+ 
+@@ -13,8 +15,6 @@
+ #include "media/gpu/h265_decoder.h"
+ #include "media/gpu/h265_dpb.h"
+ 
+-struct v4l2_ctrl_hevc_decode_params;
+-
+ namespace media {
+ 
+ class V4L2Device;
+@@ -75,12 +75,25 @@ class V4L2VideoDecoderDelegateH265 : pub
+   scoped_refptr<V4L2DecodeSurface> H265PictureToV4L2DecodeSurface(
+       H265Picture* pic);
+ 
++  // Map a reference picture to its DPB index by matching pic_order_cnt_val_.
++  uint8_t FindDpbIndex(const scoped_refptr<H265Picture>& pic) const;
++
+   raw_ptr<V4L2DecodeSurfaceHandler> const surface_handler_;
+   raw_ptr<V4L2Device> const device_;
+ 
+   // Indicate that a frame is dropped because it's not decodable
+   // (RASL frame). This is updated every SubmitFrameMetadata().
+   bool drop_frame_ = false;
++
++  // Accumulated per-slice params for the current frame.
++  std::vector<struct v4l2_ctrl_hevc_slice_params> slice_params_list_;
++
++  // Cumulative byte offset into the source buffer, tracking where the next
++  // slice's data starts. Updated in each SubmitSlice() call.
++  size_t cumulative_byte_offset_ = 0;
++
++  // Cached DPB from SubmitFrameMetadata for POC-to-DPB-index lookup.
++  struct v4l2_ctrl_hevc_decode_params cached_decode_params_ = {};
+ };
+ 
+ }  // namespace media
+Index: src/media/gpu/chromeos/libyuv_image_processor_backend.cc
+===================================================================
+--- src.orig/media/gpu/chromeos/libyuv_image_processor_backend.cc
++++ src/media/gpu/chromeos/libyuv_image_processor_backend.cc
+@@ -65,6 +65,7 @@ static constexpr struct {
+     CONV(YUYV, YU12, kConversion, Supported),
+     CONV(YV12, NV12, kConversion, Supported),
+     CONV(MM21, NV12, kConversion, Supported),
++    CONV(NC12, NV12, kConversion, Supported),
+     CONV(MT2T, P010, kConversion, Supported),
+     // Scaling.
+     CONV(NV12, NV12, kScaling, Supported),
+@@ -447,6 +448,95 @@ int LibYUVImageProcessorBackend::DoConve
+                        input->coded_size().height()));
+         }
+ 
++        // NC12 (NV12_COL128) CPU detiling mode.
++        if (input_config_.fourcc == Fourcc(Fourcc::NC12)) {
++          constexpr int kColWidth = 128;
++          const uint8_t* src = input->data(VideoFrame::Plane::kY);
++          uint8_t* dst_y =
++              output->writable_data(VideoFrame::Plane::kY);
++          uint8_t* dst_uv =
++              output->writable_data(VideoFrame::Plane::kUV);
++          const int coded_width = input->coded_size().width();
++          const int coded_height = input->coded_size().height();
++          const int dst_y_stride =
++              output->stride(VideoFrame::Plane::kY);
++          const int dst_uv_stride =
++              output->stride(VideoFrame::Plane::kUV);
++          const int num_cols = coded_width / kColWidth;
++
++          // Compute col_height from total buffer extent.
++          const auto& in_planes = input->layout().planes();
++          size_t total_size = 0;
++          for (size_t i = 0; i < in_planes.size(); i++) {
++            total_size = std::max(
++                total_size, in_planes[i].offset + in_planes[i].size);
++          }
++          const int col_height =
++              static_cast<int>(total_size / coded_width);
++
++          const int width = std::min(output->coded_size().width(),
++                                     coded_width);
++          const int height = std::min(output->coded_size().height(),
++                                      coded_height);
++          const int uv_height = height / 2;
++
++          // Split into full 128-byte columns and a possible partial
++          // last column.  Using kColWidth directly in memcpy lets the
++          // compiler emit inline NEON load/store instead of a
++          // function call (~16k calls/frame for 1080p).
++          const int full_cols = width / kColWidth;
++          const int last_col_bytes = width - full_cols * kColWidth;
++
++          // Precompute per-column source pointers.  Since
++          // src_offset(L) == L * 128, each column's data is one
++          // contiguous block of col_height * 128 bytes.
++          constexpr int kMaxCols = 32;  // 4K / 128
++          const uint8_t* col_src[kMaxCols];
++          for (int c = 0; c < num_cols && c < kMaxCols; c++) {
++            col_src[c] = src +
++                static_cast<size_t>(c) * col_height * kColWidth;
++          }
++
++          // Detile Y plane — row-major for destination locality,
++          // per-column source pointers advance by 128 (sequential).
++          for (int y = 0; y < height; y++) {
++            uint8_t* dst_row = dst_y + y * dst_y_stride;
++            for (int c = 0; c < full_cols; c++) {
++              __builtin_prefetch(col_src[c] + 4 * kColWidth, 0, 1);
++              memcpy(dst_row, col_src[c], kColWidth);
++              col_src[c] += kColWidth;
++              dst_row += kColWidth;
++            }
++            if (last_col_bytes > 0 && full_cols < num_cols) {
++              memcpy(dst_row, col_src[full_cols], last_col_bytes);
++              col_src[full_cols] += kColWidth;
++            }
++          }
++
++          // Skip remaining Y rows to advance source pointers to UV
++          // data region within each column.
++          for (int c = 0; c < num_cols && c < kMaxCols; c++) {
++            col_src[c] += (coded_height - height) * kColWidth;
++          }
++
++          // Detile UV plane.
++          for (int y = 0; y < uv_height; y++) {
++            uint8_t* dst_row = dst_uv + y * dst_uv_stride;
++            for (int c = 0; c < full_cols; c++) {
++              __builtin_prefetch(col_src[c] + 4 * kColWidth, 0, 1);
++              memcpy(dst_row, col_src[c], kColWidth);
++              col_src[c] += kColWidth;
++              dst_row += kColWidth;
++            }
++            if (last_col_bytes > 0 && full_cols < num_cols) {
++              memcpy(dst_row, col_src[full_cols], last_col_bytes);
++              col_src[full_cols] += kColWidth;
++            }
++          }
++
++          return 0;
++        }
++
+         // Scaling mode.
+         return libyuv::NV12Scale(
+             Y_UV_DATA(input), input->visible_rect().width(),

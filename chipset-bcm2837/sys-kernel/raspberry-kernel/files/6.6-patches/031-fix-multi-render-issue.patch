@@ -1,0 +1,14 @@
+Index: kernel-rpi-6_6/drivers/gpu/drm/v3d/v3d_gem.c
+===================================================================
+--- kernel-rpi-6_6.orig/drivers/gpu/drm/v3d/v3d_gem.c
++++ kernel-rpi-6_6/drivers/gpu/drm/v3d/v3d_gem.c
+@@ -702,8 +702,7 @@ v3d_get_extensions(struct drm_file *file
+ 				return ret;
+ 			break;
+ 		default:
+-			DRM_DEBUG_DRIVER("Unknown extension id: %d\n", ext.id);
+-			return -EINVAL;
++			DRM_ERROR("Unknown extension id: %d\n", ext.id);
+ 		}
+ 
+ 		user_ext = u64_to_user_ptr(ext.next);
