@@ -1,0 +1,175 @@
+Index: v6.12-rpi/drivers/gpu/drm/v3d/v3d_submit.c
+===================================================================
+--- v6.12-rpi.orig/drivers/gpu/drm/v3d/v3d_submit.c
++++ v6.12-rpi/drivers/gpu/drm/v3d/v3d_submit.c
+@@ -1066,7 +1066,6 @@ v3d_submit_cl_ioctl(struct drm_device *d
+ 		}
+ 	}
+ 
+-	mutex_lock(&v3d->sched_lock);
+ 	if (bin) {
+ 		spin_lock_irqsave(&v3d->latest_job_lock, irqflags);
+ 		if (v3d->latest_job
+@@ -1082,6 +1081,10 @@ v3d_submit_cl_ioctl(struct drm_device *d
+ 			if (ret)
+ 				DRM_ERROR("failed to bind bin job to last render job: %d\n", ret);
+ 		}
++	}
++
++	mutex_lock(&v3d->sched_lock);
++	if (bin) {
+ 		bin->base.perfmon = render->base.perfmon;
+ 		v3d_perfmon_get(bin->base.perfmon);
+ 		v3d_push_job(&bin->base);
+Index: v6.12-rpi/drivers/gpu/drm/vc4/vc4_plane.c
+===================================================================
+--- v6.12-rpi.orig/drivers/gpu/drm/vc4/vc4_plane.c
++++ v6.12-rpi/drivers/gpu/drm/vc4/vc4_plane.c
+@@ -2497,44 +2497,86 @@ static void vc4_async_complete_commit(st
+ static void vc4_plane_atomic_async_update(struct drm_plane *plane,
+ 					  struct drm_atomic_state *state)
+ {
+-  struct drm_plane_state *old_plane_state, *new_plane_state;
+-	struct vc4_plane_state *vc4_state;
+-  struct drm_crtc_commit *commit;
++	struct drm_plane_state *new_plane_state = drm_atomic_get_new_plane_state(state,
++										 plane);
++	struct vc4_plane_state *vc4_state, *new_vc4_state;
+ 	int idx;
+-  int i = drm_plane_index(plane);
+-  int delay = ASYNC_UPDATE_DELAY;
+-  int ret = 0;
++	int delay = ASYNC_UPDATE_DELAY;
+ 
+ 	if (!drm_dev_enter(plane->dev, &idx))
+ 		return;
+-  new_plane_state = state->planes[i].new_state;
+-  old_plane_state = state->planes[i].old_state;
+-  commit = old_plane_state->commit;
+-  old_plane_state->state = state;
+-  new_plane_state->state = NULL;
+-  plane->state = new_plane_state;
+-  state->planes[i].state = old_plane_state;
+-  vc4_state = to_vc4_plane_state(old_plane_state);
+-  if (ktime_before(ktime_get(),
+-      ktime_add_ms(vc4_state->update_time, MIN_UPDATE_INTERVAL))) {
+-    if (commit) {
+-      old_plane_state->commit = NULL;
+-      new_plane_state->commit = commit;
+-    }
+-    goto end;
+-  }
+-  ret = vc4_async_setup_commit(plane);
+-  if (ret)
+-    drm_err(plane->dev, "Failed to alloc commit.");
+-  vc4_state = to_vc4_plane_state(plane->state);
+-  vc4_state->update_time = ktime_get();
+-  /* I really hate this stdupid delay, but it fixed the cursor's
+-  *  flashing on the top of screen for raspberry pi 5.
+-  */
+-  if (vc4_state->crtc_y < vc4_state->crtc_h){
+-    mdelay(TOP_CURSOR_STRIP_DELAY);
+-    delay -= TOP_CURSOR_STRIP_DELAY;
+-  }
++
++	/*
++	 * Use the standard DRM in-place update: copy fields from the
++	 * new state into the current plane->state.  The modeset locks
++	 * are held throughout the async commit, so plane->state is
++	 * stable and cannot be swapped by a concurrent modeset.
++	 */
++	swap(plane->state->fb, new_plane_state->fb);
++	plane->state->crtc_x = new_plane_state->crtc_x;
++	plane->state->crtc_y = new_plane_state->crtc_y;
++	plane->state->crtc_w = new_plane_state->crtc_w;
++	plane->state->crtc_h = new_plane_state->crtc_h;
++	plane->state->src_x = new_plane_state->src_x;
++	plane->state->src_y = new_plane_state->src_y;
++	plane->state->src_w = new_plane_state->src_w;
++	plane->state->src_h = new_plane_state->src_h;
++	plane->state->alpha = new_plane_state->alpha;
++	plane->state->pixel_blend_mode = new_plane_state->pixel_blend_mode;
++	plane->state->rotation = new_plane_state->rotation;
++	plane->state->zpos = new_plane_state->zpos;
++	plane->state->normalized_zpos = new_plane_state->normalized_zpos;
++	plane->state->color_encoding = new_plane_state->color_encoding;
++	plane->state->color_range = new_plane_state->color_range;
++	plane->state->src = new_plane_state->src;
++	plane->state->dst = new_plane_state->dst;
++	plane->state->visible = new_plane_state->visible;
++
++	new_vc4_state = to_vc4_plane_state(new_plane_state);
++	vc4_state = to_vc4_plane_state(plane->state);
++
++	/* Rate-limit hardware updates to avoid cursor flashing. */
++	if (ktime_before(ktime_get(),
++			 ktime_add_ms(vc4_state->update_time, MIN_UPDATE_INTERVAL)))
++		goto end;
++
++	vc4_state->crtc_x = new_vc4_state->crtc_x;
++	vc4_state->crtc_y = new_vc4_state->crtc_y;
++	vc4_state->crtc_h = new_vc4_state->crtc_h;
++	vc4_state->crtc_w = new_vc4_state->crtc_w;
++	vc4_state->src_x = new_vc4_state->src_x;
++	vc4_state->src_y = new_vc4_state->src_y;
++	memcpy(vc4_state->src_w, new_vc4_state->src_w,
++	       sizeof(vc4_state->src_w));
++	memcpy(vc4_state->src_h, new_vc4_state->src_h,
++	       sizeof(vc4_state->src_h));
++	memcpy(vc4_state->x_scaling, new_vc4_state->x_scaling,
++	       sizeof(vc4_state->x_scaling));
++	memcpy(vc4_state->y_scaling, new_vc4_state->y_scaling,
++	       sizeof(vc4_state->y_scaling));
++	vc4_state->is_unity = new_vc4_state->is_unity;
++	vc4_state->is_yuv = new_vc4_state->is_yuv;
++	vc4_state->needs_bg_fill = new_vc4_state->needs_bg_fill;
++
++	/* Update the current vc4_state pos0, pos2 and ptr0 dlist entries. */
++	vc4_state->dlist[vc4_state->pos0_offset] =
++		new_vc4_state->dlist[vc4_state->pos0_offset];
++	vc4_state->dlist[vc4_state->pos2_offset] =
++		new_vc4_state->dlist[vc4_state->pos2_offset];
++	vc4_state->dlist[vc4_state->ptr0_offset[0]] =
++		new_vc4_state->dlist[vc4_state->ptr0_offset[0]];
++
++	vc4_state->update_time = ktime_get();
++
++	/*
++	 * Delay cursor writes near the top of screen to avoid flashing
++	 * on Raspberry Pi 5.
++	 */
++	if (vc4_state->crtc_y < vc4_state->crtc_h) {
++		mdelay(TOP_CURSOR_STRIP_DELAY);
++		delay -= TOP_CURSOR_STRIP_DELAY;
++	}
++
+ 	/* Note that we can't just call vc4_plane_write_dlist()
+ 	 * because that would smash the context data that the HVS is
+ 	 * currently using.
+@@ -2545,7 +2587,7 @@ static void vc4_plane_atomic_async_updat
+ 	       &vc4_state->hw_dlist[vc4_state->pos2_offset]);
+ 	writel(vc4_state->dlist[vc4_state->ptr0_offset[0]],
+ 	       &vc4_state->hw_dlist[vc4_state->ptr0_offset[0]]);
+-  vc4_async_complete_commit(plane, delay);
++	vc4_async_complete_commit(plane, delay);
+ end:
+ 	drm_dev_exit(idx);
+ }
+@@ -2561,7 +2603,16 @@ static int vc4_plane_atomic_async_check(
+ 	old_vc4_state = to_vc4_plane_state(plane->state);
+ 	new_vc4_state = to_vc4_plane_state(new_plane_state);
+ 
+-	if (!new_vc4_state->hw_dlist)
++	/*
++	 * Reject async update if dlist_count is 0 (plane not visible) or
++	 * hw_dlist is NULL.  With dlist_count == 0, the dlist pointer may
++	 * be ZERO_SIZE_PTR (0x10) from kmemdup(..., 0), and accessing it
++	 * would fault.  Fall back to a synchronous update instead.
++	 */
++	if (!old_vc4_state->dlist_count || !new_vc4_state->dlist_count)
++		return -EINVAL;
++
++	if (!old_vc4_state->hw_dlist)
+ 		return -EINVAL;
+ 
+ 	if (old_vc4_state->dlist_count != new_vc4_state->dlist_count ||

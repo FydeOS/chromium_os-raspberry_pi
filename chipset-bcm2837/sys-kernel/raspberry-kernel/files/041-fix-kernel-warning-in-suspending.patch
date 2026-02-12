@@ -1,0 +1,528 @@
+Index: v6.12-rpi/arch/arm64/boot/dts/broadcom/bcm2712-rpi-5-b.dts
+===================================================================
+--- v6.12-rpi.orig/arch/arm64/boot/dts/broadcom/bcm2712-rpi-5-b.dts
++++ v6.12-rpi/arch/arm64/boot/dts/broadcom/bcm2712-rpi-5-b.dts
+@@ -427,6 +427,7 @@ dpi_16bit_gpio2:        &rp1_dpi_16bit_g
+ 	vmmc-supply = <&wl_on_reg>;
+ 	sd-uhs-ddr50;
+ 	non-removable;
++	keep-power-in-suspend;
+ 	status = "okay";
+ 	#address-cells = <1>;
+ 	#size-cells = <0>;
+Index: v6.12-rpi/arch/arm64/boot/dts/broadcom/bcm2712-rpi-cm5.dtsi
+===================================================================
+--- v6.12-rpi.orig/arch/arm64/boot/dts/broadcom/bcm2712-rpi-cm5.dtsi
++++ v6.12-rpi/arch/arm64/boot/dts/broadcom/bcm2712-rpi-cm5.dtsi
+@@ -412,6 +412,7 @@ dpi_16bit_gpio2:        &rp1_dpi_16bit_g
+ 	vmmc-supply = <&wl_on_reg>;
+ 	sd-uhs-ddr50;
+ 	non-removable;
++	keep-power-in-suspend;
+ 	status = "okay";
+ 	#address-cells = <1>;
+ 	#size-cells = <0>;
+Index: v6.12-rpi/drivers/gpu/drm/vc4/vc4_hdmi.c
+===================================================================
+--- v6.12-rpi.orig/drivers/gpu/drm/vc4/vc4_hdmi.c
++++ v6.12-rpi/drivers/gpu/drm/vc4/vc4_hdmi.c
+@@ -2556,14 +2556,28 @@ static int vc4_hdmi_audio_init(struct vc
+ 
+ }
+ 
+-static irqreturn_t vc4_hdmi_hpd_irq_thread(int irq, void *priv)
++static void vc4_hdmi_hpd_work(struct work_struct *work)
+ {
+-	struct vc4_hdmi *vc4_hdmi = priv;
++	struct vc4_hdmi *vc4_hdmi = container_of(work, struct vc4_hdmi, hpd_work);
+ 	struct drm_connector *connector = &vc4_hdmi->connector;
+ 	struct drm_device *dev = connector->dev;
+ 
+ 	if (dev && dev->registered && !force_hotplug)
+ 		drm_connector_helper_hpd_irq_event(connector);
++}
++
++static irqreturn_t vc4_hdmi_hpd_irq_thread(int irq, void *priv)
++{
++	struct vc4_hdmi *vc4_hdmi = priv;
++
++	/*
++	 * Defer hotplug processing to a work item.  During system resume
++	 * the I2C adapter for DDC/EDID may still be suspended when this
++	 * IRQ fires.  Workqueue workers are frozen until after all device
++	 * resume callbacks complete, so the work naturally waits for the
++	 * I2C adapter to become available.
++	 */
++	schedule_work(&vc4_hdmi->hpd_work);
+ 
+ 	return IRQ_HANDLED;
+ }
+@@ -2574,6 +2588,8 @@ static int vc4_hdmi_hotplug_init(struct
+ 	struct platform_device *pdev = vc4_hdmi->pdev;
+ 	int ret;
+ 
++	INIT_WORK(&vc4_hdmi->hpd_work, vc4_hdmi_hpd_work);
++
+ 	if (vc4_hdmi->variant->external_irq_controller) {
+ 		unsigned int hpd_con = platform_get_irq_byname(pdev, "hpd-connected");
+ 		unsigned int hpd_rm = platform_get_irq_byname(pdev, "hpd-removed");
+@@ -3513,6 +3529,7 @@ static void vc4_hdmi_unbind(struct devic
+ {
+ 	struct vc4_hdmi *vc4_hdmi = dev_get_drvdata(dev);
+ 
++	cancel_work_sync(&vc4_hdmi->hpd_work);
+ 	mutex_destroy(&vc4_hdmi->update_plugged_status_lock);
+ }
+ 
+Index: v6.12-rpi/drivers/gpu/drm/vc4/vc4_hdmi.h
+===================================================================
+--- v6.12-rpi.orig/drivers/gpu/drm/vc4/vc4_hdmi.h
++++ v6.12-rpi/drivers/gpu/drm/vc4/vc4_hdmi.h
+@@ -249,6 +249,17 @@ struct vc4_hdmi {
+ 	struct snd_soc_jack hdmi_jack;
+   struct snd_soc_jack_pin hdmi_jack_pin;
+   enum drm_connector_status last_connector_result;
++
++	/**
++	 * @hpd_work: Work item for deferred hotplug detection.
++	 *
++	 * During system resume the hotplug IRQ can fire before dependent
++	 * devices (such as the I2C adapter used for DDC/EDID) have
++	 * finished resuming.  Deferring to a work item avoids this race
++	 * because workqueue workers are frozen until after all device
++	 * resume callbacks have completed.
++	 */
++	struct work_struct hpd_work;
+ };
+ 
+ #define connector_to_vc4_hdmi(_connector)				\
+Index: v6.12-rpi/drivers/net/ethernet/cadence/macb_main.c
+===================================================================
+--- v6.12-rpi.orig/drivers/net/ethernet/cadence/macb_main.c
++++ v6.12-rpi/drivers/net/ethernet/cadence/macb_main.c
+@@ -89,6 +89,7 @@ struct sifive_fu540_macb_mgmt {
+ #define MACB_NETIF_LSO		NETIF_F_TSO
+ 
+ #define MACB_WOL_ENABLED		BIT(0)
++#define MACB_WOL_IRQ_WAKE		BIT(1)
+ 
+ #define HS_SPEED_10000M			4
+ #define MACB_SERDES_RATE_10G		1
+@@ -5471,8 +5472,11 @@ static int __maybe_unused macb_suspend(s
+ 			tmp |= MACB_BFEXT(IP, be32_to_cpu(ifa->ifa_local));
+ 		}
+ 
++		spin_unlock_irqrestore(&bp->lock, flags);
++
+ 		/* Change interrupt handler and
+-		 * Enable WoL IRQ on queue 0
++		 * Enable WoL IRQ on queue 0.
++		 * free_irq/request_irq sleep, so must be outside spinlock.
+ 		 */
+ 		devm_free_irq(dev, bp->queues[0].irq, bp->queues);
+ 		if (macb_is_gem(bp)) {
+@@ -5482,11 +5486,8 @@ static int __maybe_unused macb_suspend(s
+ 				dev_err(dev,
+ 					"Unable to request IRQ %d (error %d)\n",
+ 					bp->queues[0].irq, err);
+-				spin_unlock_irqrestore(&bp->lock, flags);
+ 				return err;
+ 			}
+-			queue_writel(bp->queues, IER, GEM_BIT(WOL));
+-			gem_writel(bp, WOL, tmp);
+ 		} else {
+ 			err = devm_request_irq(dev, bp->queues[0].irq, macb_wol_interrupt,
+ 					       IRQF_SHARED, netdev->name, bp->queues);
+@@ -5494,15 +5495,22 @@ static int __maybe_unused macb_suspend(s
+ 				dev_err(dev,
+ 					"Unable to request IRQ %d (error %d)\n",
+ 					bp->queues[0].irq, err);
+-				spin_unlock_irqrestore(&bp->lock, flags);
+ 				return err;
+ 			}
++		}
++
++		spin_lock_irqsave(&bp->lock, flags);
++		if (macb_is_gem(bp)) {
++			queue_writel(bp->queues, IER, GEM_BIT(WOL));
++			gem_writel(bp, WOL, tmp);
++		} else {
+ 			queue_writel(bp->queues, IER, MACB_BIT(WOL));
+ 			macb_writel(bp, WOL, tmp);
+ 		}
+ 		spin_unlock_irqrestore(&bp->lock, flags);
+ 
+-		enable_irq_wake(bp->queues[0].irq);
++		if (!enable_irq_wake(bp->queues[0].irq))
++			bp->wol |= MACB_WOL_IRQ_WAKE;
+ 	}
+ 
+ 	netif_device_detach(netdev);
+@@ -5567,7 +5575,11 @@ static int __maybe_unused macb_resume(st
+ 		queue_readl(bp->queues, ISR);
+ 		if (bp->caps & MACB_CAPS_ISR_CLEAR_ON_WRITE)
+ 			queue_writel(bp->queues, ISR, -1);
+-		/* Replace interrupt handler on queue 0 */
++		spin_unlock_irqrestore(&bp->lock, flags);
++
++		/* Replace interrupt handler on queue 0.
++		 * free_irq/request_irq sleep, so must be outside spinlock.
++		 */
+ 		devm_free_irq(dev, bp->queues[0].irq, bp->queues);
+ 		err = devm_request_irq(dev, bp->queues[0].irq, macb_interrupt,
+ 				       IRQF_SHARED, netdev->name, bp->queues);
+@@ -5575,12 +5587,13 @@ static int __maybe_unused macb_resume(st
+ 			dev_err(dev,
+ 				"Unable to request IRQ %d (error %d)\n",
+ 				bp->queues[0].irq, err);
+-			spin_unlock_irqrestore(&bp->lock, flags);
+ 			return err;
+ 		}
+-		spin_unlock_irqrestore(&bp->lock, flags);
+ 
+-		disable_irq_wake(bp->queues[0].irq);
++		if (bp->wol & MACB_WOL_IRQ_WAKE) {
++			disable_irq_wake(bp->queues[0].irq);
++			bp->wol &= ~MACB_WOL_IRQ_WAKE;
++		}
+ 
+ 		/* Now make sure we disable phy before moving
+ 		 * to common restore path
+Index: v6.12-rpi/drivers/tty/serial/amba-pl011.c
+===================================================================
+--- v6.12-rpi.orig/drivers/tty/serial/amba-pl011.c
++++ v6.12-rpi/drivers/tty/serial/amba-pl011.c
+@@ -2873,6 +2873,17 @@ static int pl011_resume(struct device *d
+ 	if (!uap)
+ 		return -EINVAL;
+ 
++	/*
++	 * When console_suspend is disabled, uart_suspend_port() returns
++	 * early without shutting down the hardware or setting the
++	 * suspended flag.  Calling uart_resume_port() in that case still
++	 * runs set_termios() which can hang on the pl011-axi variant
++	 * during resume, causing a watchdog reset.  Skip the resume if
++	 * the port was never actually suspended.
++	 */
++	if (!uap->port.suspended)
++		return 0;
++
+ 	return uart_resume_port(&amba_reg, &uap->port);
+ }
+ #endif
+Index: v6.12-rpi/drivers/mfd/rp1.c
+===================================================================
+--- v6.12-rpi.orig/drivers/mfd/rp1.c
++++ v6.12-rpi/drivers/mfd/rp1.c
+@@ -70,9 +70,11 @@ struct rp1_dev {
+ 	resource_size_t bar_start;
+ 	resource_size_t bar_end;
+ 	struct clk *sys_clk;
++	struct reset_control *reset;
+ 	struct irq_domain *domain;
+ 	struct irq_data *pcie_irqds[64];
+ 	void __iomem *msix_cfg_regs;
++	u32 msix_cfg_saved[RP1_IRQS];
+ };
+ 
+ static bool rp1_level_triggered_irq[RP1_ACTUAL_IRQS] = { 0 };
+@@ -262,6 +264,12 @@ static int rp1_probe(struct pci_dev *pde
+ 		return PTR_ERR(reset);
+ 	reset_control_reset(reset);
+ 
++	/* Allocate rp1 early so we can stash the reset handle for resume */
++	rp1 = devm_kzalloc(&pdev->dev, sizeof(*rp1), GFP_KERNEL);
++	if (!rp1)
++		return -ENOMEM;
++	rp1->reset = reset;
++
+ 	dump_bar(pdev, 0);
+ 	dump_bar(pdev, 1);
+ 
+@@ -288,10 +296,6 @@ static int rp1_probe(struct pci_dev *pde
+ 		return err;
+ 	}
+ 
+-	rp1 = devm_kzalloc(&pdev->dev, sizeof(*rp1), GFP_KERNEL);
+-	if (!rp1)
+-		return -ENOMEM;
+-
+ 	rp1->pdev = pdev;
+ 	rp1->dev = &pdev->dev;
+ 
+@@ -356,6 +360,50 @@ static void rp1_remove(struct pci_dev *p
+ 	clk_unregister(rp1->sys_clk);
+ }
+ 
++static int rp1_suspend(struct device *dev)
++{
++	struct rp1_dev *rp1 = dev_get_drvdata(dev);
++	int i;
++
++	for (i = 0; i < RP1_IRQS; i++)
++		rp1->msix_cfg_saved[i] = readl(rp1->msix_cfg_regs + MSIX_CFG(i));
++
++	return 0;
++}
++
++static int rp1_resume(struct device *dev)
++{
++	struct rp1_dev *rp1 = dev_get_drvdata(dev);
++	u32 chip_id;
++	int i, retries;
++
++	/* Re-trigger RP1 firmware initialisation after PCIe power cycle */
++	reset_control_reset(rp1->reset);
++
++	/*
++	 * Wait for RP1 firmware to finish initialising after power-on.
++	 * The firmware writes the chip ID to SYSINFO when ready.
++	 */
++	for (retries = 0; retries < 100; retries++) {
++		chip_id = rp1_reg_read(rp1, RP1_SYSINFO_BASE,
++				       SYSINFO_CHIP_ID_OFFSET);
++		if (chip_id == RP1_C0_CHIP_ID)
++			break;
++		msleep(10);
++	}
++	if (chip_id != RP1_C0_CHIP_ID)
++		dev_warn(rp1->dev,
++			 "RP1 firmware not ready after resume (chip_id=0x%x)\n",
++			 chip_id);
++
++	for (i = 0; i < RP1_IRQS; i++)
++		writel(rp1->msix_cfg_saved[i], rp1->msix_cfg_regs + MSIX_CFG(i));
++
++	return 0;
++}
++
++static DEFINE_SIMPLE_DEV_PM_OPS(rp1_pm_ops, rp1_suspend, rp1_resume);
++
+ static const struct pci_device_id dev_id_table[] = {
+ 	{ PCI_DEVICE(PCI_VENDOR_ID_RPI, PCI_DEVICE_ID_RP1_C0), },
+ 	{ 0, }
+@@ -366,6 +414,7 @@ static struct pci_driver rp1_driver = {
+ 	.id_table	= dev_id_table,
+ 	.probe		= rp1_probe,
+ 	.remove		= rp1_remove,
++	.driver.pm	= pm_sleep_ptr(&rp1_pm_ops),
+ };
+ 
+ module_pci_driver(rp1_driver);
+Index: v6.12-rpi/drivers/pinctrl/pinctrl-rp1.c
+===================================================================
+--- v6.12-rpi.orig/drivers/pinctrl/pinctrl-rp1.c
++++ v6.12-rpi/drivers/pinctrl/pinctrl-rp1.c
+@@ -286,6 +286,13 @@ struct rp1_pinctrl {
+ 	struct pinctrl_gpio_range gpio_range;
+ 
+ 	raw_spinlock_t irq_lock[RP1_NUM_BANKS];
++
++	/* Saved state for suspend/resume */
++	u32 gpio_ctrl_saved[RP1_NUM_GPIOS];
++	u32 pad_saved[RP1_NUM_GPIOS];
++	u32 rio_out_saved[RP1_NUM_BANKS];
++	u32 rio_oe_saved[RP1_NUM_BANKS];
++	u32 inte_saved[RP1_NUM_BANKS];
+ };
+ 
+ const struct rp1_iobank_desc rp1_iobanks[RP1_NUM_BANKS] = {
+@@ -1675,6 +1682,72 @@ out_iounmap:
+ 	return err;
+ }
+ 
++static int rp1_pinctrl_suspend(struct device *dev)
++{
++	struct rp1_pinctrl *pc = dev_get_drvdata(dev);
++	int i;
++
++	for (i = 0; i < RP1_NUM_GPIOS; i++) {
++		struct rp1_pin_info *pin = &pc->pins[i];
++
++		pc->gpio_ctrl_saved[i] = readl(pin->gpio + RP1_GPIO_CTRL);
++		pc->pad_saved[i] = readl(pin->pad);
++	}
++
++	for (i = 0; i < RP1_NUM_BANKS; i++) {
++		const struct rp1_iobank_desc *bank = &rp1_iobanks[i];
++		void __iomem *rio = pc->rio_base + bank->rio_offset;
++
++		pc->rio_out_saved[i] = readl(rio + RP1_RIO_OUT);
++		pc->rio_oe_saved[i] = readl(rio + RP1_RIO_OE);
++		pc->inte_saved[i] = readl(pc->gpio_base + bank->inte_offset);
++	}
++
++	return 0;
++}
++
++static int rp1_pinctrl_resume(struct device *dev)
++{
++	struct rp1_pinctrl *pc = dev_get_drvdata(dev);
++	int i;
++
++	/* Restore pad configs first (drive strength, pull, etc.) */
++	for (i = 0; i < RP1_NUM_GPIOS; i++) {
++		struct rp1_pin_info *pin = &pc->pins[i];
++
++		writel(pc->pad_saved[i], pin->pad);
++	}
++
++	/* Restore output values before enabling outputs */
++	for (i = 0; i < RP1_NUM_BANKS; i++) {
++		const struct rp1_iobank_desc *bank = &rp1_iobanks[i];
++		void __iomem *rio = pc->rio_base + bank->rio_offset;
++
++		writel(pc->rio_out_saved[i], rio + RP1_RIO_OUT);
++		writel(pc->rio_oe_saved[i], rio + RP1_RIO_OE);
++	}
++
++	/* Restore GPIO mux and control (funcsel, overrides, irq enables) */
++	for (i = 0; i < RP1_NUM_GPIOS; i++) {
++		struct rp1_pin_info *pin = &pc->pins[i];
++
++		writel(pc->gpio_ctrl_saved[i], pin->gpio + RP1_GPIO_CTRL);
++	}
++
++	/* Restore interrupt enables */
++	for (i = 0; i < RP1_NUM_BANKS; i++) {
++		const struct rp1_iobank_desc *bank = &rp1_iobanks[i];
++
++		writel(pc->inte_saved[i], pc->gpio_base + bank->inte_offset);
++	}
++
++	return 0;
++}
++
++static DEFINE_SIMPLE_DEV_PM_OPS(rp1_pinctrl_pm_ops,
++				rp1_pinctrl_suspend,
++				rp1_pinctrl_resume);
++
+ static void rp1_pinctrl_remove(struct platform_device *pdev)
+ {
+ 	struct rp1_pinctrl *pc = platform_get_drvdata(pdev);
+@@ -1690,6 +1763,7 @@ static struct platform_driver rp1_pinctr
+ 		.name = MODULE_NAME,
+ 		.of_match_table = rp1_pinctrl_match,
+ 		.suppress_bind_attrs = true,
++		.pm = pm_sleep_ptr(&rp1_pinctrl_pm_ops),
+ 	},
+ };
+ builtin_platform_driver(rp1_pinctrl_driver);
+Index: v6.12-rpi/drivers/usb/dwc3/host.c
+===================================================================
+--- v6.12-rpi.orig/drivers/usb/dwc3/host.c
++++ v6.12-rpi/drivers/usb/dwc3/host.c
+@@ -79,6 +79,7 @@ static void dwc3_xhci_plat_start(struct
+ 
+ static const struct xhci_plat_priv dwc3_xhci_plat_quirk = {
+ 	.plat_start = dwc3_xhci_plat_start,
++	.quirks = BIT_ULL(7), /* XHCI_RESET_ON_RESUME */
+ };
+ 
+ static void dwc3_host_fill_xhci_irq_res(struct dwc3 *dwc,
+Index: v6.12-rpi/drivers/usb/dwc3/core.c
+===================================================================
+--- v6.12-rpi.orig/drivers/usb/dwc3/core.c
++++ v6.12-rpi/drivers/usb/dwc3/core.c
+@@ -2575,6 +2575,25 @@ static int dwc3_resume_common(struct dwc
+ 		dwc3_enable_susphy(dwc, dwc->susphy_state);
+ 	}
+ 
++	/*
++	 * Save DWC3 global register state after resume init completes.
++	 * The xHCI child device resumes after us, and its HCRST may
++	 * reset DWC3 global registers. We restore them in dwc3_complete()
++	 * which runs after all children have resumed.
++	 */
++	if (dwc->current_dr_role == DWC3_GCTL_PRTCAP_HOST &&
++	    !PMSG_IS_AUTO(msg)) {
++		dwc->saved_gctl = dwc3_readl(dwc->regs, DWC3_GCTL);
++		dwc->saved_gusb3pipectl0 = dwc3_readl(dwc->regs,
++						       DWC3_GUSB3PIPECTL(0));
++		dwc->saved_gusb2phycfg0 = dwc3_readl(dwc->regs,
++						      DWC3_GUSB2PHYCFG(0));
++		dwc->saved_gtxthrcfg = dwc3_readl(dwc->regs, DWC3_GTXTHRCFG);
++		dwc->saved_grxthrcfg = dwc3_readl(dwc->regs, DWC3_GRXTHRCFG);
++		dwc->saved_gsbuscfg0 = dwc3_readl(dwc->regs, DWC3_GSBUSCFG0);
++		dwc->saved_gsbuscfg1 = dwc3_readl(dwc->regs, DWC3_GSBUSCFG1);
++	}
++
+ 	return 0;
+ }
+ 
+@@ -2696,10 +2715,55 @@ out:
+ 	return ret;
+ }
+ 
++/*
++ * Helper to check a single DWC3 register against saved value, restore
++ * if changed, and log the discrepancy. Returns true if restored.
++ */
++static bool dwc3_check_and_restore_reg(struct dwc3 *dwc, u32 offset,
++					u32 saved, const char *name)
++{
++	u32 cur = dwc3_readl(dwc->regs, offset);
++
++	if (cur != saved) {
++		dev_warn(dwc->dev, "%s changed after xHCI resume: 0x%08x -> 0x%08x, restoring\n",
++			 name, saved, cur);
++		dwc3_writel(dwc->regs, offset, saved);
++		return true;
++	}
++	return false;
++}
++
+ static void dwc3_complete(struct device *dev)
+ {
+ 	struct dwc3	*dwc = dev_get_drvdata(dev);
+ 	u32		reg;
++	bool		restored = false;
++
++	/*
++	 * For host mode, the xHCI child has now completed its resume
++	 * (including HCRST for RESET_ON_RESUME). Check if HCRST has
++	 * inadvertently reset DWC3 global registers, and restore them.
++	 */
++	if (dwc->current_dr_role == DWC3_GCTL_PRTCAP_HOST &&
++	    dwc->saved_gctl) {
++		restored |= dwc3_check_and_restore_reg(dwc, DWC3_GCTL,
++				dwc->saved_gctl, "GCTL");
++		restored |= dwc3_check_and_restore_reg(dwc, DWC3_GUSB3PIPECTL(0),
++				dwc->saved_gusb3pipectl0, "GUSB3PIPECTL");
++		restored |= dwc3_check_and_restore_reg(dwc, DWC3_GUSB2PHYCFG(0),
++				dwc->saved_gusb2phycfg0, "GUSB2PHYCFG");
++		restored |= dwc3_check_and_restore_reg(dwc, DWC3_GTXTHRCFG,
++				dwc->saved_gtxthrcfg, "GTXTHRCFG");
++		restored |= dwc3_check_and_restore_reg(dwc, DWC3_GRXTHRCFG,
++				dwc->saved_grxthrcfg, "GRXTHRCFG");
++		restored |= dwc3_check_and_restore_reg(dwc, DWC3_GSBUSCFG0,
++				dwc->saved_gsbuscfg0, "GSBUSCFG0");
++		restored |= dwc3_check_and_restore_reg(dwc, DWC3_GSBUSCFG1,
++				dwc->saved_gsbuscfg1, "GSBUSCFG1");
++
++		if (!restored)
++			dev_info(dwc->dev, "DWC3 regs intact after xHCI resume\n");
++	}
+ 
+ 	if (dwc->current_dr_role == DWC3_GCTL_PRTCAP_HOST &&
+ 			dwc->dis_split_quirk) {
+Index: v6.12-rpi/drivers/usb/dwc3/core.h
+===================================================================
+--- v6.12-rpi.orig/drivers/usb/dwc3/core.h
++++ v6.12-rpi/drivers/usb/dwc3/core.h
+@@ -1409,6 +1409,15 @@ struct dwc3 {
+ 	unsigned		suspended:1;
+ 	unsigned		susphy_state:1;
+ 
++	/* Saved DWC3 global register values for post-xHCI-resume restore */
++	u32			saved_gctl;
++	u32			saved_gusb3pipectl0;
++	u32			saved_gusb2phycfg0;
++	u32			saved_gtxthrcfg;
++	u32			saved_grxthrcfg;
++	u32			saved_gsbuscfg0;
++	u32			saved_gsbuscfg1;
++
+ 	u16			imod_interval;
+ 
+ 	int			max_cfg_eps;
