@@ -1,7 +1,7 @@
-Index: v6.12-rpi/drivers/gpu/drm/v3d/v3d_submit.c
+Index: kernel-rpi/drivers/gpu/drm/v3d/v3d_submit.c
 ===================================================================
---- v6.12-rpi.orig/drivers/gpu/drm/v3d/v3d_submit.c
-+++ v6.12-rpi/drivers/gpu/drm/v3d/v3d_submit.c
+--- kernel-rpi.orig/drivers/gpu/drm/v3d/v3d_submit.c
++++ kernel-rpi/drivers/gpu/drm/v3d/v3d_submit.c
 @@ -1066,7 +1066,6 @@ v3d_submit_cl_ioctl(struct drm_device *d
  		}
  	}
@@ -21,10 +21,10 @@ Index: v6.12-rpi/drivers/gpu/drm/v3d/v3d_submit.c
  		bin->base.perfmon = render->base.perfmon;
  		v3d_perfmon_get(bin->base.perfmon);
  		v3d_push_job(&bin->base);
-Index: v6.12-rpi/drivers/gpu/drm/vc4/vc4_plane.c
+Index: kernel-rpi/drivers/gpu/drm/vc4/vc4_plane.c
 ===================================================================
---- v6.12-rpi.orig/drivers/gpu/drm/vc4/vc4_plane.c
-+++ v6.12-rpi/drivers/gpu/drm/vc4/vc4_plane.c
+--- kernel-rpi.orig/drivers/gpu/drm/vc4/vc4_plane.c
++++ kernel-rpi/drivers/gpu/drm/vc4/vc4_plane.c
 @@ -2497,44 +2497,86 @@ static void vc4_async_complete_commit(st
  static void vc4_plane_atomic_async_update(struct drm_plane *plane,
  					  struct drm_atomic_state *state)

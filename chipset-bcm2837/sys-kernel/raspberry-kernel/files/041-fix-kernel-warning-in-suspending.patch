@@ -1,7 +1,7 @@
-Index: v6.12-rpi/arch/arm64/boot/dts/broadcom/bcm2712-rpi-5-b.dts
+Index: kernel-rpi/arch/arm64/boot/dts/broadcom/bcm2712-rpi-5-b.dts
 ===================================================================
---- v6.12-rpi.orig/arch/arm64/boot/dts/broadcom/bcm2712-rpi-5-b.dts
-+++ v6.12-rpi/arch/arm64/boot/dts/broadcom/bcm2712-rpi-5-b.dts
+--- kernel-rpi.orig/arch/arm64/boot/dts/broadcom/bcm2712-rpi-5-b.dts
++++ kernel-rpi/arch/arm64/boot/dts/broadcom/bcm2712-rpi-5-b.dts
 @@ -427,6 +427,7 @@ dpi_16bit_gpio2:        &rp1_dpi_16bit_g
  	vmmc-supply = <&wl_on_reg>;
  	sd-uhs-ddr50;
@@ -10,10 +10,10 @@ Index: v6.12-rpi/arch/arm64/boot/dts/broadcom/bcm2712-rpi-5-b.dts
  	status = "okay";
  	#address-cells = <1>;
  	#size-cells = <0>;
-Index: v6.12-rpi/arch/arm64/boot/dts/broadcom/bcm2712-rpi-cm5.dtsi
+Index: kernel-rpi/arch/arm64/boot/dts/broadcom/bcm2712-rpi-cm5.dtsi
 ===================================================================
---- v6.12-rpi.orig/arch/arm64/boot/dts/broadcom/bcm2712-rpi-cm5.dtsi
-+++ v6.12-rpi/arch/arm64/boot/dts/broadcom/bcm2712-rpi-cm5.dtsi
+--- kernel-rpi.orig/arch/arm64/boot/dts/broadcom/bcm2712-rpi-cm5.dtsi
++++ kernel-rpi/arch/arm64/boot/dts/broadcom/bcm2712-rpi-cm5.dtsi
 @@ -412,6 +412,7 @@ dpi_16bit_gpio2:        &rp1_dpi_16bit_g
  	vmmc-supply = <&wl_on_reg>;
  	sd-uhs-ddr50;
@@ -22,10 +22,10 @@ Index: v6.12-rpi/arch/arm64/boot/dts/broadcom/bcm2712-rpi-cm5.dtsi
  	status = "okay";
  	#address-cells = <1>;
  	#size-cells = <0>;
-Index: v6.12-rpi/drivers/gpu/drm/vc4/vc4_hdmi.c
+Index: kernel-rpi/drivers/gpu/drm/vc4/vc4_hdmi.c
 ===================================================================
---- v6.12-rpi.orig/drivers/gpu/drm/vc4/vc4_hdmi.c
-+++ v6.12-rpi/drivers/gpu/drm/vc4/vc4_hdmi.c
+--- kernel-rpi.orig/drivers/gpu/drm/vc4/vc4_hdmi.c
++++ kernel-rpi/drivers/gpu/drm/vc4/vc4_hdmi.c
 @@ -2556,14 +2556,28 @@ static int vc4_hdmi_audio_init(struct vc
  
  }
@@ -74,10 +74,10 @@ Index: v6.12-rpi/drivers/gpu/drm/vc4/vc4_hdmi.c
  	mutex_destroy(&vc4_hdmi->update_plugged_status_lock);
  }
  
-Index: v6.12-rpi/drivers/gpu/drm/vc4/vc4_hdmi.h
+Index: kernel-rpi/drivers/gpu/drm/vc4/vc4_hdmi.h
 ===================================================================
---- v6.12-rpi.orig/drivers/gpu/drm/vc4/vc4_hdmi.h
-+++ v6.12-rpi/drivers/gpu/drm/vc4/vc4_hdmi.h
+--- kernel-rpi.orig/drivers/gpu/drm/vc4/vc4_hdmi.h
++++ kernel-rpi/drivers/gpu/drm/vc4/vc4_hdmi.h
 @@ -249,6 +249,17 @@ struct vc4_hdmi {
  	struct snd_soc_jack hdmi_jack;
    struct snd_soc_jack_pin hdmi_jack_pin;
@@ -96,10 +96,10 @@ Index: v6.12-rpi/drivers/gpu/drm/vc4/vc4_hdmi.h
  };
  
  #define connector_to_vc4_hdmi(_connector)				\
-Index: v6.12-rpi/drivers/net/ethernet/cadence/macb_main.c
+Index: kernel-rpi/drivers/net/ethernet/cadence/macb_main.c
 ===================================================================
---- v6.12-rpi.orig/drivers/net/ethernet/cadence/macb_main.c
-+++ v6.12-rpi/drivers/net/ethernet/cadence/macb_main.c
+--- kernel-rpi.orig/drivers/net/ethernet/cadence/macb_main.c
++++ kernel-rpi/drivers/net/ethernet/cadence/macb_main.c
 @@ -89,6 +89,7 @@ struct sifive_fu540_macb_mgmt {
  #define MACB_NETIF_LSO		NETIF_F_TSO
  
@@ -188,10 +188,10 @@ Index: v6.12-rpi/drivers/net/ethernet/cadence/macb_main.c
  
  		/* Now make sure we disable phy before moving
  		 * to common restore path
-Index: v6.12-rpi/drivers/tty/serial/amba-pl011.c
+Index: kernel-rpi/drivers/tty/serial/amba-pl011.c
 ===================================================================
---- v6.12-rpi.orig/drivers/tty/serial/amba-pl011.c
-+++ v6.12-rpi/drivers/tty/serial/amba-pl011.c
+--- kernel-rpi.orig/drivers/tty/serial/amba-pl011.c
++++ kernel-rpi/drivers/tty/serial/amba-pl011.c
 @@ -2873,6 +2873,17 @@ static int pl011_resume(struct device *d
  	if (!uap)
  		return -EINVAL;
@@ -210,10 +210,10 @@ Index: v6.12-rpi/drivers/tty/serial/amba-pl011.c
  	return uart_resume_port(&amba_reg, &uap->port);
  }
  #endif
-Index: v6.12-rpi/drivers/mfd/rp1.c
+Index: kernel-rpi/drivers/mfd/rp1.c
 ===================================================================
---- v6.12-rpi.orig/drivers/mfd/rp1.c
-+++ v6.12-rpi/drivers/mfd/rp1.c
+--- kernel-rpi.orig/drivers/mfd/rp1.c
++++ kernel-rpi/drivers/mfd/rp1.c
 @@ -70,9 +70,11 @@ struct rp1_dev {
  	resource_size_t bar_start;
  	resource_size_t bar_end;
@@ -309,10 +309,10 @@ Index: v6.12-rpi/drivers/mfd/rp1.c
  };
  
  module_pci_driver(rp1_driver);
-Index: v6.12-rpi/drivers/pinctrl/pinctrl-rp1.c
+Index: kernel-rpi/drivers/pinctrl/pinctrl-rp1.c
 ===================================================================
---- v6.12-rpi.orig/drivers/pinctrl/pinctrl-rp1.c
-+++ v6.12-rpi/drivers/pinctrl/pinctrl-rp1.c
+--- kernel-rpi.orig/drivers/pinctrl/pinctrl-rp1.c
++++ kernel-rpi/drivers/pinctrl/pinctrl-rp1.c
 @@ -286,6 +286,13 @@ struct rp1_pinctrl {
  	struct pinctrl_gpio_range gpio_range;
  
@@ -408,10 +408,10 @@ Index: v6.12-rpi/drivers/pinctrl/pinctrl-rp1.c
  	},
  };
  builtin_platform_driver(rp1_pinctrl_driver);
-Index: v6.12-rpi/drivers/usb/dwc3/host.c
+Index: kernel-rpi/drivers/usb/dwc3/host.c
 ===================================================================
---- v6.12-rpi.orig/drivers/usb/dwc3/host.c
-+++ v6.12-rpi/drivers/usb/dwc3/host.c
+--- kernel-rpi.orig/drivers/usb/dwc3/host.c
++++ kernel-rpi/drivers/usb/dwc3/host.c
 @@ -79,6 +79,7 @@ static void dwc3_xhci_plat_start(struct
  
  static const struct xhci_plat_priv dwc3_xhci_plat_quirk = {
@@ -420,10 +420,10 @@ Index: v6.12-rpi/drivers/usb/dwc3/host.c
  };
  
  static void dwc3_host_fill_xhci_irq_res(struct dwc3 *dwc,
-Index: v6.12-rpi/drivers/usb/dwc3/core.c
+Index: kernel-rpi/drivers/usb/dwc3/core.c
 ===================================================================
---- v6.12-rpi.orig/drivers/usb/dwc3/core.c
-+++ v6.12-rpi/drivers/usb/dwc3/core.c
+--- kernel-rpi.orig/drivers/usb/dwc3/core.c
++++ kernel-rpi/drivers/usb/dwc3/core.c
 @@ -2575,6 +2575,25 @@ static int dwc3_resume_common(struct dwc
  		dwc3_enable_susphy(dwc, dwc->susphy_state);
  	}
@@ -506,10 +506,10 @@ Index: v6.12-rpi/drivers/usb/dwc3/core.c
  
  	if (dwc->current_dr_role == DWC3_GCTL_PRTCAP_HOST &&
  			dwc->dis_split_quirk) {
-Index: v6.12-rpi/drivers/usb/dwc3/core.h
+Index: kernel-rpi/drivers/usb/dwc3/core.h
 ===================================================================
---- v6.12-rpi.orig/drivers/usb/dwc3/core.h
-+++ v6.12-rpi/drivers/usb/dwc3/core.h
+--- kernel-rpi.orig/drivers/usb/dwc3/core.h
++++ kernel-rpi/drivers/usb/dwc3/core.h
 @@ -1409,6 +1409,15 @@ struct dwc3 {
  	unsigned		suspended:1;
  	unsigned		susphy_state:1;

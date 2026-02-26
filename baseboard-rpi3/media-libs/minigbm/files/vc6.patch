@@ -10,7 +10,7 @@ Index: minigbm/drv.c
  #ifdef __ANDROID__
  #include <cutils/log.h>
  #include <libgen.h>
-@@ -40,6 +39,9 @@ extern const struct backend backend_msm;
+@@ -43,6 +42,9 @@ extern const struct backend backend_msm;
  #ifdef DRV_VC4
  extern const struct backend backend_vc4;
  #endif
@@ -20,9 +20,9 @@ Index: minigbm/drv.c
  
  // Dumb / generic drivers
  extern const struct backend backend_evdi;
-@@ -71,6 +73,9 @@ static const struct backend *drv_backend
- #ifdef DRV_VC4
- 	&backend_vc4,
+@@ -77,6 +79,9 @@ static const struct backend *drv_backend
+ #ifdef DRV_XE
+ 	&backend_xe,
  #endif
 +#ifdef DRV_V3D
 +  &backend_v3d,
@@ -30,7 +30,7 @@ Index: minigbm/drv.c
  	&backend_evdi,	    &backend_komeda,	&backend_marvell, &backend_mediatek,
  	&backend_meson,	    &backend_nouveau,	&backend_radeon,  &backend_rockchip,
  	&backend_sun4i_drm, &backend_synaptics, &backend_udl,	  &backend_virtgpu,
-@@ -101,6 +106,9 @@ static const struct backend *drv_get_bac
+@@ -107,6 +112,9 @@ static const struct backend *drv_get_bac
  		const struct backend *b = drv_backend_list[i];
  		if (!strcmp(drm_version->name, b->name)) {
  			drmFreeVersion(drm_version);
@@ -40,7 +40,7 @@ Index: minigbm/drv.c
  			return b;
  		}
  	}
-@@ -213,7 +221,14 @@ struct combination *drv_get_combination(
+@@ -220,7 +228,14 @@ struct combination *drv_get_combination(
  			if (!best || best->metadata.priority < curr->metadata.priority)
  				best = curr;
  	}
@@ -56,7 +56,7 @@ Index: minigbm/drv.c
  	return best;
  }
  
-@@ -499,7 +514,6 @@ void *drv_bo_map(struct bo *bo, const st
+@@ -509,7 +524,6 @@ void *drv_bo_map(struct bo *bo, const st
  
  	if (bo->is_test_buffer)
  		return MAP_FAILED;
@@ -64,7 +64,7 @@ Index: minigbm/drv.c
  	mapping.rect = *rect;
  	mapping.refcount = 1;
  
-@@ -533,6 +547,7 @@ void *drv_bo_map(struct bo *bo, const st
+@@ -543,6 +557,7 @@ void *drv_bo_map(struct bo *bo, const st
  	if (!mapping.vma) {
  		*map_data = NULL;
  		pthread_mutex_unlock(&drv->mappings_lock);
@@ -72,7 +72,7 @@ Index: minigbm/drv.c
  		return MAP_FAILED;
  	}
  
-@@ -542,6 +557,7 @@ void *drv_bo_map(struct bo *bo, const st
+@@ -552,6 +567,7 @@ void *drv_bo_map(struct bo *bo, const st
  		*map_data = NULL;
  		free(mapping.vma);
  		pthread_mutex_unlock(&drv->mappings_lock);
@@ -356,7 +356,7 @@ Index: minigbm/v3d.c
 ===================================================================
 --- /dev/null
 +++ minigbm/v3d.c
-@@ -0,0 +1,214 @@
+@@ -0,0 +1,236 @@
 +/*
 + * Copyright 2019 The FydeOS Authors. All rights reserved.
 + * Use of this source code is governed by a BSD-style license that can be
@@ -455,9 +455,30 @@ Index: minigbm/v3d.c
 +  struct drm_v3d_create_bo bo_create;
 +  memset(&bo_create, 0, sizeof(bo_create));
 +  stride = drv_stride_from_format(format, width, 0);
-+  stride = ALIGN(stride, 64);
-+  if (format == DRM_FORMAT_YVU420_ANDROID || use_flags & (BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER))
++  switch (format) {
++  case DRM_FORMAT_YVU420:
++  case DRM_FORMAT_NV12:
++  case DRM_FORMAT_NV21:
++  case DRM_FORMAT_P010:
++  case DRM_FORMAT_YVU420_ANDROID:
++    /* Use 32-byte stride alignment for YUV formats to match V4L2
++     * video decoder stride alignment. 64-byte alignment would cause
++     * a stride mismatch (e.g. 768 vs 736 for 720-wide video).
++     */
++    stride = ALIGN(stride, 32);
++    break;
++  default:
++    stride = ALIGN(stride, 64);
++    break;
++  }
++  if (format == DRM_FORMAT_YVU420_ANDROID)
 +    algin_height = bo->meta.height;
++  else if (use_flags & (BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER))
++    /* The VPU firmware aligns the Y plane height to 16 rows for YUV
++     * formats.  Match this so the UV plane offset and total buffer
++     * size are correct (e.g. 1080p: ALIGN(1080,16)=1088).
++     */
++    algin_height = ALIGN(height, 16);
 +  else
 +    algin_height = ALIGN(height, 8);
 +  drv_bo_from_format(bo, stride, 1, algin_height, format);
@@ -563,6 +584,7 @@ Index: minigbm/v3d.c
 +  .bo_create = v3d_bo_create,
 +  .bo_import = drv_prime_bo_import,
 +  .bo_destroy = drv_gem_bo_destroy,
++  .bo_export = drv_prime_bo_export,
 +  .bo_map = v3d_bo_map,
 +  .bo_unmap = v3d_bo_unmap,
 +  .bo_invalidate = v3d_bo_invalidate,
@@ -575,7 +597,7 @@ Index: minigbm/vc4.c
 ===================================================================
 --- minigbm.orig/vc4.c
 +++ /dev/null
-@@ -1,136 +0,0 @@
+@@ -1,137 +0,0 @@
 -/*
 - * Copyright 2017 The Chromium OS Authors. All rights reserved.
 - * Use of this source code is governed by a BSD-style license that can be
@@ -705,6 +727,7 @@ Index: minigbm/vc4.c
 -	.bo_create = vc4_bo_create,
 -	.bo_create_with_modifiers = vc4_bo_create_with_modifiers,
 -	.bo_import = drv_prime_bo_import,
+-	.bo_export = drv_prime_bo_export,
 -	.bo_destroy = drv_gem_bo_destroy,
 -	.bo_map = vc4_bo_map,
 -	.bo_unmap = drv_bo_munmap,
@@ -716,7 +739,7 @@ Index: minigbm/dumb_driver.c
 ===================================================================
 --- minigbm.orig/dumb_driver.c
 +++ minigbm/dumb_driver.c
-@@ -30,7 +30,7 @@ static const uint32_t scanout_render_for
+@@ -31,7 +31,7 @@ static const uint32_t scanout_render_for
  						   DRM_FORMAT_BGR888,	DRM_FORMAT_RGB565 };
  
  static const uint32_t texture_only_formats[] = { DRM_FORMAT_R8, DRM_FORMAT_NV12, DRM_FORMAT_NV21,
@@ -725,7 +748,7 @@ Index: minigbm/dumb_driver.c
  
  static int dumb_driver_init(struct driver *drv)
  {
-@@ -44,9 +44,11 @@ static int dumb_driver_init(struct drive
+@@ -45,9 +45,11 @@ static int dumb_driver_init(struct drive
  			       BO_USE_HW_VIDEO_ENCODER | BO_USE_HW_VIDEO_DECODER |
  				   BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE |
  				   BO_USE_GPU_DATA_BUFFER | BO_USE_SENSOR_DIRECT_DATA);
@@ -738,7 +761,7 @@ Index: minigbm/dumb_driver.c
  	drv_modify_combination(drv, DRM_FORMAT_NV21, &LINEAR_METADATA, BO_USE_HW_VIDEO_ENCODER);
  
  	return drv_modify_linear_combinations(drv);
-@@ -73,6 +75,9 @@ INIT_DUMB_DRIVER(radeon)
+@@ -74,6 +76,9 @@ INIT_DUMB_DRIVER(radeon)
  INIT_DUMB_DRIVER_WITH_NAME(sun4i_drm, "sun4i-drm")
  INIT_DUMB_DRIVER(synaptics)
  INIT_DUMB_DRIVER(udl)
@@ -748,3 +771,55 @@ Index: minigbm/dumb_driver.c
  INIT_DUMB_DRIVER(vkms)
  
  #ifndef DRV_ROCKCHIP
+Index: minigbm/drv_helpers.c
+===================================================================
+--- minigbm.orig/drv_helpers.c
++++ minigbm/drv_helpers.c
+@@ -369,7 +369,16 @@ int drv_dumb_bo_create_ex(struct bo *bo,
+ 	case DRM_FORMAT_NV12:
+ 	case DRM_FORMAT_NV21:
+ 	case DRM_FORMAT_P010:
+-		/* Adjust the height to include room for chroma planes */
++		/* Align width to 32 pixels to match V4L2 video decoder stride
++		 * alignment. The default 64-byte llvmpipe tile alignment would
++		 * cause a stride mismatch (e.g. 768 vs 736 for 720-wide video).
++		 */
++		aligned_width = ALIGN(width, 32);
++		/* The VPU firmware aligns the Y plane height to 16 rows.
++		 * Use the aligned height so the UV plane offset and total
++		 * buffer size match the firmware layout.
++		 */
++		height = ALIGN(height, 16);
+ 		aligned_height = 3 * DIV_ROUND_UP(height, 2);
+ 		break;
+ 	default:
+@@ -381,10 +390,26 @@ int drv_dumb_bo_create_ex(struct bo *bo,
+ 		    DIV_ROUND_UP(aligned_width * layout_from_format(format)->bytes_per_pixel[0], 4);
+ 		create_dumb.bpp = 32;
+ 	} else {
+-		/* Align for llvmpipe 64-byte tile size for dumb_driver */
+-		aligned_width = ALIGN(aligned_width, MESA_LLVMPIPE_TILE_SIZE);
+-		aligned_height = ALIGN(aligned_height, MESA_LLVMPIPE_TILE_SIZE);
+ 		create_dumb.bpp = layout_from_format(format)->bytes_per_pixel[0] * 8;
++		/*
++		 * Skip llvmpipe 64-byte tile alignment for multi-planar YUV
++		 * formats used by V4L2 video decoders, which use 32-byte stride
++		 * alignment. Applying 64-byte alignment here would cause a
++		 * stride mismatch (e.g. 768 vs 736 for 720-wide video).
++		 */
++		switch (format) {
++		case DRM_FORMAT_YVU420:
++		case DRM_FORMAT_NV12:
++		case DRM_FORMAT_NV21:
++		case DRM_FORMAT_P010:
++		case DRM_FORMAT_YVU420_ANDROID:
++			break;
++		default:
++			/* Align for llvmpipe 64-byte tile size for dumb_driver */
++			aligned_width = ALIGN(aligned_width, MESA_LLVMPIPE_TILE_SIZE);
++			aligned_height = ALIGN(aligned_height, MESA_LLVMPIPE_TILE_SIZE);
++			break;
++		}
+ 	}
+ 	create_dumb.width = aligned_width;
+ 	create_dumb.height = aligned_height;

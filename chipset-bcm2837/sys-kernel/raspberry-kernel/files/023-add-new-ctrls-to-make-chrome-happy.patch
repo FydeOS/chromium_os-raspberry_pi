@@ -80,7 +80,22 @@ Index: kernel-rpi/drivers/media/platform/raspberrypi/hevc_dec/hevc_d_video.c
 ===================================================================
 --- kernel-rpi.orig/drivers/media/platform/raspberrypi/hevc_dec/hevc_d_video.c
 +++ kernel-rpi/drivers/media/platform/raspberrypi/hevc_dec/hevc_d_video.c
-@@ -284,30 +284,21 @@ static u32 pixelformat_from_sps(const st
+@@ -157,9 +157,12 @@ static void hevc_d_prepare_dst_format(st
+ 		height = ALIGN(height, 8);
+ 
+ 		/* column height
+-		 * Accept suggested shape if at least min & < 2 * min
++		 * Accept suggested shape if at least min & < 2 * min.
++		 * Align to 32 to match bcm2835-codec ISP bytesperline_align
++		 * so that the column stride is consistent when the ISP
++		 * converts NC12 to NV12.
+ 		 */
+-		bytesperline = constrain2x(bytesperline, height * 3 / 2);
++		bytesperline = ALIGN(constrain2x(bytesperline, height * 3 / 2), 32);
+ 		sizeimage = bytesperline * width;
+ 		break;
+ 
+@@ -284,30 +287,21 @@ static u32 pixelformat_from_sps(const st
  				const int index)
  {
  	static const u32 all_formats[] = {
@@ -117,7 +132,7 @@ Index: kernel-rpi/drivers/media/platform/raspberrypi/hevc_dec/hevc_d_video.c
  		}
  	}
  
-@@ -432,12 +423,12 @@ static int hevc_d_s_fmt_vid_cap(struct f
+@@ -432,12 +426,12 @@ static int hevc_d_s_fmt_vid_cap(struct f
  				struct v4l2_format *f)
  {
  	struct hevc_d_ctx *ctx = hevc_d_file2ctx(file);
@@ -134,7 +149,7 @@ Index: kernel-rpi/drivers/media/platform/raspberrypi/hevc_dec/hevc_d_video.c
  
  	ret = hevc_d_try_fmt_vid_cap(file, priv, f);
  	if (ret)
-@@ -453,12 +444,12 @@ static int hevc_d_s_fmt_vid_out(struct f
+@@ -453,12 +447,12 @@ static int hevc_d_s_fmt_vid_out(struct f
  				struct v4l2_format *f)
  {
  	struct hevc_d_ctx *ctx = hevc_d_file2ctx(file);
@@ -151,7 +166,7 @@ Index: kernel-rpi/drivers/media/platform/raspberrypi/hevc_dec/hevc_d_video.c
  
  	ret = hevc_d_try_fmt_vid_out(file, priv, f);
  	if (ret)
-@@ -472,19 +463,49 @@ static int hevc_d_s_fmt_vid_out(struct f
+@@ -472,19 +466,49 @@ static int hevc_d_s_fmt_vid_out(struct f
  	return 0;
  }
  

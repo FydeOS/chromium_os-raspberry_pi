@@ -1,0 +1,820 @@
+Index: src/media/gpu/chromeos/video_decoder_pipeline.cc
+===================================================================
+--- src.orig/media/gpu/chromeos/video_decoder_pipeline.cc
++++ src/media/gpu/chromeos/video_decoder_pipeline.cc
+@@ -25,6 +25,7 @@
+ #include "media/base/media_switches.h"
+ #include "media/base/media_util.h"
+ #include "media/gpu/chromeos/dmabuf_video_frame_pool.h"
++#include "media/gpu/chromeos/fourcc.h"
+ #include "media/gpu/chromeos/frame_registry.h"
+ #include "media/gpu/chromeos/image_processor.h"
+ #include "media/gpu/chromeos/image_processor_factory.h"
+@@ -42,6 +43,9 @@
+ #elif BUILDFLAG(USE_V4L2_CODEC)
+ #include "media/gpu/v4l2/v4l2_stateful_video_decoder.h"
+ #include "media/gpu/v4l2/v4l2_video_decoder.h"
++#if defined(ARCH_CPU_ARM_FAMILY)
++#include "media/gpu/v4l2/vcsm_cma_utils.h"
++#endif
+ #else
+ #error Either VA-API or V4L2 must be used for decode acceleration on Chrome OS.
+ #endif
+@@ -494,20 +498,27 @@ VideoDecoderPipeline::~VideoDecoderPipel
+ 
+   decoder_weak_this_factory_.InvalidateWeakPtrs();
+ 
+-  // Destroy |frame_converter_| before |main_frame_pool_| and |decoder| because
+-  // the former may have a raw pointer to the latter (in the unwrap-frame
+-  // callback).
++  // Destroy |frame_converter_| before |decoder_| because the former may have a
++  // raw pointer to the latter (in the unwrap-frame callback).
+   //
+   // TODO(andrescj): consider making the unwrap-frame callback work with WeakPtr
+   // instead.
+   frame_converter_.reset();
+-  main_frame_pool_.reset();
+ #if BUILDFLAG(IS_CHROMEOS)
+   // We must release |buffer_transcryptor_| before the decoder because it holds
+   // a raw pointer to |decoder_|.
+   buffer_transcryptor_.reset();
+ #endif  // BUILDFLAG(IS_CHROMEOS)
++  // Destroy the decoder early to release the hardware (e.g. HEVC single-
++  // instance /dev/video-dec1) before the potentially slow ISP and frame pool
++  // teardown.  The image processor and pools do not hold raw pointers to the
++  // decoder, so this reordering is safe.
+   decoder_.reset();
++  // Destroy image processor before the frame pools, as it may hold references
++  // to frames from the auxiliary pool.
++  image_processor_.reset();
++  auxiliary_frame_pool_.reset();
++  main_frame_pool_.reset();
+ }
+ 
+ // static
+@@ -680,7 +691,7 @@ void VideoDecoderPipeline::InitializeTas
+   if (frame_converter_->UsesGetOriginalFrameCB()) {
+     FrameResourceConverter::GetOriginalFrameCB get_original_frame_cb;
+ 
+-    if (uses_oop_video_decoder_) {
++    if (uses_oop_video_decoder_ && !main_frame_pool_) {
+       // Note: base::Unretained() is safe because either a) |decoder_| outlives
+       // the |frame_converter_| or b) we call
+       // |frame_converter_|->set_get_original_frame_cb() with a null
+@@ -764,6 +775,12 @@ void VideoDecoderPipeline::OnInitializeD
+     if (!fallback_create_decoder_function_cb_.is_null()) {
+       MEDIA_LOG(INFO, media_log_)
+           << "Primary decoder failed, trying fallback decoder";
++      // The fallback decoder (e.g. stateless HEVC) runs in-process and needs
++      // a frame pool for PickDecoderOutputFormat / image processor output.
++      if (!main_frame_pool_) {
++        main_frame_pool_ = std::make_unique<PlatformVideoFramePool>();
++        main_frame_pool_->set_parent_task_runner(decoder_task_runner_);
++      }
+       decoder_ = std::move(fallback_create_decoder_function_cb_)
+                      .Run(media_log_->Clone(), decoder_task_runner_,
+                           decoder_weak_this_);
+@@ -946,7 +963,7 @@ void VideoDecoderPipeline::OnFrameDecode
+   }
+ #endif  // BUILDFLAG(IS_CHROMEOS)
+ 
+-  if (uses_oop_video_decoder_) {
++  if (uses_oop_video_decoder_ && !main_frame_pool_) {
+     oop_decoder_can_read_without_stalling_.store(
+         decoder_->CanReadWithoutStalling(), std::memory_order_seq_cst);
+   }
+@@ -1128,7 +1145,6 @@ VideoDecoderPipeline::PickDecoderOutputF
+   // is the largest amount of reference frames seen, on an ITU-T H.264 test
+   // vector (CAPCM*1_Sand_E.h264).
+   CHECK_LE(num_codec_reference_frames, 32u);
+-  CHECK(!uses_oop_video_decoder_);
+ 
+   if (candidates.empty())
+     return CroStatus::Codes::kNoDecoderOutputFormatCandidates;
+@@ -1359,6 +1375,27 @@ VideoDecoderPipeline::PickDecoderOutputF
+         *allocator, VideoFrame::STORAGE_DMABUFS);
+ #endif
+ 
++#if BUILDFLAG(USE_V4L2_CODEC) && defined(ARCH_CPU_ARM_FAMILY)
++    // On RPi4, the bcm2835-codec-isp image processor cannot import DMABUFs
++    // allocated by minigbm's V3D backend. Use VCSM-CMA to allocate decoder
++    // output buffers so they are accessible by both the HEVC decoder and ISP.
++    VLOGF(1) << "Image processor input fourcc: "
++             << image_processor->input_config().fourcc.ToString();
++    if (image_processor->input_config().fourcc == Fourcc(Fourcc::NC12)) {
++      auto vcsm_allocator = base::MakeRefCounted<VcsmCmaAllocator>();
++      if (vcsm_allocator->IsValid()) {
++        VLOGF(1) << "Using VCSM-CMA allocator for NC12 auxiliary frame pool";
++        auxiliary_frame_pool_->AsPlatformVideoFramePool()
++            ->SetCustomFrameAllocator(
++                base::BindRepeating(&VcsmCmaAllocator::CreateFrame,
++                                    std::move(vcsm_allocator)),
++                VideoFrame::STORAGE_DMABUFS);
++      } else {
++        VLOGF(1) << "VCSM-CMA not available, using default allocator";
++      }
++    }
++#endif
++
+     CroStatus::Or<GpuBufferLayout> status_or_layout =
+         auxiliary_frame_pool_->Initialize(
+             image_processor->input_config().fourcc,
+@@ -1384,9 +1421,15 @@ VideoDecoderPipeline::PickDecoderOutputF
+   // TODO(b/270990622): Add VD renderer buffer count parameter and plumb it back
+   // to clients
+ #if BUILDFLAG(USE_V4L2_CODEC)
+-  const size_t kMinImageProcessorOutputFramePoolSize = 10;
+-  num_buffers = std::max<size_t>(estimated_num_buffers_for_renderer_,
+-                                 kMinImageProcessorOutputFramePoolSize);
++  if (need_aux_frame_pool) {
++    // When using an auxiliary frame pool (e.g. RPi4 HEVC via ISP), the ISP
++    // output buffer count should match the decoder CAPTURE queue size.
++    num_buffers = num_codec_reference_frames + 2;
++  } else {
++    const size_t kMinImageProcessorOutputFramePoolSize = 10;
++    num_buffers = std::max<size_t>(estimated_num_buffers_for_renderer_,
++                                   kMinImageProcessorOutputFramePoolSize);
++  }
+ #else
+   num_buffers = estimated_num_buffers_for_renderer_;
+ #endif
+Index: src/media/gpu/sandbox/hardware_video_decoding_sandbox_hook_linux.cc
+===================================================================
+--- src.orig/media/gpu/sandbox/hardware_video_decoding_sandbox_hook_linux.cc
++++ src/media/gpu/sandbox/hardware_video_decoding_sandbox_hook_linux.cc
+@@ -175,6 +175,13 @@ bool HardwareVideoDecodingPreSandboxHook
+   // Files needed for protected DMA allocations.
+   static const char kDmaHeapPath[] = "/dev/dma_heap/restricted_mtk_cma";
+   permissions.push_back(BrokerFilePermission::ReadWrite(kDmaHeapPath));
++
++  // VCSM-CMA device for Raspberry Pi 4. Needed to allocate buffers accessible
++  // by both ARM CPU and VideoCore firmware for the bcm2835-codec-isp image
++  // processor.
++  static const char kVcsmCmaPath[] = "/dev/vcsm-cma";
++  permissions.push_back(BrokerFilePermission::ReadWrite(kVcsmCmaPath));
++
+   return true;
+ #else
+   NOTREACHED();
+Index: src/media/gpu/v4l2/BUILD.gn
+===================================================================
+--- src.orig/media/gpu/v4l2/BUILD.gn
++++ src/media/gpu/v4l2/BUILD.gn
+@@ -73,6 +73,8 @@ source_set("v4l2") {
+       "mt21/mt21_decompressor.cc",
+       "mt21/mt21_decompressor.h",
+       "mt21/mt21_util.h",
++      "vcsm_cma_utils.cc",
++      "vcsm_cma_utils.h",
+     ]
+   }
+ 
+Index: src/media/gpu/v4l2/vcsm_cma_utils.cc
+===================================================================
+--- /dev/null
++++ src/media/gpu/v4l2/vcsm_cma_utils.cc
+@@ -0,0 +1,225 @@
++// Copyright 2024 The FydeOS Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#include "media/gpu/v4l2/vcsm_cma_utils.h"
++
++#include <fcntl.h>
++#include <linux/ioctl.h>
++#include <string.h>
++#include <sys/ioctl.h>
++#include <unistd.h>
++
++#include <vector>
++
++#include "base/logging.h"
++#include "base/posix/eintr_wrapper.h"
++#include "media/base/color_plane_layout.h"
++#include "media/base/video_frame_layout.h"
++#include "media/base/video_types.h"
++#include "media/gpu/chromeos/native_pixmap_frame_resource.h"
++#include "media/gpu/macros.h"
++#include "ui/gfx/native_pixmap_handle.h"
++
++namespace media {
++
++namespace {
++
++// VCSM-CMA ioctl definitions from the RPi kernel.
++// Copied from linux/broadcom/vc_sm_cma_ioctl.h to avoid kernel header
++// dependency.
++
++constexpr uint32_t kVcSmCmaResourceNameLen = 32;
++constexpr char kVcSmCmaMagicType = 'J';
++constexpr uint32_t kVcSmCmaCmdAlloc = 0x5A;
++
++// Cache type: no caching (DMA coherent).
++constexpr uint32_t kVcSmCmaCacheNone = 0;
++
++struct VcSmCmaIoctlAlloc {
++  // user -> kernel
++  uint32_t size;
++  uint32_t num;
++  uint32_t cached;
++  uint32_t pad;
++  uint8_t name[kVcSmCmaResourceNameLen];
++  // kernel -> user
++  int32_t handle;       // DMABUF fd
++  uint32_t vc_handle;   // VideoCore handle
++  uint64_t dma_addr;    // DMA address
++};
++
++// The kernel uses _IOR (matching the actual driver implementation).
++#define VCSM_CMA_IOCTL_MEM_ALLOC \
++  _IOR(kVcSmCmaMagicType, kVcSmCmaCmdAlloc, struct VcSmCmaIoctlAlloc)
++
++constexpr const char kVcsmCmaDevicePath[] = "/dev/vcsm-cma";
++
++template <typename T>
++constexpr T AlignUp(T value, T alignment) {
++  return (value + alignment - 1) & ~(alignment - 1);
++}
++
++}  // namespace
++
++VcsmCmaAllocator::VcsmCmaAllocator() {
++  vcsm_fd_.reset(HANDLE_EINTR(open(kVcsmCmaDevicePath, O_RDWR | O_CLOEXEC)));
++  if (!vcsm_fd_.is_valid()) {
++    VPLOG(1) << "Failed to open " << kVcsmCmaDevicePath;
++  } else {
++    VLOGF(1) << "Opened " << kVcsmCmaDevicePath << " fd=" << vcsm_fd_.get();
++  }
++}
++
++VcsmCmaAllocator::~VcsmCmaAllocator() {
++  VLOGF(1) << "VcsmCmaAllocator destroyed: total_allocs=" << alloc_count_.load()
++           << " still_alive=" << alive_count_.load();
++  if (alive_count_.load() > 0) {
++    LOG(WARNING) << "VCSM-CMA: " << alive_count_.load()
++                 << " buffers still alive at allocator destruction";
++  }
++}
++
++bool VcsmCmaAllocator::IsValid() const {
++  return vcsm_fd_.is_valid();
++}
++
++base::ScopedFD VcsmCmaAllocator::AllocateBuffer(uint32_t size,
++                                                 const char* name) {
++  if (!IsValid()) {
++    LOG(ERROR) << "VCSM-CMA device not open";
++    return base::ScopedFD();
++  }
++
++  VcSmCmaIoctlAlloc alloc = {};
++  alloc.size = size;
++  alloc.num = 1;
++  alloc.cached = kVcSmCmaCacheNone;
++  if (name) {
++    strncpy(reinterpret_cast<char*>(alloc.name), name,
++            kVcSmCmaResourceNameLen - 1);
++  }
++
++  int ret =
++      HANDLE_EINTR(ioctl(vcsm_fd_.get(), VCSM_CMA_IOCTL_MEM_ALLOC, &alloc));
++  if (ret < 0) {
++    VPLOG(1) << "VCSM_CMA_IOCTL_MEM_ALLOC failed for size=" << size;
++    return base::ScopedFD();
++  }
++
++  int alloc_id = alloc_count_.fetch_add(1) + 1;
++  VLOGF(1) << "VCSM-CMA allocated: size=" << size
++           << " dmabuf_fd=" << alloc.handle << " vc_handle=0x" << std::hex
++           << alloc.vc_handle << " dma_addr=0x" << alloc.dma_addr
++           << std::dec << " alloc_id=" << alloc_id;
++
++  return base::ScopedFD(alloc.handle);
++}
++
++CroStatus::Or<scoped_refptr<FrameResource>> VcsmCmaAllocator::CreateFrame(
++    VideoPixelFormat format,
++    const gfx::Size& coded_size,
++    const gfx::Rect& visible_rect,
++    const gfx::Size& natural_size,
++    bool use_protected,
++    bool use_linear_buffers,
++    bool needs_detiling,
++    base::TimeDelta timestamp) {
++  if (format != PIXEL_FORMAT_NV12) {
++    LOG(ERROR) << "VCSM-CMA allocator only supports NV12, got "
++               << VideoPixelFormatToString(format);
++    return CroStatus::Codes::kFailedToCreateVideoFrame;
++  }
++
++  if (use_protected) {
++    LOG(ERROR) << "VCSM-CMA does not support protected buffers";
++    return CroStatus::Codes::kFailedToCreateVideoFrame;
++  }
++
++  const size_t width = static_cast<size_t>(coded_size.width());
++  const size_t height = static_cast<size_t>(coded_size.height());
++
++  // NC12 (NV12_COL128) buffer layout matching the RPi kernel drivers:
++  //   width aligned to 128 bytes (column width)
++  //   height aligned to 8 lines
++  //   column_height = ALIGN(aligned_height * 3/2, 32)
++  //     Both the HEVC decoder (hevc_d) and the ISP (bcm2835-codec) align
++  //     the column height (bytesperline) to 32 so the column stride is
++  //     consistent between the decoder output and ISP input.
++  //   sizeimage = column_height * aligned_width
++  const size_t aligned_width = AlignUp<size_t>(width, 128);
++  const size_t aligned_height = AlignUp<size_t>(height, 8);
++  const size_t column_height = AlignUp<size_t>(aligned_height * 3 / 2, 32);
++  const size_t total_size =
++      AlignUp<size_t>(column_height * aligned_width, 4096);
++
++  VLOGF(2) << "VCSM-CMA frame: " << width << "x" << height
++           << " aligned=" << aligned_width << "x" << aligned_height
++           << " column_height=" << column_height
++           << " total=" << total_size;
++
++  base::ScopedFD dmabuf_fd = AllocateBuffer(total_size, "video-frame");
++  if (!dmabuf_fd.is_valid()) {
++    LOG(ERROR) << "Failed to allocate VCSM-CMA buffer of " << total_size
++               << " bytes";
++    return CroStatus::Codes::kFailedToCreateVideoFrame;
++  }
++
++  // Build the plane layout using NC12 convention: both planes reference the
++  // entire buffer at offset 0.  The ISP / decoder driver handles Y/UV
++  // separation internally within the 128-byte column tiled layout.
++  std::vector<ColorPlaneLayout> planes;
++  planes.emplace_back(aligned_width, /*offset=*/static_cast<size_t>(0),
++                      total_size);
++  planes.emplace_back(aligned_width, /*offset=*/static_cast<size_t>(0),
++                      total_size);
++
++  auto layout = VideoFrameLayout::CreateWithPlanes(
++      format, coded_size, std::move(planes),
++      VideoFrameLayout::kBufferAddressAlignment,
++      gfx::NativePixmapHandle::kNoModifier);
++  if (!layout) {
++    LOG(ERROR) << "Failed to create VideoFrameLayout";
++    return CroStatus::Codes::kFailedToCreateVideoFrame;
++  }
++
++  // Two fds for the two NV12 color planes (Y and UV), both pointing to the
++  // same underlying VCSM-CMA DMABUF at offset 0.  NativePixmapFrameResource
++  // requires one fd per layout plane.
++  base::ScopedFD dmabuf_fd_dup(HANDLE_EINTR(dup(dmabuf_fd.get())));
++  if (!dmabuf_fd_dup.is_valid()) {
++    VPLOG(1) << "Failed to dup VCSM-CMA dmabuf fd";
++    return CroStatus::Codes::kFailedToCreateVideoFrame;
++  }
++  std::vector<base::ScopedFD> dmabuf_fds;
++  dmabuf_fds.push_back(std::move(dmabuf_fd));
++  dmabuf_fds.push_back(std::move(dmabuf_fd_dup));
++
++  scoped_refptr<NativePixmapFrameResource> frame =
++      NativePixmapFrameResource::Create(*layout, visible_rect, natural_size,
++                                        std::move(dmabuf_fds), timestamp);
++  if (!frame) {
++    LOG(ERROR) << "Failed to create NativePixmapFrameResource from VCSM-CMA";
++    return CroStatus::Codes::kFailedToCreateVideoFrame;
++  }
++
++  frame->metadata().allow_overlay = true;
++
++  // Track frame destruction to monitor VCSM-CMA buffer lifecycle.
++  int frame_id = alive_count_.fetch_add(1) + 1;
++  VLOGF(1) << "VCSM-CMA frame #" << frame_id << " created ("
++           << coded_size.ToString() << "), alive=" << frame_id;
++  scoped_refptr<VcsmCmaAllocator> self(this);
++  frame->AddDestructionObserver(base::BindOnce(
++      [](scoped_refptr<VcsmCmaAllocator> allocator, int id) {
++        int remaining = allocator->alive_count_.fetch_sub(1) - 1;
++        VLOG(1) << "VCSM-CMA frame #" << id
++                << " destroyed, alive=" << remaining;
++      },
++      std::move(self), frame_id));
++
++  scoped_refptr<FrameResource> result = std::move(frame);
++  return result;
++}
++
++}  // namespace media
+Index: src/media/gpu/v4l2/vcsm_cma_utils.h
+===================================================================
+--- /dev/null
++++ src/media/gpu/v4l2/vcsm_cma_utils.h
+@@ -0,0 +1,66 @@
++// Copyright 2024 The FydeOS Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#ifndef MEDIA_GPU_V4L2_VCSM_CMA_UTILS_H_
++#define MEDIA_GPU_V4L2_VCSM_CMA_UTILS_H_
++
++#include <stdint.h>
++
++#include <atomic>
++
++#include "base/files/scoped_file.h"
++#include "media/gpu/chromeos/dmabuf_video_frame_pool.h"
++#include "media/gpu/chromeos/frame_resource.h"
++#include "media/gpu/media_gpu_export.h"
++
++namespace media {
++
++// Allocator that uses /dev/vcsm-cma (VideoCore Shared Memory with CMA) to
++// allocate video frame buffers on Raspberry Pi 4.
++//
++// Buffers allocated via VCSM-CMA are accessible by both ARM CPU and VideoCore
++// firmware, which is required for bcm2835-codec-isp (image processor) to
++// process frames from rpi-hevc-dec (HEVC decoder). Without VCSM-CMA, the ISP
++// cannot import DMABUFs allocated by minigbm's V3D backend because they use
++// different memory domains.
++class MEDIA_GPU_EXPORT VcsmCmaAllocator
++    : public base::RefCountedThreadSafe<VcsmCmaAllocator> {
++ public:
++  VcsmCmaAllocator();
++
++  VcsmCmaAllocator(const VcsmCmaAllocator&) = delete;
++  VcsmCmaAllocator& operator=(const VcsmCmaAllocator&) = delete;
++
++  // Returns true if /dev/vcsm-cma was opened successfully.
++  bool IsValid() const;
++
++  // Allocates a VCSM-CMA buffer and returns its DMABUF file descriptor.
++  base::ScopedFD AllocateBuffer(uint32_t size, const char* name);
++
++  // Creates a FrameResource backed by VCSM-CMA memory.
++  // Matches the DmabufVideoFramePool::CreateFrameCB signature.
++  CroStatus::Or<scoped_refptr<FrameResource>> CreateFrame(
++      VideoPixelFormat format,
++      const gfx::Size& coded_size,
++      const gfx::Rect& visible_rect,
++      const gfx::Size& natural_size,
++      bool use_protected,
++      bool use_linear_buffers,
++      bool needs_detiling,
++      base::TimeDelta timestamp);
++
++ private:
++  friend class base::RefCountedThreadSafe<VcsmCmaAllocator>;
++  ~VcsmCmaAllocator();
++
++  base::ScopedFD vcsm_fd_;
++
++  // Diagnostic tracking for memory leak investigation.
++  std::atomic<int> alloc_count_{0};
++  std::atomic<int> alive_count_{0};
++};
++
++}  // namespace media
++
++#endif  // MEDIA_GPU_V4L2_VCSM_CMA_UTILS_H_
+Index: src/content/common/gpu_pre_sandbox_hook_linux.cc
+===================================================================
+--- src.orig/content/common/gpu_pre_sandbox_hook_linux.cc
++++ src/content/common/gpu_pre_sandbox_hook_linux.cc
+@@ -184,6 +184,12 @@ void AddV4L2GpuPermissions(
+         BrokerFilePermission::ReadWrite(jpegEncPath.str()));
+   }
+ 
++  // VCSM-CMA device for Raspberry Pi 4. Needed to allocate buffers accessible
++  // by both ARM CPU and VideoCore firmware for the bcm2835-codec-isp image
++  // processor.
++  static const char kVcsmCmaPath[] = "/dev/vcsm-cma";
++  permissions->push_back(BrokerFilePermission::ReadWrite(kVcsmCmaPath));
++
+   if (UseChromecastSandboxAllowlist()) {
+     static const char kAmlogicAvcEncoderPath[] = "/dev/amvenc_avc";
+     permissions->push_back(
+@@ -440,7 +446,7 @@ void AddVulkanICDPermissions(std::vector
+ 
+   static const char* const kReadOnlyICDList[] = {
+       "intel_icd.x86_64.json", "nvidia_icd.json", "radeon_icd.x86_64.json",
+-      "mali_icd.json", "freedreno_icd.aarch64.json", "broadcom_icd.aarch64.json"};
++      "mali_icd.json", "freedreno_icd.aarch64.json"};
+ 
+   for (std::string prefix : kReadOnlyICDPrefixes) {
+     permissions->push_back(BrokerFilePermission::ReadOnly(prefix));
+@@ -590,7 +596,6 @@ void LoadVulkanLibraries() {
+   dlopen("libvulkan_intel.so", dlopen_flag);
+   dlopen("libGLX_nvidia.so.0", dlopen_flag);
+   dlopen("libvulkan_freedreno.so", dlopen_flag);
+-  dlopen("libvulkan_broadcom.so", dlopen_flag);
+ }
+ 
+ void LoadChromecastV4L2Libraries() {
+Index: src/media/gpu/v4l2/v4l2_utils.cc
+===================================================================
+--- src.orig/media/gpu/v4l2/v4l2_utils.cc
++++ src/media/gpu/v4l2/v4l2_utils.cc
+@@ -47,6 +47,11 @@
+ #define V4L2_PIX_FMT_AV1_FRAME v4l2_fourcc('A', 'V', '1', 'F')
+ #endif
+ 
++// Raspberry Pi 128-byte column tiled format for hardware video decoder.
++#ifndef V4L2_PIX_FMT_NV12_COL128
++#define V4L2_PIX_FMT_NV12_COL128 v4l2_fourcc('N', 'C', '1', '2')
++#endif
++
+ #define MAKE_V4L2_CODEC_PAIR(codec, suffix) \
+   std::make_pair(codec##_##suffix, codec)
+ 
+@@ -287,6 +292,31 @@ std::optional<VideoFrameLayout> V4L2Form
+                             y_stride_abs * pix_mp.height / 2);
+         DCHECK_EQ(2u, planes.size());
+         break;
++#ifdef V4L2_PIX_FMT_NV12_COL128
++      case V4L2_PIX_FMT_NV12_COL128: {
++        // NV12_COL128: 128-byte column tiled format (Raspberry Pi).
++        // V4L2 bytesperline = column height (Y height + UV height = H*3/2).
++        // V4L2 sizeimage = bytesperline * width (single plane buffer).
++        //
++        // Each column is 128 bytes wide x col_height rows:
++        //   rows [0, H): Y data
++        //   rows [H, H*3/2): interleaved UV data
++        //
++        // We import the entire buffer for both planes with stride=width,
++        // offset=0. The shader handles Y/UV offset within each column.
++        const int32_t col128_stride =
++            static_cast<int32_t>(pix_mp.width);
++        const size_t col128_stride_abs = static_cast<size_t>(col128_stride);
++        const size_t col_height =
++            static_cast<size_t>(pix_mp.plane_fmt[0].bytesperline);
++        const size_t buffer_size = col128_stride_abs * col_height;
++        // Both planes reference the entire buffer at offset 0.
++        planes[0] = ColorPlaneLayout(col128_stride, 0u, buffer_size);
++        planes.emplace_back(col128_stride, 0u, buffer_size);
++        DCHECK_EQ(2u, planes.size());
++        break;
++      }
++#endif
+       case V4L2_PIX_FMT_YUV420:
+       case V4L2_PIX_FMT_YVU420: {
+         // The spec claims that two Cx rows (including padding) is exactly as
+Index: src/media/gpu/v4l2/v4l2_video_decoder.cc
+===================================================================
+--- src.orig/media/gpu/v4l2/v4l2_video_decoder.cc
++++ src/media/gpu/v4l2/v4l2_video_decoder.cc
+@@ -18,6 +18,8 @@
+ #include "base/functional/callback_helpers.h"
+ #include "base/logging.h"
+ #include "base/memory/ptr_util.h"
++#include "base/threading/platform_thread.h"
++#include "base/time/time.h"
+ #include "base/memory/scoped_refptr.h"
+ #include "base/metrics/histogram_functions.h"
+ #include "base/notimplemented.h"
+@@ -148,6 +150,9 @@ size_t GetInputBufferSizeForResolution(c
+ base::AtomicRefCount V4L2VideoDecoder::num_instances_(0);
+ 
+ // static
++base::AtomicRefCount V4L2VideoDecoder::num_hevc_instances_(0);
++
++// static
+ std::unique_ptr<VideoDecoderMixin> V4L2VideoDecoder::Create(
+     std::unique_ptr<MediaLog> media_log,
+     scoped_refptr<base::SequencedTaskRunner> decoder_task_runner,
+@@ -220,6 +225,9 @@ V4L2VideoDecoder::~V4L2VideoDecoder() {
+ 
+   weak_this_for_polling_factory_.InvalidateWeakPtrs();
+ 
++  if (is_hevc_instance_)
++    num_hevc_instances_.Decrement();
++
+   if (can_use_decoder_)
+     num_instances_.Decrement();
+ }
+@@ -305,6 +313,11 @@ void V4L2VideoDecoder::Initialize(const
+     input_queue_ = nullptr;
+     output_queue_ = nullptr;
+ 
++    if (is_hevc_instance_) {
++      num_hevc_instances_.Decrement();
++      is_hevc_instance_ = false;
++    }
++
+     if (can_use_decoder_) {
+       num_instances_.Decrement();
+       can_use_decoder_ = false;
+@@ -401,19 +414,61 @@ V4L2Status V4L2VideoDecoder::InitializeB
+   constexpr bool kStateful = false;
+   constexpr bool kStateless = true;
+   std::optional<std::pair<bool, uint32_t>> api_and_format;
+-  // Try both kStateful and kStateless APIs via |fourcc| and select the first
+-  // combination where Open()ing the |device_| works.
+-  for (const auto api : {kStateful, kStateless}) {
+-    const auto fourcc = VideoCodecProfileToV4L2PixFmt(profile_, api);
+-    if (fourcc == V4L2_PIX_FMT_INVALID ||
+-        !device_->Open(V4L2Device::Type::kDecoder, fourcc)) {
+-      continue;
++
++  // HEVC profiles use the stateless API directly (e.g. rpi-hevc-dec on RPi4).
++  // Skip the stateful probe to avoid opening the wrong device.
++  const bool is_hevc = profile_ >= HEVCPROFILE_MIN &&
++                        profile_ <= HEVCPROFILE_MAX;
++  if (is_hevc) {
++    // The RPi4 HEVC decoder is single-instance hardware.  Wait briefly for the
++    // previous session to finish tearing down (e.g. DestroyAsync + DeleteSoon)
++    // before giving up, so that back-to-back video switches don't flash black
++    // due to an unnecessary fallback to software decode.
++    constexpr int kHevcRetries = 20;
++    constexpr base::TimeDelta kHevcRetryDelay = base::Milliseconds(50);
++    bool acquired = false;
++    for (int i = 0; i < kHevcRetries; ++i) {
++      if (num_hevc_instances_.Increment() < kMaxNumOfHevcInstances) {
++        acquired = true;
++        break;
++      }
++      num_hevc_instances_.Decrement();
++      if (i == 0) {
++        VLOGF(1) << "HEVC decoder slot busy, waiting up to "
++                 << (kHevcRetries * kHevcRetryDelay).InMilliseconds() << "ms";
++      }
++      base::PlatformThread::Sleep(kHevcRetryDelay);
++    }
++    if (!acquired) {
++      VLOGF(1) << "Reached maximum number of HEVC decoder instances ("
++               << kMaxNumOfHevcInstances << ") after retry";
++      return V4L2Status::Codes::kMaxDecoderInstanceCount;
++    }
++    is_hevc_instance_ = true;
++    const auto fourcc = VideoCodecProfileToV4L2PixFmt(profile_, kStateless);
++    if (fourcc != V4L2_PIX_FMT_INVALID &&
++        device_->Open(V4L2Device::Type::kDecoder, fourcc)) {
++      api_and_format = std::make_pair(kStateless, fourcc);
++    }
++  } else {
++    // Try both kStateful and kStateless APIs via |fourcc| and select the first
++    // combination where Open()ing the |device_| works.
++    for (const auto api : {kStateful, kStateless}) {
++      const auto fourcc = VideoCodecProfileToV4L2PixFmt(profile_, api);
++      if (fourcc == V4L2_PIX_FMT_INVALID ||
++          !device_->Open(V4L2Device::Type::kDecoder, fourcc)) {
++        continue;
++      }
++      api_and_format = std::make_pair(api, fourcc);
++      break;
+     }
+-    api_and_format = std::make_pair(api, fourcc);
+-    break;
+   }
+ 
+   if (!api_and_format.has_value()) {
++    if (is_hevc_instance_) {
++      num_hevc_instances_.Decrement();
++      is_hevc_instance_ = false;
++    }
+     num_instances_.Decrement();
+     can_use_decoder_ = false;
+     VLOGF(1) << "No V4L2 API found for profile: " << GetProfileName(profile_);
+@@ -693,12 +748,22 @@ CroStatus V4L2VideoDecoder::SetupOutputF
+         PixelLayoutCandidate{.fourcc = *candidate, .size = adjusted_size});
+   }
+ 
++  // Check if any candidate requires an auxiliary frame pool (e.g. NC12 on RPi4
++  // needs VCSM-CMA allocated DMABUF buffers for the ISP to import).
++  bool need_aux_frame_pool = false;
++  for (const auto& candidate : candidates) {
++    if (candidate.fourcc == Fourcc(Fourcc::NC12)) {
++      need_aux_frame_pool = true;
++      break;
++    }
++  }
++
+   // Ask the pipeline to pick the output format.
+   CroStatus::Or<PixelLayoutCandidate> status_or_output_format =
+       client_->PickDecoderOutputFormat(
+           candidates, visible_rect, aspect_ratio_.GetNaturalSize(visible_rect),
+           /*output_size=*/std::nullopt, num_codec_reference_frames,
+-          /*use_protected=*/!!cdm_context_ref_, /*need_aux_frame_pool=*/false,
++          /*use_protected=*/!!cdm_context_ref_, need_aux_frame_pool,
+           std::nullopt);
+   if (!status_or_output_format.has_value()) {
+     VLOGF(1) << "Failed to pick an output format.";
+@@ -1054,10 +1119,9 @@ void V4L2VideoDecoder::ApplyResolutionCh
+ size_t V4L2VideoDecoder::GetMaxOutputFramePoolSize() const {
+   DCHECK_CALLED_ON_VALID_SEQUENCE(decoder_sequence_checker_);
+ 
+-  // VIDEO_MAX_FRAME is used as a size in V4L2 decoder drivers like Qualcomm
+-  // Venus. We should not exceed this limit for the frame pool that the decoder
+-  // writes into.
+-  return VIDEO_MAX_FRAME;
++  // Limit to 12 to reduce CMA memory pressure on devices like RPi4 while
++  // still allowing enough frames for the DPB + decode pipeline.
++  return 12;
+ }
+ 
+ bool V4L2VideoDecoder::NeedsTranscryption() {
+@@ -1179,13 +1243,14 @@ CroStatus V4L2VideoDecoder::ContinueChan
+ 
+   const v4l2_memory type =
+       use_v4l2_allocated_buffers ? V4L2_MEMORY_MMAP : V4L2_MEMORY_DMABUF;
+-  // If we don't use driver-allocated buffers, request as many as possible
+-  // (VIDEO_MAX_FRAME) since they are shallow allocations. Otherwise, allocate
++  // If we don't use driver-allocated buffers, request enough DMABUF slots
++  // for the codec reference frames plus pipeline overhead. Otherwise, allocate
+   // |num_codec_reference_frames| plus one for the video frame being decoded,
+   // and one for our client (presumably an ImageProcessor).
+-  const size_t v4l2_num_buffers = use_v4l2_allocated_buffers
+-                                      ? num_codec_reference_frames + 2
+-                                      : VIDEO_MAX_FRAME;
++  constexpr size_t kMaxDmabufCaptureBuffers = 12;
++  const size_t v4l2_num_buffers =
++      use_v4l2_allocated_buffers ? num_codec_reference_frames + 2
++                                 : kMaxDmabufCaptureBuffers;
+ 
+   VLOGF(1) << "Requesting: " << v4l2_num_buffers << " CAPTURE buffers of type "
+            << (use_v4l2_allocated_buffers ? "V4L2_MEMORY_MMAP"
+Index: src/media/gpu/v4l2/v4l2_decode_surface.cc
+===================================================================
+--- src.orig/media/gpu/v4l2/v4l2_decode_surface.cc
++++ src/media/gpu/v4l2/v4l2_decode_surface.cc
+@@ -125,11 +125,14 @@ bool V4L2RequestDecodeSurface::Submit()
+   if (input_buffer().Memory() == V4L2_MEMORY_DMABUF) {
+     if (!std::move(input_buffer())
+              .QueueDMABuf(secure_handle(), &request_ref_)) {
++      LOG(ERROR) << "Submit: Failed to queue INPUT DMABUF";
+       return false;
+     }
+   } else if (!std::move(input_buffer()).QueueMMap(&request_ref_)) {
++    LOG(ERROR) << "Submit: Failed to queue INPUT MMAP";
+     return false;
+   }
++  VLOG(1) << "Submit: INPUT buffer queued OK";
+ 
+   bool result = false;
+   switch (output_buffer().Memory()) {
+@@ -143,10 +146,20 @@ bool V4L2RequestDecodeSurface::Submit()
+       NOTREACHED() << "We should only use MMAP or DMABUF.";
+   }
+ 
+-  if (!result)
++  if (!result) {
++    LOG(ERROR) << "Submit: Failed to queue CAPTURE buffer (memory="
++               << output_buffer().Memory() << ")";
+     return result;
++  }
++  VLOG(1) << "Submit: CAPTURE buffer queued OK";
+ 
+-  return std::move(request_ref_).Submit().has_value();
++  auto submit_result = std::move(request_ref_).Submit();
++  if (!submit_result.has_value()) {
++    LOG(ERROR) << "Submit: Request submit failed";
++    return false;
++  }
++  VLOG(1) << "Submit: Request submitted OK";
++  return true;
+ }
+ 
+ }  // namespace media
+Index: src/media/gpu/v4l2/v4l2_device.cc
+===================================================================
+--- src.orig/media/gpu/v4l2/v4l2_device.cc
++++ src/media/gpu/v4l2/v4l2_device.cc
+@@ -140,6 +140,10 @@ bool V4L2Device::Open(Type type, uint32_
+     return false;
+   }
+ 
++  VLOGF(1) << "Opened device " << path << " for fourcc "
++           << FourccToString(v4l2_pixfmt)
++           << ", type: " << static_cast<int>(type);
++
+   device_poll_interrupt_fd_.reset(eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC));
+   if (!device_poll_interrupt_fd_.is_valid()) {
+     VLOGF(1) << "Failed creating a poll interrupt fd";
+Index: src/media/gpu/v4l2/v4l2_video_decoder.h
+===================================================================
+--- src.orig/media/gpu/v4l2/v4l2_video_decoder.h
++++ src/media/gpu/v4l2/v4l2_video_decoder.h
+@@ -190,6 +190,13 @@ class MEDIA_GPU_EXPORT V4L2VideoDecoder
+   static base::AtomicRefCount num_instances_;
+   bool can_use_decoder_ = false;
+ 
++  // The RPi4 HEVC hardware decoder (/dev/video-dec1) is a single-instance
++  // device.  Limit concurrent HEVC decode sessions to 1 so that a second
++  // tab/video doesn't try to open the device while it is in use.
++  static constexpr int kMaxNumOfHevcInstances = 1;
++  static base::AtomicRefCount num_hevc_instances_;
++  bool is_hevc_instance_ = false;
++
+   // The V4L2 backend, i.e. the part of the decoder that sends
+   // decoding jobs to the kernel.
+   std::unique_ptr<V4L2VideoDecoderBackend> backend_;
+Index: src/media/gpu/v4l2/v4l2_image_processor_backend.cc
+===================================================================
+--- src.orig/media/gpu/v4l2/v4l2_image_processor_backend.cc
++++ src/media/gpu/v4l2/v4l2_image_processor_backend.cc
+@@ -401,7 +401,11 @@ std::unique_ptr<ImageProcessorBackend> V
+           std::move(device), input_config, output_config, input_memory_type,
+           output_memory_type, output_mode, std::move(error_cb)));
+ 
+-  if (!image_processor->CreateInputBuffers(num_buffers) ||
++  // The ISP INPUT queue only needs enough slots to keep the M2M device fed.
++  // It does not need to match the OUTPUT queue which is sized for the renderer
++  // pipeline.  Cap INPUT at 4 (ISP processes one frame at a time).
++  const size_t input_num_buffers = std::min(num_buffers, static_cast<size_t>(4));
++  if (!image_processor->CreateInputBuffers(input_num_buffers) ||
+       !image_processor->CreateOutputBuffers(num_buffers)) {
+     return nullptr;
+   }

@@ -20,6 +20,7 @@ IUSE_KERNEL_VERS=(
 	kernel-5_4
 	kernel-5_10
 	kernel-5_15
+  kernel-6_12
 	kernel-experimental
 	kernel-next
 	kernel-upstream
@@ -37,6 +38,7 @@ RDEPEND="
 	kernel-5_4? ( sys-kernel/chromeos-kernel-5_4 )
 	kernel-5_10? ( sys-kernel/raspberry-kernel )
 	kernel-5_15? ( sys-kernel/chromeos-kernel-5_15 )
+  kernel-6_12? ( sys-kernel/raspberry-kernel )
 	kernel-experimental? ( sys-kernel/chromeos-kernel-experimental )
 	kernel-next? ( sys-kernel/chromeos-kernel-next )
 	kernel-upstream? ( sys-kernel/chromeos-kernel-upstream )

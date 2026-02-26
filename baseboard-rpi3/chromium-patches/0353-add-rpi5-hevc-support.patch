@@ -984,7 +984,7 @@ Index: src/media/gpu/chromeos/libyuv_image_processor_backend.cc
      CONV(MT2T, P010, kConversion, Supported),
      // Scaling.
      CONV(NV12, NV12, kScaling, Supported),
-@@ -447,6 +448,95 @@ int LibYUVImageProcessorBackend::DoConve
+@@ -447,6 +448,108 @@ int LibYUVImageProcessorBackend::DoConve
                         input->coded_size().height()));
          }
  
@@ -994,8 +994,6 @@ Index: src/media/gpu/chromeos/libyuv_image_processor_backend.cc
 +          const uint8_t* src = input->data(VideoFrame::Plane::kY);
 +          uint8_t* dst_y =
 +              output->writable_data(VideoFrame::Plane::kY);
-+          uint8_t* dst_uv =
-+              output->writable_data(VideoFrame::Plane::kUV);
 +          const int coded_width = input->coded_size().width();
 +          const int coded_height = input->coded_size().height();
 +          const int dst_y_stride =
@@ -1014,11 +1012,26 @@ Index: src/media/gpu/chromeos/libyuv_image_processor_backend.cc
 +          const int col_height =
 +              static_cast<int>(total_size / coded_width);
 +
++          // The VPU firmware aligns the Y plane height to 16 rows
++          // within each NC12 column.  UV data starts at row
++          // ALIGN(coded_height, 16), not at row coded_height.
++          const int y_rows_in_column =
++              (coded_height + 15) & ~15;  // ALIGN(coded_height, 16)
++          const int uv_rows_in_column = col_height - y_rows_in_column;
++
++          // Place UV right after the aligned Y plane, not at the
++          // offset the VideoFrame layout reports (which may use the
++          // unaligned coded_height).
++          uint8_t* dst_uv =
++              dst_y + y_rows_in_column * dst_y_stride;
 +          const int width = std::min(output->coded_size().width(),
 +                                     coded_width);
++          // Copy as many rows as the output needs, limited by what
++          // the input column actually provides.
 +          const int height = std::min(output->coded_size().height(),
-+                                      coded_height);
-+          const int uv_height = height / 2;
++                                      y_rows_in_column);
++          const int uv_height = std::min(output->coded_size().height() / 2,
++                                         uv_rows_in_column);
 +
 +          // Split into full 128-byte columns and a possible partial
 +          // last column.  Using kColWidth directly in memcpy lets the
@@ -1053,10 +1066,10 @@ Index: src/media/gpu/chromeos/libyuv_image_processor_backend.cc
 +            }
 +          }
 +
-+          // Skip remaining Y rows to advance source pointers to UV
-+          // data region within each column.
++          // Skip from current position to the UV region start
++          // within each column.
 +          for (int c = 0; c < num_cols && c < kMaxCols; c++) {
-+            col_src[c] += (coded_height - height) * kColWidth;
++            col_src[c] += (y_rows_in_column - height) * kColWidth;
 +          }
 +
 +          // Detile UV plane.

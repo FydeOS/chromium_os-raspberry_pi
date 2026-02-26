@@ -1,0 +1,15 @@
+Index: src/media/gpu/v4l2/v4l2_stateful_video_decoder.cc
+===================================================================
+--- src.orig/media/gpu/v4l2/v4l2_stateful_video_decoder.cc
++++ src/media/gpu/v4l2/v4l2_stateful_video_decoder.cc
+@@ -420,8 +420,8 @@ void V4L2StatefulVideoDecoder::Initializ
+     std::move(init_cb).Run(DecoderStatus::Codes::kFailedToCreateDecoder);
+     return;
+   }
+-  client_->NotifyEstimatedMaxDecodeRequests(base::checked_cast<int>(
+-      std::min(static_cast<size_t>(4), num_input_buffers)));
++  client_->NotifyEstimatedMaxDecodeRequests(
++      base::checked_cast<int>(num_input_buffers));
+ 
+   // Subscribe to the resolution change event. This is needed for resolution
+   // changes mid stream but also to initialize the |CAPTURE_queue|.

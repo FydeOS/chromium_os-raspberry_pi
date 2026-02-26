@@ -1,0 +1,363 @@
+Index: src/media/gpu/v4l2/v4l2_utils.cc
+===================================================================
+--- src.orig/media/gpu/v4l2/v4l2_utils.cc
++++ src/media/gpu/v4l2/v4l2_utils.cc
+@@ -47,11 +47,6 @@
+ #define V4L2_PIX_FMT_AV1_FRAME v4l2_fourcc('A', 'V', '1', 'F')
+ #endif
+ 
+-// Raspberry Pi 128-byte column tiled format for hardware video decoder.
+-#ifndef V4L2_PIX_FMT_NV12_COL128
+-#define V4L2_PIX_FMT_NV12_COL128 v4l2_fourcc('N', 'C', '1', '2')
+-#endif
+-
+ #define MAKE_V4L2_CODEC_PAIR(codec, suffix) \
+   std::make_pair(codec##_##suffix, codec)
+ 
+@@ -292,31 +287,6 @@ std::optional<VideoFrameLayout> V4L2Form
+                             y_stride_abs * pix_mp.height / 2);
+         DCHECK_EQ(2u, planes.size());
+         break;
+-#ifdef V4L2_PIX_FMT_NV12_COL128
+-      case V4L2_PIX_FMT_NV12_COL128: {
+-        // NV12_COL128: 128-byte column tiled format (Raspberry Pi).
+-        // V4L2 bytesperline = column height (Y height + UV height = H*3/2).
+-        // V4L2 sizeimage = bytesperline * width (single plane buffer).
+-        //
+-        // Each column is 128 bytes wide × col_height rows:
+-        //   rows [0, H): Y data
+-        //   rows [H, H*3/2): interleaved UV data
+-        //
+-        // We import the entire buffer for both planes with stride=width,
+-        // offset=0. The shader handles Y/UV offset within each column.
+-        const int32_t col128_stride =
+-            static_cast<int32_t>(pix_mp.width);
+-        const size_t col128_stride_abs = static_cast<size_t>(col128_stride);
+-        const size_t col_height =
+-            static_cast<size_t>(pix_mp.plane_fmt[0].bytesperline);
+-        const size_t buffer_size = col128_stride_abs * col_height;
+-        // Both planes reference the entire buffer at offset 0.
+-        planes[0] = ColorPlaneLayout(col128_stride, 0u, buffer_size);
+-        planes.emplace_back(col128_stride, 0u, buffer_size);
+-        DCHECK_EQ(2u, planes.size());
+-        break;
+-      }
+-#endif
+       case V4L2_PIX_FMT_YUV420:
+       case V4L2_PIX_FMT_YVU420: {
+         // The spec claims that two Cx rows (including padding) is exactly as
+@@ -614,8 +584,15 @@ std::optional<SupportedVideoDecoderConfi
+   std::vector<std::string> candidate_paths;
+ 
+ #if BUILDFLAG(IS_CHROMEOS)
+-  constexpr char kVideoDevicePattern[] = "/dev/video-dec0";
+-  candidate_paths.push_back(kVideoDevicePattern);
++  constexpr char kVideoDevicePattern[] = "/dev/video-dec";
++  // Scan multiple decoder devices (e.g. video-dec0 for H264, video-dec1 for
++  // HEVC) to discover all available hardware decoders.
++  constexpr int kMaxDecoderDevices = 10;
++  candidate_paths.reserve(kMaxDecoderDevices);
++  for (int i = 0; i < kMaxDecoderDevices; ++i) {
++    candidate_paths.push_back(
++        base::StringPrintf("%s%d", kVideoDevicePattern, i));
++  }
+ #else
+   constexpr char kVideoDevicePattern[] = "/dev/video";
+   constexpr int kMaxDevices = 256;
+@@ -630,9 +607,6 @@ std::optional<SupportedVideoDecoderConfi
+     base::ScopedFD device_fd(
+         HANDLE_EINTR(open(path.c_str(), O_RDWR | O_NONBLOCK | O_CLOEXEC)));
+     if (!device_fd.is_valid()) {
+-#if BUILDFLAG(IS_CHROMEOS)
+-      PLOG(WARNING) << "Could not open " << path;
+-#endif
+       continue;
+     }
+ 
+Index: src/media/gpu/chromeos/video_decoder_pipeline.cc
+===================================================================
+--- src.orig/media/gpu/chromeos/video_decoder_pipeline.cc
++++ src/media/gpu/chromeos/video_decoder_pipeline.cc
+@@ -256,6 +256,15 @@ std::unique_ptr<VideoDecoder> VideoDecod
+       std::move(frame_converter), std::move(renderable_fourccs),
+       std::move(media_log), std::move(create_decoder_function_cb),
+       uses_oop_video_decoder, in_video_decoder_process);
++#if BUILDFLAG(USE_V4L2_CODEC)
++  // When using V4L2StatefulVideoDecoder as primary, set V4L2VideoDecoder as
++  // fallback for codecs not supported by the stateful decoder (e.g. HEVC on
++  // a separate stateless device node).
++  if (IsV4L2DecoderStateful()) {
++    pipeline->fallback_create_decoder_function_cb_ =
++        base::BindOnce(&V4L2VideoDecoder::Create);
++  }
++#endif
+   return std::make_unique<AsyncDestroyVideoDecoder<VideoDecoderPipeline>>(
+       base::WrapUnique(pipeline));
+ }
+@@ -720,7 +729,8 @@ void VideoDecoderPipeline::InitializeTas
+   decoder_->Initialize(
+       config, /* low_delay=*/false, cdm_context,
+       base::BindOnce(&VideoDecoderPipeline::OnInitializeDone,
+-                     decoder_weak_this_, std::move(init_cb), cdm_context),
++                     decoder_weak_this_, std::move(init_cb), cdm_context,
++                     config),
+       base::BindRepeating(&VideoDecoderPipeline::OnFrameDecoded,
+                           decoder_weak_this_),
+       base::BindRepeating(&VideoDecoderPipeline::OnDecoderWaiting,
+@@ -729,6 +739,7 @@ void VideoDecoderPipeline::InitializeTas
+ 
+ void VideoDecoderPipeline::OnInitializeDone(InitCB init_cb,
+                                             CdmContext* cdm_context,
++                                            VideoDecoderConfig config,
+                                             DecoderStatus status) {
+   DCHECK_CALLED_ON_VALID_SEQUENCE(decoder_sequence_checker_);
+   DVLOGF(4) << "Initialization status = " << static_cast<int>(status.code());
+@@ -744,6 +755,32 @@ void VideoDecoderPipeline::OnInitializeD
+     buffer_transcryptor_.reset();
+ #endif  // BUILDFLAG(IS_CHROMEOS)
+     decoder_.reset();
++
++#if BUILDFLAG(USE_V4L2_CODEC)
++    // If the primary decoder (e.g. V4L2StatefulVideoDecoder) failed and we
++    // have a fallback (V4L2VideoDecoder), try it. This handles the case where
++    // the system has both stateful (H264) and stateless (HEVC) decoders on
++    // different device nodes.
++    if (!fallback_create_decoder_function_cb_.is_null()) {
++      MEDIA_LOG(INFO, media_log_)
++          << "Primary decoder failed, trying fallback decoder";
++      decoder_ = std::move(fallback_create_decoder_function_cb_)
++                     .Run(media_log_->Clone(), decoder_task_runner_,
++                          decoder_weak_this_);
++      if (decoder_) {
++        decoder_->Initialize(
++            config, /*low_delay=*/false, cdm_context,
++            base::BindOnce(&VideoDecoderPipeline::OnInitializeDone,
++                           decoder_weak_this_, std::move(init_cb), cdm_context,
++                           config),
++            base::BindRepeating(&VideoDecoderPipeline::OnFrameDecoded,
++                                decoder_weak_this_),
++            base::BindRepeating(&VideoDecoderPipeline::OnDecoderWaiting,
++                                decoder_weak_this_));
++        return;
++      }
++    }
++#endif  // BUILDFLAG(USE_V4L2_CODEC)
+   } else {
+     MEDIA_LOG(INFO, media_log_)
+         << "VideoDecoderPipeline |decoder_| Initialize() successful";
+Index: src/media/gpu/chromeos/video_decoder_pipeline.h
+===================================================================
+--- src.orig/media/gpu/chromeos/video_decoder_pipeline.h
++++ src/media/gpu/chromeos/video_decoder_pipeline.h
+@@ -330,6 +330,7 @@ class MEDIA_GPU_EXPORT VideoDecoderPipel
+ 
+   void OnInitializeDone(InitCB init_cb,
+                         CdmContext* cdm_context,
++                        VideoDecoderConfig config,
+                         DecoderStatus status);
+ 
+   void OnDecodeDone(bool eos_buffer, DecodeCB decode_cb, DecoderStatus status);
+@@ -454,6 +455,13 @@ class MEDIA_GPU_EXPORT VideoDecoderPipel
+   CreateDecoderFunctionCB create_decoder_function_cb_
+       GUARDED_BY_CONTEXT(decoder_sequence_checker_);
+ 
++  // Fallback decoder creation callback, used when the primary decoder (e.g.
++  // V4L2StatefulVideoDecoder) fails to initialize for a given codec. This
++  // allows falling back to V4L2VideoDecoder which supports both stateful and
++  // stateless codecs across multiple device nodes.
++  CreateDecoderFunctionCB fallback_create_decoder_function_cb_
++      GUARDED_BY_CONTEXT(decoder_sequence_checker_);
++
+   // Callbacks provided by the client. Used on |decoder_task_runner_|.
+   // The callback methods themselves are exercised on |client_task_runner_|.
+   OutputCB client_output_cb_ GUARDED_BY_CONTEXT(decoder_sequence_checker_);
+Index: src/media/gpu/chromeos/image_processor_factory.cc
+===================================================================
+--- src.orig/media/gpu/chromeos/image_processor_factory.cc
++++ src/media/gpu/chromeos/image_processor_factory.cc
+@@ -232,60 +232,29 @@ std::unique_ptr<ImageProcessor> CreateGL
+     scoped_refptr<base::SequencedTaskRunner> client_task_runner,
+     ImageProcessorFactory::PickFormatCB out_format_picker,
+     ImageProcessor::ErrorCB error_cb) {
+-  VLOGF(1) << "CreateGLImageProcessorWithInputCandidates: candidates="
+-           << input_candidates.size() << ", input_visible_rect="
+-           << input_visible_rect.ToString() << ", output_size="
+-           << output_size.ToString() << ", storage_type="
+-           << static_cast<int>(output_storage_type);
++  if (input_candidates.size() != 1)
++    return nullptr;
+ 
+-  if (input_candidates.empty()) {
+-    VLOGF(1) << "No input candidates";
++  if (input_candidates[0].fourcc != Fourcc(Fourcc::MM21) &&
++      input_candidates[0].fourcc != Fourcc(Fourcc::NV12)) {
+     return nullptr;
+   }
+ 
+-  // Find the first supported input candidate
+-  for (const auto& candidate : input_candidates) {
+-    VLOGF(1) << "Trying candidate: fourcc=" << candidate.fourcc.ToString()
+-             << ", size=" << candidate.size.ToString();
+-
+-    if (candidate.fourcc != Fourcc(Fourcc::MM21) &&
+-        candidate.fourcc != Fourcc(Fourcc::NC12) &&
+-        candidate.fourcc != Fourcc(Fourcc::NV12)) {
+-      VLOGF(1) << "Skipping unsupported fourcc: " << candidate.fourcc.ToString();
+-      continue;
+-    }
+-
+-    ImageProcessor::PortConfig input_config(
+-        candidate.fourcc, candidate.size, /*planes=*/{},
+-        input_visible_rect, VideoFrame::STORAGE_DMABUFS);
+-    ImageProcessor::PortConfig output_config(
+-        Fourcc(Fourcc::NV12), output_size, /*planes=*/{}, gfx::Rect(output_size),
+-        output_storage_type);
+-
+-    VLOGF(1) << "Checking IsSupported: input_size=" << candidate.size.ToString()
+-             << ", input_visible_rect=" << input_visible_rect.ToString()
+-             << ", output_size=" << output_size.ToString();
+-
+-    if (!GLImageProcessorBackend::IsSupported(input_config, output_config)) {
+-      VLOGF(1) << "GLImageProcessorBackend::IsSupported returned false";
+-      continue;
+-    }
++  ImageProcessor::PortConfig input_config(
++      input_candidates[0].fourcc, input_candidates[0].size, /*planes=*/{},
++      input_visible_rect, VideoFrame::STORAGE_DMABUFS);
++  ImageProcessor::PortConfig output_config(
++      Fourcc(Fourcc::NV12), output_size, /*planes=*/{}, gfx::Rect(output_size),
++      output_storage_type);
+ 
+-    VLOGF(1) << "Creating GLImageProcessor";
+-    auto processor = ImageProcessor::Create(
+-        base::BindRepeating(&GLImageProcessorBackend::Create), input_config,
+-        output_config, ImageProcessor::OutputMode::IMPORT, std::move(error_cb),
+-        std::move(client_task_runner));
+-    if (processor) {
+-      VLOGF(1) << "GLImageProcessor created successfully";
+-    } else {
+-      VLOGF(1) << "ImageProcessor::Create returned nullptr";
+-    }
+-    return processor;
++  if (!GLImageProcessorBackend::IsSupported(input_config, output_config)) {
++    return nullptr;
+   }
+ 
+-  VLOGF(1) << "No suitable candidate found";
+-  return nullptr;
++  return ImageProcessor::Create(
++      base::BindRepeating(&GLImageProcessorBackend::Create), input_config,
++      output_config, ImageProcessor::OutputMode::IMPORT, std::move(error_cb),
++      std::move(client_task_runner));
+ }
+ #endif  // defined(ARCH_CPU_ARM_FAMILY)
+ #endif
+@@ -351,63 +320,72 @@ ImageProcessorFactory::CreateWithInputCa
+   if (processor)
+     return processor;
+ #elif BUILDFLAG(USE_V4L2_CODEC)
+-#if defined(ARCH_CPU_ARM_FAMILY)
+-  VLOGF(1) << "CreateWithInputCandidates: V4L2 ARM path, candidates="
++  VLOGF(1) << "CreateWithInputCandidates: candidates="
+            << input_candidates.size();
++  bool has_tiled_input = false;
+   for (size_t i = 0; i < input_candidates.size(); i++) {
+     VLOGF(1) << "  candidate[" << i << "]: fourcc="
+              << input_candidates[i].fourcc.ToString()
+              << ", size=" << input_candidates[i].size.ToString();
+-  }
+-
+-  const bool use_gl_scaling =
+-      (base::FeatureList::IsEnabled(media::kUseGLForScaling) &&
+-       (input_candidates[0].fourcc == Fourcc(Fourcc::NV12) ||
+-        input_candidates[0].fourcc == Fourcc(Fourcc::NM12)));
+-  const bool use_gl_detiling =
+-      (base::FeatureList::IsEnabled(media::kPreferGLImageProcessor) &&
+-       input_candidates[0].fourcc == Fourcc(Fourcc::MM21));
+-  // NC12 (Raspberry Pi NV12_COL128) requires GL detiling - there's no
+-  // alternative image processor that supports this format.
+-  // Note: NC30 (10-bit COL128) is not yet supported.
+-  bool requires_gl_detiling = false;
+-  for (const auto& candidate : input_candidates) {
+-    if (candidate.fourcc == Fourcc(Fourcc::NC12)) {
+-      requires_gl_detiling = true;
+-      break;
++    if (input_candidates[i].fourcc == Fourcc(Fourcc::NC12) ||
++        input_candidates[i].fourcc == Fourcc(Fourcc::MM21)) {
++      has_tiled_input = true;
+     }
+   }
+-  VLOGF(1) << "use_gl_scaling=" << use_gl_scaling
+-           << ", use_gl_detiling=" << use_gl_detiling
+-           << ", requires_gl_detiling=" << requires_gl_detiling;
+-
+-  if (use_gl_scaling || use_gl_detiling || requires_gl_detiling) {
+-    VLOGF(1) << "Attempting GL image processor";
+-    auto processor = CreateGLImageProcessorWithInputCandidates(
+-        input_candidates, input_visible_rect, output_size, output_storage_type,
++
++  // Try V4L2 hardware image processor first. For tiled formats (NC12, MM21),
++  // the caller (video_decoder_pipeline) should use VCSM-CMA to allocate
++  // auxiliary frame pool buffers that are accessible by both decoder and ISP.
++  {
++    VLOGF(1) << "Trying V4L2 hardware image processor"
++             << (has_tiled_input ? " (tiled input, needs VCSM-CMA buffers)" : "");
++    auto processor = CreateV4L2ImageProcessorWithInputCandidates(
++        input_candidates, input_visible_rect, output_storage_type, num_buffers,
+         client_task_runner, out_format_picker, error_cb);
+     if (processor) {
+-      VLOGF(1) << "GL image processor created successfully";
++      VLOGF(1) << "V4L2 hardware image processor created successfully";
+       return processor;
+     }
+-    VLOGF(1) << "GL image processor creation failed";
++    VLOGF(1) << "V4L2 hardware image processor creation failed";
++  }
++
++#if defined(ARCH_CPU_ARM_FAMILY)
++  {
++    const bool use_gl_scaling =
++        (base::FeatureList::IsEnabled(media::kUseGLForScaling) &&
++         (input_candidates[0].fourcc == Fourcc(Fourcc::NV12) ||
++          input_candidates[0].fourcc == Fourcc(Fourcc::NM12)));
++    const bool use_gl_detiling =
++        (base::FeatureList::IsEnabled(media::kPreferGLImageProcessor) &&
++         input_candidates[0].fourcc == Fourcc(Fourcc::MM21));
++    VLOGF(1) << "has_tiled_input=" << has_tiled_input
++             << ", use_gl_scaling=" << use_gl_scaling
++             << ", use_gl_detiling=" << use_gl_detiling;
++
++    if (has_tiled_input || use_gl_scaling || use_gl_detiling) {
++      VLOGF(1) << "Trying GL image processor";
++      auto processor = CreateGLImageProcessorWithInputCandidates(
++          input_candidates, input_visible_rect, output_size,
++          output_storage_type, client_task_runner, out_format_picker, error_cb);
++      if (processor) {
++        VLOGF(1) << "GL image processor created successfully";
++        return processor;
++      }
++      VLOGF(1) << "GL image processor creation failed";
++    }
+   }
+ #endif  // defined(ARCH_CPU_ARM_FAMILY)
+ 
+   if (base::FeatureList::IsEnabled(kLibyuvImageProcessor)) {
++    VLOGF(1) << "Trying LibYUV image processor (CPU fallback)";
+     auto processor = CreateLibYUVImageProcessorWithInputCandidates(
+         input_candidates, input_visible_rect, output_size, output_storage_type,
+         client_task_runner, out_format_picker, error_cb);
+     if (processor) {
++      VLOGF(1) << "LibYUV image processor created successfully";
+       return processor;
+     }
+-  }
+-
+-  auto processor = CreateV4L2ImageProcessorWithInputCandidates(
+-      input_candidates, input_visible_rect, output_storage_type, num_buffers,
+-      client_task_runner, out_format_picker, error_cb);
+-  if (processor) {
+-    return processor;
++    VLOGF(1) << "LibYUV image processor creation failed";
+   }
+ 
+ #endif

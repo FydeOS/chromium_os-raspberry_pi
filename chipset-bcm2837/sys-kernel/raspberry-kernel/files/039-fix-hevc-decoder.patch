@@ -1,0 +1,128 @@
+Index: kernel-rpi/arch/arm/boot/dts/broadcom/bcm2711-rpi-ds.dtsi
+===================================================================
+--- kernel-rpi.orig/arch/arm/boot/dts/broadcom/bcm2711-rpi-ds.dtsi
++++ kernel-rpi/arch/arm/boot/dts/broadcom/bcm2711-rpi-ds.dtsi
+@@ -78,8 +78,11 @@
+ };
+ 
+ &cma {
+-	/* Limit cma to the lower 768MB to allow room for HIGHMEM on 32-bit */
+-	alloc-ranges = <0x0 0x00000000 0x30000000>;
++	/*
++	 * On arm64 (no HIGHMEM), use the full 1GB ZONE_DMA range.
++	 * On 32-bit this was 0x30000000 to leave room for HIGHMEM.
++	 */
++	alloc-ranges = <0x0 0x00000000 0x40000000>;
+ };
+ 
+ &soc {
+Index: kernel-rpi/arch/arm/boot/dts/overlays/cma-overlay.dts
+===================================================================
+--- kernel-rpi.orig/arch/arm/boot/dts/overlays/cma-overlay.dts
++++ kernel-rpi/arch/arm/boot/dts/overlays/cma-overlay.dts
+@@ -21,6 +21,8 @@
+ 	};
+ 
+ 	__overrides__ {
++		cma-768 = <&frag0>,"size:0=",<0x30000000>;
++		cma-640 = <&frag0>,"size:0=",<0x28000000>;
+ 		cma-512 = <&frag0>,"size:0=",<0x20000000>;
+ 		cma-448 = <&frag0>,"size:0=",<0x1c000000>;
+ 		cma-384 = <&frag0>,"size:0=",<0x18000000>;
+Index: kernel-rpi/drivers/staging/vc04_services/vc-sm-cma/vc_sm.c
+===================================================================
+--- kernel-rpi.orig/drivers/staging/vc04_services/vc-sm-cma/vc_sm.c
++++ kernel-rpi/drivers/staging/vc04_services/vc-sm-cma/vc_sm.c
+@@ -28,6 +28,7 @@
+ 
+ /* ---- Include Files ----------------------------------------------------- */
+ #include <linux/cdev.h>
++#include <linux/delay.h>
+ #include <linux/device.h>
+ #include <linux/debugfs.h>
+ #include <linux/dma-mapping.h>
+@@ -525,7 +526,10 @@ static void vc_sm_dma_buf_release(struct
+ 
+ 	pr_debug("%s dmabuf %p, buffer %p\n", __func__, dmabuf, buffer);
+ 
+-	buffer->in_use = false;
++	/*
++	 * Don't clear in_use yet — this prevents the VPU release callback
++	 * from freeing the buffer while we wait for it below.
++	 */
+ 
+ 	/* Unmap on the VPU */
+ 	vc_sm_vpu_free(buffer);
+@@ -537,6 +541,33 @@ static void vc_sm_dma_buf_release(struct
+ 	vc_sm_clean_up_dmabuf(buffer);
+ 	pr_debug("%s clean_up dmabuf done\n", __func__);
+ 
++	if (buffer->vc_handle && buffer->vpu_state == VPU_UNMAPPING) {
++		/*
++		 * VPU hasn't acknowledged the free yet. Wait briefly for the
++		 * release callback. Set in_use to prevent the callback from
++		 * freeing the buffer while we sleep (Chrome-allocated buffers
++		 * have in_use == false from kzalloc, unlike imported buffers).
++		 */
++		buffer->in_use = true;
++		mutex_unlock(&buffer->lock);
++		msleep(100);
++		mutex_lock(&buffer->lock);
++
++		if (buffer->vc_handle) {
++			/*
++			 * VPU didn't respond within 100ms — force release to
++			 * prevent indefinite accumulation of zombie buffers.
++			 */
++			pr_info("%s: VPU release timeout for buffer %p (vc_handle %08x), forcing cleanup\n",
++				__func__, buffer, buffer->vc_handle);
++			free_kernel_id(buffer->kernel_id);
++			buffer->vc_handle = 0;
++			buffer->vpu_state = VPU_NOT_MAPPED;
++		}
++	}
++
++	buffer->in_use = false;
++
+ 	/* buffer->lock will be destroyed by vc_sm_release_resource if finished
+ 	 * with, otherwise unlocked. Do NOT unlock here.
+ 	 */
+Index: kernel-rpi/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
+===================================================================
+--- kernel-rpi.orig/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
++++ kernel-rpi/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
+@@ -882,8 +882,17 @@ static inline unsigned int get_sizeimage
+ 			return DEF_COMP_BUF_SIZE_720P_OR_LESS;
+ 	}
+ 
+-	if (fmt->fourcc != V4L2_PIX_FMT_NV12_COL128)
+-		return (bpl * height * fmt->size_multiplier_x2) >> 1;
++	if (fmt->fourcc != V4L2_PIX_FMT_NV12_COL128) {
++		/*
++		 * The VPU aligns the Y plane height to 16 rows for YUV
++		 * formats.  Use the aligned height so the buffer is large
++		 * enough for the UV plane at the offset the firmware uses.
++		 */
++		unsigned int aligned_height =
++			(fmt->size_multiplier_x2 == 3) ? ALIGN(height, 16)
++						       : height;
++		return (bpl * aligned_height * fmt->size_multiplier_x2) >> 1;
++	}
+ 
+ 	/*
+ 	 * V4L2_PIX_FMT_NV12_COL128 is 128 pixel wide columns.
+@@ -3769,6 +3778,14 @@ static int bcm2835_codec_get_supported_f
+ 		const struct bcm2835_codec_fmt *fmt = get_fmt(fourccs[i]);
+ 
+ 		if (fmt) {
++			/*
++			 * For DECODE CAPTURE, only expose NV12.
++			 * The stateful decoder outputs NV12 directly;
++			 * no ISP conversion needed.
++			 */
++			if (dev->role == DECODE &&
++			    fmt->fourcc != V4L2_PIX_FMT_NV12)
++				continue;
+ 			list[j] = *fmt;
+ 			j++;
+ 		}
