@@ -565,7 +565,15 @@ Index: src/media/gpu/v4l2/v4l2_video_decoder.cc
  #include "base/memory/scoped_refptr.h"
  #include "base/metrics/histogram_functions.h"
  #include "base/notimplemented.h"
-@@ -148,6 +150,9 @@ size_t GetInputBufferSizeForResolution(c
+@@ -38,6 +40,7 @@
+ #include "media/gpu/gpu_video_decode_accelerator_helpers.h"
+ #include "media/gpu/macros.h"
+ #include "media/gpu/v4l2/legacy/v4l2_video_decoder_backend_stateful.h"
++#include "media/gpu/v4l2/v4l2_image_processor_backend.h"
+ #include "media/gpu/v4l2/v4l2_status.h"
+ #include "media/gpu/v4l2/v4l2_utils.h"
+ #include "media/gpu/v4l2/v4l2_video_decoder_backend_stateless.h"
+@@ -148,6 +151,9 @@ size_t GetInputBufferSizeForResolution(c
  base::AtomicRefCount V4L2VideoDecoder::num_instances_(0);
  
  // static
@@ -575,7 +583,7 @@ Index: src/media/gpu/v4l2/v4l2_video_decoder.cc
  std::unique_ptr<VideoDecoderMixin> V4L2VideoDecoder::Create(
      std::unique_ptr<MediaLog> media_log,
      scoped_refptr<base::SequencedTaskRunner> decoder_task_runner,
-@@ -220,6 +225,9 @@ V4L2VideoDecoder::~V4L2VideoDecoder() {
+@@ -220,6 +226,9 @@ V4L2VideoDecoder::~V4L2VideoDecoder() {
  
    weak_this_for_polling_factory_.InvalidateWeakPtrs();
  
@@ -585,7 +593,7 @@ Index: src/media/gpu/v4l2/v4l2_video_decoder.cc
    if (can_use_decoder_)
      num_instances_.Decrement();
  }
-@@ -305,6 +313,11 @@ void V4L2VideoDecoder::Initialize(const
+@@ -305,6 +314,11 @@ void V4L2VideoDecoder::Initialize(const
      input_queue_ = nullptr;
      output_queue_ = nullptr;
  
@@ -597,7 +605,7 @@ Index: src/media/gpu/v4l2/v4l2_video_decoder.cc
      if (can_use_decoder_) {
        num_instances_.Decrement();
        can_use_decoder_ = false;
-@@ -401,19 +414,61 @@ V4L2Status V4L2VideoDecoder::InitializeB
+@@ -401,19 +415,65 @@ V4L2Status V4L2VideoDecoder::InitializeB
    constexpr bool kStateful = false;
    constexpr bool kStateless = true;
    std::optional<std::pair<bool, uint32_t>> api_and_format;
@@ -614,31 +622,35 @@ Index: src/media/gpu/v4l2/v4l2_video_decoder.cc
 +  const bool is_hevc = profile_ >= HEVCPROFILE_MIN &&
 +                        profile_ <= HEVCPROFILE_MAX;
 +  if (is_hevc) {
-+    // The RPi4 HEVC decoder is single-instance hardware.  Wait briefly for the
-+    // previous session to finish tearing down (e.g. DestroyAsync + DeleteSoon)
-+    // before giving up, so that back-to-back video switches don't flash black
-+    // due to an unnecessary fallback to software decode.
-+    constexpr int kHevcRetries = 20;
-+    constexpr base::TimeDelta kHevcRetryDelay = base::Milliseconds(50);
-+    bool acquired = false;
-+    for (int i = 0; i < kHevcRetries; ++i) {
-+      if (num_hevc_instances_.Increment() < kMaxNumOfHevcInstances) {
-+        acquired = true;
-+        break;
++    // When V4L2 image processing hardware (e.g. RPi4 ISP) is present, HEVC
++    // decoding requires large VCSM-CMA buffer allocations that limit the
++    // number of concurrent sessions.  Enforce kMaxNumOfHevcInstances only
++    // on these devices.  Devices without V4L2 ISP (e.g. RPi5, which uses
++    // libyuv) are not CMA-constrained and can run multiple instances.
++    const bool limit_hevc = V4L2ImageProcessorBackend::IsSupported();
++    if (limit_hevc) {
++      constexpr int kHevcRetries = 20;
++      constexpr base::TimeDelta kHevcRetryDelay = base::Milliseconds(50);
++      bool acquired = false;
++      for (int i = 0; i < kHevcRetries; ++i) {
++        if (num_hevc_instances_.Increment() < kMaxNumOfHevcInstances) {
++          acquired = true;
++          break;
++        }
++        num_hevc_instances_.Decrement();
++        if (i == 0) {
++          VLOGF(1) << "HEVC decoder slot busy, waiting up to "
++                   << (kHevcRetries * kHevcRetryDelay).InMilliseconds() << "ms";
++        }
++        base::PlatformThread::Sleep(kHevcRetryDelay);
 +      }
-+      num_hevc_instances_.Decrement();
-+      if (i == 0) {
-+        VLOGF(1) << "HEVC decoder slot busy, waiting up to "
-+                 << (kHevcRetries * kHevcRetryDelay).InMilliseconds() << "ms";
++      if (!acquired) {
++        VLOGF(1) << "Reached maximum number of HEVC decoder instances ("
++                 << kMaxNumOfHevcInstances << ") after retry";
++        return V4L2Status::Codes::kMaxDecoderInstanceCount;
 +      }
-+      base::PlatformThread::Sleep(kHevcRetryDelay);
++      is_hevc_instance_ = true;
 +    }
-+    if (!acquired) {
-+      VLOGF(1) << "Reached maximum number of HEVC decoder instances ("
-+               << kMaxNumOfHevcInstances << ") after retry";
-+      return V4L2Status::Codes::kMaxDecoderInstanceCount;
-+    }
-+    is_hevc_instance_ = true;
 +    const auto fourcc = VideoCodecProfileToV4L2PixFmt(profile_, kStateless);
 +    if (fourcc != V4L2_PIX_FMT_INVALID &&
 +        device_->Open(V4L2Device::Type::kDecoder, fourcc)) {
@@ -668,16 +680,18 @@ Index: src/media/gpu/v4l2/v4l2_video_decoder.cc
      num_instances_.Decrement();
      can_use_decoder_ = false;
      VLOGF(1) << "No V4L2 API found for profile: " << GetProfileName(profile_);
-@@ -693,12 +748,22 @@ CroStatus V4L2VideoDecoder::SetupOutputF
+@@ -693,12 +753,24 @@ CroStatus V4L2VideoDecoder::SetupOutputF
          PixelLayoutCandidate{.fourcc = *candidate, .size = adjusted_size});
    }
  
-+  // Check if any candidate requires an auxiliary frame pool (e.g. NC12 on RPi4
-+  // needs VCSM-CMA allocated DMABUF buffers for the ISP to import).
++  // Check if any candidate requires an auxiliary frame pool.  NC12 on RPi4
++  // needs VCSM-CMA allocated DMABUF buffers for the V4L2 ISP to import.
++  // On RPi5 (no ISP), libyuv detiles NC12→NV12 from decoder MMAP buffers,
++  // so no auxiliary frame pool is needed.
 +  bool need_aux_frame_pool = false;
 +  for (const auto& candidate : candidates) {
 +    if (candidate.fourcc == Fourcc(Fourcc::NC12)) {
-+      need_aux_frame_pool = true;
++      need_aux_frame_pool = V4L2ImageProcessorBackend::IsSupported();
 +      break;
 +    }
 +  }
@@ -692,7 +706,7 @@ Index: src/media/gpu/v4l2/v4l2_video_decoder.cc
            std::nullopt);
    if (!status_or_output_format.has_value()) {
      VLOGF(1) << "Failed to pick an output format.";
-@@ -1054,10 +1119,9 @@ void V4L2VideoDecoder::ApplyResolutionCh
+@@ -1054,10 +1126,9 @@ void V4L2VideoDecoder::ApplyResolutionCh
  size_t V4L2VideoDecoder::GetMaxOutputFramePoolSize() const {
    DCHECK_CALLED_ON_VALID_SEQUENCE(decoder_sequence_checker_);
  
@@ -706,7 +720,7 @@ Index: src/media/gpu/v4l2/v4l2_video_decoder.cc
  }
  
  bool V4L2VideoDecoder::NeedsTranscryption() {
-@@ -1179,13 +1243,14 @@ CroStatus V4L2VideoDecoder::ContinueChan
+@@ -1179,13 +1250,14 @@ CroStatus V4L2VideoDecoder::ContinueChan
  
    const v4l2_memory type =
        use_v4l2_allocated_buffers ? V4L2_MEMORY_MMAP : V4L2_MEMORY_DMABUF;
