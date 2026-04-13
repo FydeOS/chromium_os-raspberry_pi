@@ -1,0 +1,21 @@
+diff --git a/arch/arm/boot/dts/overlays/cutiepi-panel-overlay.dts b/arch/arm/boot/dts/overlays/cutiepi-panel-overlay.dts
+index d14c3698eb75..2d53bae13f75 100644
+--- a/arch/arm/boot/dts/overlays/cutiepi-panel-overlay.dts
++++ b/arch/arm/boot/dts/overlays/cutiepi-panel-overlay.dts
+@@ -48,7 +48,6 @@ fragment@2 {
+         frag1: __overlay__ {
+             pinctrl-names = "default";
+             pinctrl-0 = <&pwm_pins>;
+-            assigned-clock-rates = <1000000>;
+             status = "okay";
+         };
+     };
+@@ -59,7 +58,7 @@ __overlay__ {
+             rpi_backlight: rpi_backlight {
+                 compatible = "pwm-backlight";
+                 brightness-levels = <0 6 8 12 16 24 32 40 48 64 96 128 160 192 224 255>;
+-                default-brightness-level = <6>;
++                default-brightness-level = <15>;
+                 pwms = <&pwm 0 200000 0>;
+                 power-supply = <&vdd_3v3_reg>;
+                 status = "okay";

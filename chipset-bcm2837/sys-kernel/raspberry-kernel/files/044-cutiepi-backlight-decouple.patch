@@ -1,0 +1,12 @@
+diff --git a/arch/arm/boot/dts/overlays/cutiepi-panel-overlay.dts b/arch/arm/boot/dts/overlays/cutiepi-panel-overlay.dts
+index d4f48d026a08..3789764c6687 100644
+--- a/arch/arm/boot/dts/overlays/cutiepi-panel-overlay.dts
++++ b/arch/arm/boot/dts/overlays/cutiepi-panel-overlay.dts
+@@ -22,7 +22,6 @@ dsi1_out_port: endpoint {
+             display1: panel@0 {
+                 compatible = "nwe,nwe080";
+                 reg=<0>;
+-                backlight = <&rpi_backlight>;
+                 reset-gpios = <&gpio 20 0>;
+                 rotation = <270>;
+                 port {

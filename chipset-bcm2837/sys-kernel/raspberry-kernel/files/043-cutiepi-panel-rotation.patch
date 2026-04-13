@@ -1,0 +1,12 @@
+diff --git a/arch/arm/boot/dts/overlays/cutiepi-panel-overlay.dts b/arch/arm/boot/dts/overlays/cutiepi-panel-overlay.dts
+index 2d53bae13f75..d4f48d026a08 100644
+--- a/arch/arm/boot/dts/overlays/cutiepi-panel-overlay.dts
++++ b/arch/arm/boot/dts/overlays/cutiepi-panel-overlay.dts
+@@ -24,6 +24,7 @@ display1: panel@0 {
+                 reg=<0>;
+                 backlight = <&rpi_backlight>;
+                 reset-gpios = <&gpio 20 0>;
++                rotation = <270>;
+                 port {
+                     panel_dsi_in1: endpoint {
+                         remote-endpoint = <&dsi1_out_port>;
