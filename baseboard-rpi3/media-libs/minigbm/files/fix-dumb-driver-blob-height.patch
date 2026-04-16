@@ -1,0 +1,19 @@
+--- a/drv_helpers.c
++++ b/drv_helpers.c
+@@ -380,8 +380,15 @@
+ 	} else {
+ 		/* Align for llvmpipe 64-byte tile size for dumb_driver */
+-		aligned_width = ALIGN(aligned_width, MESA_LLVMPIPE_TILE_SIZE);
+-		aligned_height = ALIGN(aligned_height, MESA_LLVMPIPE_TILE_SIZE);
++		if (aligned_height == 1) {
++			/* 1D blob buffers (e.g. JPEG as R8 w=max_jpeg_size h=1)
++			 * must not be height-aligned; 64x inflation turns ~13MB
++			 * into ~832MB, causing ENOMEM on CMA-backed allocators. */
++			aligned_width = ALIGN(aligned_width, 64);
++		} else {
++			aligned_width = ALIGN(aligned_width, MESA_LLVMPIPE_TILE_SIZE);
++			aligned_height = ALIGN(aligned_height, MESA_LLVMPIPE_TILE_SIZE);
++		}
+ 		create_dumb.bpp = layout_from_format(format)->bytes_per_pixel[0] * 8;
+ 	}
+ 	create_dumb.width = aligned_width;

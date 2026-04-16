@@ -46,6 +46,7 @@ DEPEND="${RDEPEND}
 src_prepare() {
 	default
 	eapply ${FILESDIR}/vc6.patch
+	eapply ${FILESDIR}/fix-dumb-driver-blob-height.patch
 	sanitizers-setup-env
 	cros-common.mk_src_prepare
 }
