@@ -1,1 +1,2 @@
 virtual/linux-sources::chromiumos
+sys-kernel/linux-firmware::chromiumos

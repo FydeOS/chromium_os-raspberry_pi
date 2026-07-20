@@ -6,7 +6,7 @@
 
 EAPI=7
 CROS_WORKON_REPO="https://github.com/raspberrypi"
-CROS_WORKON_COMMIT="8b22b5cc162dafe1899fb81f0ea02fc2dd18f92e"
+CROS_WORKON_COMMIT="da5f07d402549ea355de25e48a9c179b75ae82f5"
 CROS_WORKON_PROJECT="linux"
 CROS_WORKON_LOCALNAME="kernel/v6.12-rpi"
 CROS_WORKON_EGIT_BRANCH="rpi-6.12.y"
@@ -34,5 +34,5 @@ ARM_AFDO_FROZEN_PROFILE_VERSION=""
 inherit cros-workon cros-kernel
 
 HOMEPAGE="https://www.chromium.org/chromium-os/chromiumos-design-docs/chromium-os-kernel"
-DESCRIPTION="Chromium OS Linux kernel 6.6"
+DESCRIPTION="Chromium OS Linux kernel 6.12"
 KEYWORDS="*"

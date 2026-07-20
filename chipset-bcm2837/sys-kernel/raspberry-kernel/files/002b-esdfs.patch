@@ -1,7 +1,7 @@
-Index: kernel-rpi/fs/Kconfig
+Index: v6.12-rpi/fs/Kconfig
 ===================================================================
---- kernel-rpi.orig/fs/Kconfig
-+++ kernel-rpi/fs/Kconfig
+--- v6.12-rpi.orig/fs/Kconfig
++++ v6.12-rpi/fs/Kconfig
 @@ -319,6 +319,7 @@ source "fs/orangefs/Kconfig"
  source "fs/adfs/Kconfig"
  source "fs/affs/Kconfig"
@@ -10,10 +10,10 @@ Index: kernel-rpi/fs/Kconfig
  source "fs/hfs/Kconfig"
  source "fs/hfsplus/Kconfig"
  source "fs/befs/Kconfig"
-Index: kernel-rpi/fs/Makefile
+Index: v6.12-rpi/fs/Makefile
 ===================================================================
---- kernel-rpi.orig/fs/Makefile
-+++ kernel-rpi/fs/Makefile
+--- v6.12-rpi.orig/fs/Makefile
++++ v6.12-rpi/fs/Makefile
 @@ -4,7 +4,7 @@
  #
  # 14 Sep 2000, Christoph Hellwig <hch@infradead.org>
@@ -40,10 +40,10 @@ Index: kernel-rpi/fs/Makefile
  obj-$(CONFIG_VXFS_FS)		+= freevxfs/
  obj-$(CONFIG_NFS_FS)		+= nfs/
  obj-$(CONFIG_EXPORTFS)		+= exportfs/
-Index: kernel-rpi/fs/esdfs/Kconfig
+Index: v6.12-rpi/fs/esdfs/Kconfig
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/fs/esdfs/Kconfig
++++ v6.12-rpi/fs/esdfs/Kconfig
 @@ -0,0 +1,7 @@
 +config ESD_FS
 +	tristate "Emulated 'SD card' file system for Android (EXPERIMENTAL)"
@@ -52,10 +52,10 @@ Index: kernel-rpi/fs/esdfs/Kconfig
 +	help
 +	  Esdfs is a wrapfs-based file system, designed to implement the
 +	  Android "sdcard" FUSE-backed file system from within the kernel.
-Index: kernel-rpi/fs/esdfs/Makefile
+Index: v6.12-rpi/fs/esdfs/Makefile
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/fs/esdfs/Makefile
++++ v6.12-rpi/fs/esdfs/Makefile
 @@ -0,0 +1,7 @@
 +ESDFS_VERSION="0.2"
 +
@@ -64,10 +64,10 @@ Index: kernel-rpi/fs/esdfs/Makefile
 +obj-$(CONFIG_ESD_FS) += esdfs.o
 +
 +esdfs-y := dentry.o file.o inode.o main.o super.o lookup.o mmap.o derive.o
-Index: kernel-rpi/fs/esdfs/dentry.c
+Index: v6.12-rpi/fs/esdfs/dentry.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/fs/esdfs/dentry.c
++++ v6.12-rpi/fs/esdfs/dentry.c
 @@ -0,0 +1,158 @@
 +/*
 + * Copyright (c) 1998-2014 Erez Zadok
@@ -227,10 +227,10 @@ Index: kernel-rpi/fs/esdfs/dentry.c
 +	.d_compare	= esdfs_d_compare,
 +	.d_release	= esdfs_d_release,
 +};
-Index: kernel-rpi/fs/esdfs/derive.c
+Index: v6.12-rpi/fs/esdfs/derive.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/fs/esdfs/derive.c
++++ v6.12-rpi/fs/esdfs/derive.c
 @@ -0,0 +1,610 @@
 +/*
 + * Copyright (c) 2013-2014 Motorola Mobility LLC
@@ -842,10 +842,10 @@ Index: kernel-rpi/fs/esdfs/derive.c
 +	esdfs_revert_creds(creds, &mask);
 +	return err;
 +}
-Index: kernel-rpi/fs/esdfs/esdfs.h
+Index: v6.12-rpi/fs/esdfs/esdfs.h
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/fs/esdfs/esdfs.h
++++ v6.12-rpi/fs/esdfs/esdfs.h
 @@ -0,0 +1,627 @@
 +/*
 + * Copyright (c) 1998-2014 Erez Zadok
@@ -1474,10 +1474,10 @@ Index: kernel-rpi/fs/esdfs/esdfs.h
 +}
 +
 +#endif	/* not _ESDFS_H_ */
-Index: kernel-rpi/fs/esdfs/file.c
+Index: v6.12-rpi/fs/esdfs/file.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/fs/esdfs/file.c
++++ v6.12-rpi/fs/esdfs/file.c
 @@ -0,0 +1,528 @@
 +/*
 + * Copyright (c) 1998-2014 Erez Zadok
@@ -1750,7 +1750,7 @@ Index: kernel-rpi/fs/esdfs/file.c
 +
 +	/* open lower object and link esdfs's file struct to lower's */
 +	esdfs_get_lower_path(file->f_path.dentry, &lower_path);
-+  lower_file = backing_file_open(file_user_path(file), file->f_flags, &lower_path, current_cred());
++  lower_file = backing_file_open(file, file->f_flags, &lower_path, current_cred());
 +	path_put(&lower_path);
 +	if (IS_ERR(lower_file)) {
 +		err = PTR_ERR(lower_file);
@@ -2007,10 +2007,10 @@ Index: kernel-rpi/fs/esdfs/file.c
 +	.fsync		= esdfs_fsync,
 +	.fasync		= esdfs_fasync,
 +};
-Index: kernel-rpi/fs/esdfs/inode.c
+Index: v6.12-rpi/fs/esdfs/inode.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/fs/esdfs/inode.c
++++ v6.12-rpi/fs/esdfs/inode.c
 @@ -0,0 +1,550 @@
 +/*
 + * Copyright (c) 1998-2014 Erez Zadok
@@ -2562,10 +2562,10 @@ Index: kernel-rpi/fs/esdfs/inode.c
 +	.setattr	= esdfs_setattr,
 +	.getattr	= esdfs_getattr,
 +};
-Index: kernel-rpi/fs/esdfs/lookup.c
+Index: v6.12-rpi/fs/esdfs/lookup.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/fs/esdfs/lookup.c
++++ v6.12-rpi/fs/esdfs/lookup.c
 @@ -0,0 +1,471 @@
 +/*
 + * Copyright (c) 1998-2014 Erez Zadok
@@ -3038,10 +3038,10 @@ Index: kernel-rpi/fs/esdfs/lookup.c
 +		dput(real_parent);
 +	return ret;
 +}
-Index: kernel-rpi/fs/esdfs/main.c
+Index: v6.12-rpi/fs/esdfs/main.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/fs/esdfs/main.c
++++ v6.12-rpi/fs/esdfs/main.c
 @@ -0,0 +1,734 @@
 +/*
 + * Copyright (c) 1998-2014 Erez Zadok
@@ -3777,10 +3777,10 @@ Index: kernel-rpi/fs/esdfs/main.c
 +
 +module_init(init_esdfs_fs);
 +module_exit(exit_esdfs_fs);
-Index: kernel-rpi/fs/esdfs/mmap.c
+Index: v6.12-rpi/fs/esdfs/mmap.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/fs/esdfs/mmap.c
++++ v6.12-rpi/fs/esdfs/mmap.c
 @@ -0,0 +1,98 @@
 +/*
 + * Copyright (c) 1998-2014 Erez Zadok
@@ -3880,10 +3880,10 @@ Index: kernel-rpi/fs/esdfs/mmap.c
 +	.open		= esdfs_vm_open,
 +	.close		= esdfs_vm_close,
 +};
-Index: kernel-rpi/fs/esdfs/super.c
+Index: v6.12-rpi/fs/esdfs/super.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/fs/esdfs/super.c
++++ v6.12-rpi/fs/esdfs/super.c
 @@ -0,0 +1,290 @@
 +/*
 + * Copyright (c) 1998-2014 Erez Zadok
@@ -4175,10 +4175,10 @@ Index: kernel-rpi/fs/esdfs/super.c
 +	.destroy_inode	= esdfs_destroy_inode,
 +	.drop_inode	= generic_delete_inode,
 +};
-Index: kernel-rpi/include/uapi/linux/magic.h
+Index: v6.12-rpi/include/uapi/linux/magic.h
 ===================================================================
---- kernel-rpi.orig/include/uapi/linux/magic.h
-+++ kernel-rpi/include/uapi/linux/magic.h
+--- v6.12-rpi.orig/include/uapi/linux/magic.h
++++ v6.12-rpi/include/uapi/linux/magic.h
 @@ -63,6 +63,8 @@
  #define REISER2FS_SUPER_MAGIC_STRING	"ReIsEr2Fs"
  #define REISER2FS_JR_SUPER_MAGIC_STRING	"ReIsEr3Fs"
@@ -4188,11 +4188,11 @@ Index: kernel-rpi/include/uapi/linux/magic.h
  #define SMB_SUPER_MAGIC		0x517B
  #define CIFS_SUPER_MAGIC	0xFF534D42      /* the first four bytes of SMB PDUs */
  #define SMB2_SUPER_MAGIC	0xFE534D42
-Index: kernel-rpi/fs/erofs/decompressor_zstd.c
+Index: v6.12-rpi/fs/erofs/decompressor_zstd.c
 ===================================================================
---- kernel-rpi.orig/fs/erofs/decompressor_zstd.c
-+++ kernel-rpi/fs/erofs/decompressor_zstd.c
-@@ -178,6 +178,7 @@ static int z_erofs_zstd_decompress(struc
+--- v6.12-rpi.orig/fs/erofs/decompressor_zstd.c
++++ v6.12-rpi/fs/erofs/decompressor_zstd.c
+@@ -172,6 +172,7 @@ static int z_erofs_zstd_decompress(struc
  	dctx.bounce = strm->bounce;
  
  	do {
@@ -4200,7 +4200,7 @@ Index: kernel-rpi/fs/erofs/decompressor_zstd.c
  		dctx.inbuf_sz = in_buf.size;
  		dctx.inbuf_pos = in_buf.pos;
  		err = z_erofs_stream_switch_bufs(&dctx, &out_buf.dst,
-@@ -193,18 +194,14 @@ static int z_erofs_zstd_decompress(struc
+@@ -187,18 +188,14 @@ static int z_erofs_zstd_decompress(struc
  		in_buf.pos = dctx.inbuf_pos;
  
  		zerr = zstd_decompress_stream(stream, &out_buf, &in_buf);
@@ -4222,11 +4222,11 @@ Index: kernel-rpi/fs/erofs/decompressor_zstd.c
  
  	if (dctx.kout)
  		kunmap_local(dctx.kout);
-Index: kernel-rpi/fs/erofs/super.c
+Index: v6.12-rpi/fs/erofs/super.c
 ===================================================================
---- kernel-rpi.orig/fs/erofs/super.c
-+++ kernel-rpi/fs/erofs/super.c
-@@ -636,29 +636,6 @@ static int erofs_fc_fill_super(struct su
+--- v6.12-rpi.orig/fs/erofs/super.c
++++ v6.12-rpi/fs/erofs/super.c
+@@ -635,29 +635,6 @@ static int erofs_fc_fill_super(struct su
  
  	sbi->blkszbits = PAGE_SHIFT;
  	if (!sb->s_bdev) {
@@ -4256,10 +4256,10 @@ Index: kernel-rpi/fs/erofs/super.c
  		sb->s_blocksize = PAGE_SIZE;
  		sb->s_blocksize_bits = PAGE_SHIFT;
  
-Index: kernel-rpi/fs/erofs/xattr.c
+Index: v6.12-rpi/fs/erofs/xattr.c
 ===================================================================
---- kernel-rpi.orig/fs/erofs/xattr.c
-+++ kernel-rpi/fs/erofs/xattr.c
+--- v6.12-rpi.orig/fs/erofs/xattr.c
++++ v6.12-rpi/fs/erofs/xattr.c
 @@ -135,7 +135,8 @@ static bool erofs_xattr_trusted_list(str
  
  static int erofs_xattr_generic_get(const struct xattr_handler *handler,
@@ -4270,11 +4270,11 @@ Index: kernel-rpi/fs/erofs/xattr.c
  {
  	if (handler->flags == EROFS_XATTR_INDEX_USER &&
  	    !test_opt(&EROFS_I_SB(inode)->opt, XATTR_USER))
-Index: kernel-rpi/fs/erofs/zdata.c
+Index: v6.12-rpi/fs/erofs/zdata.c
 ===================================================================
---- kernel-rpi.orig/fs/erofs/zdata.c
-+++ kernel-rpi/fs/erofs/zdata.c
-@@ -1244,14 +1244,14 @@ static int z_erofs_parse_in_bvecs(struct
+--- v6.12-rpi.orig/fs/erofs/zdata.c
++++ v6.12-rpi/fs/erofs/zdata.c
+@@ -1230,14 +1230,14 @@ static int z_erofs_parse_in_bvecs(struct
  	return err;
  }
  
@@ -4291,7 +4291,7 @@ Index: kernel-rpi/fs/erofs/zdata.c
  	struct page *page;
  	bool overlapped;
  	bool try_free = true;
-@@ -1381,12 +1381,12 @@ static int z_erofs_decompress_queue(cons
+@@ -1369,12 +1369,12 @@ static int z_erofs_decompress_queue(cons
  		.pcl = io->head,
  	};
  	struct z_erofs_pcluster *next;
@@ -4306,7 +4306,7 @@ Index: kernel-rpi/fs/erofs/zdata.c
  	}
  	return err;
  }
-@@ -1410,16 +1410,6 @@ static void z_erofs_decompressqueue_kthr
+@@ -1398,16 +1398,6 @@ static void z_erofs_decompressqueue_kthr
  }
  #endif
  
@@ -4323,13 +4323,13 @@ Index: kernel-rpi/fs/erofs/zdata.c
  static void z_erofs_decompress_kickoff(struct z_erofs_decompressqueue *io,
  				       int bios)
  {
-@@ -1434,7 +1424,8 @@ static void z_erofs_decompress_kickoff(s
+@@ -1423,7 +1413,8 @@ static void z_erofs_decompress_kickoff(s
  
  	if (atomic_add_return(bios, &io->pending_bios))
  		return;
 -	if (z_erofs_in_atomic()) {
 +	/* Use (kthread_)work and sync decompression for atomic contexts only */
 +	if (!in_task() || irqs_disabled() || rcu_read_lock_any_held()) {
- #ifdef CONFIG_EROFS_FS_PCPU_KTHREAD
- 		struct kthread_worker *worker;
- 
+ 		/* See `sync_decompress` in sysfs-fs-erofs for more details */
+ 		if (sbi->sync_decompress == EROFS_SYNC_DECOMPRESS_AUTO)
+ 			sbi->sync_decompress = EROFS_SYNC_DECOMPRESS_FORCE_ON;

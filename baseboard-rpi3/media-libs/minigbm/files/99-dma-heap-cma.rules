@@ -1,0 +1,6 @@
+# Grant the Chrome GPU process (minigbm v3d backend) access to the CMA dma-buf
+# heap. The v3d backend allocates contiguous, linear scanout/render buffers
+# from /dev/dma_heap/linux,cma and imports them into v3d via PRIME (Option A),
+# instead of borrowing a CMA BO from vc4. The GPU process runs as chronos,
+# which is a member of the "video" group (same group that owns /dev/dri/card*).
+SUBSYSTEM=="dma_heap", ENV{DEVNAME}=="/dev/dma_heap/linux,cma", GROUP="video", MODE="0660"

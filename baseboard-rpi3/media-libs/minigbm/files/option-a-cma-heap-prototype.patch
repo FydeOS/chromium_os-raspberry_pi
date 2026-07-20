@@ -1,0 +1,408 @@
+FYDE: v3d minigbm: allocate shared/scanout buffers from CMA dma-heap (Option A)
+
+Prototype of the "Option A" design: replace the kernel-side vc4 buffer borrow
+(VC4_CALLOC ioctl flag -> v3d_vc4_bind.c, plus the vc4_drm / vc4_drm_file
+globals) with a standard dma-buf flow.
+
+For scanout / SW / video (V3D_HEAP_USE) buffers, the v3d minigbm backend now:
+  1. allocates a contiguous, linear buffer from the CMA dma-buf heap
+     (/dev/dma_heap/<cma-area>), and
+  2. imports it into v3d via PRIME (drmPrimeFDToHandle). v3d maps the CMA
+     pages into the GPU MMU through its existing gem_prime_import_sg_table ->
+     v3d_bo_create_finish path, so the GPU can render into it. The same
+     dma-buf is what vc4 imports for HVS scanout.
+
+Pure-GPU (non-shared) buffers keep their native UIF-tiled v3d allocation.
+CPU map / export / sync go through the dma-buf fd (mmap + DMA_BUF_IOCTL_SYNC).
+
+If no CMA heap is present at runtime the backend falls back to the legacy
+VC4_CALLOC borrow, so behaviour never regresses. This removes the need for the
+in-kernel v3d<->vc4 coupling once validated on-device.
+
+Requires kernel: CONFIG_DMABUF_HEAPS_CMA=y (already set) and a CMA region
+large enough for framebuffers (config.txt cma=... / reserved-memory).
+
+BUG=none
+TEST=emerge-rpi5-openfyde media-libs/minigbm
+Index: minigbm/v3d.c
+===================================================================
+--- minigbm.orig/v3d.c
++++ minigbm/v3d.c
+@@ -5,18 +5,44 @@
+  * Author: Yang Tsao <yang@fydeos.io>
+  */
+ #ifdef DRV_V3D
++#include <dirent.h>
+ #include <errno.h>
++#include <fcntl.h>
++#include <stdint.h>
+ #include <stdio.h>
++#include <stdlib.h>
+ #include <string.h>
++#include <sys/ioctl.h>
+ #include <sys/mman.h>
++#include <unistd.h>
+ #include <xf86drm.h>
+ 
+-#include "drv_priv.h"
+ #include "drv_helpers.h"
+-#include "util.h"
++#include "drv_priv.h"
++#include "external/dma-buf.h"
++#include "external/dma-heap.h"
+ #include "external/v3d_drm.h"
++#include "util.h"
+ #define ARC_CALLOC (1<<7)
+ #define CROS_CALLOC (1<<6)
++
++/*
++ * Option A prototype: allocate scanout/shared/CPU-visible buffers from a CMA
++ * dma-buf heap and import the resulting dma-buf into v3d via standard PRIME,
++ * instead of borrowing a CMA BO from vc4 through the custom VC4_CALLOC ioctl
++ * flag (v3d_vc4_bind.c). The heap-backed buffer is contiguous + linear, so it
++ * is both HVS-scanout-capable (vc4 imports it) and v3d-renderable (v3d maps it
++ * into the GPU MMU via gem_prime_import_sg_table -> v3d_bo_create_finish).
++ *
++ * Pure-GPU (non-shared) buffers keep their native UIF-tiled v3d allocation.
++ *
++ * If no CMA heap is available at runtime, we fall back to the legacy
++ * VC4_CALLOC borrow so behaviour never regresses.
++ */
++#define V3D_HEAP_USE                                                                               \
++	(BO_USE_SW_MASK | BO_USE_SCANOUT | BO_USE_LINEAR | BO_USE_HW_VIDEO_DECODER |                \
++	 BO_USE_HW_VIDEO_ENCODER)
++
+ enum v3d_tiling_mode {
+         /* Untiled resources.  Not valid as texture inputs. */
+         V3D_TILING_RASTER,
+@@ -41,6 +67,21 @@ enum v3d_tiling_mode {
+         V3D_TILING_UIF_XOR,
+ };
+ 
++/* Per-driver state: the CMA dma-buf heap fd (or -1 if unavailable). */
++struct v3d_driver_priv {
++	int heap_fd;
++};
++
++/* Per-BO state for heap-backed buffers. */
++struct v3d_bo_priv {
++	int dmabuf_fd; /* the CMA heap dma-buf; >= 0 for heap-backed buffers */
++};
++
++struct v3d_private_map_data {
++  void *cached_addr;
++  void *gem_addr;
++};
++
+ static const uint32_t render_target_formats[] = { DRM_FORMAT_RGB565, DRM_FORMAT_BGR565,
+  DRM_FORMAT_ARGB8888, DRM_FORMAT_XRGB8888, DRM_FORMAT_ABGR8888, DRM_FORMAT_XBGR8888 };
+ 
+@@ -49,7 +90,54 @@ static const uint32_t texture_target_for
+  DRM_FORMAT_GR88, DRM_FORMAT_R16, DRM_FORMAT_NV21, DRM_FORMAT_P010
+       };
+ 
++/*
++ * Open the CMA dma-buf heap. The default CMA area is exported by
++ * drivers/dma-buf/heaps/cma_heap.c as /dev/dma_heap/<cma-area-name>; the name
++ * varies by devicetree ("linux,cma", "reserved", ...), so try the common
++ * names and then fall back to scanning for any non-system heap.
++ */
++static int v3d_open_cma_heap(void)
++{
++	static const char *const candidates[] = {
++		"/dev/dma_heap/linux,cma",
++		"/dev/dma_heap/reserved",
++		"/dev/dma_heap/linux,cma-default",
++	};
++	DIR *dir;
++	struct dirent *ent;
++	int fd;
++	size_t i;
++
++	for (i = 0; i < ARRAY_SIZE(candidates); i++) {
++		fd = open(candidates[i], O_RDWR | O_CLOEXEC);
++		if (fd >= 0) {
++			drv_logi("v3d: using CMA dma-heap %s\n", candidates[i]);
++			return fd;
++		}
++	}
++
++	/* Fallback: first heap that is not the (non-contiguous) system heap. */
++	dir = opendir("/dev/dma_heap");
++	if (!dir)
++		return -1;
++	while ((ent = readdir(dir))) {
++		char path[256];
++		if (ent->d_name[0] == '.' || !strcmp(ent->d_name, "system"))
++			continue;
++		snprintf(path, sizeof(path), "/dev/dma_heap/%s", ent->d_name);
++		fd = open(path, O_RDWR | O_CLOEXEC);
++		if (fd >= 0) {
++			drv_logi("v3d: using CMA dma-heap %s\n", path);
++			closedir(dir);
++			return fd;
++		}
++	}
++	closedir(dir);
++	return -1;
++}
++
+ static int v3d_init(struct driver *drv) {
++  struct v3d_driver_priv *priv;
+   struct format_metadata metadata;
+   metadata.tiling = 0;
+   metadata.priority = 1;
+@@ -80,17 +168,79 @@ static int v3d_init(struct driver *drv)
+              BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE);
+   drv_modify_combination(drv, DRM_FORMAT_YVU420, &metadata,
+              BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE);
++
++  priv = calloc(1, sizeof(*priv));
++  if (!priv)
++    return -ENOMEM;
++  priv->heap_fd = v3d_open_cma_heap();
++  if (priv->heap_fd < 0)
++    drv_logi("v3d: no CMA dma-heap found, falling back to VC4_CALLOC borrow\n");
++  drv->priv = priv;
++
+   drv_logi("v3d driver init.\n");
+   return drv_modify_linear_combinations(drv);
+ }
+ 
+-struct v3d_private_map_data {
+-  void *cached_addr;
+-  void *gem_addr;
+-};
++static void v3d_close(struct driver *drv)
++{
++	struct v3d_driver_priv *priv = drv->priv;
++	if (priv) {
++		if (priv->heap_fd >= 0)
++			close(priv->heap_fd);
++		free(priv);
++		drv->priv = NULL;
++	}
++}
++
++/*
++ * Allocate a contiguous linear buffer from the CMA dma-heap and import it into
++ * v3d so the GPU can render into it. On success bo->handle.u32 is the v3d GEM
++ * handle and *out_priv owns the dma-buf fd used for CPU map / export / sync.
++ */
++static int v3d_alloc_from_heap(struct bo *bo, int heap_fd, struct v3d_bo_priv **out_priv)
++{
++	struct dma_heap_allocation_data alloc = {
++		.len = bo->meta.total_size,
++		.fd_flags = O_RDWR | O_CLOEXEC,
++	};
++	struct v3d_bo_priv *priv;
++	uint32_t handle = 0;
++	int ret;
++
++	ret = ioctl(heap_fd, DMA_HEAP_IOCTL_ALLOC, &alloc);
++	if (ret) {
++		drv_loge("v3d: DMA_HEAP_IOCTL_ALLOC failed size=%zu: %s\n", bo->meta.total_size,
++			 strerror(errno));
++		return -errno;
++	}
++
++	/* Import the CMA dma-buf into v3d's GPU address space (standard PRIME). */
++	ret = drmPrimeFDToHandle(bo->drv->fd, alloc.fd, &handle);
++	if (ret) {
++		drv_loge("v3d: PRIME import of heap buffer failed: %s\n", strerror(errno));
++		close(alloc.fd);
++		return -errno;
++	}
++
++	priv = calloc(1, sizeof(*priv));
++	if (!priv) {
++		struct drm_gem_close gem_close = { .handle = handle };
++		drmIoctl(bo->drv->fd, DRM_IOCTL_GEM_CLOSE, &gem_close);
++		close(alloc.fd);
++		return -ENOMEM;
++	}
++
++	priv->dmabuf_fd = alloc.fd;
++	bo->handle.u32 = handle;
++	bo->meta.format_modifier = DRM_FORMAT_MOD_LINEAR;
++	bo->meta.tiling = V3D_TILING_RASTER;
++	*out_priv = priv;
++	return 0;
++}
+ 
+ static int v3d_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t format,
+        uint64_t use_flags) {
++  struct v3d_driver_priv *dpriv = bo->drv->priv;
+   int ret;
+   uint32_t stride, algin_height;
+   struct drm_v3d_create_bo bo_create;
+@@ -124,15 +274,38 @@ static int v3d_bo_create(struct bo *bo,
+     algin_height = ALIGN(height, 8);
+   drv_bo_from_format(bo, stride, 1, algin_height, format);
+   bo->meta.total_size = ALIGN(bo->meta.total_size, 4096);
+-  bo_create.size = bo->meta.total_size;
+-  if (use_flags & (BO_USE_SW_MASK | BO_USE_SCANOUT | BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER)) {
+-     bo_create.flags = ARC_CALLOC;
+-     bo->meta.format_modifier = DRM_FORMAT_MOD_LINEAR;
+-     bo->meta.tiling = V3D_TILING_RASTER;
++
++  /*
++   * Shared / scanout / CPU-visible buffers must be contiguous + linear.
++   * Prefer the CMA dma-heap (Option A); fall back to the legacy vc4 borrow
++   * only if the heap is unavailable.
++   */
++  if (use_flags & V3D_HEAP_USE) {
++    if (dpriv && dpriv->heap_fd >= 0) {
++      struct v3d_bo_priv *bpriv = NULL;
++      ret = v3d_alloc_from_heap(bo, dpriv->heap_fd, &bpriv);
++      if (ret)
++        return ret;
++      bo->priv = bpriv;
++      drv_logi("v3d bo path=CMA-HEAP  %ux%u %4s size=%zu mod=linear v3d_handle=0x%x dmabuf_fd=%d use=0x%llx\n",
++        width, height, (char *)&format, bo->meta.total_size, bo->handle.u32,
++        bpriv->dmabuf_fd, (unsigned long long)use_flags);
++      return 0;
++    }
++    /* Legacy fallback: borrow a CMA BO from vc4 via the custom ioctl flag. */
++    bo_create.flags = ARC_CALLOC;
++    bo->meta.format_modifier = DRM_FORMAT_MOD_LINEAR;
++    bo->meta.tiling = V3D_TILING_RASTER;
++    drv_logi("v3d bo path=VC4-BORROW %ux%u %4s size=%zu mod=linear (no CMA dma-heap) use=0x%llx\n",
++      width, height, (char *)&format, bo->meta.total_size, (unsigned long long)use_flags);
+   } else {
+-     bo_create.flags = 0;
+-     bo->meta.format_modifier = DRM_FORMAT_MOD_BROADCOM_UIF;
++    bo_create.flags = 0;
++    bo->meta.format_modifier = DRM_FORMAT_MOD_BROADCOM_UIF;
++    drv_logi("v3d bo path=V3D-UIF    %ux%u %4s size=%zu mod=uif (GPU-private) use=0x%llx\n",
++      width, height, (char *)&format, bo->meta.total_size, (unsigned long long)use_flags);
+   }
++
++  bo_create.size = bo->meta.total_size;
+   ret = drmIoctl(bo->drv->fd, DRM_IOCTL_V3D_CREATE_BO, &bo_create);
+   if (ret) {
+     drv_logv("DRM_IOCTL_V3D_CREATE_BO failed (size=%zu), ret=%d, format:%s\n", bo->meta.total_size, ret, (char *)&format);
+@@ -147,11 +320,64 @@ static int v3d_bo_create(struct bo *bo,
+   return 0;
+ }
+ 
++static int v3d_bo_destroy(struct bo *bo)
++{
++	struct v3d_bo_priv *bpriv = bo->priv;
++
++	if (bpriv) {
++		struct drm_gem_close gem_close = { .handle = bo->handle.u32 };
++		drmIoctl(bo->drv->fd, DRM_IOCTL_GEM_CLOSE, &gem_close);
++		close(bpriv->dmabuf_fd);
++		free(bpriv);
++		bo->priv = NULL;
++		return 0;
++	}
++
++	return drv_gem_bo_destroy(bo);
++}
++
++static int v3d_bo_import(struct bo *bo, struct drv_import_fd_data *data)
++{
++	/* Imported buffers keep the standard PRIME-into-v3d path (no heap priv). */
++	int ret = drv_prime_bo_import(bo, data);
++	if (!ret)
++		drv_logi("v3d bo path=IMPORT    %ux%u %4s mod=0x%llx v3d_handle=0x%x (external dma-buf)\n",
++			bo->meta.width, bo->meta.height, (char *)&bo->meta.format,
++			(unsigned long long)data->format_modifier, bo->handle.u32);
++	return ret;
++}
++
++static int v3d_bo_export(struct bo *bo, size_t plane)
++{
++	struct v3d_bo_priv *bpriv = bo->priv;
++
++	/* Heap-backed: hand out a dup of the CMA dma-buf directly. */
++	if (bpriv)
++		return bpriv->dmabuf_fd >= 0 ? dup(bpriv->dmabuf_fd) : -EINVAL;
++
++	return drv_prime_bo_export(bo, plane);
++}
++
+ static void *v3d_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags) {
++  struct v3d_bo_priv *bpriv = bo->priv;
+   int ret;
+   struct drm_v3d_mmap_bo bo_map;
+   struct v3d_private_map_data *priv;
+   void *addr = NULL;
++
++  /* Heap-backed buffers are mapped through the dma-buf fd. */
++  if (bpriv) {
++    vma->length = bo->meta.total_size;
++    addr = mmap(NULL, bo->meta.total_size, drv_get_prot(map_flags), MAP_SHARED,
++                bpriv->dmabuf_fd, 0);
++    if (addr == MAP_FAILED) {
++      drv_loge("v3d: heap dma-buf mmap failed size=%zu: %s\n", bo->meta.total_size,
++               strerror(errno));
++      return MAP_FAILED;
++    }
++    return addr;
++  }
++
+   memset(&bo_map, 0, sizeof(bo_map));
+   bo_map.handle = bo->handle.u32;
+ 
+@@ -200,8 +426,29 @@ static int v3d_bo_unmap(struct bo *bo, s
+   return munmap(vma->addr, vma->length);
+ }
+ 
++/* dma-buf CPU-access sync for heap-backed buffers. */
++static int v3d_heap_sync(struct bo *bo, bool start, uint32_t map_flags)
++{
++	struct v3d_bo_priv *bpriv = bo->priv;
++	struct dma_buf_sync sync = { 0 };
++
++	if (!bpriv)
++		return 0;
++
++	sync.flags = start ? DMA_BUF_SYNC_START : DMA_BUF_SYNC_END;
++	if (map_flags & BO_MAP_READ)
++		sync.flags |= DMA_BUF_SYNC_READ;
++	if (map_flags & BO_MAP_WRITE)
++		sync.flags |= DMA_BUF_SYNC_WRITE;
++
++	return ioctl(bpriv->dmabuf_fd, DMA_BUF_IOCTL_SYNC, &sync) ? -errno : 0;
++}
++
+ static int v3d_bo_invalidate(struct bo *bo, struct mapping *mapping)
+ {
++  if (bo->priv)
++    return v3d_heap_sync(bo, true, mapping->vma->map_flags);
++
+   if (mapping->vma->priv) {
+     struct v3d_private_map_data *priv = mapping->vma->priv;
+     memcpy(priv->cached_addr, priv->gem_addr, bo->meta.total_size);
+@@ -212,7 +459,12 @@ static int v3d_bo_invalidate(struct bo *
+ 
+ static int v3d_bo_flush(struct bo *bo, struct mapping *mapping)
+ {
+-  struct v3d_private_map_data *priv = mapping->vma->priv;
++  struct v3d_private_map_data *priv;
++
++  if (bo->priv)
++    return v3d_heap_sync(bo, false, mapping->vma->map_flags);
++
++  priv = mapping->vma->priv;
+   if (priv && (mapping->vma->map_flags & BO_MAP_WRITE))
+     memcpy(priv->gem_addr, priv->cached_addr, bo->meta.total_size);
+ 
+@@ -222,10 +474,11 @@ static int v3d_bo_flush(struct bo *bo, s
+ const struct backend backend_v3d = {
+   .name = "v3d",
+   .init = v3d_init,
++  .close = v3d_close,
+   .bo_create = v3d_bo_create,
+-  .bo_import = drv_prime_bo_import,
+-  .bo_destroy = drv_gem_bo_destroy,
+-  .bo_export = drv_prime_bo_export,
++  .bo_import = v3d_bo_import,
++  .bo_destroy = v3d_bo_destroy,
++  .bo_export = v3d_bo_export,
+   .bo_map = v3d_bo_map,
+   .bo_unmap = v3d_bo_unmap,
+   .bo_invalidate = v3d_bo_invalidate,

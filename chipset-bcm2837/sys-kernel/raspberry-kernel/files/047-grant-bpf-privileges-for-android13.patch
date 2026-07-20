@@ -1,0 +1,51 @@
+Index: kernel-rpi/kernel/bpf/inode.c
+===================================================================
+--- kernel-rpi.orig/kernel/bpf/inode.c
++++ kernel-rpi/kernel/bpf/inode.c
+@@ -1014,8 +1014,17 @@ static int bpf_fill_super(struct super_b
+ 	struct inode *inode;
+ 	int ret;
+ 
+-	/* Mounting an instance of BPF FS requires privileges */
+-	if (fc->user_ns != &init_user_ns && !capable(CAP_SYS_ADMIN))
++	/*
++	 * Mounting an instance of BPF FS requires privileges over the user
++	 * namespace that will own the superblock. Upstream requires init-ns
++	 * CAP_SYS_ADMIN here; fydroid relaxes it to ns_capable() so the ARC++
++	 * (Android 13) container can mount its own bpffs from inside its user
++	 * namespace -- Android 13 netd hard-requires a writable /sys/fs/bpf for
++	 * the in-container bpfloader. This matches the FS_USERNS_MOUNT idiom
++	 * already used by tmpfs/cgroup2. RE-CHECK ON KERNEL UPREV.
++	 */
++	if (fc->user_ns != &init_user_ns &&
++	    !ns_capable(fc->user_ns, CAP_SYS_ADMIN))
+ 		return -EPERM;
+ 
+ 	ret = simple_fill_super(sb, BPF_FS_MAGIC, bpf_rfiles);
+Index: kernel-rpi/kernel/bpf/token.c
+===================================================================
+--- kernel-rpi.orig/kernel/bpf/token.c
++++ kernel-rpi/kernel/bpf/token.c
+@@ -17,8 +17,20 @@ bool bpf_token_capable(const struct bpf_
+ {
+ 	struct user_namespace *userns;
+ 
+-	/* BPF token allows ns_capable() level of capabilities */
+-	userns = token ? token->userns : &init_user_ns;
++	/*
++	 * BPF token allows ns_capable() level of capabilities over the user
++	 * namespace that owns the bpffs the token was minted from. With no
++	 * token, upstream falls back to init_user_ns -- which a child-userns
++	 * container (e.g. the ARC++ Android 13 container) can never satisfy, so
++	 * its tokenless bpf() syscalls (BPF_MAP_CREATE / BPF_PROG_LOAD /
++	 * BPF_PROG_ATTACH) get EPERM even though it holds CAP_SYS_ADMIN/CAP_BPF
++	 * in its own userns. fydroid falls back to current_user_ns() so the A13
++	 * bpfloader (which does not use BPF tokens) can load its networking
++	 * programs. In init_user_ns this is identical to upstream behaviour.
++	 * SECURITY: any userns root with CAP_BPF/CAP_SYS_ADMIN over its own
++	 * userns can now drive the BPF verifier. RE-CHECK ON KERNEL UPREV.
++	 */
++	userns = token ? token->userns : current_user_ns();
+ 	if (!bpf_ns_capable(userns, cap))
+ 		return false;
+ 	if (token && security_bpf_token_capable(token, cap) < 0)

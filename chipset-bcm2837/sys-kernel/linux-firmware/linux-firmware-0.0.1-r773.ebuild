@@ -10,14 +10,9 @@ LICENSE="BSD-Google"
 SLOT="0"
 KEYWORDS="*"
 IUSE=""
-SRC_URI="https://github.com/raspberrypi/firmware/releases/download/1.20250915/raspi-firmware_1.20250915.orig.tar.xz"
-RESTRICT="mirror"
 
-RDEPEND="!chromeos-base/rpi-boot-bin"
+RDEPEND="sys-kernel/raspi-accessory-firmware"
 
 DEPEND="${RDEPEND}"
 
-src_install() {
-  insinto /firmware/rpi
-  doins boot/*
-}
+S=${FILESDIR}

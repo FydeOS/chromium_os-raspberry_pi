@@ -69,7 +69,7 @@ Index: kernel-rpi/drivers/gpu/drm/v3d/v3d_sched.c
  	if (job->base.irq_fence)
  		dma_fence_put(job->base.irq_fence);
  	job->base.irq_fence = dma_fence_get(fence);
-@@ -709,13 +741,18 @@ v3d_cache_clean_job_run(struct drm_sched
+@@ -710,13 +742,18 @@ v3d_cache_clean_job_run(struct drm_sched
  {
  	struct v3d_job *job = to_v3d_job(sched_job);
  	struct v3d_dev *v3d = job->v3d;
@@ -89,7 +89,7 @@ Index: kernel-rpi/drivers/gpu/drm/v3d/v3d_sched.c
  	return NULL;
  }
  
-@@ -829,7 +866,21 @@ v3d_csd_job_timedout(struct drm_sched_jo
+@@ -830,7 +867,21 @@ v3d_csd_job_timedout(struct drm_sched_jo
  
  	return v3d_gpu_reset_for_timeout(v3d, sched_job);
  }
@@ -112,7 +112,7 @@ Index: kernel-rpi/drivers/gpu/drm/v3d/v3d_sched.c
  static const struct drm_sched_backend_ops v3d_bin_sched_ops = {
  	.run_job = v3d_bin_job_run,
  	.timedout_job = v3d_bin_job_timedout,
-@@ -851,13 +902,13 @@ static const struct drm_sched_backend_op
+@@ -852,13 +903,13 @@ static const struct drm_sched_backend_op
  static const struct drm_sched_backend_ops v3d_csd_sched_ops = {
  	.run_job = v3d_csd_job_run,
  	.timedout_job = v3d_csd_job_timedout,
@@ -179,7 +179,7 @@ Index: kernel-rpi/drivers/gpu/drm/v3d/v3d_drv.c
 @@ -128,7 +130,12 @@ v3d_open(struct drm_device *dev, struct
  	struct v3d_file_priv *v3d_priv;
  	struct drm_gpu_scheduler *sched;
- 	int i;
+ 	int i, ret;
 -
 +//  const struct cred *cred = current_cred();
 +  int priority = DRM_SCHED_PRIORITY_NORMAL;
@@ -193,12 +193,12 @@ Index: kernel-rpi/drivers/gpu/drm/v3d/v3d_drv.c
 @@ -138,7 +145,7 @@ v3d_open(struct drm_device *dev, struct
  	for (i = 0; i < V3D_MAX_QUEUES; i++) {
  		sched = &v3d->queue[i].sched;
- 		drm_sched_entity_init(&v3d_priv->sched_entity[i],
--				      DRM_SCHED_PRIORITY_NORMAL, &sched,
-+				      priority, &sched,
- 				      1, NULL);
- 
- 		memset(&v3d_priv->stats[i], 0, sizeof(v3d_priv->stats[i]));
+ 		ret = drm_sched_entity_init(&v3d_priv->sched_entity[i],
+-					    DRM_SCHED_PRIORITY_NORMAL, &sched,
++					    priority, &sched,
+ 					    1, NULL);
+ 		if (ret)
+ 			goto err_sched;
 Index: kernel-rpi/drivers/gpu/drm/v3d/v3d_submit.c
 ===================================================================
 --- kernel-rpi.orig/drivers/gpu/drm/v3d/v3d_submit.c
@@ -216,7 +216,7 @@ Index: kernel-rpi/drivers/gpu/drm/v3d/v3d_submit.c
  
  	if (job->bo) {
  		for (i = 0; i < job->bo_count; i++)
-@@ -960,7 +966,9 @@ v3d_submit_cl_ioctl(struct drm_device *d
+@@ -965,7 +971,9 @@ v3d_submit_cl_ioctl(struct drm_device *d
  	struct v3d_job *clean_job = NULL;
  	struct v3d_job *last_job;
  	struct ww_acquire_ctx acquire_ctx;
@@ -226,7 +226,7 @@ Index: kernel-rpi/drivers/gpu/drm/v3d/v3d_submit.c
  
  	trace_v3d_submit_cl_ioctl(&v3d->drm, args->rcl_start, args->rcl_end);
  
-@@ -1060,6 +1068,20 @@ v3d_submit_cl_ioctl(struct drm_device *d
+@@ -1065,6 +1073,20 @@ v3d_submit_cl_ioctl(struct drm_device *d
  
  	mutex_lock(&v3d->sched_lock);
  	if (bin) {
@@ -247,7 +247,7 @@ Index: kernel-rpi/drivers/gpu/drm/v3d/v3d_submit.c
  		bin->base.perfmon = render->base.perfmon;
  		v3d_perfmon_get(bin->base.perfmon);
  		v3d_push_job(&bin->base);
-@@ -1093,6 +1115,10 @@ v3d_submit_cl_ioctl(struct drm_device *d
+@@ -1098,6 +1120,10 @@ v3d_submit_cl_ioctl(struct drm_device *d
  						 &se,
  						 last_job->done_fence);
  

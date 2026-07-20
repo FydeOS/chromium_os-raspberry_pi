@@ -96,5 +96,11 @@ src_install() {
 	insinto "${EPREFIX}/etc/udev/rules.d"
 	doins "${FILESDIR}/50-vgem.rules"
 
+	# The v3d backend allocates scanout/render buffers from the CMA dma-buf
+	# heap; grant the GPU process access to it.
+	if use video_cards_v3d; then
+		doins "${FILESDIR}/99-dma-heap-cma.rules"
+	fi
+
 	default
 }

@@ -1,0 +1,67 @@
+FYDE: mfd: rp1: restore PCI state after firmware reset on resume
+
+rp1_resume() (added in 041-fix-kernel-warning-in-suspending) re-triggers
+the RP1 firmware by calling reset_control_reset() and then restores only
+RP1's private MSI-X cfg registers. But that reset runs in the regular
+resume phase, AFTER the PCI core has already restored RP1's config space
+and MSI-X table in the noirq phase. The reset returns the RP1 PCIe
+endpoint to its power-on state, wiping the BARs, bus-master-enable and
+the MSI-X table -- and nothing reprograms them.
+
+The result: after system resume RP1 register/MMIO access still works (so
+the PCIe link and the macb PHY report "up"), but no downstream peripheral
+can DMA to system memory or raise MSI-X interrupts. The ethernet link
+comes up at 1Gbps yet moves zero packets (TX=0, RX all errors), DHCP
+fails, and even unbind/rebind of the macb driver cannot recover it. A
+full PCI remove+rescan of RP1 (which reprograms everything after the
+reset) does recover it -- confirming the missing step is the post-reset
+PCI reprogramming, not anything in the child drivers.
+
+Fix: snapshot the good PCI state at the start of rp1_resume (it was
+restored by the core in the noirq phase), then after the firmware reset
+call pci_restore_state() to reprogram the config space and MSI-X table,
+mirroring probe's order (reset first, then configure).
+
+BUG=none
+TEST=powerd_dbus_suspend on rpi5; eth0 gets a DHCP lease and passes traffic after resume
+Index: v6.12-rpi/drivers/mfd/rp1.c
+===================================================================
+--- v6.12-rpi.orig/drivers/mfd/rp1.c
++++ v6.12-rpi/drivers/mfd/rp1.c
+@@ -374,9 +374,22 @@ static int rp1_suspend(struct device *de
+ static int rp1_resume(struct device *dev)
+ {
+ 	struct rp1_dev *rp1 = dev_get_drvdata(dev);
++	struct pci_dev *pdev = rp1->pdev;
+ 	u32 chip_id;
+ 	int i, retries;
+ 
++	/*
++	 * Snapshot the good PCI state that the PCI core restored during the
++	 * noirq resume phase. The firmware reset below returns the RP1 PCIe
++	 * endpoint to its power-on state, clearing the BARs, bus-master enable
++	 * and the MSI-X table; we reprogram them afterwards with
++	 * pci_restore_state() so the downstream peripherals (ethernet, USB)
++	 * can DMA and raise interrupts again. Without this the datapath
++	 * silently dies on resume even though the link and register access
++	 * still work (link reports up, but TX/RX move no packets).
++	 */
++	pci_save_state(pdev);
++
+ 	/* Re-trigger RP1 firmware initialisation after PCIe power cycle */
+ 	reset_control_reset(rp1->reset);
+ 
+@@ -396,6 +409,13 @@ static int rp1_resume(struct device *dev
+ 			 "RP1 firmware not ready after resume (chip_id=0x%x)\n",
+ 			 chip_id);
+ 
++	/*
++	 * Reprogram the config space (BARs, command/bus-master) and MSI-X
++	 * table that the firmware reset cleared, mirroring the order used at
++	 * probe time (reset first, then configure).
++	 */
++	pci_restore_state(pdev);
++
+ 	for (i = 0; i < RP1_IRQS; i++)
+ 		writel(rp1->msix_cfg_saved[i], rp1->msix_cfg_regs + MSIX_CFG(i));
+ 

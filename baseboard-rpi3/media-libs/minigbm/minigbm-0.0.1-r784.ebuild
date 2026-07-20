@@ -3,8 +3,8 @@
 
 EAPI="7"
 
-CROS_WORKON_COMMIT="b50cb6437527e8a00a3434c84004132ce9b40eb5"
-CROS_WORKON_TREE="a11c7e7c03fefb9e83218fc7035fcb14edd7cfa1"
+CROS_WORKON_COMMIT="9d21b5cb5896c0cde186b54d430131f9f537104c"
+CROS_WORKON_TREE="7a0f88f73ad89b7f24a8a7f8ec295193febfbdeb"
 CROS_WORKON_PROJECT="chromiumos/platform/minigbm"
 CROS_WORKON_LOCALNAME="../platform/minigbm"
 CROS_WORKON_OUTOFTREE_BUILD=1
@@ -26,10 +26,8 @@ for card in ${VIDEO_CARDS}; do
 	IUSE+=" video_cards_${card}"
 done
 
-MINI_GBM_PLATFORMS_USE=( mt8173 mt8183 mt8186 mt8188g mt8192 mt8195 mt8196 sc7280)
+MINI_GBM_PLATFORMS_USE=( mt8173 mt8183 mt8186 mt8188g mt8189 mt8192 mt8195 mt8196 sc7280)
 IUSE+=" ${MINI_GBM_PLATFORMS_USE[*]/#/minigbm_platform_}"
-
-IUSE+=" intel_drm_tile4"
 
 RDEPEND="
 	x11-libs/libdrm
@@ -45,8 +43,9 @@ DEPEND="${RDEPEND}
 
 src_prepare() {
 	default
-	eapply ${FILESDIR}/vc6.patch
-	eapply ${FILESDIR}/fix-dumb-driver-blob-height.patch
+	eapply "${FILESDIR}/vc6.patch"
+	eapply "${FILESDIR}/fix-dumb-driver-blob-height.patch"
+	eapply "${FILESDIR}/option-a-cma-heap-prototype.patch"
 	sanitizers-setup-env
 	cros-common.mk_src_prepare
 }
@@ -57,18 +56,12 @@ src_configure() {
 	use video_cards_amdgpu && append-cppflags -DDRV_AMDGPU && export DRV_AMDGPU=1
 	use video_cards_exynos && append-cppflags -DDRV_EXYNOS && export DRV_EXYNOS=1
 	use video_cards_intel && append-cppflags -DDRV_I915 && export DRV_I915=1
-	if use video_cards_intel ; then
-		if use intel_drm_tile4 ; then
-			append-cppflags -DI915_SCANOUT_4_TILED
-		else
-			append-cppflags -DI915_SCANOUT_Y_TILED
-		fi
-	fi
 	use video_cards_marvell && append-cppflags -DDRV_MARVELL && export DRV_MARVELL=1
 	use minigbm_platform_mt8173 && append-cppflags -DMTK_MT8173
 	use minigbm_platform_mt8183 && append-cppflags -DMTK_MT8183
 	use minigbm_platform_mt8186 && append-cppflags -DMTK_MT8186
 	use minigbm_platform_mt8188g && append-cppflags -DMTK_MT8188G
+	use minigbm_platform_mt8189 && append-cppflags -DMTK_MT8189
 	use minigbm_platform_mt8192 && append-cppflags -DMTK_MT8192
 	use minigbm_platform_mt8195 && append-cppflags -DMTK_MT8195
 	use minigbm_platform_mt8196 && append-cppflags -DMTK_MT8196
@@ -81,8 +74,8 @@ src_configure() {
 	use video_cards_tegra && append-cppflags -DDRV_TEGRA && export DRV_TEGRA=1
 	use video_cards_vc4 && append-cppflags -DDRV_VC4 && export DRV_VC4=1
 	use video_cards_virgl && append-cppflags -DDRV_VIRGL && export DRV_VIRGL=1
-	use linear_align_256 && append-cppflags -DLINEAR_ALIGN_256
 	use video_cards_v3d && append-cppflags -DDRV_V3D && export DRV_V3D=1
+	use linear_align_256 && append-cppflags -DLINEAR_ALIGN_256
 	cros-common.mk_src_configure
 }
 
@@ -99,6 +92,12 @@ src_compile() {
 src_install() {
 	insinto "${EPREFIX}/etc/udev/rules.d"
 	doins "${FILESDIR}/50-vgem.rules"
+
+	# The v3d backend allocates scanout/render buffers from the CMA dma-buf
+	# heap; grant the GPU process access to it.
+	if use video_cards_v3d; then
+		doins "${FILESDIR}/99-dma-heap-cma.rules"
+	fi
 
 	default
 }

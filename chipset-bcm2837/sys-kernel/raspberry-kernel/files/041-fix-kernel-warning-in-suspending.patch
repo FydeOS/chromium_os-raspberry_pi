@@ -64,9 +64,9 @@ Index: kernel-rpi/drivers/gpu/drm/vc4/vc4_hdmi.c
 +	INIT_WORK(&vc4_hdmi->hpd_work, vc4_hdmi_hpd_work);
 +
  	if (vc4_hdmi->variant->external_irq_controller) {
- 		unsigned int hpd_con = platform_get_irq_byname(pdev, "hpd-connected");
- 		unsigned int hpd_rm = platform_get_irq_byname(pdev, "hpd-removed");
-@@ -3513,6 +3529,7 @@ static void vc4_hdmi_unbind(struct devic
+ 		int hpd = platform_get_irq_byname(pdev, "hpd-connected");
+ 
+@@ -3519,6 +3535,7 @@ static void vc4_hdmi_unbind(struct devic
  {
  	struct vc4_hdmi *vc4_hdmi = dev_get_drvdata(dev);
  
@@ -100,7 +100,7 @@ Index: kernel-rpi/drivers/net/ethernet/cadence/macb_main.c
 ===================================================================
 --- kernel-rpi.orig/drivers/net/ethernet/cadence/macb_main.c
 +++ kernel-rpi/drivers/net/ethernet/cadence/macb_main.c
-@@ -89,6 +89,7 @@ struct sifive_fu540_macb_mgmt {
+@@ -90,6 +90,7 @@ struct sifive_fu540_macb_mgmt {
  #define MACB_NETIF_LSO		NETIF_F_TSO
  
  #define MACB_WOL_ENABLED		BIT(0)
@@ -108,12 +108,9 @@ Index: kernel-rpi/drivers/net/ethernet/cadence/macb_main.c
  
  #define HS_SPEED_10000M			4
  #define MACB_SERDES_RATE_10G		1
-@@ -5471,8 +5472,11 @@ static int __maybe_unused macb_suspend(s
- 			tmp |= MACB_BFEXT(IP, be32_to_cpu(ifa->ifa_local));
- 		}
+@@ -5579,7 +5580,8 @@ static int __maybe_unused macb_suspend(s
+ 		spin_unlock_irqrestore(&bp->lock, flags);
  
-+		spin_unlock_irqrestore(&bp->lock, flags);
-+
  		/* Change interrupt handler and
 -		 * Enable WoL IRQ on queue 0
 +		 * Enable WoL IRQ on queue 0.
@@ -121,36 +118,9 @@ Index: kernel-rpi/drivers/net/ethernet/cadence/macb_main.c
  		 */
  		devm_free_irq(dev, bp->queues[0].irq, bp->queues);
  		if (macb_is_gem(bp)) {
-@@ -5482,11 +5486,8 @@ static int __maybe_unused macb_suspend(s
- 				dev_err(dev,
- 					"Unable to request IRQ %d (error %d)\n",
- 					bp->queues[0].irq, err);
--				spin_unlock_irqrestore(&bp->lock, flags);
- 				return err;
- 			}
--			queue_writel(bp->queues, IER, GEM_BIT(WOL));
--			gem_writel(bp, WOL, tmp);
- 		} else {
- 			err = devm_request_irq(dev, bp->queues[0].irq, macb_wol_interrupt,
- 					       IRQF_SHARED, netdev->name, bp->queues);
-@@ -5494,15 +5495,22 @@ static int __maybe_unused macb_suspend(s
- 				dev_err(dev,
- 					"Unable to request IRQ %d (error %d)\n",
- 					bp->queues[0].irq, err);
--				spin_unlock_irqrestore(&bp->lock, flags);
- 				return err;
- 			}
-+		}
-+
-+		spin_lock_irqsave(&bp->lock, flags);
-+		if (macb_is_gem(bp)) {
-+			queue_writel(bp->queues, IER, GEM_BIT(WOL));
-+			gem_writel(bp, WOL, tmp);
-+		} else {
- 			queue_writel(bp->queues, IER, MACB_BIT(WOL));
- 			macb_writel(bp, WOL, tmp);
+@@ -5610,7 +5612,8 @@ static int __maybe_unused macb_suspend(s
+ 			spin_unlock_irqrestore(&bp->lock, flags);
  		}
- 		spin_unlock_irqrestore(&bp->lock, flags);
  
 -		enable_irq_wake(bp->queues[0].irq);
 +		if (!enable_irq_wake(bp->queues[0].irq))
@@ -158,27 +128,9 @@ Index: kernel-rpi/drivers/net/ethernet/cadence/macb_main.c
  	}
  
  	netif_device_detach(netdev);
-@@ -5567,7 +5575,11 @@ static int __maybe_unused macb_resume(st
- 		queue_readl(bp->queues, ISR);
- 		if (bp->caps & MACB_CAPS_ISR_CLEAR_ON_WRITE)
- 			queue_writel(bp->queues, ISR, -1);
--		/* Replace interrupt handler on queue 0 */
-+		spin_unlock_irqrestore(&bp->lock, flags);
-+
-+		/* Replace interrupt handler on queue 0.
-+		 * free_irq/request_irq sleep, so must be outside spinlock.
-+		 */
- 		devm_free_irq(dev, bp->queues[0].irq, bp->queues);
- 		err = devm_request_irq(dev, bp->queues[0].irq, macb_interrupt,
- 				       IRQF_SHARED, netdev->name, bp->queues);
-@@ -5575,12 +5587,13 @@ static int __maybe_unused macb_resume(st
- 			dev_err(dev,
- 				"Unable to request IRQ %d (error %d)\n",
- 				bp->queues[0].irq, err);
--			spin_unlock_irqrestore(&bp->lock, flags);
+@@ -5688,7 +5691,10 @@ static int __maybe_unused macb_resume(st
  			return err;
  		}
--		spin_unlock_irqrestore(&bp->lock, flags);
  
 -		disable_irq_wake(bp->queues[0].irq);
 +		if (bp->wol & MACB_WOL_IRQ_WAKE) {
@@ -424,7 +376,7 @@ Index: kernel-rpi/drivers/usb/dwc3/core.c
 ===================================================================
 --- kernel-rpi.orig/drivers/usb/dwc3/core.c
 +++ kernel-rpi/drivers/usb/dwc3/core.c
-@@ -2575,6 +2575,25 @@ static int dwc3_resume_common(struct dwc
+@@ -2594,6 +2594,25 @@ static int dwc3_resume_common(struct dwc
  		dwc3_enable_susphy(dwc, dwc->susphy_state);
  	}
  
@@ -450,7 +402,7 @@ Index: kernel-rpi/drivers/usb/dwc3/core.c
  	return 0;
  }
  
-@@ -2696,10 +2715,55 @@ out:
+@@ -2715,10 +2734,55 @@ out:
  	return ret;
  }
  
@@ -510,7 +462,7 @@ Index: kernel-rpi/drivers/usb/dwc3/core.h
 ===================================================================
 --- kernel-rpi.orig/drivers/usb/dwc3/core.h
 +++ kernel-rpi/drivers/usb/dwc3/core.h
-@@ -1409,6 +1409,15 @@ struct dwc3 {
+@@ -1414,6 +1414,15 @@ struct dwc3 {
  	unsigned		suspended:1;
  	unsigned		susphy_state:1;
  

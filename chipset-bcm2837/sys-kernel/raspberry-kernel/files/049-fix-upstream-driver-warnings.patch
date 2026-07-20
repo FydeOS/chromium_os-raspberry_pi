@@ -1,0 +1,91 @@
+FYDE: fix compiler warnings in upstream/downstream drivers
+
+Silence several build warnings coming from the Raspberry Pi vendor
+driver tree (not -Werror, but noisy and some indicate real latent bugs):
+
+- dma/dw-axi-dmac: chan_flags_all was OR-accumulated without being
+  initialized. Init to 0 (-Wuninitialized).
+- media/rpi hevc_dec: hevc_d_device_run() could goto fail before src_req
+  was assigned, then pass a garbage pointer to
+  media_request_manual_complete(). Init src_req to NULL; the callee
+  already WARN/returns on NULL (-Wsometimes-uninitialized).
+- usb/dwc_common_port: the DWC_SPINLOCK_ALLOC() prototype was only
+  declared in the non-CONFIG_DEBUG_SPINLOCK branch, so the definition
+  had no visible prototype when spinlock debugging is on. Declare it
+  unconditionally (-Wmissing-prototypes).
+- pci/pcie-brcmstb: brcm_config_clkreq() does a read-modify-write of the
+  HARD_DEBUG register but never read the current value first, leaving
+  clkreq_cntl uninitialized and clobbering existing bits on write-back.
+  Read the register first (-Wuninitialized).
+- drm/vc4: vc4_async_setup_commit() is currently unreferenced; mark it
+  __maybe_unused (-Wunused-function).
+
+BUG=none
+TEST=emerge-rpi5-openfyde sys-kernel/raspberry-kernel
+Index: v6.12-rpi/drivers/dma/dw-axi-dmac/dw-axi-dmac-platform.c
+===================================================================
+--- v6.12-rpi.orig/drivers/dma/dw-axi-dmac/dw-axi-dmac-platform.c
++++ v6.12-rpi/drivers/dma/dw-axi-dmac/dw-axi-dmac-platform.c
+@@ -1497,7 +1497,7 @@ static struct dma_chan *dw_axi_dma_of_xl
+ {
+ 	struct dw_axi_dma *dw = ofdma->of_dma_data;
+ 	struct axi_dma_chan *chan;
+-	uint32_t chan_flags_all;
++	uint32_t chan_flags_all = 0;
+ 	uint32_t busy_channels;
+ 	struct dma_chan *dchan;
+ 	dma_cap_mask_t mask;
+Index: v6.12-rpi/drivers/gpu/drm/vc4/vc4_plane.c
+===================================================================
+--- v6.12-rpi.orig/drivers/gpu/drm/vc4/vc4_plane.c
++++ v6.12-rpi/drivers/gpu/drm/vc4/vc4_plane.c
+@@ -2493,7 +2493,7 @@ static void init_commit(struct drm_crtc_
+ 	commit->crtc = crtc;
+ }
+ 
+-static int vc4_async_setup_commit(struct drm_plane *plane) {
++static int __maybe_unused vc4_async_setup_commit(struct drm_plane *plane) {
+   struct drm_crtc_commit *commit;
+   commit = kzalloc(sizeof(*commit), GFP_KERNEL);
+   if (!commit)
+Index: v6.12-rpi/drivers/media/platform/raspberrypi/hevc_dec/hevc_d_h265.c
+===================================================================
+--- v6.12-rpi.orig/drivers/media/platform/raspberrypi/hevc_dec/hevc_d_h265.c
++++ v6.12-rpi/drivers/media/platform/raspberrypi/hevc_dec/hevc_d_h265.c
+@@ -2512,7 +2512,7 @@ void hevc_d_device_run(void *priv)
+ 	struct hevc_d_ctx *const ctx = priv;
+ 	struct hevc_d_dev *const dev = ctx->dev;
+ 	struct hevc_d_run run = {};
+-	struct media_request *src_req;
++	struct media_request *src_req = NULL;
+ 
+ 	run.src = v4l2_m2m_next_src_buf(ctx->fh.m2m_ctx);
+ 	run.dst = v4l2_m2m_next_dst_buf(ctx->fh.m2m_ctx);
+Index: v6.12-rpi/drivers/pci/controller/pcie-brcmstb.c
+===================================================================
+--- v6.12-rpi.orig/drivers/pci/controller/pcie-brcmstb.c
++++ v6.12-rpi/drivers/pci/controller/pcie-brcmstb.c
+@@ -1557,7 +1557,7 @@ static void brcm_config_clkreq(struct br
+ {
+ 	static const char err_msg[] = "invalid 'brcm,clkreq-mode' DT string\n";
+ 	const char *mode = "default";
+-	u32 clkreq_cntl;
++	u32 clkreq_cntl = readl(pcie->base + HARD_DEBUG(pcie));
+ 	int ret, tmp;
+ 
+ 	ret = of_property_read_string(pcie->np, "brcm,clkreq-mode", &mode);
+Index: v6.12-rpi/drivers/usb/host/dwc_common_port/dwc_os.h
+===================================================================
+--- v6.12-rpi.orig/drivers/usb/host/dwc_common_port/dwc_os.h
++++ v6.12-rpi/drivers/usb/host/dwc_common_port/dwc_os.h
+@@ -1052,9 +1052,9 @@ typedef unsigned long dwc_irqflags_t;
+ 	} \
+ })
+ #else
+-extern dwc_spinlock_t *DWC_SPINLOCK_ALLOC(void);
+ #define dwc_spinlock_alloc(_ctx_) DWC_SPINLOCK_ALLOC()
+ #endif
++extern dwc_spinlock_t *DWC_SPINLOCK_ALLOC(void);
+ 
+ /** Frees an initialized lock variable. */
+ extern void DWC_SPINLOCK_FREE(dwc_spinlock_t *lock);
