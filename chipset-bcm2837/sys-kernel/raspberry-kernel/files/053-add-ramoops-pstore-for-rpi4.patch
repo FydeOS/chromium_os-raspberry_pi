@@ -1,0 +1,43 @@
+FYDE: ARM: dts: bcm2711: add ramoops/pstore region for Raspberry Pi 4
+
+Same fix as the BCM2712/Pi 5 change, for the Pi 4 family (Pi 4B, Pi 400,
+CM4). chromeos_startup's EncryptedRebootVault aborts with "pmsg0 not
+enabled" because the BCM2711 device tree gives the ramoops (pstore-RAM)
+backend no memory region, so /dev/pmsg0 is never created even though
+CONFIG_PSTORE_RAM/PSTORE_PMSG are enabled.
+
+Add a ramoops node under rmem. Base 0x0b000000 matches the stock RPi
+ramoops overlay and lies in low System RAM (ZONE_DMA), clear of the
+kernel image. pmsg-size is set explicitly because the driver defaults it
+to 0 for a reserved-memory child (fs/pstore/ram.c).
+
+This node is added in bcm2711.dtsi (not the shared bcm283x.dtsi) so it
+applies only to the Pi 4 family, not the older 512MB-class boards. rmem
+on bcm2711 is #address-cells=2 (override here) and #size-cells=1.
+
+--- a/arch/arm/boot/dts/broadcom/bcm2711.dtsi
++++ b/arch/arm/boot/dts/broadcom/bcm2711.dtsi
+@@ -1105,6 +1105,23 @@
+ 
+ &rmem {
+ 	#address-cells = <2>;
++
++	/*
++	 * pstore/ramoops region so crash logs and, crucially, the pmsg
++	 * buffer survive a reboot. chromeos_startup's EncryptedRebootVault
++	 * needs pstore-pmsg (/dev/pmsg0) to pass its encryption key across
++	 * reboots; without this node the ramoops backend gets no memory and
++	 * pmsg0 is never created. Base 0x0b000000 matches the stock RPi
++	 * ramoops overlay and sits in low System RAM (ZONE_DMA) clear of the
++	 * kernel image. rmem here is #address-cells=2, #size-cells=1.
++	 */
++	ramoops@b000000 {
++		compatible = "ramoops";
++		reg = <0x0 0x0b000000 0x100000>; /* 1 MB */
++		record-size = <0x20000>;  /* 128 KB */
++		console-size = <0x20000>; /* 128 KB */
++		pmsg-size = <0x20000>;    /* 128 KB */
++	};
+ };
+ 
+ &csi0 {

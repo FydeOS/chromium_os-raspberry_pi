@@ -1,0 +1,68 @@
+FYDE: arm64: dts: bcm2712: add ramoops/pstore region for Raspberry Pi 5
+
+chromeos_startup fails early on rpi5-openfyde with:
+
+  ERROR chromeos_startup: encrypted_reboot_vault.cc:40] pmsg0 not enabled.
+  ERROR chromeos_startup: EncryptedRebootVault depends on pstore-pmsg to
+    pass the encryption key. Enable CONFIG_PSTORE_PMSG
+
+The kernel config is already correct (CONFIG_PSTORE_RAM=y,
+CONFIG_PSTORE_PMSG=y). The real problem is that the BCM2712 device tree
+never gives the ramoops (pstore-RAM) backend a memory region: rmem only
+contains atf@0 and the dynamic CMA. With mem_size=0 the ramoops platform
+device never registers, /dev/pmsg0 is never created, and
+EncryptedRebootVault cannot persist its key across reboots.
+
+Add a ramoops node to the reserved-memory (rmem) node. Base 0x0b000000
+matches the stock RPi ramoops overlay and sits in low System RAM, well
+clear of ATF (0x0-0x80000) and the kernel image. pmsg-size is set
+explicitly because for a reserved-memory child the driver defaults it to
+0 (fs/pstore/ram.c) -- the stock RPi overlay omits it, which is why
+"dtoverlay=ramoops" alone would not create pmsg0.
+
+Cell-count caveat: bcm2712.dtsi declares rmem as #address-cells=2,
+#size-cells=2, but the reg here is written with only 3 cells (addr, addr,
+size) as if #size-cells were 1. This is deliberate: the Raspberry Pi
+firmware normalises /reserved-memory to #address-cells=2, #size-cells=1
+at boot -- it rewrites the nodes it owns (atf, cma) and injects its own
+nvram nodes, but copies unknown nodes like this one through verbatim. A
+"correct" 4-cell reg is then interpreted under the runtime #size-cells=1,
+fails "OF: reserved mem: invalid reg property ... skipping node", the
+region is dropped and pmsg0 is still absent. Encoding the reg as 3 cells
+makes it valid post-fixup and matches the stock ramoops-pi4 overlay.
+
+--- a/arch/arm64/boot/dts/broadcom/bcm2712.dtsi
++++ b/arch/arm64/boot/dts/broadcom/bcm2712.dtsi
+@@ -177,6 +177,32 @@
+ 			no-map;
+ 		};
+ 
++		/*
++		 * pstore/ramoops region so crash logs and, crucially, the
++		 * pmsg buffer survive a reboot. chromeos_startup's
++		 * EncryptedRebootVault needs pstore-pmsg (/dev/pmsg0) to pass
++		 * its encryption key across reboots; without this node the
++		 * ramoops backend gets no memory and pmsg0 is never created.
++		 * Base 0x0b000000 matches the stock RPi ramoops overlay and
++		 * sits in low System RAM well clear of ATF and the kernel.
++		 *
++		 * NB: the reg is 3 cells (addr, addr, size), i.e. as if
++		 * #size-cells were 1, even though this node declares 2. The
++		 * Raspberry Pi firmware normalises /reserved-memory to
++		 * #address-cells=2, #size-cells=1 at boot (rewriting atf/cma
++		 * and injecting its nvram nodes) but copies this node through
++		 * verbatim; a 4-cell reg then fails "invalid reg property" and
++		 * the node is skipped. This matches the stock ramoops-pi4
++		 * overlay's reg encoding.
++		 */
++		ramoops@b000000 {
++			compatible = "ramoops";
++			reg = <0x0 0x0b000000 0x100000>; /* 1 MB @ 0x0b000000 */
++			record-size = <0x20000>;  /* 128 KB */
++			console-size = <0x20000>; /* 128 KB */
++			pmsg-size = <0x20000>;    /* 128 KB */
++		};
++
+ 		cma: linux,cma {
+ 			compatible = "shared-dma-pool";
+ 			size = <0x0 0x4000000>; /* 64MB */
