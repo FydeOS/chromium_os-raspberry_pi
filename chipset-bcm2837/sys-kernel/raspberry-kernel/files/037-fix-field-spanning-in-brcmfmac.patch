@@ -1,7 +1,7 @@
-Index: kernel-rpi/drivers/net/wireless/broadcom/brcm80211/brcmfmac/fweh.h
+Index: v6.12-rpi/drivers/net/wireless/broadcom/brcm80211/brcmfmac/fweh.h
 ===================================================================
---- kernel-rpi.orig/drivers/net/wireless/broadcom/brcm80211/brcmfmac/fweh.h
-+++ kernel-rpi/drivers/net/wireless/broadcom/brcm80211/brcmfmac/fweh.h
+--- v6.12-rpi.orig/drivers/net/wireless/broadcom/brcm80211/brcmfmac/fweh.h
++++ v6.12-rpi/drivers/net/wireless/broadcom/brcm80211/brcmfmac/fweh.h
 @@ -293,7 +293,7 @@ enum event_msgs_ext_command {
  };
  
@@ -20,10 +20,10 @@ Index: kernel-rpi/drivers/net/wireless/broadcom/brcm80211/brcmfmac/fweh.h
  };
  
  typedef int (*brcmf_fweh_handler_t)(struct brcmf_if *ifp,
-Index: kernel-rpi/drivers/net/wireless/broadcom/brcm80211/brcmfmac/fwil_types.h
+Index: v6.12-rpi/drivers/net/wireless/broadcom/brcm80211/brcmfmac/fwil_types.h
 ===================================================================
---- kernel-rpi.orig/drivers/net/wireless/broadcom/brcm80211/brcmfmac/fwil_types.h
-+++ kernel-rpi/drivers/net/wireless/broadcom/brcm80211/brcmfmac/fwil_types.h
+--- v6.12-rpi.orig/drivers/net/wireless/broadcom/brcm80211/brcmfmac/fwil_types.h
++++ v6.12-rpi/drivers/net/wireless/broadcom/brcm80211/brcmfmac/fwil_types.h
 @@ -641,7 +641,7 @@ struct brcmf_mf_params_le {
  	u8 da[ETH_ALEN];
  	u8 bssid[ETH_ALEN];
@@ -33,10 +33,10 @@ Index: kernel-rpi/drivers/net/wireless/broadcom/brcm80211/brcmfmac/fwil_types.h
  };
  
  /* Used to get specific STA parameters */
-Index: kernel-rpi/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
+Index: v6.12-rpi/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
 ===================================================================
---- kernel-rpi.orig/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
-+++ kernel-rpi/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
+--- v6.12-rpi.orig/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
++++ v6.12-rpi/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
 @@ -6906,7 +6906,7 @@ brcmf_notify_auth_frame_rx(struct brcmf_
  	brcmf_fil_cmd_data_get(ifp, BRCMF_C_GET_BSSID, mgmt_frame->bssid,
  			       ETH_ALEN);

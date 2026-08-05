@@ -2,7 +2,7 @@ Index: src/media/gpu/v4l2/v4l2_stateful_video_decoder.cc
 ===================================================================
 --- src.orig/media/gpu/v4l2/v4l2_stateful_video_decoder.cc
 +++ src/media/gpu/v4l2/v4l2_stateful_video_decoder.cc
-@@ -420,8 +420,8 @@ void V4L2StatefulVideoDecoder::Initializ
+@@ -416,8 +416,8 @@ void V4L2StatefulVideoDecoder::Initializ
      std::move(init_cb).Run(DecoderStatus::Codes::kFailedToCreateDecoder);
      return;
    }

@@ -15,8 +15,10 @@ This node is added in bcm2711.dtsi (not the shared bcm283x.dtsi) so it
 applies only to the Pi 4 family, not the older 512MB-class boards. rmem
 on bcm2711 is #address-cells=2 (override here) and #size-cells=1.
 
---- a/arch/arm/boot/dts/broadcom/bcm2711.dtsi
-+++ b/arch/arm/boot/dts/broadcom/bcm2711.dtsi
+Index: v6.12-rpi/arch/arm/boot/dts/broadcom/bcm2711.dtsi
+===================================================================
+--- v6.12-rpi.orig/arch/arm/boot/dts/broadcom/bcm2711.dtsi
++++ v6.12-rpi/arch/arm/boot/dts/broadcom/bcm2711.dtsi
 @@ -1105,6 +1105,23 @@
  
  &rmem {

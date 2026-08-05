@@ -31,8 +31,10 @@ fails "OF: reserved mem: invalid reg property ... skipping node", the
 region is dropped and pmsg0 is still absent. Encoding the reg as 3 cells
 makes it valid post-fixup and matches the stock ramoops-pi4 overlay.
 
---- a/arch/arm64/boot/dts/broadcom/bcm2712.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/bcm2712.dtsi
+Index: v6.12-rpi/arch/arm64/boot/dts/broadcom/bcm2712.dtsi
+===================================================================
+--- v6.12-rpi.orig/arch/arm64/boot/dts/broadcom/bcm2712.dtsi
++++ v6.12-rpi/arch/arm64/boot/dts/broadcom/bcm2712.dtsi
 @@ -177,6 +177,32 @@
  			no-map;
  		};

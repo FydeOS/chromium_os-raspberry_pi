@@ -101,7 +101,7 @@ Index: v6.12-rpi/drivers/gpu/drm/v3d/v3d_drv.h
 ===================================================================
 --- v6.12-rpi.orig/drivers/gpu/drm/v3d/v3d_drv.h
 +++ v6.12-rpi/drivers/gpu/drm/v3d/v3d_drv.h
-@@ -573,6 +573,7 @@ int v3d_gem_init(struct drm_device *dev)
+@@ -568,6 +568,7 @@ int v3d_gem_init(struct drm_device *dev)
  void v3d_gem_destroy(struct drm_device *dev);
  void v3d_reset_sms(struct v3d_dev *v3d);
  void v3d_reset(struct v3d_dev *v3d);

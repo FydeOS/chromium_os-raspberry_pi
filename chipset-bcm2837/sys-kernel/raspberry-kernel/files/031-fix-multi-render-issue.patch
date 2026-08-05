@@ -1,8 +1,8 @@
-Index: kernel-rpi/drivers/gpu/drm/v3d/v3d_submit.c
+Index: v6.12-rpi/drivers/gpu/drm/v3d/v3d_submit.c
 ===================================================================
---- kernel-rpi.orig/drivers/gpu/drm/v3d/v3d_submit.c
-+++ kernel-rpi/drivers/gpu/drm/v3d/v3d_submit.c
-@@ -923,8 +923,7 @@ v3d_get_extensions(struct drm_file *file
+--- v6.12-rpi.orig/drivers/gpu/drm/v3d/v3d_submit.c
++++ v6.12-rpi/drivers/gpu/drm/v3d/v3d_submit.c
+@@ -928,8 +928,7 @@ v3d_get_extensions(struct drm_file *file
  			ret = v3d_get_cpu_copy_performance_query_params(file_priv, user_ext, job);
  			break;
  		default:
@@ -12,7 +12,7 @@ Index: kernel-rpi/drivers/gpu/drm/v3d/v3d_submit.c
  		}
  
  		if (ret)
-@@ -1477,4 +1476,4 @@ void v3d_submit_init(struct drm_device *
+@@ -1482,4 +1481,4 @@ void v3d_submit_init(struct drm_device *
  	/* kick the clock so firmware knows we are using firmware clock interface */
  	v3d_clock_up_get(v3d);
  	v3d_clock_up_put(v3d);

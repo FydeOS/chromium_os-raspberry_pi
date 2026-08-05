@@ -1,7 +1,7 @@
-Index: kernel-rpi/drivers/gpu/drm/drm_auth.c
+Index: v6.12-rpi/drivers/gpu/drm/drm_auth.c
 ===================================================================
---- kernel-rpi.orig/drivers/gpu/drm/drm_auth.c
-+++ kernel-rpi/drivers/gpu/drm/drm_auth.c
+--- v6.12-rpi.orig/drivers/gpu/drm/drm_auth.c
++++ v6.12-rpi/drivers/gpu/drm/drm_auth.c
 @@ -234,7 +234,8 @@ static int
  drm_master_check_perm(struct drm_device *dev, struct drm_file *file_priv)
  {
@@ -12,10 +12,10 @@ Index: kernel-rpi/drivers/gpu/drm/drm_auth.c
  		return 0;
  
  	if (!capable(CAP_SYS_ADMIN))
-Index: kernel-rpi/drivers/gpu/drm/drm_drv.c
+Index: v6.12-rpi/drivers/gpu/drm/drm_drv.c
 ===================================================================
---- kernel-rpi.orig/drivers/gpu/drm/drm_drv.c
-+++ kernel-rpi/drivers/gpu/drm/drm_drv.c
+--- v6.12-rpi.orig/drivers/gpu/drm/drm_drv.c
++++ v6.12-rpi/drivers/gpu/drm/drm_drv.c
 @@ -1056,6 +1056,8 @@ out:
  	return err;
  }
@@ -35,10 +35,10 @@ Index: kernel-rpi/drivers/gpu/drm/drm_drv.c
  	ret = register_chrdev(DRM_MAJOR, "drm", &drm_stub_fops);
  	if (ret < 0)
  		goto error;
-Index: kernel-rpi/include/drm/drm_drv.h
+Index: v6.12-rpi/include/drm/drm_drv.h
 ===================================================================
---- kernel-rpi.orig/include/drm/drm_drv.h
-+++ kernel-rpi/include/drm/drm_drv.h
+--- v6.12-rpi.orig/include/drm/drm_drv.h
++++ v6.12-rpi/include/drm/drm_drv.h
 @@ -438,6 +438,8 @@ void *__devm_drm_dev_alloc(struct device
  			   const struct drm_driver *driver,
  			   size_t size, size_t offset);

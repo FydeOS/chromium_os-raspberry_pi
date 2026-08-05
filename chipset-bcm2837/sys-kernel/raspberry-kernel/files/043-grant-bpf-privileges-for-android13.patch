@@ -1,7 +1,7 @@
-Index: kernel-rpi/kernel/bpf/inode.c
+Index: v6.12-rpi/kernel/bpf/inode.c
 ===================================================================
---- kernel-rpi.orig/kernel/bpf/inode.c
-+++ kernel-rpi/kernel/bpf/inode.c
+--- v6.12-rpi.orig/kernel/bpf/inode.c
++++ v6.12-rpi/kernel/bpf/inode.c
 @@ -1014,8 +1014,17 @@ static int bpf_fill_super(struct super_b
  	struct inode *inode;
  	int ret;
@@ -22,10 +22,10 @@ Index: kernel-rpi/kernel/bpf/inode.c
  		return -EPERM;
  
  	ret = simple_fill_super(sb, BPF_FS_MAGIC, bpf_rfiles);
-Index: kernel-rpi/kernel/bpf/token.c
+Index: v6.12-rpi/kernel/bpf/token.c
 ===================================================================
---- kernel-rpi.orig/kernel/bpf/token.c
-+++ kernel-rpi/kernel/bpf/token.c
+--- v6.12-rpi.orig/kernel/bpf/token.c
++++ v6.12-rpi/kernel/bpf/token.c
 @@ -17,8 +17,20 @@ bool bpf_token_capable(const struct bpf_
  {
  	struct user_namespace *userns;

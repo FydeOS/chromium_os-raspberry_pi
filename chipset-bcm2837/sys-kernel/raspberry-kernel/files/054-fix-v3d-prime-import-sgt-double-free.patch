@@ -1,0 +1,51 @@
+FYDE: drm/v3d: fix sg_table double free on the prime import error path
+
+v3d_prime_import_sg_table() runs as the ->gem_prime_import_sg_table
+callback, which drm_gem_prime_import_dev() invokes *before* it assigns
+obj->import_attach (drm_prime.c:970 vs :976). So when
+v3d_bo_create_finish() fails and we call drm_gem_shmem_free(),
+obj->import_attach is still NULL and drm_gem_shmem_free() takes its
+non-imported path, which does dma_unmap_sgtable() + sg_free_table() +
+kfree() on shmem->sgt.
+
+That table is not ours. drm_gem_shmem_prime_import_sg_table() merely
+stored the exporter's attachment sgt in shmem->sgt. Control then returns
+to drm_gem_prime_import_dev()'s fail_unmap/fail_detach path: because
+drm_gem_prime_dmabuf_ops sets cache_sgt_mapping (drm_prime.c:813) the same
+table is cached in attach->sgt, so dma_buf_unmap_attachment_unlocked() is
+a no-op and dma_buf_detach() calls __unmap_dma_buf() on it -- a second
+sg_free_table() walk and kfree() over already freed memory.
+
+Disown the table before freeing the shmem object so it is released exactly
+once, by the caller. Nothing is leaked by skipping it: an imported shmem
+object is created private and drm_gem_shmem_get_pages_sgt_locked() returns
+the existing shmem->sgt immediately (drm_gem_shmem_helper.c:705), so
+shmem->pages is never populated.
+
+Reachable whenever v3d's 4GB GPU address space is fragmented enough for
+drm_mm_insert_node_generic() in v3d_bo_create_finish() to return -ENOSPC,
+from any DRM_IOCTL_PRIME_FD_TO_HANDLE into v3d. This is upstream v3d code
+and has nothing to do with the downstream VC4_CALLOC path, which is why it
+is a separate patch.
+
+Index: v6.12-rpi/drivers/gpu/drm/v3d/v3d_bo.c
+===================================================================
+--- v6.12-rpi.orig/drivers/gpu/drm/v3d/v3d_bo.c
++++ v6.12-rpi/drivers/gpu/drm/v3d/v3d_bo.c
+@@ -186,6 +186,16 @@ v3d_prime_import_sg_table(struct drm_dev
+ 
+ 	ret = v3d_bo_create_finish(obj);
+ 	if (ret) {
++		/* The sg_table belongs to the exporter's attachment, and we are
++		 * called before drm_gem_prime_import_dev() has set
++		 * obj->import_attach.  drm_gem_shmem_free() would therefore take
++		 * its non-imported path and sg_free_table()/kfree() a table our
++		 * caller frees again from dma_buf_detach() -- the mapping is
++		 * cached in attach->sgt because drm_gem_prime_dmabuf_ops sets
++		 * cache_sgt_mapping.  Disown it so it is released exactly once,
++		 * by the caller's fail_unmap/fail_detach path.
++		 */
++		to_v3d_bo(obj)->base.sgt = NULL;
+ 		drm_gem_shmem_free(&to_v3d_bo(obj)->base);
+ 		return ERR_PTR(ret);
+ 	}

@@ -1,0 +1,12 @@
+Index: v6.12-rpi/arch/arm/boot/dts/overlays/cutiepi-panel-overlay.dts
+===================================================================
+--- v6.12-rpi.orig/arch/arm/boot/dts/overlays/cutiepi-panel-overlay.dts
++++ v6.12-rpi/arch/arm/boot/dts/overlays/cutiepi-panel-overlay.dts
+@@ -24,6 +24,7 @@
+                 reg=<0>;
+                 backlight = <&rpi_backlight>;
+                 reset-gpios = <&gpio 20 0>;
++                rotation = <270>;
+                 port {
+                     panel_dsi_in1: endpoint {
+                         remote-endpoint = <&dsi1_out_port>;

@@ -36,7 +36,7 @@ Index: v6.12-rpi/fs/Makefile
  obj-$(CONFIG_HFSPLUS_FS)	+= hfsplus/ # Before hfs to find wrapped HFS+
  obj-$(CONFIG_HFS_FS)		+= hfs/
  obj-$(CONFIG_ECRYPT_FS)		+= ecryptfs/
-+obj-$(CONFIG_ESD_FS)      += esdfs/
++obj-$(CONFIG_ESD_FS)           += esdfs/
  obj-$(CONFIG_VXFS_FS)		+= freevxfs/
  obj-$(CONFIG_NFS_FS)		+= nfs/
  obj-$(CONFIG_EXPORTFS)		+= exportfs/
@@ -231,7 +231,7 @@ Index: v6.12-rpi/fs/esdfs/derive.c
 ===================================================================
 --- /dev/null
 +++ v6.12-rpi/fs/esdfs/derive.c
-@@ -0,0 +1,610 @@
+@@ -0,0 +1,631 @@
 +/*
 + * Copyright (c) 2013-2014 Motorola Mobility LLC
 + * Copyright (C) 2017      Google, Inc.
@@ -395,9 +395,24 @@ Index: v6.12-rpi/fs/esdfs/derive.c
 +	struct esdfs_sb_info *sbi = ESDFS_SB(inode->i_sb);
 +	struct esdfs_inode_info *inode_i = ESDFS_I(inode);
 +	gid_t gid = sbi->upper_perms.gid;
++	umode_t mode = inode->i_mode & S_IFMT;
 +
++	/*
++	 * Build the mode in a local and publish it with a single store below.
++	 *
++	 * This used to read-modify-write inode->i_mode in place ~11 times,
++	 * starting with "i_mode &= S_IFMT" -- i.e. momentarily mode 0000.  This
++	 * runs from esdfs_getattr() (every stat) and esdfs_open(), with no lock,
++	 * on an inode that other threads are using concurrently.  A racing
++	 * esdfs_permission() -> generic_permission() reading i_mode inside that
++	 * window sees no permission bits and returns -EACCES for a file the
++	 * caller is perfectly entitled to -- a spurious, load-dependent failure
++	 * on a live, byte-correct file.
++	 *
++	 * uid/gid are still published as separate stores; they never transit
++	 * through a "deny everything" value, so they are less dangerous.
++	 */
 +	esdfs_i_uid_write(inode, sbi->upper_perms.uid);
-+	inode->i_mode &= S_IFMT;
 +	if (ESDFS_RESTRICT_PERMS(sbi))
 +		esdfs_i_gid_write(inode, gid);
 +	else {
@@ -405,16 +420,16 @@ Index: v6.12-rpi/fs/esdfs/derive.c
 +			esdfs_i_gid_write(inode, AID_SDCARD_RW);
 +		else
 +			esdfs_i_gid_write(inode, derive_uid(inode_i, gid));
-+		inode->i_mode |= sbi->upper_perms.dmask;
++		mode |= sbi->upper_perms.dmask;
 +	}
 +
 +	switch (inode_i->tree) {
 +	case ESDFS_TREE_ROOT_LEGACY:
 +		if (ESDFS_RESTRICT_PERMS(sbi))
-+			inode->i_mode |= sbi->upper_perms.dmask;
++			mode |= sbi->upper_perms.dmask;
 +		else if (test_opt(sbi, DERIVE_MULTI)) {
-+			inode->i_mode &= S_IFMT;
-+			inode->i_mode |= 0711;
++			mode &= S_IFMT;
++			mode |= 0711;
 +		}
 +		break;
 +
@@ -422,18 +437,18 @@ Index: v6.12-rpi/fs/esdfs/derive.c
 +	case ESDFS_TREE_ROOT:
 +		if (ESDFS_RESTRICT_PERMS(sbi)) {
 +			esdfs_i_gid_write(inode, AID_SDCARD_R);
-+			inode->i_mode |= sbi->upper_perms.dmask;
++			mode |= sbi->upper_perms.dmask;
 +		} else if (test_opt(sbi, DERIVE_PUBLIC) &&
 +			   test_opt(ESDFS_SB(inode->i_sb), DERIVE_CONFINE)) {
-+			inode->i_mode &= S_IFMT;
-+			inode->i_mode |= 0771;
++			mode &= S_IFMT;
++			mode |= 0771;
 +		}
 +		break;
 +
 +	case ESDFS_TREE_MEDIA:
 +		if (ESDFS_RESTRICT_PERMS(sbi)) {
 +			esdfs_i_gid_write(inode, AID_SDCARD_R);
-+			inode->i_mode |= 0770;
++			mode |= 0770;
 +		}
 +		break;
 +
@@ -443,7 +458,7 @@ Index: v6.12-rpi/fs/esdfs/derive.c
 +	case ESDFS_TREE_ANDROID_OBB:
 +	case ESDFS_TREE_ANDROID_MEDIA:
 +		if (ESDFS_RESTRICT_PERMS(sbi))
-+			inode->i_mode |= 0771;
++			mode |= 0771;
 +		break;
 +
 +	case ESDFS_TREE_ANDROID_APP:
@@ -452,21 +467,27 @@ Index: v6.12-rpi/fs/esdfs/derive.c
 +			esdfs_i_uid_write(inode, derive_uid(inode_i,
 +							inode_i->appid));
 +		if (ESDFS_RESTRICT_PERMS(sbi))
-+			inode->i_mode |= 0770;
++			mode |= 0770;
 +		break;
 +
 +	case ESDFS_TREE_ANDROID_USER:
 +		if (ESDFS_RESTRICT_PERMS(sbi)) {
 +			esdfs_i_gid_write(inode, AID_SDCARD_ALL);
-+			inode->i_mode |= 0770;
++			mode |= 0770;
 +		}
-+		inode->i_mode |= 0770;
++		mode |= 0770;
 +		break;
 +	}
 +
 +	/* strip execute bits from any non-directories */
-+	if (!S_ISDIR(inode->i_mode))
-+		inode->i_mode &= ~S_IXUGO;
++	if (!S_ISDIR(mode))
++		mode &= ~S_IXUGO;
++
++	/*
++	 * Publish atomically: readers see the old mode or the new, never 0000.
++	 * WRITE_ONCE because this races plain loads in generic_permission().
++	 */
++	WRITE_ONCE(inode->i_mode, mode);
 +}
 +
 +/*
@@ -846,7 +867,7 @@ Index: v6.12-rpi/fs/esdfs/esdfs.h
 ===================================================================
 --- /dev/null
 +++ v6.12-rpi/fs/esdfs/esdfs.h
-@@ -0,0 +1,627 @@
+@@ -0,0 +1,644 @@
 +/*
 + * Copyright (c) 1998-2014 Erez Zadok
 + * Copyright (c) 2009	   Shrikar Archak
@@ -892,6 +913,12 @@ Index: v6.12-rpi/fs/esdfs/esdfs.h
 +/* ioctl command */
 +#define ESDFS_IOCTL_MAGIC	'e'
 +#define ESDFS_IOC_DIS_ACCESS	_IO(ESDFS_IOCTL_MAGIC, 1)
++/*
++ * Counterpart to DIS_ACCESS.  Without this, ACCESS_DISABLE is a one-way latch:
++ * every path that tests it returns -ENOENT, so once set the whole mount looks
++ * permanently empty and only umount can recover it.
++ */
++#define ESDFS_IOC_EN_ACCESS	_IO(ESDFS_IOCTL_MAGIC, 2)
 +
 +/* esdfs root inode number */
 +#define ESDFS_ROOT_INO     1
@@ -1346,7 +1373,18 @@ Index: v6.12-rpi/fs/esdfs/esdfs.h
 +static inline void esdfs_copy_lower_attr(struct inode *dest,
 +					 const struct inode *src)
 +{
-+	dest->i_mode = src->i_mode & S_IFMT;
++	/*
++	 * Never publish a permission-less mode on a live inode.  Every caller
++	 * but esdfs_iget() runs esdfs_set_perms() immediately after us, and that
++	 * stores the final mode in a single store; esdfs_iget() runs under I_NEW
++	 * with dest perms already 0, so preserving them is a no-op there.
++	 *
++	 * Storing (src type | dest perms) instead of bare "src->i_mode & S_IFMT"
++	 * keeps a racing esdfs_permission() -> generic_permission() from ever
++	 * observing mode 0000 and denying access to a file the caller owns.
++	 */
++	WRITE_ONCE(dest->i_mode,
++		   (src->i_mode & S_IFMT) | (dest->i_mode & ~S_IFMT));
 +	dest->i_rdev = src->i_rdev;
 +	inode_set_atime_to_ts(dest, inode_get_atime(src));
 +	inode_set_mtime_to_ts(dest, inode_get_mtime(src));
@@ -1478,7 +1516,7 @@ Index: v6.12-rpi/fs/esdfs/file.c
 ===================================================================
 --- /dev/null
 +++ v6.12-rpi/fs/esdfs/file.c
-@@ -0,0 +1,528 @@
+@@ -0,0 +1,593 @@
 +/*
 + * Copyright (c) 1998-2014 Erez Zadok
 + * Copyright (c) 2009	   Shrikar Archak
@@ -1608,6 +1646,16 @@ Index: v6.12-rpi/fs/esdfs/file.c
 +		goto out;
 +	}
 +
++	if (cmd == ESDFS_IOC_EN_ACCESS) {
++		if (!capable(CAP_SYS_ADMIN)) {
++			err = -EPERM;
++			goto out;
++		}
++		clear_opt(sbi, ACCESS_DISABLE);
++		err = 0;
++		goto out;
++	}
++
 +	lower_file = esdfs_lower_file(file);
 +
 +	/* XXX: use vfs_ioctl if/when VFS exports it */
@@ -1667,17 +1715,23 @@ Index: v6.12-rpi/fs/esdfs/file.c
 +	willwrite = ((vma->vm_flags | VM_SHARED | VM_WRITE) == vma->vm_flags);
 +
 +	/*
-+	 * File systems which do not implement ->writepage may use
++	 * File systems which cannot write dirty pages back may use
 +	 * generic_file_readonly_mmap as their ->mmap op.  If you call
 +	 * generic_file_readonly_mmap with VM_WRITE, you'd get an -EINVAL.
 +	 * But we cannot call the lower ->mmap op, so we can't tell that
 +	 * writeable mappings won't work.  Therefore, our only choice is to
-+	 * check if the lower file system supports the ->writepage, and if
++	 * check whether the lower file system can write pages back, and if
 +	 * not, return EINVAL (the same error that
 +	 * generic_file_readonly_mmap returns in that case).
++	 *
++	 * Probe ->writepages, NOT ->writepage: the folio conversion removed
++	 * ->writepage from ext4 (and from most filesystems) while leaving the
++	 * field in address_space_operations, so testing ->writepage matches
++	 * NULL for every modern lower fs and rejected *all* shared writable
++	 * mmaps on the sdcard with -EINVAL.
 +	 */
 +	lower_file = esdfs_lower_file(file);
-+	if (willwrite && !lower_file->f_mapping->a_ops->writepage) {
++	if (willwrite && !lower_file->f_mapping->a_ops->writepages) {
 +		err = -EINVAL;
 +		esdfs_msg(file->f_mapping->host->i_sb, KERN_INFO,
 +			"lower file system does not support writeable mmap\n");
@@ -1750,7 +1804,8 @@ Index: v6.12-rpi/fs/esdfs/file.c
 +
 +	/* open lower object and link esdfs's file struct to lower's */
 +	esdfs_get_lower_path(file->f_path.dentry, &lower_path);
-+  lower_file = backing_file_open(file, file->f_flags, &lower_path, current_cred());
++	lower_file = backing_file_open(file, file->f_flags, &lower_path,
++				       current_cred());
 +	path_put(&lower_path);
 +	if (IS_ERR(lower_file)) {
 +		err = PTR_ERR(lower_file);
@@ -1763,10 +1818,16 @@ Index: v6.12-rpi/fs/esdfs/file.c
 +		esdfs_set_lower_file(file, lower_file);
 +	}
 +
-+	if (err)
++	if (err) {
 +		kfree(ESDFS_F(file));
-+	else
++	} else {
 +		esdfs_copy_attr(inode, esdfs_lower_inode(inode));
++		/*
++		 * esdfs_copy_attr() deliberately leaves i_size alone, but
++		 * SEEK_END is answered out of it, so refresh it here as well.
++		 */
++		fsstack_copy_inode_size(inode, esdfs_lower_inode(inode));
++	}
 +out_err:
 +	esdfs_revert_creds(creds, NULL);
 +	return err;
@@ -1858,23 +1919,40 @@ Index: v6.12-rpi/fs/esdfs/file.c
 + */
 +static loff_t esdfs_file_llseek(struct file *file, loff_t offset, int whence)
 +{
-+	int err;
-+	struct file *lower_file;
-+	struct esdfs_sb_info *sbi = ESDFS_SB(file->f_path.dentry->d_sb);
-+	const struct cred *creds = esdfs_override_creds(sbi,
-+				ESDFS_I(file->f_inode), NULL);
-+	if (!creds)
-+		return -ENOMEM;
++	loff_t err;
++	struct file *lower_file = esdfs_lower_file(file);
++	struct inode *inode = file_inode(file);
++
++	/*
++	 * No creds override here: nothing below touches the lower filesystem or
++	 * performs a permission check, so overriding would only add a
++	 * GFP_KERNEL allocation -- and a new -ENOMEM failure mode -- to what is
++	 * frequently the hottest syscall on this mount.
++	 *
++	 * Our cached i_size goes stale.  The same lower tree is exported
++	 * through several esdfs superblocks (/storage/emulated,
++	 * /mnt/runtime/default, /mnt/user/0, /mnt/pass_through/0, and so on),
++	 * each with its own inode, so a write through one never updates the
++	 * size another one has cached, and esdfs_open() does not copy i_size
++	 * either.  Refresh it from the lower inode, but ONLY for the whences
++	 * that actually consult i_size: an unconditional refresh is wasted work
++	 * on every SEEK_SET, and inside the esdfs_setattr() window it can copy a
++	 * not-yet-truncated lower size back over the upper size that
++	 * esdfs_setattr() has already updated (upper i_size_write() happens
++	 * before the lower notify_change()).
++	 */
++	if (whence == SEEK_END || whence == SEEK_DATA || whence == SEEK_HOLE)
++		fsstack_copy_inode_size(inode, file_inode(lower_file));
 +
 +	err = generic_file_llseek(file, offset, whence);
 +	if (err < 0)
-+		goto out;
++		return err;
 +
-+	lower_file = esdfs_lower_file(file);
-+	err = generic_file_llseek(lower_file, offset, whence);
-+
-+out:
-+	esdfs_revert_creds(creds, NULL);
++	/*
++	 * Mirror the resulting position instead of replaying the seek against
++	 * the lower file: replaying SEEK_CUR would apply the delta twice.
++	 */
++	lower_file->f_pos = file->f_pos;
 +	return err;
 +}
 +
@@ -1941,39 +2019,64 @@ Index: v6.12-rpi/fs/esdfs/file.c
 +			       struct pipe_inode_info *pipe, size_t len,
 +			       unsigned int flags)
 +{
-+  struct file *lower_file = esdfs_lower_file(in);
-+  ssize_t ret;
-+  struct esdfs_sb_info *sbi = ESDFS_SB(in->f_path.dentry->d_sb);
-+  struct backing_file_ctx ctx = {
-+    .cred = esdfs_override_creds(sbi, ESDFS_I(in->f_inode), NULL),
-+    .user_file = in,
-+    .accessed = esdfs_file_accessed,
-+  };
-+  get_file(lower_file); /* prevent lower_file from being released */
-+  ret = backing_file_splice_read(lower_file, ppos, pipe, len, flags, &ctx);
-+  fput(lower_file);
-+  return ret;
++	struct file *lower_file = esdfs_lower_file(in);
++	struct esdfs_sb_info *sbi = ESDFS_SB(in->f_path.dentry->d_sb);
++	struct backing_file_ctx ctx = {
++		.user_file = in,
++		.accessed = esdfs_file_accessed,
++	};
++	const struct cred *saved;
++	ssize_t ret;
++
++	/*
++	 * esdfs_override_creds() INSTALLS the lower creds and returns the
++	 * caller's old creds (override_creds() semantics).  Assigning its return
++	 * value straight into ctx.cred therefore did two things wrong: it ran
++	 * the lower splice with the *app's* creds (the opposite of intent), and
++	 * it never reverted, so the calling thread kept the esdfs lower cred
++	 * (fsuid AID_MEDIA_RW) for the rest of its life and leaked a cred
++	 * reference on every call.  Install first, then hand the lower op the
++	 * creds now current -- the same shape esdfs_open() uses.
++	 */
++	saved = esdfs_override_creds(sbi, ESDFS_I(in->f_inode), NULL);
++	if (!saved)
++		return -ENOMEM;
++	ctx.cred = current_cred();
++
++	get_file(lower_file); /* prevent lower_file from being released */
++	ret = backing_file_splice_read(lower_file, ppos, pipe, len, flags, &ctx);
++	fput(lower_file);
++	esdfs_revert_creds(saved, NULL);
++	return ret;
 +}
 +
 +static ssize_t esdfs_splice_write(struct pipe_inode_info *pipe, struct file *out,
 +				loff_t *ppos, size_t len, unsigned int flags)
 +{
-+  struct file *lower_file = esdfs_lower_file(out);
-+  ssize_t ret;
-+  struct esdfs_sb_info *sbi = ESDFS_SB(out->f_path.dentry->d_sb);
-+  struct backing_file_ctx ctx = {
-+    .cred = esdfs_override_creds(sbi, ESDFS_I(out->f_inode), NULL),
-+    .user_file = out,
-+    .end_write = esdfs_file_end_write,
-+  };
-+  get_file(lower_file); /* prevent lower_file from being released */
-+  ret = backing_file_splice_write(pipe, lower_file, ppos, len, flags, &ctx);
-+  fput(lower_file);
-+  return ret;
++	struct file *lower_file = esdfs_lower_file(out);
++	struct esdfs_sb_info *sbi = ESDFS_SB(out->f_path.dentry->d_sb);
++	struct backing_file_ctx ctx = {
++		.user_file = out,
++		.end_write = esdfs_file_end_write,
++	};
++	const struct cred *saved;
++	ssize_t ret;
++
++	/* Same cred-lifetime bug as esdfs_splice_read(); see the note there. */
++	saved = esdfs_override_creds(sbi, ESDFS_I(out->f_inode), NULL);
++	if (!saved)
++		return -ENOMEM;
++	ctx.cred = current_cred();
++
++	get_file(lower_file); /* prevent lower_file from being released */
++	ret = backing_file_splice_write(pipe, lower_file, ppos, len, flags, &ctx);
++	fput(lower_file);
++	esdfs_revert_creds(saved, NULL);
++	return ret;
 +}
 +
 +const struct file_operations esdfs_main_fops = {
-+	.llseek		= generic_file_llseek,
++	.llseek		= esdfs_file_llseek,
 +	.read		= esdfs_read,
 +	.write		= esdfs_write,
 +	.unlocked_ioctl	= esdfs_unlocked_ioctl,
@@ -2011,7 +2114,7 @@ Index: v6.12-rpi/fs/esdfs/inode.c
 ===================================================================
 --- /dev/null
 +++ v6.12-rpi/fs/esdfs/inode.c
-@@ -0,0 +1,550 @@
+@@ -0,0 +1,579 @@
 +/*
 + * Copyright (c) 1998-2014 Erez Zadok
 + * Copyright (c) 2009	   Shrikar Archak
@@ -2362,6 +2465,24 @@ Index: v6.12-rpi/fs/esdfs/inode.c
 +	/* First, check the upper permissions */
 +	err = generic_permission(mnt_idmap, inode, mask);
 +
++	/*
++	 * generic_permission() on the derived i_mode/i_uid is the only EACCES
++	 * producer in this driver, so log the inputs when it denies.  This
++	 * discriminates the competing explanations for spurious "file not
++	 * exist" on byte-correct files in one shot:
++	 *   mode=100000/40000       -> a permission-less i_mode was observed
++	 *   uid=0 on an app dir     -> the uid publish was caught mid-update
++	 *   fsuid=1023 w/ sane mode -> the caller's creds are poisoned
++	 * No hits across a full pass rules the whole permission family out.
++	 */
++	if (err == -EACCES)
++		pr_warn_ratelimited("ESDFS-fs: EACCES ino=%lu mode=%o uid=%u gid=%u mask=%x fsuid=%u fsgid=%u\n",
++				    inode->i_ino, (unsigned int)inode->i_mode,
++				    i_uid_read(inode), i_gid_read(inode),
++				    (unsigned int)mask,
++				    from_kuid(&init_user_ns, current_fsuid()),
++				    from_kgid(&init_user_ns, current_fsgid()));
++
 +	/* Basic checking of the lower inode (can't override creds here) */
 +	lower_inode = esdfs_lower_inode(inode);
 +	if (S_ISSOCK(lower_inode->i_mode) ||
@@ -2515,6 +2636,17 @@ Index: v6.12-rpi/fs/esdfs/inode.c
 +		return -ENOMEM;
 +
 +	if (test_opt(ESDFS_SB(inode->i_sb), ACCESS_DISABLE)) {
++		/*
++		 * -ENOENT here is deliberate and matches the other seven
++		 * ACCESS_DISABLE sites: a disabled mount is meant to look
++		 * empty.  But stat() claiming a file does not exist is
++		 * indistinguishable from the file really being gone, and
++		 * userspace reacts by deleting and re-fetching it.  Say so in
++		 * the log (ratelimited) so a stuck latch is diagnosable
++		 * instead of masquerading as missing data.
++		 */
++		pr_warn_ratelimited("ESDFS-fs: access disabled, reporting ENOENT for %pd\n",
++				    dentry);
 +		esdfs_revert_creds(creds, NULL);
 +		return -ENOENT;
 +	}
@@ -2566,7 +2698,7 @@ Index: v6.12-rpi/fs/esdfs/lookup.c
 ===================================================================
 --- /dev/null
 +++ v6.12-rpi/fs/esdfs/lookup.c
-@@ -0,0 +1,471 @@
+@@ -0,0 +1,493 @@
 +/*
 + * Copyright (c) 1998-2014 Erez Zadok
 + * Copyright (c) 2009	   Shrikar Archak
@@ -2593,15 +2725,27 @@ Index: v6.12-rpi/fs/esdfs/lookup.c
 +		loff_t offset, u64 ino, unsigned int d_type)
 +{
 +	struct esdfs_name_data *buf = container_of(ctx, struct esdfs_name_data, ctx);
-+	struct qstr candidate = QSTR_INIT(name, namelen);
 +
-+	if (qstr_case_eq(buf->to_find, &candidate)) {
++	/*
++	 * filldir_t returns 'true' to keep iterating and 'false' to stop
++	 * (include/linux/fs.h).  These were inverted: returning false on a
++	 * mismatch aborted iterate_dir() at the very first entry -- normally
++	 * "." -- so buf->found was never set and esdfs_lookup_nocase() always
++	 * returned -ENOENT, making case-insensitive lookup dead code.
++	 *
++	 * The comparison is bounded by namelen.  qstr_case_eq() -> strcasecmp()
++	 * is NUL-terminated and ignores the length, but dir_emit() makes no
++	 * termination guarantee -- so it would read past the entry into
++	 * inter-dirent padding and mis-report a genuine match as unequal.
++	 */
++	if (buf->to_find->len == namelen &&
++	    str_n_case_eq(buf->to_find->name, name, namelen)) {
 +		memcpy(buf->match_name, name, namelen);
 +		buf->match_name[namelen] = 0;
 +		buf->found = true;
-+		return true;
++		return false;	/* found it: stop iterating */
 +	}
-+	return false;
++	return true;		/* no match: keep going */
 +}
 +
 +int esdfs_lookup_nocase(struct path *parent,
@@ -2621,13 +2765,23 @@ Index: v6.12-rpi/fs/esdfs/lookup.c
 +			.found = false,
 +		};
 +
++		/*
++		 * Never leak this fallback's errno to the caller.  The exact
++		 * lookup above already proved the name is absent, so the only
++		 * useful outcome here is "found a case-variant" or "-ENOENT".
++		 * __esdfs_lookup() treats any non-ENOENT error as fatal before
++		 * it reaches the LOOKUP_CREATE rescue, so leaking -ENOMEM from
++		 * ext4's per-entry allocation (this board runs at ~1% free
++		 * memory), -EIO, -EINTR or -EACCES from security_file_open()
++		 * would turn "create a .tmp file" into a hard failure.
++		 */
 +		file = dentry_open(parent, O_RDONLY | O_DIRECTORY, cred);
 +		if (IS_ERR(file))
-+			return PTR_ERR(file);
++			return -ENOENT;
 +		err = iterate_dir(file, &buffer.ctx);
 +		fput(file);
 +		if (err)
-+			return err;
++			return -ENOENT;
 +
 +		if (buffer.found)
 +			err = vfs_path_lookup(parent->dentry, parent->mnt,
@@ -4183,79 +4337,11 @@ Index: v6.12-rpi/include/uapi/linux/magic.h
  #define REISER2FS_SUPER_MAGIC_STRING	"ReIsEr2Fs"
  #define REISER2FS_JR_SUPER_MAGIC_STRING	"ReIsEr3Fs"
  
-+#define ESDFS_SUPER_MAGIC 0x00035df5
++#define ESDFS_SUPER_MAGIC	0x00035df5
 +
  #define SMB_SUPER_MAGIC		0x517B
  #define CIFS_SUPER_MAGIC	0xFF534D42      /* the first four bytes of SMB PDUs */
  #define SMB2_SUPER_MAGIC	0xFE534D42
-Index: v6.12-rpi/fs/erofs/decompressor_zstd.c
-===================================================================
---- v6.12-rpi.orig/fs/erofs/decompressor_zstd.c
-+++ v6.12-rpi/fs/erofs/decompressor_zstd.c
-@@ -172,6 +172,7 @@ static int z_erofs_zstd_decompress(struc
- 	dctx.bounce = strm->bounce;
- 
- 	do {
-+		dctx.avail_out = out_buf.size - out_buf.pos;
- 		dctx.inbuf_sz = in_buf.size;
- 		dctx.inbuf_pos = in_buf.pos;
- 		err = z_erofs_stream_switch_bufs(&dctx, &out_buf.dst,
-@@ -187,18 +188,14 @@ static int z_erofs_zstd_decompress(struc
- 		in_buf.pos = dctx.inbuf_pos;
- 
- 		zerr = zstd_decompress_stream(stream, &out_buf, &in_buf);
--		dctx.avail_out = out_buf.size - out_buf.pos;
--		if (zstd_is_error(zerr) ||
--		    ((rq->outputsize + dctx.avail_out) && (!zerr || (zerr > 0 &&
--				!(rq->inputsize + in_buf.size - in_buf.pos))))) {
-+		if (zstd_is_error(zerr) || (!zerr && rq->outputsize)) {
- 			erofs_err(sb, "failed to decompress in[%u] out[%u]: %s",
- 				  rq->inputsize, rq->outputsize,
--				  zstd_is_error(zerr) ? zstd_get_error_name(zerr) :
--					"unexpected end of stream");
-+				  zerr ? zstd_get_error_name(zerr) : "unexpected end of stream");
- 			err = -EFSCORRUPTED;
- 			break;
- 		}
--	} while (rq->outputsize + dctx.avail_out);
-+	} while (rq->outputsize || out_buf.pos < out_buf.size);
- 
- 	if (dctx.kout)
- 		kunmap_local(dctx.kout);
-Index: v6.12-rpi/fs/erofs/super.c
-===================================================================
---- v6.12-rpi.orig/fs/erofs/super.c
-+++ v6.12-rpi/fs/erofs/super.c
-@@ -635,29 +635,6 @@ static int erofs_fc_fill_super(struct su
- 
- 	sbi->blkszbits = PAGE_SHIFT;
- 	if (!sb->s_bdev) {
--		/*
--		 * (File-backed mounts) EROFS claims it's safe to nest other
--		 * fs contexts (including its own) due to self-controlled RO
--		 * accesses/contexts and no side-effect changes that need to
--		 * context save & restore so it can reuse the current thread
--		 * context.
--		 * However, we still need to prevent kernel stack overflow due
--		 * to filesystem nesting: just ensure that s_stack_depth is 0
--		 * to disallow mounting EROFS on stacked filesystems.
--		 * Note: s_stack_depth is not incremented here for now, since
--		 * EROFS is the only fs supporting file-backed mounts for now.
--		 * It MUST change if another fs plans to support them, which
--		 * may also require adjusting FILESYSTEM_MAX_STACK_DEPTH.
--		 */
--		if (erofs_is_fileio_mode(sbi)) {
--			inode = file_inode(sbi->dif0.file);
--			if ((inode->i_sb->s_op == &erofs_sops &&
--			     !inode->i_sb->s_bdev) ||
--			    inode->i_sb->s_stack_depth) {
--				erofs_err(sb, "file-backed mounts cannot be applied to stacked fses");
--				return -ENOTBLK;
--			}
--		}
- 		sb->s_blocksize = PAGE_SIZE;
- 		sb->s_blocksize_bits = PAGE_SHIFT;
- 
 Index: v6.12-rpi/fs/erofs/xattr.c
 ===================================================================
 --- v6.12-rpi.orig/fs/erofs/xattr.c
@@ -4270,66 +4356,3 @@ Index: v6.12-rpi/fs/erofs/xattr.c
  {
  	if (handler->flags == EROFS_XATTR_INDEX_USER &&
  	    !test_opt(&EROFS_I_SB(inode)->opt, XATTR_USER))
-Index: v6.12-rpi/fs/erofs/zdata.c
-===================================================================
---- v6.12-rpi.orig/fs/erofs/zdata.c
-+++ v6.12-rpi/fs/erofs/zdata.c
-@@ -1230,14 +1230,14 @@ static int z_erofs_parse_in_bvecs(struct
- 	return err;
- }
- 
--static int z_erofs_decompress_pcluster(struct z_erofs_backend *be, bool eio)
-+static int z_erofs_decompress_pcluster(struct z_erofs_backend *be, int err)
- {
- 	struct erofs_sb_info *const sbi = EROFS_SB(be->sb);
- 	struct z_erofs_pcluster *pcl = be->pcl;
- 	unsigned int pclusterpages = z_erofs_pclusterpages(pcl);
- 	const struct z_erofs_decompressor *decomp =
- 				z_erofs_decomp[pcl->algorithmformat];
--	int i, j, jtop, err2, err = eio ? -EIO : 0;
-+	int i, j, jtop, err2;
- 	struct page *page;
- 	bool overlapped;
- 	bool try_free = true;
-@@ -1369,12 +1369,12 @@ static int z_erofs_decompress_queue(cons
- 		.pcl = io->head,
- 	};
- 	struct z_erofs_pcluster *next;
--	int err = 0;
-+	int err = io->eio ? -EIO : 0;
- 
- 	for (; be.pcl != Z_EROFS_PCLUSTER_TAIL; be.pcl = next) {
- 		DBG_BUGON(!be.pcl);
- 		next = READ_ONCE(be.pcl->next);
--		err = z_erofs_decompress_pcluster(&be, io->eio) ?: err;
-+		err = z_erofs_decompress_pcluster(&be, err) ?: err;
- 	}
- 	return err;
- }
-@@ -1398,16 +1398,6 @@ static void z_erofs_decompressqueue_kthr
- }
- #endif
- 
--/* Use (kthread_)work in atomic contexts to minimize scheduling overhead */
--static inline bool z_erofs_in_atomic(void)
--{
--	if (IS_ENABLED(CONFIG_PREEMPTION) && rcu_preempt_depth())
--		return true;
--	if (!IS_ENABLED(CONFIG_PREEMPT_COUNT))
--		return true;
--	return !preemptible();
--}
--
- static void z_erofs_decompress_kickoff(struct z_erofs_decompressqueue *io,
- 				       int bios)
- {
-@@ -1423,7 +1413,8 @@ static void z_erofs_decompress_kickoff(s
- 
- 	if (atomic_add_return(bios, &io->pending_bios))
- 		return;
--	if (z_erofs_in_atomic()) {
-+	/* Use (kthread_)work and sync decompression for atomic contexts only */
-+	if (!in_task() || irqs_disabled() || rcu_read_lock_any_held()) {
- 		/* See `sync_decompress` in sysfs-fs-erofs for more details */
- 		if (sbi->sync_decompress == EROFS_SYNC_DECOMPRESS_AUTO)
- 			sbi->sync_decompress = EROFS_SYNC_DECOMPRESS_FORCE_ON;

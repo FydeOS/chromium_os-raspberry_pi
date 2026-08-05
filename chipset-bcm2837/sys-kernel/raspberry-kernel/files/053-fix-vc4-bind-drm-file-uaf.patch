@@ -1,0 +1,489 @@
+FYDE: drm/v3d: stop borrowing a foreign drm_file for VC4_CALLOC
+
+import_bo_from_vc4() allocated the CMA buffer through a global
+'struct drm_file *vc4_drm_file', which vc5_open() set to whichever
+process had most recently opened the vc4 primary node. No reference of
+any kind was taken on that file. READ_ONCE() gave the pointer stability
+but not lifetime: drm_file_free() runs drm_gem_release(), which
+destroys file->object_idr, *before* ->postclose gets to clear the
+global. A caller that had already passed the NULL check could therefore
+allocate a handle into a torn-down IDR and go on to touch freed slab.
+The window is wide -- the function used the file across four separate
+operations (create_with_handle, handle_to_fd, its retry, and
+handle_delete).
+
+The single global slot was functionally wrong as well. vc5_open()
+overwrote it unconditionally on VC4_GEN_6_C, so the last opener won,
+and that client's close set it to NULL and made every subsequent
+VC4_CALLOC allocation fail with -ENODEV for every other client still
+running -- with no fallback in v3d_create_bo_ioctl(), which returns the
+error straight to userspace.
+
+None of it was necessary: the buffer only has to be allocated by vc4
+because that is where the CMA allocator lives, and that needs the vc4
+*device*, not one of its clients. So:
+
+  vc4_dev = vc4_drm_get()        /* new: drm_dev_get() under a mutex */
+  drm_dev_enter(vc4_dev, &idx)   /* unbind calls drm_dev_unplug() */
+  drm_gem_dma_create(vc4_dev, size)
+  drm_gem_prime_export(&dma_obj->base, O_RDWR | O_CLOEXEC)
+  drm_gem_prime_import_dev(dev, dmabuf, dev->dev)
+  v3d_obj->dma_buf = dmabuf; get_dma_buf(dmabuf);
+  drm_gem_handle_create(file_priv, v3d_obj, handle)
+
+with the resulting ownership chain
+
+  v3d handle -> v3d GEM obj -> import_attach -> dma_buf -> vc4 GEM obj
+
+and the dma_buf additionally holding drm_dev_get() on the vc4 device
+(taken by drm_gem_dmabuf_export()), so a buffer stays valid regardless
+of what any vc4 client does.
+
+Setting obj->dma_buf by hand is not optional and not cosmetic:
+drm_gem_shmem_mmap() passes it straight to dma_buf_mmap() for an
+imported BO, so leaving it NULL makes every mmap() of one of these
+buffers WARN and return -EINVAL. The stock helper that would set it,
+drm_gem_prime_fd_to_handle(), only reaches it by way of a descriptor
+installed in the *caller's* fd table; that descriptor stays visible
+across several sleeping operations, so a sibling thread could close it
+(making our close_fd() shoot down an unrelated descriptor) or dup2()
+over it (making the ioctl import a different dma_buf entirely). The
+object is not reachable from userspace until the handle exists, so the
+assignment here is safe, and drm_gem_handle_create()'s err_unref path
+releases the reference for us via
+drm_gem_object_exported_dma_buf_free().
+
+The one thing lost relative to drm_gem_prime_fd_to_handle() is the
+file_priv->prime cache entry; drm_prime_add_buf_handle() is static to
+drm_prime.c and cannot be called from a driver. The effect is limited
+to a client that re-imports its own buffer getting a second handle for
+it. Re-export still works, because drm_gem_prime_handle_to_fd() takes
+the obj->import_attach branch and returns the original dma_buf.
+
+vc4_drm_file, vc5_open() and vc5_close() have no remaining users and
+are removed, along with the now-empty .open/.postclose hooks in
+vc5_drm_driver. vc4_drm is now published and withdrawn under
+vc4_drm_lock and only handed out by vc4_drm_get(), which takes a
+reference, closing the window where a caller could be given a pointer
+that vc4_drm_unbind() then freed.
+
+While here, return args->offset on this path too. drm_v3d_create_bo
+documents it as "Returned offset for the BO in the V3D address space"
+that "will always be nonzero, since various HW units treat 0
+specially", but the VC4_CALLOC branch returned early without setting
+it, and because the ioctl is DRM_IOWR the kernel echoed back whatever
+userspace passed in -- zero for the usual zero-initialised struct. The
+address was always available; v3d_bo_create_finish() allocates the
+drm_mm node during the import. Clients that used
+DRM_IOCTL_V3D_GET_BO_OFFSET instead are unaffected.
+
+Also drop the de-static/EXPORT_SYMBOL_GPL of
+drm_gem_dma_create_with_handle() and its declaration in
+include/drm/drm_gem_dma_helper.h: it was widened for the old
+implementation and now has no users outside its own file. It is
+precisely the footgun this fix removes -- it installs a GEM handle for
+a vc4 object into whatever drm_file it is passed.
+
+Index: v6.12-rpi/drivers/gpu/drm/drm_gem_dma_helper.c
+===================================================================
+--- v6.12-rpi.orig/drivers/gpu/drm/drm_gem_dma_helper.c
++++ v6.12-rpi/drivers/gpu/drm/drm_gem_dma_helper.c
+@@ -187,7 +187,7 @@ EXPORT_SYMBOL_GPL(drm_gem_dma_create);
+  * A struct drm_gem_dma_object * on success or an ERR_PTR()-encoded negative
+  * error code on failure.
+  */
+-struct drm_gem_dma_object *
++static struct drm_gem_dma_object *
+ drm_gem_dma_create_with_handle(struct drm_file *file_priv,
+ 			       struct drm_device *drm, size_t size,
+ 			       uint32_t *handle)
+@@ -214,7 +214,6 @@ drm_gem_dma_create_with_handle(struct dr
+ 
+ 	return dma_obj;
+ }
+-EXPORT_SYMBOL_GPL(drm_gem_dma_create_with_handle);
+ 
+ /**
+  * drm_gem_dma_free - free resources associated with a DMA GEM object
+Index: v6.12-rpi/drivers/gpu/drm/v3d/v3d_bo.c
+===================================================================
+--- v6.12-rpi.orig/drivers/gpu/drm/v3d/v3d_bo.c
++++ v6.12-rpi/drivers/gpu/drm/v3d/v3d_bo.c
+@@ -218,12 +218,13 @@ int v3d_create_bo_ioctl(struct drm_devic
+ 		DRM_INFO("unknown create_bo flags: %d\n", args->flags);
+ 		return -EINVAL;
+ 	}
+-  if (is_vc4_enable() && (args->flags & VC4_CALLOC)) {
+-    ret = import_bo_from_vc4(dev, file_priv, PAGE_ALIGN(args->size), &args->handle);
+-    if (ret)
+-      DRM_ERROR("import_bo_from_vc4 error:%d\n", ret);
+-    return ret;
+-  }
++	if (is_vc4_enable() && (args->flags & VC4_CALLOC)) {
++		ret = import_bo_from_vc4(dev, file_priv, PAGE_ALIGN(args->size),
++					 &args->handle, &args->offset);
++		if (ret)
++			DRM_ERROR("import_bo_from_vc4 error:%d\n", ret);
++		return ret;
++	}
+ 
+ 	bo = v3d_bo_create(dev, file_priv, PAGE_ALIGN(args->size));
+ 	if (IS_ERR(bo))
+Index: v6.12-rpi/drivers/gpu/drm/v3d/v3d_vc4_bind.c
+===================================================================
+--- v6.12-rpi.orig/drivers/gpu/drm/v3d/v3d_vc4_bind.c
++++ v6.12-rpi/drivers/gpu/drm/v3d/v3d_vc4_bind.c
+@@ -1,50 +1,139 @@
+-#include <linux/fdtable.h>
++// SPDX-License-Identifier: GPL-2.0+
++/* Copyright (C) 2023 FydeOS team */
++/* Author: Yang Tsao (yang@fydeos.io)*/
++
++#include <linux/dma-buf.h>
++
+ #include <drm/drm_drv.h>
+ #include <drm/drm_file.h>
+-#include <drm/drm_prime.h>
++#include <drm/drm_gem.h>
+ #include <drm/drm_gem_dma_helper.h>
++#include <drm/drm_prime.h>
++
++#include "v3d_drv.h"
+ #include "v3d_vc4_bind.h"
+ 
+-int import_bo_from_vc4(struct drm_device *dev,
+-    struct drm_file *file_priv, size_t unaligned_size, u32 *handle)
++/**
++ * import_bo_from_vc4() - Allocate a scanout-capable BO on the vc4 device and
++ * import it into the calling v3d client.
++ * @dev: the v3d DRM device
++ * @file_priv: the v3d client that will own the resulting handle
++ * @unaligned_size: requested size in bytes
++ * @handle: out parameter, the resulting v3d GEM handle
++ * @offset: out parameter, the BO's address in the V3D address space
++ *
++ * The buffer has to be allocated by vc4 because only its allocator produces
++ * the physically contiguous (CMA) memory the display side can scan out.
++ *
++ * This deliberately allocates against the vc4 *device* and never borrows a
++ * struct drm_file from it.  The previous implementation snapshotted a global
++ * vc4_drm_file that vc5_open() set to whichever process had most recently
++ * opened the vc4 primary node.  READ_ONCE() gave that pointer stability but
++ * not lifetime: drm_file_free() runs drm_gem_release(), destroying
++ * file->object_idr, before ->postclose clears the global, so a caller that had
++ * already passed the NULL check could allocate a handle into a torn-down IDR
++ * and go on to touch freed memory.  The single global slot was functionally
++ * wrong as well -- the last opener won, and its close made every subsequent
++ * VC4_CALLOC allocation fail with -ENODEV for every other client still
++ * running.
++ *
++ * Handing the buffer over as a dma_buf needs no foreign file, no prime fd
++ * round trip and no close_fd().
++ *
++ * Returns 0 on success or a negative error code.
++ */
++int import_bo_from_vc4(struct drm_device *dev, struct drm_file *file_priv,
++		       size_t unaligned_size, u32 *handle, u32 *offset)
+ {
+-  struct drm_gem_dma_object *obj = NULL;
+-  struct drm_device *vc4_dev;
+-  struct drm_file *vc4_file;
+-  int ret, prime_fd = 0;
+-  u32 vc4_handle = 0;
+-
+-  /* Snapshot the global pointers to avoid TOCTOU race with vc5_close(). */
+-  vc4_dev = READ_ONCE(vc4_drm);
+-  vc4_file = READ_ONCE(vc4_drm_file);
+-  if (!vc4_dev || !vc4_file)
+-    return -ENODEV;
+-
+-  obj = drm_gem_dma_create_with_handle(vc4_file, vc4_dev, unaligned_size, &vc4_handle);
+-  ret = PTR_ERR_OR_ZERO(obj);
+-  if (ret)
+-    goto out;
+-  ret = drm_gem_prime_handle_to_fd(vc4_dev, vc4_file, vc4_handle,
+-     DRM_CLOEXEC | DRM_RDWR, &prime_fd);
+-  if (ret)
+-    ret = drm_gem_prime_handle_to_fd(vc4_dev, vc4_file, vc4_handle,
+-         DRM_CLOEXEC, &prime_fd);
+-  if (ret)
+-    goto out;
+-
+-  ret = drm_gem_prime_fd_to_handle(dev, file_priv, prime_fd, handle);
+-
+-out:
+-  if (prime_fd > 0) {
+-    close_fd(prime_fd);
+-  }
+-  if (vc4_handle)
+-    drm_gem_handle_delete(vc4_file, vc4_handle);
+-  if (ret)
+-    DRM_ERROR("Borrow bo from vc4 size:%uk, vc4 handle:%u, fd:%d, v3d handle:%u, ret:%d\n",
+-      (u32) (unaligned_size / 1024), vc4_handle, prime_fd, *handle, ret);
+-  else
+-    DRM_DEBUG("Borrow bo from vc4 size:%uk, vc4 handle:%u, fd:%d, v3d handle:%u, ret:%d\n",
+-      (u32) (unaligned_size / 1024), vc4_handle, prime_fd, *handle, ret);
+-  return ret;
++	struct drm_gem_dma_object *dma_obj;
++	struct drm_gem_object *v3d_obj;
++	struct drm_device *vc4_dev;
++	struct dma_buf *dmabuf;
++	int ret, idx;
++
++	/* Takes a reference, so the device cannot be freed under us -- unlike
++	 * the bare global this used to read.
++	 */
++	vc4_dev = vc4_drm_get();
++	if (!vc4_dev)
++		return -ENODEV;
++
++	/* vc4_drm_unbind() calls drm_dev_unplug(); the reference above keeps
++	 * the memory alive, this keeps the hardware alive.
++	 */
++	if (!drm_dev_enter(vc4_dev, &idx)) {
++		ret = -ENODEV;
++		goto out_put_dev;
++	}
++
++	dma_obj = drm_gem_dma_create(vc4_dev, unaligned_size);
++	if (IS_ERR(dma_obj)) {
++		ret = PTR_ERR(dma_obj);
++		goto out_exit;
++	}
++
++	/* The dma_buf takes its own reference on both the object and the vc4
++	 * device, so the buffer outlives this function and any vc4 client.
++	 */
++	dmabuf = drm_gem_prime_export(&dma_obj->base, O_RDWR | O_CLOEXEC);
++	if (IS_ERR(dmabuf)) {
++		ret = PTR_ERR(dmabuf);
++		goto out_put_dma;
++	}
++
++	v3d_obj = drm_gem_prime_import_dev(dev, dmabuf, dev->dev);
++	if (IS_ERR(v3d_obj)) {
++		ret = PTR_ERR(v3d_obj);
++		goto out_put_dmabuf;
++	}
++
++	/* drm_gem_shmem_mmap() hands obj->dma_buf straight to dma_buf_mmap()
++	 * for an imported BO, so leaving it NULL makes every mmap() of this
++	 * buffer WARN and return -EINVAL.  drm_gem_prime_fd_to_handle() would
++	 * set it for us, but only by way of a descriptor installed in the
++	 * caller's fd table -- which is shared with its other threads and
++	 * would let them close or dup2() over it while we sleep in the import.
++	 * So set it directly; the object is not reachable from userspace until
++	 * the handle below exists, and drm_prime.c does the same assignment.
++	 *
++	 * The reference is released either by the last handle going away, or,
++	 * if drm_gem_handle_create() fails, by its err_unref path taking
++	 * handle_count to zero and calling
++	 * drm_gem_object_exported_dma_buf_free().
++	 */
++	mutex_lock(&dev->object_name_lock);
++	if (v3d_obj->dma_buf) {
++		WARN_ON(v3d_obj->dma_buf != dmabuf);
++	} else {
++		v3d_obj->dma_buf = dmabuf;
++		get_dma_buf(dmabuf);
++	}
++	mutex_unlock(&dev->object_name_lock);
++
++	/* drm_v3d_create_bo documents offset as always nonzero, so report it
++	 * here as the normal v3d_bo_create() path does.  The node was
++	 * allocated by v3d_bo_create_finish() during the import above.
++	 */
++	*offset = to_v3d_bo(v3d_obj)->node.start << V3D_MMU_PAGE_SHIFT;
++
++	ret = drm_gem_handle_create(file_priv, v3d_obj, handle);
++	drm_gem_object_put(v3d_obj);
++
++out_put_dmabuf:
++	dma_buf_put(dmabuf);
++out_put_dma:
++	drm_gem_object_put(&dma_obj->base);
++out_exit:
++	drm_dev_exit(idx);
++out_put_dev:
++	drm_dev_put(vc4_dev);
++
++	if (ret)
++		DRM_DEBUG("Borrow bo from vc4 size:%uk failed, ret:%d\n",
++			  (u32)(unaligned_size / 1024), ret);
++	else
++		DRM_DEBUG("Borrow bo from vc4 size:%uk, v3d handle:%u\n",
++			  (u32)(unaligned_size / 1024), *handle);
++
++	return ret;
+ }
+Index: v6.12-rpi/drivers/gpu/drm/v3d/v3d_vc4_bind.h
+===================================================================
+--- v6.12-rpi.orig/drivers/gpu/drm/v3d/v3d_vc4_bind.h
++++ v6.12-rpi/drivers/gpu/drm/v3d/v3d_vc4_bind.h
+@@ -11,12 +11,19 @@ struct drm_device;
+ struct drm_file;
+ 
+ extern struct drm_device *vc4_drm;
+-extern struct drm_file *vc4_drm_file;
+ 
+-static inline bool is_vc4_enable(void) {
+-  return vc4_drm != NULL && vc4_drm_file != NULL;
++/* Returns the vc4 device with a reference taken, or NULL. drm_dev_put() it. */
++struct drm_device *vc4_drm_get(void);
++
++/* Cheap unlocked hint only -- import_bo_from_vc4() re-checks properly via
++ * vc4_drm_get().  Only the vc4 *device* is needed to allocate through; no
++ * client's drm_file is borrowed any more.
++ */
++static inline bool is_vc4_enable(void)
++{
++	return READ_ONCE(vc4_drm) != NULL;
+ }
+ 
+ int import_bo_from_vc4(struct drm_device *dev, struct drm_file *file_priv,
+-  size_t unaligned_size, u32 *handle);
++		       size_t unaligned_size, u32 *handle, u32 *offset);
+ #endif /* V3D_VC4_BIND_H */
+Index: v6.12-rpi/drivers/gpu/drm/vc4/vc4_drv.c
+===================================================================
+--- v6.12-rpi.orig/drivers/gpu/drm/vc4/vc4_drv.c
++++ v6.12-rpi/drivers/gpu/drm/vc4/vc4_drv.c
+@@ -51,10 +51,36 @@
+ #define DRIVER_MINOR 0
+ #define DRIVER_PATCHLEVEL 0
+ 
+-struct drm_device *vc4_drm = NULL;
++/* The vc4 device, published for v3d's VC4_CALLOC path so it can allocate
++ * scanout-capable (CMA) buffers.  vc4_drm_lock makes publish/withdraw atomic
++ * against vc4_drm_get(), so a caller can never be handed a pointer that is
++ * freed out from under it.
++ */
++static DEFINE_MUTEX(vc4_drm_lock);
++struct drm_device *vc4_drm;
+ EXPORT_SYMBOL(vc4_drm);
+-struct drm_file *vc4_drm_file = NULL;
+-EXPORT_SYMBOL(vc4_drm_file);
++
++/**
++ * vc4_drm_get - get a counted reference to the vc4 DRM device
++ *
++ * Returns the device with a reference taken, or NULL if vc4 is not bound.
++ * The caller must drm_dev_put() it.  Note this only keeps the allocation
++ * alive; pair it with drm_dev_enter()/drm_dev_exit() to also exclude the
++ * device having been unplugged.
++ */
++struct drm_device *vc4_drm_get(void)
++{
++	struct drm_device *drm;
++
++	mutex_lock(&vc4_drm_lock);
++	drm = vc4_drm;
++	if (drm)
++		drm_dev_get(drm);
++	mutex_unlock(&vc4_drm_lock);
++
++	return drm;
++}
++EXPORT_SYMBOL(vc4_drm_get);
+ 
+ /* Helper function for mapping the regs on a platform device. */
+ void __iomem *vc4_ioremap_regs(struct platform_device *pdev, int index)
+@@ -166,20 +192,6 @@ static int vc4_open(struct drm_device *d
+ 	return 0;
+ }
+ 
+-static int vc5_open(struct drm_device *dev, struct drm_file *file)
+-{
+-  struct vc4_dev *vc4 = to_vc4_dev(dev);
+-  if (file->minor->type == DRM_MINOR_PRIMARY) {
+-    if (vc4->gen < VC4_GEN_6_C) {
+-      if (!READ_ONCE(vc4_drm_file))
+-        WRITE_ONCE(vc4_drm_file, file);
+-    } else {
+-        WRITE_ONCE(vc4_drm_file, file);
+-    }
+-  }
+-  return 0;
+-}
+-
+ static void vc4_close(struct drm_device *dev, struct drm_file *file)
+ {
+ 	struct vc4_dev *vc4 = to_vc4_dev(dev);
+@@ -208,12 +220,6 @@ vc4_prime_import_sg_table(struct drm_dev
+ 	return drm_gem_dma_prime_import_sg_table(dev, attach, sgt);
+ }
+ 
+-static void vc5_close(struct drm_device *dev, struct drm_file *file)
+-{
+-  if (file == READ_ONCE(vc4_drm_file))
+-    WRITE_ONCE(vc4_drm_file, NULL);
+-}
+-
+ DEFINE_DRM_GEM_FOPS(vc4_drm_fops);
+ 
+ static const struct drm_ioctl_desc vc4_drm_ioctls[] = {
+@@ -269,8 +275,6 @@ const struct drm_driver vc5_drm_driver =
+ 	.driver_features = (DRIVER_MODESET |
+ 			    DRIVER_ATOMIC |
+ 			    DRIVER_GEM),
+-  .open = vc5_open,
+-  .postclose = vc5_close,
+ 
+ #if defined(CONFIG_DEBUG_FS)
+ 	.debugfs_init = vc4_debugfs_init,
+@@ -457,7 +461,10 @@ static int vc4_drm_bind(struct device *d
+ 
+ 	drm_fbdev_dma_setup(drm, 16);
+ 
+-  vc4_drm = drm;
++	mutex_lock(&vc4_drm_lock);
++	vc4_drm = drm;
++	mutex_unlock(&vc4_drm_lock);
++
+ 	return 0;
+ 
+ err:
+@@ -469,8 +476,10 @@ static void vc4_drm_unbind(struct device
+ {
+ 	struct drm_device *drm = dev_get_drvdata(dev);
+ 
+-  vc4_drm = NULL;
+-  vc4_drm_file = NULL;
++	mutex_lock(&vc4_drm_lock);
++	vc4_drm = NULL;
++	mutex_unlock(&vc4_drm_lock);
++
+ 	drm_dev_unplug(drm);
+ 	drm_atomic_helper_shutdown(drm);
+ 	dev_set_drvdata(dev, NULL);
+Index: v6.12-rpi/drivers/gpu/drm/vc4/vc4_drv.h
+===================================================================
+--- v6.12-rpi.orig/drivers/gpu/drm/vc4/vc4_drv.h
++++ v6.12-rpi/drivers/gpu/drm/vc4/vc4_drv.h
+@@ -31,6 +31,10 @@ struct drm_gem_object;
+ extern const struct drm_driver vc4_drm_driver;
+ extern const struct drm_driver vc5_drm_driver;
+ 
++/* Published for v3d's VC4_CALLOC path; see vc4_drm_get() in vc4_drv.c. */
++extern struct drm_device *vc4_drm;
++struct drm_device *vc4_drm_get(void);
++
+ /* Don't forget to update vc4_bo.c: bo_type_names[] when adding to
+  * this.
+  */
+Index: v6.12-rpi/include/drm/drm_gem_dma_helper.h
+===================================================================
+--- v6.12-rpi.orig/include/drm/drm_gem_dma_helper.h
++++ v6.12-rpi/include/drm/drm_gem_dma_helper.h
+@@ -142,11 +142,6 @@ int drm_gem_dma_dumb_create_internal(str
+ 				     struct drm_device *drm,
+ 				     struct drm_mode_create_dumb *args);
+ 
+-struct drm_gem_dma_object *
+-drm_gem_dma_create_with_handle(struct drm_file *file_priv,
+-             struct drm_device *drm, size_t size,
+-                         uint32_t *handle);
+-
+ /* create memory region for DRM framebuffer */
+ int drm_gem_dma_dumb_create(struct drm_file *file_priv,
+ 			    struct drm_device *drm,

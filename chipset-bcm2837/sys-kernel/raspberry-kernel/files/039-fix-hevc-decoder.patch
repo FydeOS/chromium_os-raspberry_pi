@@ -1,7 +1,7 @@
-Index: kernel-rpi/arch/arm/boot/dts/broadcom/bcm2711-rpi-ds.dtsi
+Index: v6.12-rpi/arch/arm/boot/dts/broadcom/bcm2711-rpi-ds.dtsi
 ===================================================================
---- kernel-rpi.orig/arch/arm/boot/dts/broadcom/bcm2711-rpi-ds.dtsi
-+++ kernel-rpi/arch/arm/boot/dts/broadcom/bcm2711-rpi-ds.dtsi
+--- v6.12-rpi.orig/arch/arm/boot/dts/broadcom/bcm2711-rpi-ds.dtsi
++++ v6.12-rpi/arch/arm/boot/dts/broadcom/bcm2711-rpi-ds.dtsi
 @@ -78,8 +78,11 @@
  };
  
@@ -16,10 +16,10 @@ Index: kernel-rpi/arch/arm/boot/dts/broadcom/bcm2711-rpi-ds.dtsi
  };
  
  &soc {
-Index: kernel-rpi/arch/arm/boot/dts/overlays/cma-overlay.dts
+Index: v6.12-rpi/arch/arm/boot/dts/overlays/cma-overlay.dts
 ===================================================================
---- kernel-rpi.orig/arch/arm/boot/dts/overlays/cma-overlay.dts
-+++ kernel-rpi/arch/arm/boot/dts/overlays/cma-overlay.dts
+--- v6.12-rpi.orig/arch/arm/boot/dts/overlays/cma-overlay.dts
++++ v6.12-rpi/arch/arm/boot/dts/overlays/cma-overlay.dts
 @@ -21,6 +21,8 @@
  	};
  
@@ -29,10 +29,10 @@ Index: kernel-rpi/arch/arm/boot/dts/overlays/cma-overlay.dts
  		cma-512 = <&frag0>,"size:0=",<0x20000000>;
  		cma-448 = <&frag0>,"size:0=",<0x1c000000>;
  		cma-384 = <&frag0>,"size:0=",<0x18000000>;
-Index: kernel-rpi/drivers/staging/vc04_services/vc-sm-cma/vc_sm.c
+Index: v6.12-rpi/drivers/staging/vc04_services/vc-sm-cma/vc_sm.c
 ===================================================================
---- kernel-rpi.orig/drivers/staging/vc04_services/vc-sm-cma/vc_sm.c
-+++ kernel-rpi/drivers/staging/vc04_services/vc-sm-cma/vc_sm.c
+--- v6.12-rpi.orig/drivers/staging/vc04_services/vc-sm-cma/vc_sm.c
++++ v6.12-rpi/drivers/staging/vc04_services/vc-sm-cma/vc_sm.c
 @@ -28,6 +28,7 @@
  
  /* ---- Include Files ----------------------------------------------------- */
@@ -87,10 +87,10 @@ Index: kernel-rpi/drivers/staging/vc04_services/vc-sm-cma/vc_sm.c
  	/* buffer->lock will be destroyed by vc_sm_release_resource if finished
  	 * with, otherwise unlocked. Do NOT unlock here.
  	 */
-Index: kernel-rpi/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
+Index: v6.12-rpi/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
 ===================================================================
---- kernel-rpi.orig/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
-+++ kernel-rpi/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
+--- v6.12-rpi.orig/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
++++ v6.12-rpi/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
 @@ -882,8 +882,17 @@ static inline unsigned int get_sizeimage
  			return DEF_COMP_BUF_SIZE_720P_OR_LESS;
  	}

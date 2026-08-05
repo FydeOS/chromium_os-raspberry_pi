@@ -2,7 +2,7 @@ Index: src/gpu/command_buffer/service/shared_image/ozone_image_backing_factory.c
 ===================================================================
 --- src.orig/gpu/command_buffer/service/shared_image/ozone_image_backing_factory.cc
 +++ src/gpu/command_buffer/service/shared_image/ozone_image_backing_factory.cc
-@@ -338,7 +338,7 @@ bool OzoneImageBackingFactory::IsSupport
+@@ -301,7 +301,7 @@ bool OzoneImageBackingFactory::IsSupport
        return false;
      }
  

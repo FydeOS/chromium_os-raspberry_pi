@@ -1,7 +1,7 @@
-Index: kernel-rpi/drivers/misc/Kconfig
+Index: v6.12-rpi/drivers/misc/Kconfig
 ===================================================================
---- kernel-rpi.orig/drivers/misc/Kconfig
-+++ kernel-rpi/drivers/misc/Kconfig
+--- v6.12-rpi.orig/drivers/misc/Kconfig
++++ v6.12-rpi/drivers/misc/Kconfig
 @@ -518,6 +518,21 @@ config MISC_RTSX
  	tristate
  	default MISC_RTSX_PCI || MISC_RTSX_USB
@@ -24,10 +24,10 @@ Index: kernel-rpi/drivers/misc/Kconfig
  config HISI_HIKEY_USB
  	tristate "USB GPIO Hub on HiSilicon Hikey 960/970 Platform"
  	depends on (OF && GPIOLIB) || COMPILE_TEST
-Index: kernel-rpi/drivers/misc/Makefile
+Index: v6.12-rpi/drivers/misc/Makefile
 ===================================================================
---- kernel-rpi.orig/drivers/misc/Makefile
-+++ kernel-rpi/drivers/misc/Makefile
+--- v6.12-rpi.orig/drivers/misc/Makefile
++++ v6.12-rpi/drivers/misc/Makefile
 @@ -62,6 +62,7 @@ obj-y				+= cardreader/
  obj-$(CONFIG_PVPANIC)   	+= pvpanic/
  obj-$(CONFIG_UACCE)		+= uacce/
@@ -36,10 +36,10 @@ Index: kernel-rpi/drivers/misc/Makefile
  obj-$(CONFIG_HISI_HIKEY_USB)	+= hisi_hikey_usb.o
  obj-$(CONFIG_NTSYNC)		+= ntsync.o
  obj-$(CONFIG_HI6421V600_IRQ)	+= hi6421v600-irq.o
-Index: kernel-rpi/drivers/misc/uid_sys_stats.c
+Index: v6.12-rpi/drivers/misc/uid_sys_stats.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/drivers/misc/uid_sys_stats.c
++++ v6.12-rpi/drivers/misc/uid_sys_stats.c
 @@ -0,0 +1,834 @@
 +/* drivers/misc/uid_sys_stats.c
 + *

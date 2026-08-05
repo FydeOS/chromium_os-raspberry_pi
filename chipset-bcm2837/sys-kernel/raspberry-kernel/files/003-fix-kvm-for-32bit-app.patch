@@ -1,7 +1,7 @@
-Index: kernel-rpi/virt/kvm/Kconfig
+Index: v6.12-rpi/virt/kvm/Kconfig
 ===================================================================
---- kernel-rpi.orig/virt/kvm/Kconfig
-+++ kernel-rpi/virt/kvm/Kconfig
+--- v6.12-rpi.orig/virt/kvm/Kconfig
++++ v6.12-rpi/virt/kvm/Kconfig
 @@ -72,7 +72,7 @@ config KVM_GENERIC_PRE_FAULT_MEMORY
  
  config KVM_COMPAT

@@ -1,7 +1,7 @@
-Index: kernel-rpi/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
+Index: v6.12-rpi/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
 ===================================================================
---- kernel-rpi.orig/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
-+++ kernel-rpi/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
+--- v6.12-rpi.orig/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
++++ v6.12-rpi/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec.c
 @@ -2423,7 +2423,22 @@ static int bcm2835_codec_s_ctrl(struct v
  	case V4L2_CID_MPEG_VIDEO_B_FRAMES:
  		ret = 0;
@@ -48,10 +48,10 @@ Index: kernel-rpi/drivers/staging/vc04_services/bcm2835-codec/bcm2835-v4l2-codec
  		if (hdl->error) {
  			rc = hdl->error;
  			goto free_ctrl_handler;
-Index: kernel-rpi/drivers/media/platform/raspberrypi/hevc_dec/hevc_d.c
+Index: v6.12-rpi/drivers/media/platform/raspberrypi/hevc_dec/hevc_d.c
 ===================================================================
---- kernel-rpi.orig/drivers/media/platform/raspberrypi/hevc_dec/hevc_d.c
-+++ kernel-rpi/drivers/media/platform/raspberrypi/hevc_dec/hevc_d.c
+--- v6.12-rpi.orig/drivers/media/platform/raspberrypi/hevc_dec/hevc_d.c
++++ v6.12-rpi/drivers/media/platform/raspberrypi/hevc_dec/hevc_d.c
 @@ -83,6 +83,23 @@ static const struct hevc_d_control hevc_
  		},
  		.required	= false,
@@ -76,10 +76,10 @@ Index: kernel-rpi/drivers/media/platform/raspberrypi/hevc_dec/hevc_d.c
  };
  
  #define HEVC_D_CTRLS_COUNT	ARRAY_SIZE(hevc_d_ctrls)
-Index: kernel-rpi/drivers/media/platform/raspberrypi/hevc_dec/hevc_d_video.c
+Index: v6.12-rpi/drivers/media/platform/raspberrypi/hevc_dec/hevc_d_video.c
 ===================================================================
---- kernel-rpi.orig/drivers/media/platform/raspberrypi/hevc_dec/hevc_d_video.c
-+++ kernel-rpi/drivers/media/platform/raspberrypi/hevc_dec/hevc_d_video.c
+--- v6.12-rpi.orig/drivers/media/platform/raspberrypi/hevc_dec/hevc_d_video.c
++++ v6.12-rpi/drivers/media/platform/raspberrypi/hevc_dec/hevc_d_video.c
 @@ -157,9 +157,12 @@ static void hevc_d_prepare_dst_format(st
  		height = ALIGN(height, 8);
  

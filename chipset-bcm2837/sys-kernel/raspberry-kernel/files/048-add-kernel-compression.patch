@@ -1,0 +1,16 @@
+Index: v6.12-rpi/arch/arm64/Kconfig
+===================================================================
+--- v6.12-rpi.orig/arch/arm64/Kconfig
++++ v6.12-rpi/arch/arm64/Kconfig
+@@ -33,6 +33,11 @@ config ARM64
+ 	select ARCH_HAS_GCOV_PROFILE_ALL
+ 	select ARCH_HAS_GIGANTIC_PAGE
+ 	select ARCH_HAS_KCOV
++  select HAVE_KERNEL_GZIP
++  select HAVE_KERNEL_LZ4
++  select HAVE_KERNEL_LZMA
++  select HAVE_KERNEL_LZO
++  select HAVE_KERNEL_XZ
+ 	select ARCH_HAS_KERNEL_FPU_SUPPORT if KERNEL_MODE_NEON
+ 	select ARCH_HAS_KEEPINITRD
+ 	select ARCH_HAS_MEMBARRIER_SYNC_CORE

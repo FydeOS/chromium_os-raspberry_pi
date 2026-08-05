@@ -1,7 +1,7 @@
-Index: kernel-rpi/drivers/Kconfig
+Index: v6.12-rpi/drivers/Kconfig
 ===================================================================
---- kernel-rpi.orig/drivers/Kconfig
-+++ kernel-rpi/drivers/Kconfig
+--- v6.12-rpi.orig/drivers/Kconfig
++++ v6.12-rpi/drivers/Kconfig
 @@ -245,4 +245,6 @@ source "drivers/cdx/Kconfig"
  
  source "drivers/dpll/Kconfig"
@@ -9,10 +9,10 @@ Index: kernel-rpi/drivers/Kconfig
 +source "drivers/pkglist/Kconfig"
 +
  endmenu
-Index: kernel-rpi/drivers/Makefile
+Index: v6.12-rpi/drivers/Makefile
 ===================================================================
---- kernel-rpi.orig/drivers/Makefile
-+++ kernel-rpi/drivers/Makefile
+--- v6.12-rpi.orig/drivers/Makefile
++++ v6.12-rpi/drivers/Makefile
 @@ -193,5 +193,5 @@ obj-$(CONFIG_HTE)		+= hte/
  obj-$(CONFIG_DRM_ACCEL)		+= accel/
  obj-$(CONFIG_CDX_BUS)		+= cdx/
@@ -20,10 +20,10 @@ Index: kernel-rpi/drivers/Makefile
 -
 +obj-$(CONFIG_PKGLIST)           += pkglist/
  obj-$(CONFIG_S390)		+= s390/
-Index: kernel-rpi/drivers/pkglist/Kconfig
+Index: v6.12-rpi/drivers/pkglist/Kconfig
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/drivers/pkglist/Kconfig
++++ v6.12-rpi/drivers/pkglist/Kconfig
 @@ -0,0 +1,30 @@
 +config PKGLIST
 +	tristate "Package list for emulated 'SD card' file system for Android"
@@ -55,18 +55,18 @@ Index: kernel-rpi/drivers/pkglist/Kconfig
 +	help
 +	  This does not allow configuration of sdcardfs.
 +endchoice
-Index: kernel-rpi/drivers/pkglist/Makefile
+Index: v6.12-rpi/drivers/pkglist/Makefile
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/drivers/pkglist/Makefile
++++ v6.12-rpi/drivers/pkglist/Makefile
 @@ -0,0 +1,3 @@
 +obj-$(CONFIG_PKGLIST) += pkg.o
 +pkg-$(CONFIG_PKGLIST_USE_CONFIGFS) += pkglist.o
 +pkg-$(CONFIG_PKGLIST_NO_CONFIG) += pkglist_none.o
-Index: kernel-rpi/drivers/pkglist/pkglist.c
+Index: v6.12-rpi/drivers/pkglist/pkglist.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/drivers/pkglist/pkglist.c
++++ v6.12-rpi/drivers/pkglist/pkglist.c
 @@ -0,0 +1,966 @@
 +/*
 + * Copyright (C) 2017 Google Inc., Author: Daniel Rosenberg <drosen@google.com>
@@ -1034,10 +1034,10 @@ Index: kernel-rpi/drivers/pkglist/pkglist.c
 +MODULE_AUTHOR("Daniel Rosenberg, Google");
 +MODULE_DESCRIPTION("Configfs Pkglist implementation");
 +MODULE_LICENSE("GPL v2");
-Index: kernel-rpi/drivers/pkglist/pkglist_none.c
+Index: v6.12-rpi/drivers/pkglist/pkglist_none.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/drivers/pkglist/pkglist_none.c
++++ v6.12-rpi/drivers/pkglist/pkglist_none.c
 @@ -0,0 +1,57 @@
 +/*
 + * Copyright (C) 2017 Google Inc., Author: Daniel Rosenberg <drosen@google.com>
@@ -1096,10 +1096,10 @@ Index: kernel-rpi/drivers/pkglist/pkglist_none.c
 +MODULE_AUTHOR("Daniel Rosenberg, Google");
 +MODULE_DESCRIPTION("Empty Pkglist implementation");
 +MODULE_LICENSE("GPL v2");
-Index: kernel-rpi/include/linux/pkglist.h
+Index: v6.12-rpi/include/linux/pkglist.h
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/include/linux/pkglist.h
++++ v6.12-rpi/include/linux/pkglist.h
 @@ -0,0 +1,38 @@
 +#ifndef _PKGLIST_H_
 +#define _PKGLIST_H_

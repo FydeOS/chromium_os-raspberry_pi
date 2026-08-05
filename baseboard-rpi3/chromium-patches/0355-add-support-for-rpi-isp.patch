@@ -2,7 +2,7 @@ Index: src/media/gpu/chromeos/video_decoder_pipeline.cc
 ===================================================================
 --- src.orig/media/gpu/chromeos/video_decoder_pipeline.cc
 +++ src/media/gpu/chromeos/video_decoder_pipeline.cc
-@@ -25,6 +25,7 @@
+@@ -26,6 +26,7 @@
  #include "media/base/media_switches.h"
  #include "media/base/media_util.h"
  #include "media/gpu/chromeos/dmabuf_video_frame_pool.h"
@@ -10,7 +10,7 @@ Index: src/media/gpu/chromeos/video_decoder_pipeline.cc
  #include "media/gpu/chromeos/frame_registry.h"
  #include "media/gpu/chromeos/image_processor.h"
  #include "media/gpu/chromeos/image_processor_factory.h"
-@@ -42,6 +43,9 @@
+@@ -43,6 +44,9 @@
  #elif BUILDFLAG(USE_V4L2_CODEC)
  #include "media/gpu/v4l2/v4l2_stateful_video_decoder.h"
  #include "media/gpu/v4l2/v4l2_video_decoder.h"
@@ -20,7 +20,7 @@ Index: src/media/gpu/chromeos/video_decoder_pipeline.cc
  #else
  #error Either VA-API or V4L2 must be used for decode acceleration on Chrome OS.
  #endif
-@@ -494,20 +498,27 @@ VideoDecoderPipeline::~VideoDecoderPipel
+@@ -496,20 +500,27 @@ VideoDecoderPipeline::~VideoDecoderPipel
  
    decoder_weak_this_factory_.InvalidateWeakPtrs();
  
@@ -52,7 +52,7 @@ Index: src/media/gpu/chromeos/video_decoder_pipeline.cc
  }
  
  // static
-@@ -680,7 +691,7 @@ void VideoDecoderPipeline::InitializeTas
+@@ -682,7 +693,7 @@ void VideoDecoderPipeline::InitializeTas
    if (frame_converter_->UsesGetOriginalFrameCB()) {
      FrameResourceConverter::GetOriginalFrameCB get_original_frame_cb;
  
@@ -61,7 +61,7 @@ Index: src/media/gpu/chromeos/video_decoder_pipeline.cc
        // Note: base::Unretained() is safe because either a) |decoder_| outlives
        // the |frame_converter_| or b) we call
        // |frame_converter_|->set_get_original_frame_cb() with a null
-@@ -764,6 +775,12 @@ void VideoDecoderPipeline::OnInitializeD
+@@ -766,6 +777,12 @@ void VideoDecoderPipeline::OnInitializeD
      if (!fallback_create_decoder_function_cb_.is_null()) {
        MEDIA_LOG(INFO, media_log_)
            << "Primary decoder failed, trying fallback decoder";
@@ -74,7 +74,7 @@ Index: src/media/gpu/chromeos/video_decoder_pipeline.cc
        decoder_ = std::move(fallback_create_decoder_function_cb_)
                       .Run(media_log_->Clone(), decoder_task_runner_,
                            decoder_weak_this_);
-@@ -946,7 +963,7 @@ void VideoDecoderPipeline::OnFrameDecode
+@@ -948,7 +965,7 @@ void VideoDecoderPipeline::OnFrameDecode
    }
  #endif  // BUILDFLAG(IS_CHROMEOS)
  
@@ -83,7 +83,7 @@ Index: src/media/gpu/chromeos/video_decoder_pipeline.cc
      oop_decoder_can_read_without_stalling_.store(
          decoder_->CanReadWithoutStalling(), std::memory_order_seq_cst);
    }
-@@ -1128,7 +1145,6 @@ VideoDecoderPipeline::PickDecoderOutputF
+@@ -1130,7 +1147,6 @@ VideoDecoderPipeline::PickDecoderOutputF
    // is the largest amount of reference frames seen, on an ITU-T H.264 test
    // vector (CAPCM*1_Sand_E.h264).
    CHECK_LE(num_codec_reference_frames, 32u);
@@ -91,7 +91,7 @@ Index: src/media/gpu/chromeos/video_decoder_pipeline.cc
  
    if (candidates.empty())
      return CroStatus::Codes::kNoDecoderOutputFormatCandidates;
-@@ -1359,6 +1375,27 @@ VideoDecoderPipeline::PickDecoderOutputF
+@@ -1361,6 +1377,27 @@ VideoDecoderPipeline::PickDecoderOutputF
          *allocator, VideoFrame::STORAGE_DMABUFS);
  #endif
  
@@ -119,7 +119,7 @@ Index: src/media/gpu/chromeos/video_decoder_pipeline.cc
      CroStatus::Or<GpuBufferLayout> status_or_layout =
          auxiliary_frame_pool_->Initialize(
              image_processor->input_config().fourcc,
-@@ -1384,9 +1421,15 @@ VideoDecoderPipeline::PickDecoderOutputF
+@@ -1386,9 +1423,15 @@ VideoDecoderPipeline::PickDecoderOutputF
    // TODO(b/270990622): Add VD renderer buffer count parameter and plumb it back
    // to clients
  #if BUILDFLAG(USE_V4L2_CODEC)
@@ -142,7 +142,7 @@ Index: src/media/gpu/sandbox/hardware_video_decoding_sandbox_hook_linux.cc
 ===================================================================
 --- src.orig/media/gpu/sandbox/hardware_video_decoding_sandbox_hook_linux.cc
 +++ src/media/gpu/sandbox/hardware_video_decoding_sandbox_hook_linux.cc
-@@ -175,6 +175,13 @@ bool HardwareVideoDecodingPreSandboxHook
+@@ -202,6 +202,13 @@ bool HardwareVideoDecodingPreSandboxHook
    // Files needed for protected DMA allocations.
    static const char kDmaHeapPath[] = "/dev/dma_heap/restricted_mtk_cma";
    permissions.push_back(BrokerFilePermission::ReadWrite(kDmaHeapPath));
@@ -160,7 +160,7 @@ Index: src/media/gpu/v4l2/BUILD.gn
 ===================================================================
 --- src.orig/media/gpu/v4l2/BUILD.gn
 +++ src/media/gpu/v4l2/BUILD.gn
-@@ -73,6 +73,8 @@ source_set("v4l2") {
+@@ -80,6 +80,8 @@ source_set("v4l2") {
        "mt21/mt21_decompressor.cc",
        "mt21/mt21_decompressor.h",
        "mt21/mt21_util.h",
@@ -508,7 +508,7 @@ Index: src/media/gpu/v4l2/v4l2_utils.cc
 ===================================================================
 --- src.orig/media/gpu/v4l2/v4l2_utils.cc
 +++ src/media/gpu/v4l2/v4l2_utils.cc
-@@ -47,6 +47,11 @@
+@@ -43,6 +43,11 @@
  #define V4L2_PIX_FMT_AV1_FRAME v4l2_fourcc('A', 'V', '1', 'F')
  #endif
  
@@ -520,7 +520,7 @@ Index: src/media/gpu/v4l2/v4l2_utils.cc
  #define MAKE_V4L2_CODEC_PAIR(codec, suffix) \
    std::make_pair(codec##_##suffix, codec)
  
-@@ -287,6 +292,31 @@ std::optional<VideoFrameLayout> V4L2Form
+@@ -284,6 +289,31 @@ std::optional<VideoFrameLayout> V4L2Form
                              y_stride_abs * pix_mp.height / 2);
          DCHECK_EQ(2u, planes.size());
          break;
@@ -556,7 +556,7 @@ Index: src/media/gpu/v4l2/v4l2_video_decoder.cc
 ===================================================================
 --- src.orig/media/gpu/v4l2/v4l2_video_decoder.cc
 +++ src/media/gpu/v4l2/v4l2_video_decoder.cc
-@@ -18,6 +18,8 @@
+@@ -13,6 +13,8 @@
  #include "base/functional/callback_helpers.h"
  #include "base/logging.h"
  #include "base/memory/ptr_util.h"
@@ -565,7 +565,7 @@ Index: src/media/gpu/v4l2/v4l2_video_decoder.cc
  #include "base/memory/scoped_refptr.h"
  #include "base/metrics/histogram_functions.h"
  #include "base/notimplemented.h"
-@@ -38,6 +40,7 @@
+@@ -33,6 +35,7 @@
  #include "media/gpu/gpu_video_decode_accelerator_helpers.h"
  #include "media/gpu/macros.h"
  #include "media/gpu/v4l2/legacy/v4l2_video_decoder_backend_stateful.h"
@@ -573,7 +573,7 @@ Index: src/media/gpu/v4l2/v4l2_video_decoder.cc
  #include "media/gpu/v4l2/v4l2_status.h"
  #include "media/gpu/v4l2/v4l2_utils.h"
  #include "media/gpu/v4l2/v4l2_video_decoder_backend_stateless.h"
-@@ -148,6 +151,9 @@ size_t GetInputBufferSizeForResolution(c
+@@ -143,6 +146,9 @@ size_t GetInputBufferSizeForResolution(c
  base::AtomicRefCount V4L2VideoDecoder::num_instances_(0);
  
  // static
@@ -583,7 +583,7 @@ Index: src/media/gpu/v4l2/v4l2_video_decoder.cc
  std::unique_ptr<VideoDecoderMixin> V4L2VideoDecoder::Create(
      std::unique_ptr<MediaLog> media_log,
      scoped_refptr<base::SequencedTaskRunner> decoder_task_runner,
-@@ -220,6 +226,9 @@ V4L2VideoDecoder::~V4L2VideoDecoder() {
+@@ -215,6 +221,9 @@ V4L2VideoDecoder::~V4L2VideoDecoder() {
  
    weak_this_for_polling_factory_.InvalidateWeakPtrs();
  
@@ -593,7 +593,7 @@ Index: src/media/gpu/v4l2/v4l2_video_decoder.cc
    if (can_use_decoder_)
      num_instances_.Decrement();
  }
-@@ -305,6 +314,11 @@ void V4L2VideoDecoder::Initialize(const
+@@ -300,6 +309,11 @@ void V4L2VideoDecoder::Initialize(const
      input_queue_ = nullptr;
      output_queue_ = nullptr;
  
@@ -605,7 +605,7 @@ Index: src/media/gpu/v4l2/v4l2_video_decoder.cc
      if (can_use_decoder_) {
        num_instances_.Decrement();
        can_use_decoder_ = false;
-@@ -401,19 +415,65 @@ V4L2Status V4L2VideoDecoder::InitializeB
+@@ -398,19 +412,65 @@ V4L2Status V4L2VideoDecoder::InitializeB
    constexpr bool kStateful = false;
    constexpr bool kStateless = true;
    std::optional<std::pair<bool, uint32_t>> api_and_format;
@@ -680,7 +680,7 @@ Index: src/media/gpu/v4l2/v4l2_video_decoder.cc
      num_instances_.Decrement();
      can_use_decoder_ = false;
      VLOGF(1) << "No V4L2 API found for profile: " << GetProfileName(profile_);
-@@ -693,12 +753,24 @@ CroStatus V4L2VideoDecoder::SetupOutputF
+@@ -686,12 +746,24 @@ CroStatus V4L2VideoDecoder::SetupOutputF
          PixelLayoutCandidate{.fourcc = *candidate, .size = adjusted_size});
    }
  
@@ -706,7 +706,7 @@ Index: src/media/gpu/v4l2/v4l2_video_decoder.cc
            std::nullopt);
    if (!status_or_output_format.has_value()) {
      VLOGF(1) << "Failed to pick an output format.";
-@@ -1054,10 +1126,9 @@ void V4L2VideoDecoder::ApplyResolutionCh
+@@ -1074,10 +1146,9 @@ void V4L2VideoDecoder::ApplyResolutionCh
  size_t V4L2VideoDecoder::GetMaxOutputFramePoolSize() const {
    DCHECK_CALLED_ON_VALID_SEQUENCE(decoder_sequence_checker_);
  
@@ -720,7 +720,7 @@ Index: src/media/gpu/v4l2/v4l2_video_decoder.cc
  }
  
  bool V4L2VideoDecoder::NeedsTranscryption() {
-@@ -1179,13 +1250,14 @@ CroStatus V4L2VideoDecoder::ContinueChan
+@@ -1199,13 +1270,14 @@ CroStatus V4L2VideoDecoder::ContinueChan
  
    const v4l2_memory type =
        use_v4l2_allocated_buffers ? V4L2_MEMORY_MMAP : V4L2_MEMORY_DMABUF;
@@ -786,7 +786,7 @@ Index: src/media/gpu/v4l2/v4l2_device.cc
 ===================================================================
 --- src.orig/media/gpu/v4l2/v4l2_device.cc
 +++ src/media/gpu/v4l2/v4l2_device.cc
-@@ -140,6 +140,10 @@ bool V4L2Device::Open(Type type, uint32_
+@@ -136,6 +136,10 @@ bool V4L2Device::Open(Type type, uint32_
      return false;
    }
  
@@ -801,7 +801,7 @@ Index: src/media/gpu/v4l2/v4l2_video_decoder.h
 ===================================================================
 --- src.orig/media/gpu/v4l2/v4l2_video_decoder.h
 +++ src/media/gpu/v4l2/v4l2_video_decoder.h
-@@ -190,6 +190,13 @@ class MEDIA_GPU_EXPORT V4L2VideoDecoder
+@@ -188,6 +188,13 @@ class MEDIA_GPU_EXPORT V4L2VideoDecoder
    static base::AtomicRefCount num_instances_;
    bool can_use_decoder_ = false;
  
@@ -819,7 +819,7 @@ Index: src/media/gpu/v4l2/v4l2_image_processor_backend.cc
 ===================================================================
 --- src.orig/media/gpu/v4l2/v4l2_image_processor_backend.cc
 +++ src/media/gpu/v4l2/v4l2_image_processor_backend.cc
-@@ -401,7 +401,11 @@ std::unique_ptr<ImageProcessorBackend> V
+@@ -397,7 +397,11 @@ std::unique_ptr<ImageProcessorBackend> V
            std::move(device), input_config, output_config, input_memory_type,
            output_memory_type, output_mode, std::move(error_cb)));
  

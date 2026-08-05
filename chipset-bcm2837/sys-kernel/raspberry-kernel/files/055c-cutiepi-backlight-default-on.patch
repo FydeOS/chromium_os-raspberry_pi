@@ -1,12 +1,11 @@
-diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
-index e942908d1275..87c9d831a9ca 100644
---- a/drivers/video/backlight/pwm_bl.c
-+++ b/drivers/video/backlight/pwm_bl.c
-@@ -399,6 +399,17 @@ static int pwm_backlight_initial_power_state(const struct pwm_bl_data *pb)
- 	struct device_node *node = pb->dev->of_node;
+Index: v6.12-rpi/drivers/video/backlight/pwm_bl.c
+===================================================================
+--- v6.12-rpi.orig/drivers/video/backlight/pwm_bl.c
++++ v6.12-rpi/drivers/video/backlight/pwm_bl.c
+@@ -400,6 +400,17 @@ static int pwm_backlight_initial_power_s
  	bool active = true;
-
-+	/*
+ 
+ 	/*
 +	 * If the DT node carries the 'default-on' property, start powered on
 +	 * unconditionally.  This is needed when the backlight node has no
 +	 * consumer phandle (so no driver will call backlight_enable() later)
@@ -17,15 +16,16 @@ index e942908d1275..87c9d831a9ca 100644
 +	if (of_property_read_bool(node, "default-on"))
 +		return BACKLIGHT_POWER_ON;
 +
- 	/*
++	/*
  	 * If the enable GPIO is present, observable (either as input
  	 * or output) and off then the backlight is not currently active.
-diff --git a/arch/arm/boot/dts/overlays/cutiepi-panel-overlay.dts b/arch/arm/boot/dts/overlays/cutiepi-panel-overlay.dts
-index 3789764c6687..xxxxxxxx 100644
---- a/arch/arm/boot/dts/overlays/cutiepi-panel-overlay.dts
-+++ b/arch/arm/boot/dts/overlays/cutiepi-panel-overlay.dts
-@@ -61,6 +61,7 @@ rpi_backlight: rpi_backlight {
-                 default-brightness-level = <15>;
+ 	 * */
+Index: v6.12-rpi/arch/arm/boot/dts/overlays/cutiepi-panel-overlay.dts
+===================================================================
+--- v6.12-rpi.orig/arch/arm/boot/dts/overlays/cutiepi-panel-overlay.dts
++++ v6.12-rpi/arch/arm/boot/dts/overlays/cutiepi-panel-overlay.dts
+@@ -62,6 +62,7 @@
+                 default-brightness-level = <6>;
                  pwms = <&pwm 0 200000 0>;
                  power-supply = <&vdd_3v3_reg>;
 +                default-on;

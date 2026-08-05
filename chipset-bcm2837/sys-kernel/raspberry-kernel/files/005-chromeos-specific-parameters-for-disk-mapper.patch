@@ -1,7 +1,7 @@
-Index: kernel-rpi/drivers/md/dm-verity-target.c
+Index: v6.12-rpi/drivers/md/dm-verity-target.c
 ===================================================================
---- kernel-rpi.orig/drivers/md/dm-verity-target.c
-+++ kernel-rpi/drivers/md/dm-verity-target.c
+--- v6.12-rpi.orig/drivers/md/dm-verity-target.c
++++ v6.12-rpi/drivers/md/dm-verity-target.c
 @@ -17,8 +17,10 @@
  #include "dm-verity-fec.h"
  #include "dm-verity-verify-sig.h"
@@ -411,10 +411,10 @@ Index: kernel-rpi/drivers/md/dm-verity-target.c
  	return r;
  }
  
-Index: kernel-rpi/drivers/md/dm-verity.h
+Index: v6.12-rpi/drivers/md/dm-verity.h
 ===================================================================
---- kernel-rpi.orig/drivers/md/dm-verity.h
-+++ kernel-rpi/drivers/md/dm-verity.h
+--- v6.12-rpi.orig/drivers/md/dm-verity.h
++++ v6.12-rpi/drivers/md/dm-verity.h
 @@ -16,6 +16,7 @@
  #include <linux/device-mapper.h>
  #include <linux/interrupt.h>
@@ -472,10 +472,10 @@ Index: kernel-rpi/drivers/md/dm-verity.h
  static inline void *verity_io_hash_req(struct dm_verity *v,
  				       struct dm_verity_io *io)
  {
-Index: kernel-rpi/drivers/md/dm-verity-chromeos.c
+Index: v6.12-rpi/drivers/md/dm-verity-chromeos.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/drivers/md/dm-verity-chromeos.c
++++ v6.12-rpi/drivers/md/dm-verity-chromeos.c
 @@ -0,0 +1,565 @@
 +/*
 + * Copyright (C) 2010 The Chromium OS Authors <chromium-os-dev@chromium.org>
@@ -1042,10 +1042,10 @@ Index: kernel-rpi/drivers/md/dm-verity-chromeos.c
 +#undef MODULE_PARAM_PREFIX
 +#define MODULE_PARAM_PREFIX	""
 +module_param_string(kern_guid, kern_guid, sizeof(kern_guid), 0);
-Index: kernel-rpi/drivers/md/Makefile
+Index: v6.12-rpi/drivers/md/Makefile
 ===================================================================
---- kernel-rpi.orig/drivers/md/Makefile
-+++ kernel-rpi/drivers/md/Makefile
+--- v6.12-rpi.orig/drivers/md/Makefile
++++ v6.12-rpi/drivers/md/Makefile
 @@ -53,6 +53,7 @@ obj-$(CONFIG_DM_UNSTRIPED)	+= dm-unstrip
  obj-$(CONFIG_DM_BUFIO)		+= dm-bufio.o
  obj-$(CONFIG_DM_BIO_PRISON)	+= dm-bio-prison.o
@@ -1062,10 +1062,10 @@ Index: kernel-rpi/drivers/md/Makefile
  
  ifeq ($(CONFIG_DM_INIT),y)
  dm-mod-objs			+= dm-init.o
-Index: kernel-rpi/drivers/md/Kconfig
+Index: v6.12-rpi/drivers/md/Kconfig
 ===================================================================
---- kernel-rpi.orig/drivers/md/Kconfig
-+++ kernel-rpi/drivers/md/Kconfig
+--- v6.12-rpi.orig/drivers/md/Kconfig
++++ v6.12-rpi/drivers/md/Kconfig
 @@ -283,6 +283,37 @@ config DM_CRYPT
  
  	  If unsure, say N.
@@ -1104,11 +1104,11 @@ Index: kernel-rpi/drivers/md/Kconfig
  config DM_SNAPSHOT
         tristate "Snapshot target"
         depends on BLK_DEV_DM
-Index: kernel-rpi/drivers/base/dd.c
+Index: v6.12-rpi/drivers/base/dd.c
 ===================================================================
---- kernel-rpi.orig/drivers/base/dd.c
-+++ kernel-rpi/drivers/base/dd.c
-@@ -752,13 +752,14 @@ static int really_probe_debug(struct dev
+--- v6.12-rpi.orig/drivers/base/dd.c
++++ v6.12-rpi/drivers/base/dd.c
+@@ -812,13 +812,14 @@ static int really_probe_debug(struct dev
   *
   * Should somehow figure out how to use a semaphore, not an atomic variable...
   */
@@ -1124,10 +1124,10 @@ Index: kernel-rpi/drivers/base/dd.c
  
  /**
   * wait_for_device_probe
-Index: kernel-rpi/include/linux/device/driver.h
+Index: v6.12-rpi/include/linux/device/driver.h
 ===================================================================
---- kernel-rpi.orig/include/linux/device/driver.h
-+++ kernel-rpi/include/linux/device/driver.h
+--- v6.12-rpi.orig/include/linux/device/driver.h
++++ v6.12-rpi/include/linux/device/driver.h
 @@ -126,7 +126,7 @@ int __must_check driver_register(struct
  void driver_unregister(struct device_driver *drv);
  
@@ -1137,11 +1137,11 @@ Index: kernel-rpi/include/linux/device/driver.h
  void wait_for_device_probe(void);
  void __init wait_for_init_devices_probe(void);
  
-Index: kernel-rpi/include/linux/blkdev.h
+Index: v6.12-rpi/include/linux/blkdev.h
 ===================================================================
---- kernel-rpi.orig/include/linux/blkdev.h
-+++ kernel-rpi/include/linux/blkdev.h
-@@ -1688,7 +1688,7 @@ int sync_blockdev_nowait(struct block_de
+--- v6.12-rpi.orig/include/linux/blkdev.h
++++ v6.12-rpi/include/linux/blkdev.h
+@@ -1684,7 +1684,7 @@ int sync_blockdev_nowait(struct block_de
  void sync_bdevs(bool wait);
  void bdev_statx(struct path *, struct kstat *, u32);
  void printk_all_partitions(void);
@@ -1150,10 +1150,10 @@ Index: kernel-rpi/include/linux/blkdev.h
  #else
  static inline void invalidate_bdev(struct block_device *bdev)
  {
-Index: kernel-rpi/drivers/md/dm-default-key.c
+Index: v6.12-rpi/drivers/md/dm-default-key.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/drivers/md/dm-default-key.c
++++ v6.12-rpi/drivers/md/dm-default-key.c
 @@ -0,0 +1,412 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
@@ -1567,10 +1567,10 @@ Index: kernel-rpi/drivers/md/dm-default-key.c
 +MODULE_AUTHOR("Eric Biggers <ebiggers@google.com>");
 +MODULE_DESCRIPTION(DM_NAME " target for encrypting filesystem metadata");
 +MODULE_LICENSE("GPL");
-Index: kernel-rpi/block/bio.c
+Index: v6.12-rpi/block/bio.c
 ===================================================================
---- kernel-rpi.orig/block/bio.c
-+++ kernel-rpi/block/bio.c
+--- v6.12-rpi.orig/block/bio.c
++++ v6.12-rpi/block/bio.c
 @@ -269,6 +269,9 @@ void bio_init(struct bio *bio, struct bl
  #endif
  #ifdef CONFIG_BLK_INLINE_ENCRYPTION
@@ -1581,10 +1581,10 @@ Index: kernel-rpi/block/bio.c
  #endif
  #ifdef CONFIG_BLK_DEV_INTEGRITY
  	bio->bi_integrity = NULL;
-Index: kernel-rpi/fs/crypto/inline_crypt.c
+Index: v6.12-rpi/fs/crypto/inline_crypt.c
 ===================================================================
---- kernel-rpi.orig/fs/crypto/inline_crypt.c
-+++ kernel-rpi/fs/crypto/inline_crypt.c
+--- v6.12-rpi.orig/fs/crypto/inline_crypt.c
++++ v6.12-rpi/fs/crypto/inline_crypt.c
 @@ -270,6 +270,9 @@ void fscrypt_set_bio_crypt_ctx(struct bi
  	const struct fscrypt_inode_info *ci;
  	u64 dun[BLK_CRYPTO_DUN_ARRAY_SIZE];
@@ -1605,10 +1605,10 @@ Index: kernel-rpi/fs/crypto/inline_crypt.c
  	if (!bc)
  		return true;
  
-Index: kernel-rpi/include/linux/blk-crypto.h
+Index: v6.12-rpi/include/linux/blk-crypto.h
 ===================================================================
---- kernel-rpi.orig/include/linux/blk-crypto.h
-+++ kernel-rpi/include/linux/blk-crypto.h
+--- v6.12-rpi.orig/include/linux/blk-crypto.h
++++ v6.12-rpi/include/linux/blk-crypto.h
 @@ -132,4 +132,36 @@ static inline int bio_crypt_clone(struct
  	return 0;
  }
@@ -1646,10 +1646,10 @@ Index: kernel-rpi/include/linux/blk-crypto.h
 +#endif /* !CONFIG_DM_DEFAULT_KEY */
 +
  #endif /* __LINUX_BLK_CRYPTO_H */
-Index: kernel-rpi/include/linux/blk_types.h
+Index: v6.12-rpi/include/linux/blk_types.h
 ===================================================================
---- kernel-rpi.orig/include/linux/blk_types.h
-+++ kernel-rpi/include/linux/blk_types.h
+--- v6.12-rpi.orig/include/linux/blk_types.h
++++ v6.12-rpi/include/linux/blk_types.h
 @@ -249,6 +249,9 @@ struct bio {
  
  #ifdef CONFIG_BLK_INLINE_ENCRYPTION
@@ -1660,10 +1660,10 @@ Index: kernel-rpi/include/linux/blk_types.h
  #endif
  
  #if defined(CONFIG_BLK_DEV_INTEGRITY)
-Index: kernel-rpi/include/linux/fscrypt.h
+Index: v6.12-rpi/include/linux/fscrypt.h
 ===================================================================
---- kernel-rpi.orig/include/linux/fscrypt.h
-+++ kernel-rpi/include/linux/fscrypt.h
+--- v6.12-rpi.orig/include/linux/fscrypt.h
++++ v6.12-rpi/include/linux/fscrypt.h
 @@ -892,6 +892,20 @@ static inline u64 fscrypt_limit_io_block
  }
  #endif /* !CONFIG_FS_ENCRYPTION_INLINE_CRYPT */
@@ -1685,11 +1685,11 @@ Index: kernel-rpi/include/linux/fscrypt.h
  /**
   * fscrypt_inode_uses_inline_crypto() - test whether an inode uses inline
   *					encryption
-Index: kernel-rpi/fs/f2fs/data.c
+Index: v6.12-rpi/fs/f2fs/data.c
 ===================================================================
---- kernel-rpi.orig/fs/f2fs/data.c
-+++ kernel-rpi/fs/f2fs/data.c
-@@ -486,6 +486,8 @@ static void f2fs_set_bio_crypt_ctx(struc
+--- v6.12-rpi.orig/fs/f2fs/data.c
++++ v6.12-rpi/fs/f2fs/data.c
+@@ -492,6 +492,8 @@ static void f2fs_set_bio_crypt_ctx(struc
  	 */
  	if (!fio || !fio->encrypted_page)
  		fscrypt_set_bio_crypt_ctx(bio, inode, first_idx, gfp_mask);
@@ -1698,7 +1698,7 @@ Index: kernel-rpi/fs/f2fs/data.c
  }
  
  static bool f2fs_crypt_mergeable_bio(struct bio *bio, const struct inode *inode,
-@@ -497,7 +499,9 @@ static bool f2fs_crypt_mergeable_bio(str
+@@ -503,7 +505,9 @@ static bool f2fs_crypt_mergeable_bio(str
  	 * read/write raw data without encryption.
  	 */
  	if (fio && fio->encrypted_page)
@@ -1709,10 +1709,10 @@ Index: kernel-rpi/fs/f2fs/data.c
  
  	return fscrypt_mergeable_bio(bio, inode, next_idx);
  }
-Index: kernel-rpi/block/blk-crypto.c
+Index: v6.12-rpi/block/blk-crypto.c
 ===================================================================
---- kernel-rpi.orig/block/blk-crypto.c
-+++ kernel-rpi/block/blk-crypto.c
+--- v6.12-rpi.orig/block/blk-crypto.c
++++ v6.12-rpi/block/blk-crypto.c
 @@ -106,6 +106,7 @@ void bio_crypt_set_ctx(struct bio *bio,
  
  	bio->bi_crypt_context = bc;

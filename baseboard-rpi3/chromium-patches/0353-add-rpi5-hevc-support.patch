@@ -10,8 +10,8 @@ Index: src/media/gpu/chromeos/fourcc.cc
 +    case NC30:
      case P010:
      case MT2T:
-     case AR24:
-@@ -183,10 +185,17 @@ VideoPixelFormat Fourcc::ToVideoPixelFor
+     case BGR4:
+@@ -185,10 +187,17 @@ VideoPixelFormat Fourcc::ToVideoPixelFor
      // similar to V4L2_PIX_FMT_MT21C but is not compressed ; thus it can also
      // be mapped to PIXEL_FORMAT_NV12.
      case MM21:
@@ -27,27 +27,27 @@ Index: src/media/gpu/chromeos/fourcc.cc
 +    // decoder for 10-bit content. It is a 128-byte column tiled format.
 +    case NC30:
        return PIXEL_FORMAT_P010LE;
-     case AR24:
-       return PIXEL_FORMAT_ARGB;
-@@ -289,6 +298,8 @@ std::optional<Fourcc> Fourcc::ToSinglePl
+     case BGR4:
+       return PIXEL_FORMAT_XRGB;
+@@ -294,6 +303,8 @@ std::optional<Fourcc> Fourcc::ToSinglePl
      case NV21:
      case P010:
      case MM21:
 +    case NC12:
 +    case NC30:
      case MT2T:
+     case BGR4:
      case AR24:
-       return Fourcc(value_);
-@@ -325,6 +336,8 @@ bool Fourcc::IsMultiPlanar() const {
+@@ -331,6 +342,8 @@ bool Fourcc::IsMultiPlanar() const {
      case YU16:
      case P010:
      case MT2T:
 +    case NC12:
 +    case NC30:
+     case BGR4:
      case AR24:
      case Q08C:
-     case Q10C:
-@@ -373,5 +386,12 @@ static_assert(Fourcc::Q08C == V4L2_PIX_F
+@@ -381,5 +394,12 @@ static_assert(Fourcc::Q08C == V4L2_PIX_F
  #ifdef V4L2_PIX_FMT_QC10C
  static_assert(Fourcc::Q10C == V4L2_PIX_FMT_QC10C, "Mismatch Fourcc");
  #endif  // V4L2_PIX_FMT_QC10C
@@ -93,7 +93,7 @@ Index: src/media/gpu/chromeos/gl_image_processor_backend.cc
    CHECK(plane == 0 || plane == 1);
  
    // Note: if this is changed to accept other formats,
-@@ -114,6 +115,30 @@ std::unique_ptr<ui::NativePixmapGLBindin
+@@ -122,6 +123,31 @@ std::unique_ptr<ui::NativePixmapGLBindin
          target, texture_id);
    }
  
@@ -114,17 +114,18 @@ Index: src/media/gpu/chromeos/gl_image_processor_backend.cc
 +        std::move(gpu_memory_buffer_handle).native_pixmap_handle());
 +    DCHECK(native_pixmap->AreDmaBufFdsValid());
 +
-+    // Both planes use BufferPlane::Y since both start at offset 0.
++    // Both planes start at offset 0 of the single-plane pixmap, so use
++    // plane_index 0 for each.
 +    return GetCurrentGLOzone().ImportNativePixmap(
 +        std::move(native_pixmap), tex_format,
-+        gfx::BufferPlane::Y, tex_size,
++        /*plane_index=*/0, tex_size,
 +        gfx::ColorSpace(), target, texture_id);
 +  }
 +
    base::CheckedNumeric<int> uv_width(0);
    base::CheckedNumeric<int> uv_height(0);
  
-@@ -170,45 +195,62 @@ std::string GLImageProcessorBackend::typ
+@@ -177,45 +203,62 @@ std::string GLImageProcessorBackend::typ
  
  bool GLImageProcessorBackend::IsSupported(const PortConfig& input_config,
                                            const PortConfig& output_config) {
@@ -196,7 +197,7 @@ Index: src/media/gpu/chromeos/gl_image_processor_backend.cc
               << ") does not contain the output visible rect ("
               << output_config.visible_rect.ToString() << ")";
      return false;
-@@ -217,12 +259,25 @@ bool GLImageProcessorBackend::IsSupporte
+@@ -224,12 +267,25 @@ bool GLImageProcessorBackend::IsSupporte
    if (input_config.fourcc == Fourcc(Fourcc::MM21) &&
        ((input_config.size.width() & (kTileWidth - 1)) ||
         (input_config.size.height() & (kTileHeight - 1)))) {
@@ -223,7 +224,7 @@ Index: src/media/gpu/chromeos/gl_image_processor_backend.cc
    return true;
  }
  
-@@ -452,28 +507,96 @@ void GLImageProcessorBackend::Initialize
+@@ -459,28 +515,96 @@ void GLImageProcessorBackend::Initialize
      return;
    }
  
@@ -337,7 +338,7 @@ Index: src/media/gpu/chromeos/gl_image_processor_backend.cc
      }
    } else {
      // The GL_EXT_YUV_target extension is needed for using a YUV texture (target
-@@ -560,6 +683,20 @@ void GLImageProcessorBackend::Initialize
+@@ -567,6 +691,20 @@ void GLImageProcessorBackend::Initialize
      return;
    }
    glUseProgram(program);
@@ -358,7 +359,7 @@ Index: src/media/gpu/chromeos/gl_image_processor_backend.cc
    glDeleteProgram(program);
  
    // Create an input texture. This will be eventually attached to the input
-@@ -568,7 +705,11 @@ void GLImageProcessorBackend::Initialize
+@@ -575,7 +713,11 @@ void GLImageProcessorBackend::Initialize
    CHECK_GT(src_texture_id_, 0u);
    const auto gl_texture_target =
        scaling ? GL_TEXTURE_2D : GL_TEXTURE_EXTERNAL_OES;
@@ -371,7 +372,7 @@ Index: src/media/gpu/chromeos/gl_image_processor_backend.cc
    glBindTexture(gl_texture_target, src_texture_id_);
    glTexParameteri(gl_texture_target, GL_TEXTURE_MIN_FILTER, gl_texture_filter);
    glTexParameteri(gl_texture_target, GL_TEXTURE_MAG_FILTER, gl_texture_filter);
-@@ -577,12 +718,26 @@ void GLImageProcessorBackend::Initialize
+@@ -584,12 +726,26 @@ void GLImageProcessorBackend::Initialize
  
    if (!scaling) {
      glUniform1i(glGetUniformLocation(program, "tex"), 0);
@@ -404,7 +405,7 @@ Index: src/media/gpu/chromeos/gl_image_processor_backend.cc
    }
  
    // Ensure the GLImageProcessorBackend is fully initialized by blocking until
-@@ -694,11 +849,32 @@ void GLImageProcessorBackend::ProcessFra
+@@ -701,11 +857,32 @@ void GLImageProcessorBackend::ProcessFra
    // didn't work: it generates a GL error. I guess this means the texture must
    // have a valid image prior to attaching it to the framebuffer.
  
@@ -439,7 +440,7 @@ Index: src/media/gpu/chromeos/gl_image_processor_backend.cc
    const int num_planes = scaling ? 2 : 1;
    const auto gl_texture_target =
        scaling ? GL_TEXTURE_2D : GL_TEXTURE_EXTERNAL_OES;
-@@ -715,6 +891,14 @@ void GLImageProcessorBackend::ProcessFra
+@@ -722,6 +899,14 @@ void GLImageProcessorBackend::ProcessFra
      }
      glViewport(0, 0, output_width.ValueOrDie(), output_height.ValueOrDie());
  
@@ -454,7 +455,7 @@ Index: src/media/gpu/chromeos/gl_image_processor_backend.cc
      glBindTexture(gl_texture_target, dst_texture_id_);
      auto output_image_binding = CreateAndBindImage(
          output_frame.get(), gl_texture_target, dst_texture_id_,
-@@ -743,7 +927,8 @@ void GLImageProcessorBackend::ProcessFra
+@@ -750,7 +935,8 @@ void GLImageProcessorBackend::ProcessFra
  
      auto input_image_binding = CreateAndBindImage(
          input_frame.get(), gl_texture_target, src_texture_id_,
@@ -468,7 +469,7 @@ Index: src/media/gpu/chromeos/image_processor_factory.cc
 ===================================================================
 --- src.orig/media/gpu/chromeos/image_processor_factory.cc
 +++ src/media/gpu/chromeos/image_processor_factory.cc
-@@ -232,29 +232,60 @@ std::unique_ptr<ImageProcessor> CreateGL
+@@ -234,29 +234,60 @@ std::unique_ptr<ImageProcessor> CreateGL
      scoped_refptr<base::SequencedTaskRunner> client_task_runner,
      ImageProcessorFactory::PickFormatCB out_format_picker,
      ImageProcessor::ErrorCB error_cb) {
@@ -545,7 +546,7 @@ Index: src/media/gpu/chromeos/image_processor_factory.cc
  }
  #endif  // defined(ARCH_CPU_ARM_FAMILY)
  #endif
-@@ -321,6 +352,14 @@ ImageProcessorFactory::CreateWithInputCa
+@@ -323,6 +354,14 @@ ImageProcessorFactory::CreateWithInputCa
      return processor;
  #elif BUILDFLAG(USE_V4L2_CODEC)
  #if defined(ARCH_CPU_ARM_FAMILY)
@@ -560,7 +561,7 @@ Index: src/media/gpu/chromeos/image_processor_factory.cc
    const bool use_gl_scaling =
        (base::FeatureList::IsEnabled(media::kUseGLForScaling) &&
         (input_candidates[0].fourcc == Fourcc(Fourcc::NV12) ||
-@@ -328,12 +367,30 @@ ImageProcessorFactory::CreateWithInputCa
+@@ -330,12 +369,30 @@ ImageProcessorFactory::CreateWithInputCa
    const bool use_gl_detiling =
        (base::FeatureList::IsEnabled(media::kPreferGLImageProcessor) &&
         input_candidates[0].fourcc == Fourcc(Fourcc::MM21));
@@ -622,7 +623,7 @@ Index: src/media/base/media_switches.cc
 ===================================================================
 --- src.orig/media/base/media_switches.cc
 +++ src/media/base/media_switches.cc
-@@ -1115,7 +1115,7 @@ BASE_FEATURE(kUseGLForScaling, base::FEA
+@@ -1239,7 +1239,7 @@ BASE_FEATURE(kUseGLForScaling, base::FEA
  // the hardware accelerated video decoder outputs frames in a format not
  // understood by the display controller. We usually use LibYUV to convert these
  // frames. This flag enables an experimental GL-based conversion method.
@@ -652,7 +653,7 @@ Index: src/media/gpu/v4l2/v4l2_utils.cc
 ===================================================================
 --- src.orig/media/gpu/v4l2/v4l2_utils.cc
 +++ src/media/gpu/v4l2/v4l2_utils.cc
-@@ -47,6 +47,11 @@
+@@ -43,6 +43,11 @@
  #define V4L2_PIX_FMT_AV1_FRAME v4l2_fourcc('A', 'V', '1', 'F')
  #endif
  
@@ -664,7 +665,7 @@ Index: src/media/gpu/v4l2/v4l2_utils.cc
  #define MAKE_V4L2_CODEC_PAIR(codec, suffix) \
    std::make_pair(codec##_##suffix, codec)
  
-@@ -287,6 +292,31 @@ std::optional<VideoFrameLayout> V4L2Form
+@@ -284,6 +289,31 @@ std::optional<VideoFrameLayout> V4L2Form
                              y_stride_abs * pix_mp.height / 2);
          DCHECK_EQ(2u, planes.size());
          break;
@@ -700,8 +701,8 @@ Index: src/media/gpu/v4l2/v4l2_video_decoder_delegate_h265.cc
 ===================================================================
 --- src.orig/media/gpu/v4l2/v4l2_video_decoder_delegate_h265.cc
 +++ src/media/gpu/v4l2/v4l2_video_decoder_delegate_h265.cc
-@@ -18,6 +18,36 @@
- 
+@@ -15,6 +15,36 @@
+ #include "base/compiler_specific.h"
  #include "base/logging.h"
  #include "base/memory/scoped_refptr.h"
 +
@@ -737,7 +738,7 @@ Index: src/media/gpu/v4l2/v4l2_video_decoder_delegate_h265.cc
  #include "build/build_config.h"
  #include "media/gpu/macros.h"
  #include "media/gpu/v4l2/v4l2_decode_surface.h"
-@@ -510,6 +540,12 @@ V4L2VideoDecoderDelegateH265::SubmitFram
+@@ -505,6 +535,12 @@ V4L2VideoDecoderDelegateH265::SubmitFram
      return Status::kFail;
    }
  
@@ -750,7 +751,7 @@ Index: src/media/gpu/v4l2/v4l2_video_decoder_delegate_h265.cc
    return Status::kOk;
  }
  
-@@ -533,8 +569,115 @@ H265Decoder::H265Accelerator::Status V4L
+@@ -528,8 +564,115 @@ H265Decoder::H265Accelerator::Status V4L
    scoped_refptr<V4L2DecodeSurface> dec_surface =
        H265PictureToV4L2DecodeSurface(pic.get());
  
@@ -868,7 +869,7 @@ Index: src/media/gpu/v4l2/v4l2_video_decoder_delegate_h265.cc
    const size_t data_copy_size = size + 3;
    if (dec_surface->secure_handle()) {
      // The secure world already post-processed the secure buffer so that all of
-@@ -563,6 +706,27 @@ H265Decoder::H265Accelerator::Status V4L
+@@ -557,6 +700,27 @@ H265Decoder::H265Accelerator::Status V4L
    scoped_refptr<V4L2DecodeSurface> dec_surface =
        H265PictureToV4L2DecodeSurface(pic.get());
  
@@ -896,7 +897,7 @@ Index: src/media/gpu/v4l2/v4l2_video_decoder_delegate_h265.cc
    DVLOGF(4) << "Submitting decode for surface: " << dec_surface->ToString();
    surface_handler_->DecodeSurface(dec_surface);
    return Status::kOk;
-@@ -578,6 +742,9 @@ bool V4L2VideoDecoderDelegateH265::Outpu
+@@ -572,6 +736,9 @@ bool V4L2VideoDecoderDelegateH265::Outpu
  
  void V4L2VideoDecoderDelegateH265::Reset() {
    drop_frame_ = false;
@@ -906,7 +907,7 @@ Index: src/media/gpu/v4l2/v4l2_video_decoder_delegate_h265.cc
  }
  
  bool V4L2VideoDecoderDelegateH265::IsChromaSamplingSupported(
-@@ -592,4 +759,17 @@ V4L2VideoDecoderDelegateH265::H265Pictur
+@@ -586,4 +753,17 @@ V4L2VideoDecoderDelegateH265::H265Pictur
    return v4l2_pic->dec_surface();
  }
  
@@ -976,7 +977,7 @@ Index: src/media/gpu/chromeos/libyuv_image_processor_backend.cc
 ===================================================================
 --- src.orig/media/gpu/chromeos/libyuv_image_processor_backend.cc
 +++ src/media/gpu/chromeos/libyuv_image_processor_backend.cc
-@@ -65,6 +65,7 @@ static constexpr struct {
+@@ -60,6 +60,7 @@ static constexpr struct {
      CONV(YUYV, YU12, kConversion, Supported),
      CONV(YV12, NV12, kConversion, Supported),
      CONV(MM21, NV12, kConversion, Supported),
@@ -984,7 +985,7 @@ Index: src/media/gpu/chromeos/libyuv_image_processor_backend.cc
      CONV(MT2T, P010, kConversion, Supported),
      // Scaling.
      CONV(NV12, NV12, kScaling, Supported),
-@@ -447,6 +448,108 @@ int LibYUVImageProcessorBackend::DoConve
+@@ -457,6 +458,108 @@ int LibYUVImageProcessorBackend::DoConve
                         input->coded_size().height()));
          }
  

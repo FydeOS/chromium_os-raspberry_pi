@@ -1,0 +1,539 @@
+Index: v6.12-rpi/fs/9p/xattr.c
+===================================================================
+--- v6.12-rpi.orig/fs/9p/xattr.c
++++ v6.12-rpi/fs/9p/xattr.c
+@@ -145,7 +145,8 @@ ssize_t v9fs_listxattr(struct dentry *de
+ 
+ static int v9fs_xattr_handler_get(const struct xattr_handler *handler,
+ 				  struct dentry *dentry, struct inode *inode,
+-				  const char *name, void *buffer, size_t size)
++				  const char *name, void *buffer, size_t size,
++				  int flags)
+ {
+ 	const char *full_name = xattr_full_name(handler, name);
+ 
+Index: v6.12-rpi/fs/afs/xattr.c
+===================================================================
+--- v6.12-rpi.orig/fs/afs/xattr.c
++++ v6.12-rpi/fs/afs/xattr.c
+@@ -36,7 +36,7 @@ static const struct afs_operation_ops af
+ static int afs_xattr_get_acl(const struct xattr_handler *handler,
+ 			     struct dentry *dentry,
+ 			     struct inode *inode, const char *name,
+-			     void *buffer, size_t size)
++			     void *buffer, size_t size, int flags)
+ {
+ 	struct afs_operation *op;
+ 	struct afs_vnode *vnode = AFS_FS_I(inode);
+@@ -138,7 +138,7 @@ static const struct afs_operation_ops yf
+ static int afs_xattr_get_yfs(const struct xattr_handler *handler,
+ 			     struct dentry *dentry,
+ 			     struct inode *inode, const char *name,
+-			     void *buffer, size_t size)
++			     void *buffer, size_t size, int flags)
+ {
+ 	struct afs_operation *op;
+ 	struct afs_vnode *vnode = AFS_FS_I(inode);
+@@ -268,7 +268,7 @@ static const struct xattr_handler afs_xa
+ static int afs_xattr_get_cell(const struct xattr_handler *handler,
+ 			      struct dentry *dentry,
+ 			      struct inode *inode, const char *name,
+-			      void *buffer, size_t size)
++			      void *buffer, size_t size, int flags)
+ {
+ 	struct afs_vnode *vnode = AFS_FS_I(inode);
+ 	struct afs_cell *cell = vnode->volume->cell;
+@@ -295,7 +295,7 @@ static const struct xattr_handler afs_xa
+ static int afs_xattr_get_fid(const struct xattr_handler *handler,
+ 			     struct dentry *dentry,
+ 			     struct inode *inode, const char *name,
+-			     void *buffer, size_t size)
++			     void *buffer, size_t size, int flags)
+ {
+ 	struct afs_vnode *vnode = AFS_FS_I(inode);
+ 	char text[16 + 1 + 24 + 1 + 8 + 1];
+@@ -333,7 +333,7 @@ static const struct xattr_handler afs_xa
+ static int afs_xattr_get_volume(const struct xattr_handler *handler,
+ 			      struct dentry *dentry,
+ 			      struct inode *inode, const char *name,
+-			      void *buffer, size_t size)
++			      void *buffer, size_t size, int flags)
+ {
+ 	struct afs_vnode *vnode = AFS_FS_I(inode);
+ 	const char *volname = vnode->volume->name;
+Index: v6.12-rpi/fs/bcachefs/xattr.c
+===================================================================
+--- v6.12-rpi.orig/fs/bcachefs/xattr.c
++++ v6.12-rpi/fs/bcachefs/xattr.c
+@@ -326,7 +326,8 @@ ssize_t bch2_xattr_list(struct dentry *d
+ 
+ static int bch2_xattr_get_handler(const struct xattr_handler *handler,
+ 				  struct dentry *dentry, struct inode *vinode,
+-				  const char *name, void *buffer, size_t size)
++				  const char *name, void *buffer, size_t size,
++				  int flags)
+ {
+ 	struct bch_inode_info *inode = to_bch_ei(vinode);
+ 	struct bch_fs *c = inode->v.i_sb->s_fs_info;
+@@ -454,7 +455,8 @@ static int __bch2_xattr_bcachefs_get(con
+ 
+ static int bch2_xattr_bcachefs_get(const struct xattr_handler *handler,
+ 				   struct dentry *dentry, struct inode *vinode,
+-				   const char *name, void *buffer, size_t size)
++				   const char *name, void *buffer, size_t size,
++				   int flags)
+ {
+ 	return __bch2_xattr_bcachefs_get(handler, dentry, vinode,
+ 					 name, buffer, size, false);
+@@ -585,7 +587,8 @@ static const struct xattr_handler bch_xa
+ static int bch2_xattr_bcachefs_get_effective(
+ 				const struct xattr_handler *handler,
+ 				struct dentry *dentry, struct inode *vinode,
+-				const char *name, void *buffer, size_t size)
++				const char *name, void *buffer, size_t size,
++				int flags)
+ {
+ 	return __bch2_xattr_bcachefs_get(handler, dentry, vinode,
+ 					 name, buffer, size, true);
+Index: v6.12-rpi/fs/btrfs/xattr.c
+===================================================================
+--- v6.12-rpi.orig/fs/btrfs/xattr.c
++++ v6.12-rpi/fs/btrfs/xattr.c
+@@ -363,7 +363,8 @@ next:
+ 
+ static int btrfs_xattr_handler_get(const struct xattr_handler *handler,
+ 				   struct dentry *unused, struct inode *inode,
+-				   const char *name, void *buffer, size_t size)
++				   const char *name, void *buffer, size_t size,
++				   int flags)
+ {
+ 	name = xattr_full_name(handler, name);
+ 	return btrfs_getxattr(inode, name, buffer, size);
+@@ -386,7 +387,7 @@ static int btrfs_xattr_handler_get_secur
+ 					    struct dentry *unused,
+ 					    struct inode *inode,
+ 					    const char *name, void *buffer,
+-					    size_t size)
++					    size_t size, int flags)
+ {
+ 	int ret;
+ 	bool is_cap = false;
+Index: v6.12-rpi/fs/ceph/xattr.c
+===================================================================
+--- v6.12-rpi.orig/fs/ceph/xattr.c
++++ v6.12-rpi/fs/ceph/xattr.c
+@@ -1345,7 +1345,8 @@ out:
+ 
+ static int ceph_get_xattr_handler(const struct xattr_handler *handler,
+ 				  struct dentry *dentry, struct inode *inode,
+-				  const char *name, void *value, size_t size)
++				  const char *name, void *value, size_t size,
++				  int flags)
+ {
+ 	if (!ceph_is_valid_xattr(name))
+ 		return -EOPNOTSUPP;
+Index: v6.12-rpi/fs/ext2/xattr_security.c
+===================================================================
+--- v6.12-rpi.orig/fs/ext2/xattr_security.c
++++ v6.12-rpi/fs/ext2/xattr_security.c
+@@ -11,7 +11,7 @@
+ static int
+ ext2_xattr_security_get(const struct xattr_handler *handler,
+ 			struct dentry *unused, struct inode *inode,
+-			const char *name, void *buffer, size_t size)
++			const char *name, void *buffer, size_t size, int flags)
+ {
+ 	return ext2_xattr_get(inode, EXT2_XATTR_INDEX_SECURITY, name,
+ 			      buffer, size);
+Index: v6.12-rpi/fs/ext2/xattr_trusted.c
+===================================================================
+--- v6.12-rpi.orig/fs/ext2/xattr_trusted.c
++++ v6.12-rpi/fs/ext2/xattr_trusted.c
+@@ -18,7 +18,7 @@ ext2_xattr_trusted_list(struct dentry *d
+ static int
+ ext2_xattr_trusted_get(const struct xattr_handler *handler,
+ 		       struct dentry *unused, struct inode *inode,
+-		       const char *name, void *buffer, size_t size)
++		       const char *name, void *buffer, size_t size, int flags)
+ {
+ 	return ext2_xattr_get(inode, EXT2_XATTR_INDEX_TRUSTED, name,
+ 			      buffer, size);
+Index: v6.12-rpi/fs/ext2/xattr_user.c
+===================================================================
+--- v6.12-rpi.orig/fs/ext2/xattr_user.c
++++ v6.12-rpi/fs/ext2/xattr_user.c
+@@ -20,7 +20,7 @@ ext2_xattr_user_list(struct dentry *dent
+ static int
+ ext2_xattr_user_get(const struct xattr_handler *handler,
+ 		    struct dentry *unused, struct inode *inode,
+-		    const char *name, void *buffer, size_t size)
++		    const char *name, void *buffer, size_t size, int flags)
+ {
+ 	if (!test_opt(inode->i_sb, XATTR_USER))
+ 		return -EOPNOTSUPP;
+Index: v6.12-rpi/fs/f2fs/xattr.c
+===================================================================
+--- v6.12-rpi.orig/fs/f2fs/xattr.c
++++ v6.12-rpi/fs/f2fs/xattr.c
+@@ -46,7 +46,7 @@ static void xattr_free(struct f2fs_sb_in
+ 
+ static int f2fs_xattr_generic_get(const struct xattr_handler *handler,
+ 		struct dentry *unused, struct inode *inode,
+-		const char *name, void *buffer, size_t size)
++		const char *name, void *buffer, size_t size, int flags)
+ {
+ 	struct f2fs_sb_info *sbi = F2FS_SB(inode->i_sb);
+ 
+@@ -102,7 +102,7 @@ static bool f2fs_xattr_trusted_list(stru
+ 
+ static int f2fs_xattr_advise_get(const struct xattr_handler *handler,
+ 		struct dentry *unused, struct inode *inode,
+-		const char *name, void *buffer, size_t size)
++		const char *name, void *buffer, size_t size, int flags)
+ {
+ 	if (buffer)
+ 		*((char *)buffer) = F2FS_I(inode)->i_advise;
+Index: v6.12-rpi/fs/gfs2/xattr.c
+===================================================================
+--- v6.12-rpi.orig/fs/gfs2/xattr.c
++++ v6.12-rpi/fs/gfs2/xattr.c
+@@ -606,7 +606,8 @@ static int __gfs2_xattr_get(struct inode
+ 
+ static int gfs2_xattr_get(const struct xattr_handler *handler,
+ 			  struct dentry *unused, struct inode *inode,
+-			  const char *name, void *buffer, size_t size)
++			  const char *name, void *buffer, size_t size,
++			  int flags)
+ {
+ 	struct gfs2_inode *ip = GFS2_I(inode);
+ 	struct gfs2_holder gh;
+Index: v6.12-rpi/fs/hfs/attr.c
+===================================================================
+--- v6.12-rpi.orig/fs/hfs/attr.c
++++ v6.12-rpi/fs/hfs/attr.c
+@@ -115,7 +115,7 @@ out:
+ 
+ static int hfs_xattr_get(const struct xattr_handler *handler,
+ 			 struct dentry *unused, struct inode *inode,
+-			 const char *name, void *value, size_t size)
++			 const char *name, void *value, size_t size, int flags)
+ {
+ 	return __hfs_getxattr(inode, handler->flags, value, size);
+ }
+Index: v6.12-rpi/fs/hfsplus/xattr.c
+===================================================================
+--- v6.12-rpi.orig/fs/hfsplus/xattr.c
++++ v6.12-rpi/fs/hfsplus/xattr.c
+@@ -840,7 +840,8 @@ end_removexattr:
+ 
+ static int hfsplus_osx_getxattr(const struct xattr_handler *handler,
+ 				struct dentry *unused, struct inode *inode,
+-				const char *name, void *buffer, size_t size)
++				const char *name, void *buffer, size_t size,
++				int flags)
+ {
+ 	/*
+ 	 * Don't allow retrieving properly prefixed attributes
+Index: v6.12-rpi/fs/hfsplus/xattr_security.c
+===================================================================
+--- v6.12-rpi.orig/fs/hfsplus/xattr_security.c
++++ v6.12-rpi/fs/hfsplus/xattr_security.c
+@@ -15,7 +15,8 @@
+ 
+ static int hfsplus_security_getxattr(const struct xattr_handler *handler,
+ 				     struct dentry *unused, struct inode *inode,
+-				     const char *name, void *buffer, size_t size)
++				     const char *name, void *buffer, size_t size,
++				     int flags)
+ {
+ 	return hfsplus_getxattr(inode, name, buffer, size,
+ 				XATTR_SECURITY_PREFIX,
+Index: v6.12-rpi/fs/hfsplus/xattr_trusted.c
+===================================================================
+--- v6.12-rpi.orig/fs/hfsplus/xattr_trusted.c
++++ v6.12-rpi/fs/hfsplus/xattr_trusted.c
+@@ -14,7 +14,8 @@
+ 
+ static int hfsplus_trusted_getxattr(const struct xattr_handler *handler,
+ 				    struct dentry *unused, struct inode *inode,
+-				    const char *name, void *buffer, size_t size)
++				    const char *name, void *buffer, size_t size,
++				    int flags)
+ {
+ 	return hfsplus_getxattr(inode, name, buffer, size,
+ 				XATTR_TRUSTED_PREFIX,
+Index: v6.12-rpi/fs/hfsplus/xattr_user.c
+===================================================================
+--- v6.12-rpi.orig/fs/hfsplus/xattr_user.c
++++ v6.12-rpi/fs/hfsplus/xattr_user.c
+@@ -14,7 +14,8 @@
+ 
+ static int hfsplus_user_getxattr(const struct xattr_handler *handler,
+ 				 struct dentry *unused, struct inode *inode,
+-				 const char *name, void *buffer, size_t size)
++				 const char *name, void *buffer, size_t size,
++				 int flags)
+ {
+ 
+ 	return hfsplus_getxattr(inode, name, buffer, size,
+Index: v6.12-rpi/fs/jffs2/security.c
+===================================================================
+--- v6.12-rpi.orig/fs/jffs2/security.c
++++ v6.12-rpi/fs/jffs2/security.c
+@@ -50,7 +50,8 @@ int jffs2_init_security(struct inode *in
+ /* ---- XATTR Handler for "security.*" ----------------- */
+ static int jffs2_security_getxattr(const struct xattr_handler *handler,
+ 				   struct dentry *unused, struct inode *inode,
+-				   const char *name, void *buffer, size_t size)
++				   const char *name, void *buffer, size_t size,
++				   int flags)
+ {
+ 	return do_jffs2_getxattr(inode, JFFS2_XPREFIX_SECURITY,
+ 				 name, buffer, size);
+Index: v6.12-rpi/fs/jffs2/xattr_trusted.c
+===================================================================
+--- v6.12-rpi.orig/fs/jffs2/xattr_trusted.c
++++ v6.12-rpi/fs/jffs2/xattr_trusted.c
+@@ -18,7 +18,8 @@
+ 
+ static int jffs2_trusted_getxattr(const struct xattr_handler *handler,
+ 				  struct dentry *unused, struct inode *inode,
+-				  const char *name, void *buffer, size_t size)
++				  const char *name, void *buffer, size_t size,
++				  int flags)
+ {
+ 	return do_jffs2_getxattr(inode, JFFS2_XPREFIX_TRUSTED,
+ 				 name, buffer, size);
+Index: v6.12-rpi/fs/jffs2/xattr_user.c
+===================================================================
+--- v6.12-rpi.orig/fs/jffs2/xattr_user.c
++++ v6.12-rpi/fs/jffs2/xattr_user.c
+@@ -18,7 +18,8 @@
+ 
+ static int jffs2_user_getxattr(const struct xattr_handler *handler,
+ 			       struct dentry *unused, struct inode *inode,
+-			       const char *name, void *buffer, size_t size)
++			       const char *name, void *buffer, size_t size,
++			       int flags)
+ {
+ 	return do_jffs2_getxattr(inode, JFFS2_XPREFIX_USER,
+ 				 name, buffer, size);
+Index: v6.12-rpi/fs/jfs/xattr.c
+===================================================================
+--- v6.12-rpi.orig/fs/jfs/xattr.c
++++ v6.12-rpi/fs/jfs/xattr.c
+@@ -949,7 +949,7 @@ static int __jfs_xattr_set(struct inode
+ 
+ static int jfs_xattr_get(const struct xattr_handler *handler,
+ 			 struct dentry *unused, struct inode *inode,
+-			 const char *name, void *value, size_t size)
++			 const char *name, void *value, size_t size, int flags)
+ {
+ 	name = xattr_full_name(handler, name);
+ 	return __jfs_getxattr(inode, name, value, size);
+@@ -967,7 +967,8 @@ static int jfs_xattr_set(const struct xa
+ 
+ static int jfs_xattr_get_os2(const struct xattr_handler *handler,
+ 			     struct dentry *unused, struct inode *inode,
+-			     const char *name, void *value, size_t size)
++			     const char *name, void *value, size_t size,
++			     int flags)
+ {
+ 	if (is_known_namespace(name))
+ 		return -EOPNOTSUPP;
+Index: v6.12-rpi/fs/nfs/nfs4proc.c
+===================================================================
+--- v6.12-rpi.orig/fs/nfs/nfs4proc.c
++++ v6.12-rpi/fs/nfs/nfs4proc.c
+@@ -7949,7 +7949,7 @@ static int nfs4_xattr_set_nfs4_acl(const
+ 
+ static int nfs4_xattr_get_nfs4_acl(const struct xattr_handler *handler,
+ 				   struct dentry *unused, struct inode *inode,
+-				   const char *key, void *buf, size_t buflen)
++				   const char *key, void *buf, size_t buflen, int flags)
+ {
+ 	return nfs4_proc_get_acl(inode, buf, buflen, NFS4ACL_ACL);
+ }
+@@ -7973,7 +7973,8 @@ static int nfs4_xattr_set_nfs4_dacl(cons
+ 
+ static int nfs4_xattr_get_nfs4_dacl(const struct xattr_handler *handler,
+ 				    struct dentry *unused, struct inode *inode,
+-				    const char *key, void *buf, size_t buflen)
++				    const char *key, void *buf, size_t buflen,
++				    int flags)
+ {
+ 	return nfs4_proc_get_acl(inode, buf, buflen, NFS4ACL_DACL);
+ }
+@@ -7996,7 +7997,8 @@ static int nfs4_xattr_set_nfs4_sacl(cons
+ 
+ static int nfs4_xattr_get_nfs4_sacl(const struct xattr_handler *handler,
+ 				    struct dentry *unused, struct inode *inode,
+-				    const char *key, void *buf, size_t buflen)
++				    const char *key, void *buf, size_t buflen,
++				    int flags)
+ {
+ 	return nfs4_proc_get_acl(inode, buf, buflen, NFS4ACL_SACL);
+ }
+@@ -8024,7 +8026,8 @@ static int nfs4_xattr_set_nfs4_label(con
+ 
+ static int nfs4_xattr_get_nfs4_label(const struct xattr_handler *handler,
+ 				     struct dentry *unused, struct inode *inode,
+-				     const char *key, void *buf, size_t buflen)
++				     const char *key, void *buf, size_t buflen,
++				     int flags)
+ {
+ 	if (security_ismaclabel(key))
+ 		return nfs4_get_security_label(inode, buf, buflen);
+@@ -8102,7 +8105,8 @@ static int nfs4_xattr_set_nfs4_user(cons
+ 
+ static int nfs4_xattr_get_nfs4_user(const struct xattr_handler *handler,
+ 				    struct dentry *unused, struct inode *inode,
+-				    const char *key, void *buf, size_t buflen)
++				    const char *key, void *buf, size_t buflen,
++				    int flags)
+ {
+ 	u32 mask;
+ 	ssize_t ret;
+Index: v6.12-rpi/fs/ntfs3/xattr.c
+===================================================================
+--- v6.12-rpi.orig/fs/ntfs3/xattr.c
++++ v6.12-rpi/fs/ntfs3/xattr.c
+@@ -745,7 +745,7 @@ ssize_t ntfs_listxattr(struct dentry *de
+ 
+ static int ntfs_getxattr(const struct xattr_handler *handler, struct dentry *de,
+ 			 struct inode *inode, const char *name, void *buffer,
+-			 size_t size)
++			 size_t size, int flags)
+ {
+ 	int err;
+ 	struct ntfs_inode *ni = ntfs_i(inode);
+Index: v6.12-rpi/fs/ocfs2/xattr.c
+===================================================================
+--- v6.12-rpi.orig/fs/ocfs2/xattr.c
++++ v6.12-rpi/fs/ocfs2/xattr.c
+@@ -7230,7 +7230,8 @@ leave:
+  */
+ static int ocfs2_xattr_security_get(const struct xattr_handler *handler,
+ 				    struct dentry *unused, struct inode *inode,
+-				    const char *name, void *buffer, size_t size)
++				    const char *name, void *buffer, size_t size,
++				    int flags)
+ {
+ 	return ocfs2_xattr_get(inode, OCFS2_XATTR_INDEX_SECURITY,
+ 			       name, buffer, size);
+@@ -7325,7 +7326,8 @@ const struct xattr_handler ocfs2_xattr_s
+  */
+ static int ocfs2_xattr_trusted_get(const struct xattr_handler *handler,
+ 				   struct dentry *unused, struct inode *inode,
+-				   const char *name, void *buffer, size_t size)
++				   const char *name, void *buffer, size_t size,
++				   int flags)
+ {
+ 	return ocfs2_xattr_get(inode, OCFS2_XATTR_INDEX_TRUSTED,
+ 			       name, buffer, size);
+@@ -7352,7 +7354,8 @@ const struct xattr_handler ocfs2_xattr_t
+  */
+ static int ocfs2_xattr_user_get(const struct xattr_handler *handler,
+ 				struct dentry *unused, struct inode *inode,
+-				const char *name, void *buffer, size_t size)
++				const char *name, void *buffer, size_t size,
++				int flags)
+ {
+ 	struct ocfs2_super *osb = OCFS2_SB(inode->i_sb);
+ 
+Index: v6.12-rpi/fs/orangefs/xattr.c
+===================================================================
+--- v6.12-rpi.orig/fs/orangefs/xattr.c
++++ v6.12-rpi/fs/orangefs/xattr.c
+@@ -544,7 +544,7 @@ static int orangefs_xattr_get_default(co
+ 				      struct inode *inode,
+ 				      const char *name,
+ 				      void *buffer,
+-				      size_t size)
++				      size_t size, int flags)
+ {
+ 	return orangefs_inode_getxattr(inode, name, buffer, size);
+ 
+Index: v6.12-rpi/fs/reiserfs/xattr_security.c
+===================================================================
+--- v6.12-rpi.orig/fs/reiserfs/xattr_security.c
++++ v6.12-rpi/fs/reiserfs/xattr_security.c
+@@ -11,7 +11,8 @@
+ 
+ static int
+ security_get(const struct xattr_handler *handler, struct dentry *unused,
+-	     struct inode *inode, const char *name, void *buffer, size_t size)
++	     struct inode *inode, const char *name, void *buffer, size_t size,
++	     int flags)
+ {
+ 	if (IS_PRIVATE(inode))
+ 		return -EPERM;
+Index: v6.12-rpi/fs/reiserfs/xattr_trusted.c
+===================================================================
+--- v6.12-rpi.orig/fs/reiserfs/xattr_trusted.c
++++ v6.12-rpi/fs/reiserfs/xattr_trusted.c
+@@ -10,7 +10,8 @@
+ 
+ static int
+ trusted_get(const struct xattr_handler *handler, struct dentry *unused,
+-	    struct inode *inode, const char *name, void *buffer, size_t size)
++	    struct inode *inode, const char *name, void *buffer, size_t size,
++	    int flags)
+ {
+ 	if (!capable(CAP_SYS_ADMIN) || IS_PRIVATE(inode))
+ 		return -EPERM;
+Index: v6.12-rpi/fs/reiserfs/xattr_user.c
+===================================================================
+--- v6.12-rpi.orig/fs/reiserfs/xattr_user.c
++++ v6.12-rpi/fs/reiserfs/xattr_user.c
+@@ -9,7 +9,8 @@
+ 
+ static int
+ user_get(const struct xattr_handler *handler, struct dentry *unused,
+-	 struct inode *inode, const char *name, void *buffer, size_t size)
++	 struct inode *inode, const char *name, void *buffer, size_t size,
++	 int flags)
+ {
+ 	if (!reiserfs_xattrs_user(inode->i_sb))
+ 		return -EOPNOTSUPP;
+Index: v6.12-rpi/fs/smb/client/xattr.c
+===================================================================
+--- v6.12-rpi.orig/fs/smb/client/xattr.c
++++ v6.12-rpi/fs/smb/client/xattr.c
+@@ -260,7 +260,7 @@ static int cifs_creation_time_get(struct
+ 
+ static int cifs_xattr_get(const struct xattr_handler *handler,
+ 			  struct dentry *dentry, struct inode *inode,
+-			  const char *name, void *value, size_t size)
++			  const char *name, void *value, size_t size, int flags)
+ {
+ 	ssize_t rc = -EOPNOTSUPP;
+ 	unsigned int xid;
+Index: v6.12-rpi/fs/ubifs/xattr.c
+===================================================================
+--- v6.12-rpi.orig/fs/ubifs/xattr.c
++++ v6.12-rpi/fs/ubifs/xattr.c
+@@ -689,7 +689,8 @@ int ubifs_init_security(struct inode *de
+ 
+ static int xattr_get(const struct xattr_handler *handler,
+ 			   struct dentry *dentry, struct inode *inode,
+-			   const char *name, void *buffer, size_t size)
++			   const char *name, void *buffer, size_t size,
++			   int flags)
+ {
+ 	dbg_gen("xattr '%s', ino %lu ('%pd'), buf size %zd", name,
+ 		inode->i_ino, dentry, size);
+Index: v6.12-rpi/fs/xfs/xfs_xattr.c
+===================================================================
+--- v6.12-rpi.orig/fs/xfs/xfs_xattr.c
++++ v6.12-rpi/fs/xfs/xfs_xattr.c
+@@ -133,7 +133,8 @@ xfs_attr_change(
+ 
+ static int
+ xfs_xattr_get(const struct xattr_handler *handler, struct dentry *unused,
+-		struct inode *inode, const char *name, void *value, size_t size)
++		struct inode *inode, const char *name, void *value, size_t size,
++		int flags)
+ {
+ 	struct xfs_da_args	args = {
+ 		.dp		= XFS_I(inode),

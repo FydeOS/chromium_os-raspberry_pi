@@ -1,7 +1,7 @@
-Index: kernel-rpi/mm/vmscan.c
+Index: v6.12-rpi/mm/vmscan.c
 ===================================================================
---- kernel-rpi.orig/mm/vmscan.c
-+++ kernel-rpi/mm/vmscan.c
+--- v6.12-rpi.orig/mm/vmscan.c
++++ v6.12-rpi/mm/vmscan.c
 @@ -2603,6 +2603,8 @@ static bool can_age_anon_pages(struct pg
  
  #ifdef CONFIG_LRU_GEN

@@ -1,7 +1,7 @@
-Index: kernel-rpi/mm/mprotect.c
+Index: v6.12-rpi/mm/mprotect.c
 ===================================================================
---- kernel-rpi.orig/mm/mprotect.c
-+++ kernel-rpi/mm/mprotect.c
+--- v6.12-rpi.orig/mm/mprotect.c
++++ v6.12-rpi/mm/mprotect.c
 @@ -856,7 +856,10 @@ out:
  SYSCALL_DEFINE3(mprotect, unsigned long, start, size_t, len,
  		unsigned long, prot)

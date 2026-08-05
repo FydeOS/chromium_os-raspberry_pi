@@ -1,7 +1,7 @@
-Index: kernel-rpi/mm/Kconfig
+Index: v6.12-rpi/mm/Kconfig
 ===================================================================
---- kernel-rpi.orig/mm/Kconfig
-+++ kernel-rpi/mm/Kconfig
+--- v6.12-rpi.orig/mm/Kconfig
++++ v6.12-rpi/mm/Kconfig
 @@ -771,6 +771,23 @@ config DEFAULT_MMAP_MIN_ADDR
  	  This value can be changed after boot using the
  	  /proc/sys/vm/mmap_min_addr tunable.
@@ -26,10 +26,10 @@ Index: kernel-rpi/mm/Kconfig
  config ARCH_SUPPORTS_MEMORY_FAILURE
  	bool
  
-Index: kernel-rpi/mm/util.c
+Index: v6.12-rpi/mm/util.c
 ===================================================================
---- kernel-rpi.orig/mm/util.c
-+++ kernel-rpi/mm/util.c
+--- v6.12-rpi.orig/mm/util.c
++++ v6.12-rpi/mm/util.c
 @@ -905,6 +905,7 @@ int sysctl_overcommit_memory __read_most
  int sysctl_overcommit_ratio __read_mostly = 50;
  unsigned long sysctl_overcommit_kbytes __read_mostly;
@@ -38,10 +38,10 @@ Index: kernel-rpi/mm/util.c
  unsigned long sysctl_user_reserve_kbytes __read_mostly = 1UL << 17; /* 128MB */
  unsigned long sysctl_admin_reserve_kbytes __read_mostly = 1UL << 13; /* 8MB */
  
-Index: kernel-rpi/include/linux/mm.h
+Index: v6.12-rpi/include/linux/mm.h
 ===================================================================
---- kernel-rpi.orig/include/linux/mm.h
-+++ kernel-rpi/include/linux/mm.h
+--- v6.12-rpi.orig/include/linux/mm.h
++++ v6.12-rpi/include/linux/mm.h
 @@ -204,6 +204,7 @@ static inline void __mm_zero_struct_page
  #define DEFAULT_MAX_MAP_COUNT	(USHRT_MAX - MAPCOUNT_ELF_CORE_MARGIN)
  
@@ -50,10 +50,10 @@ Index: kernel-rpi/include/linux/mm.h
  
  extern unsigned long sysctl_user_reserve_kbytes;
  extern unsigned long sysctl_admin_reserve_kbytes;
-Index: kernel-rpi/kernel/sysctl.c
+Index: v6.12-rpi/kernel/sysctl.c
 ===================================================================
---- kernel-rpi.orig/kernel/sysctl.c
-+++ kernel-rpi/kernel/sysctl.c
+--- v6.12-rpi.orig/kernel/sysctl.c
++++ v6.12-rpi/kernel/sysctl.c
 @@ -2181,6 +2181,15 @@ static struct ctl_table vm_table[] = {
  		.mode		= 0644,
  		.proc_handler	= mmap_min_addr_handler,
@@ -70,11 +70,11 @@ Index: kernel-rpi/kernel/sysctl.c
  #endif
  #if (defined(CONFIG_X86_32) && !defined(CONFIG_UML))|| \
     (defined(CONFIG_SUPERH) && defined(CONFIG_VSYSCALL))
-Index: kernel-rpi/mm/mmap.c
+Index: v6.12-rpi/mm/mmap.c
 ===================================================================
---- kernel-rpi.orig/mm/mmap.c
-+++ kernel-rpi/mm/mmap.c
-@@ -419,7 +419,8 @@ unsigned long do_mmap(struct file *file,
+--- v6.12-rpi.orig/mm/mmap.c
++++ v6.12-rpi/mm/mmap.c
+@@ -417,7 +417,8 @@ unsigned long do_mmap(struct file *file,
  			if (path_noexec(&file->f_path)) {
  				if (vm_flags & VM_EXEC)
  					return -EPERM;

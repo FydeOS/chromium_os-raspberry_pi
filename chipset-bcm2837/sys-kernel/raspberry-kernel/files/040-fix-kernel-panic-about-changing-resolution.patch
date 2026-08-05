@@ -1,31 +1,8 @@
-Index: kernel-rpi/drivers/gpu/drm/v3d/v3d_submit.c
+Index: v6.12-rpi/drivers/gpu/drm/vc4/vc4_plane.c
 ===================================================================
---- kernel-rpi.orig/drivers/gpu/drm/v3d/v3d_submit.c
-+++ kernel-rpi/drivers/gpu/drm/v3d/v3d_submit.c
-@@ -1066,7 +1066,6 @@ v3d_submit_cl_ioctl(struct drm_device *d
- 		}
- 	}
- 
--	mutex_lock(&v3d->sched_lock);
- 	if (bin) {
- 		spin_lock_irqsave(&v3d->latest_job_lock, irqflags);
- 		if (v3d->latest_job
-@@ -1082,6 +1081,10 @@ v3d_submit_cl_ioctl(struct drm_device *d
- 			if (ret)
- 				DRM_ERROR("failed to bind bin job to last render job: %d\n", ret);
- 		}
-+	}
-+
-+	mutex_lock(&v3d->sched_lock);
-+	if (bin) {
- 		bin->base.perfmon = render->base.perfmon;
- 		v3d_perfmon_get(bin->base.perfmon);
- 		v3d_push_job(&bin->base);
-Index: kernel-rpi/drivers/gpu/drm/vc4/vc4_plane.c
-===================================================================
---- kernel-rpi.orig/drivers/gpu/drm/vc4/vc4_plane.c
-+++ kernel-rpi/drivers/gpu/drm/vc4/vc4_plane.c
-@@ -2497,44 +2497,86 @@ static void vc4_async_complete_commit(st
+--- v6.12-rpi.orig/drivers/gpu/drm/vc4/vc4_plane.c
++++ v6.12-rpi/drivers/gpu/drm/vc4/vc4_plane.c
+@@ -2521,44 +2521,86 @@ static void vc4_async_complete_commit(st
  static void vc4_plane_atomic_async_update(struct drm_plane *plane,
  					  struct drm_atomic_state *state)
  {
@@ -146,7 +123,7 @@ Index: kernel-rpi/drivers/gpu/drm/vc4/vc4_plane.c
  	/* Note that we can't just call vc4_plane_write_dlist()
  	 * because that would smash the context data that the HVS is
  	 * currently using.
-@@ -2545,7 +2587,7 @@ static void vc4_plane_atomic_async_updat
+@@ -2569,7 +2611,7 @@ static void vc4_plane_atomic_async_updat
  	       &vc4_state->hw_dlist[vc4_state->pos2_offset]);
  	writel(vc4_state->dlist[vc4_state->ptr0_offset[0]],
  	       &vc4_state->hw_dlist[vc4_state->ptr0_offset[0]]);
@@ -155,7 +132,7 @@ Index: kernel-rpi/drivers/gpu/drm/vc4/vc4_plane.c
  end:
  	drm_dev_exit(idx);
  }
-@@ -2561,7 +2603,16 @@ static int vc4_plane_atomic_async_check(
+@@ -2585,7 +2627,16 @@ static int vc4_plane_atomic_async_check(
  	old_vc4_state = to_vc4_plane_state(plane->state);
  	new_vc4_state = to_vc4_plane_state(new_plane_state);
  

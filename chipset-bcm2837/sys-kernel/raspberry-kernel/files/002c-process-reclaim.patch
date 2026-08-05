@@ -1,8 +1,8 @@
-Index: kernel-rpi/fs/proc/base.c
+Index: v6.12-rpi/fs/proc/base.c
 ===================================================================
---- kernel-rpi.orig/fs/proc/base.c
-+++ kernel-rpi/fs/proc/base.c
-@@ -2716,7 +2716,7 @@ static struct dentry *proc_pident_instan
+--- v6.12-rpi.orig/fs/proc/base.c
++++ v6.12-rpi/fs/proc/base.c
+@@ -2715,7 +2715,7 @@ static struct dentry *proc_pident_instan
  	return d_splice_alias(inode, dentry);
  }
  
@@ -11,7 +11,7 @@ Index: kernel-rpi/fs/proc/base.c
  					 struct dentry *dentry,
  					 const struct pid_entry *p,
  					 const struct pid_entry *end)
-@@ -2929,7 +2929,7 @@ static const struct pid_entry attr_dir_s
+@@ -2928,7 +2928,7 @@ static const struct pid_entry attr_dir_s
  
  static int proc_attr_dir_readdir(struct file *file, struct dir_context *ctx)
  {
@@ -20,7 +20,7 @@ Index: kernel-rpi/fs/proc/base.c
  				   attr_dir_stuff, ARRAY_SIZE(attr_dir_stuff));
  }
  
-@@ -3350,6 +3350,9 @@ static const struct pid_entry tgid_base_
+@@ -3349,6 +3349,9 @@ static const struct pid_entry tgid_base_
  	REG("mounts",     S_IRUGO, proc_mounts_operations),
  	REG("mountinfo",  S_IRUGO, proc_mountinfo_operations),
  	REG("mountstats", S_IRUSR, proc_mountstats_operations),
@@ -30,10 +30,10 @@ Index: kernel-rpi/fs/proc/base.c
  #ifdef CONFIG_PROC_PAGE_MONITOR
  	REG("clear_refs", S_IWUSR, proc_clear_refs_operations),
  	REG("smaps",      S_IRUGO, proc_pid_smaps_operations),
-Index: kernel-rpi/fs/proc/internal.h
+Index: v6.12-rpi/fs/proc/internal.h
 ===================================================================
---- kernel-rpi.orig/fs/proc/internal.h
-+++ kernel-rpi/fs/proc/internal.h
+--- v6.12-rpi.orig/fs/proc/internal.h
++++ v6.12-rpi/fs/proc/internal.h
 @@ -267,6 +267,7 @@ struct pde_opener {
  extern const struct inode_operations proc_link_inode_operations;
  extern const struct inode_operations proc_pid_link_inode_operations;
@@ -42,10 +42,10 @@ Index: kernel-rpi/fs/proc/internal.h
  
  void proc_init_kmemcache(void);
  void proc_invalidate_siblings_dcache(struct hlist_head *inodes, spinlock_t *lock);
-Index: kernel-rpi/fs/proc/task_mmu.c
+Index: v6.12-rpi/fs/proc/task_mmu.c
 ===================================================================
---- kernel-rpi.orig/fs/proc/task_mmu.c
-+++ kernel-rpi/fs/proc/task_mmu.c
+--- v6.12-rpi.orig/fs/proc/task_mmu.c
++++ v6.12-rpi/fs/proc/task_mmu.c
 @@ -28,6 +28,7 @@
  #include <asm/tlb.h>
  #include <asm/tlbflush.h>
@@ -54,7 +54,7 @@ Index: kernel-rpi/fs/proc/task_mmu.c
  
  #define SEQ_PUT_DEC(str, val) \
  		seq_put_decimal_ull_width(m, str, (val) << (PAGE_SHIFT-10), 8)
-@@ -2840,6 +2841,425 @@ const struct file_operations proc_pagema
+@@ -2853,6 +2854,425 @@ const struct file_operations proc_pagema
  };
  #endif /* CONFIG_PROC_PAGE_MONITOR */
  
@@ -480,10 +480,10 @@ Index: kernel-rpi/fs/proc/task_mmu.c
  #ifdef CONFIG_NUMA
  
  struct numa_maps {
-Index: kernel-rpi/mm/Kconfig
+Index: v6.12-rpi/mm/Kconfig
 ===================================================================
---- kernel-rpi.orig/mm/Kconfig
-+++ kernel-rpi/mm/Kconfig
+--- v6.12-rpi.orig/mm/Kconfig
++++ v6.12-rpi/mm/Kconfig
 @@ -661,6 +661,18 @@ config PAGE_REPORTING
  	  those pages to another entity, such as a hypervisor, so that the
  	  memory can be freed within the host for other uses.

@@ -1,0 +1,12 @@
+Index: v6.12-rpi/arch/arm/boot/dts/overlays/cutiepi-panel-overlay.dts
+===================================================================
+--- v6.12-rpi.orig/arch/arm/boot/dts/overlays/cutiepi-panel-overlay.dts
++++ v6.12-rpi/arch/arm/boot/dts/overlays/cutiepi-panel-overlay.dts
+@@ -22,7 +22,6 @@
+             display1: panel@0 {
+                 compatible = "nwe,nwe080";
+                 reg=<0>;
+-                backlight = <&rpi_backlight>;
+                 reset-gpios = <&gpio 20 0>;
+                 rotation = <270>;
+                 port {

@@ -2,7 +2,7 @@ Index: src/media/gpu/v4l2/v4l2_utils.cc
 ===================================================================
 --- src.orig/media/gpu/v4l2/v4l2_utils.cc
 +++ src/media/gpu/v4l2/v4l2_utils.cc
-@@ -47,11 +47,6 @@
+@@ -43,11 +43,6 @@
  #define V4L2_PIX_FMT_AV1_FRAME v4l2_fourcc('A', 'V', '1', 'F')
  #endif
  
@@ -14,7 +14,7 @@ Index: src/media/gpu/v4l2/v4l2_utils.cc
  #define MAKE_V4L2_CODEC_PAIR(codec, suffix) \
    std::make_pair(codec##_##suffix, codec)
  
-@@ -292,31 +287,6 @@ std::optional<VideoFrameLayout> V4L2Form
+@@ -289,31 +284,6 @@ std::optional<VideoFrameLayout> V4L2Form
                              y_stride_abs * pix_mp.height / 2);
          DCHECK_EQ(2u, planes.size());
          break;
@@ -46,7 +46,7 @@ Index: src/media/gpu/v4l2/v4l2_utils.cc
        case V4L2_PIX_FMT_YUV420:
        case V4L2_PIX_FMT_YVU420: {
          // The spec claims that two Cx rows (including padding) is exactly as
-@@ -614,8 +584,15 @@ std::optional<SupportedVideoDecoderConfi
+@@ -608,8 +578,15 @@ std::optional<SupportedVideoDecoderConfi
    std::vector<std::string> candidate_paths;
  
  #if BUILDFLAG(IS_CHROMEOS)
@@ -64,7 +64,7 @@ Index: src/media/gpu/v4l2/v4l2_utils.cc
  #else
    constexpr char kVideoDevicePattern[] = "/dev/video";
    constexpr int kMaxDevices = 256;
-@@ -630,9 +607,6 @@ std::optional<SupportedVideoDecoderConfi
+@@ -624,9 +601,6 @@ std::optional<SupportedVideoDecoderConfi
      base::ScopedFD device_fd(
          HANDLE_EINTR(open(path.c_str(), O_RDWR | O_NONBLOCK | O_CLOEXEC)));
      if (!device_fd.is_valid()) {
@@ -78,7 +78,7 @@ Index: src/media/gpu/chromeos/video_decoder_pipeline.cc
 ===================================================================
 --- src.orig/media/gpu/chromeos/video_decoder_pipeline.cc
 +++ src/media/gpu/chromeos/video_decoder_pipeline.cc
-@@ -256,6 +256,15 @@ std::unique_ptr<VideoDecoder> VideoDecod
+@@ -258,6 +258,15 @@ std::unique_ptr<VideoDecoder> VideoDecod
        std::move(frame_converter), std::move(renderable_fourccs),
        std::move(media_log), std::move(create_decoder_function_cb),
        uses_oop_video_decoder, in_video_decoder_process);
@@ -94,7 +94,7 @@ Index: src/media/gpu/chromeos/video_decoder_pipeline.cc
    return std::make_unique<AsyncDestroyVideoDecoder<VideoDecoderPipeline>>(
        base::WrapUnique(pipeline));
  }
-@@ -720,7 +729,8 @@ void VideoDecoderPipeline::InitializeTas
+@@ -722,7 +731,8 @@ void VideoDecoderPipeline::InitializeTas
    decoder_->Initialize(
        config, /* low_delay=*/false, cdm_context,
        base::BindOnce(&VideoDecoderPipeline::OnInitializeDone,
@@ -104,7 +104,7 @@ Index: src/media/gpu/chromeos/video_decoder_pipeline.cc
        base::BindRepeating(&VideoDecoderPipeline::OnFrameDecoded,
                            decoder_weak_this_),
        base::BindRepeating(&VideoDecoderPipeline::OnDecoderWaiting,
-@@ -729,6 +739,7 @@ void VideoDecoderPipeline::InitializeTas
+@@ -731,6 +741,7 @@ void VideoDecoderPipeline::InitializeTas
  
  void VideoDecoderPipeline::OnInitializeDone(InitCB init_cb,
                                              CdmContext* cdm_context,
@@ -112,7 +112,7 @@ Index: src/media/gpu/chromeos/video_decoder_pipeline.cc
                                              DecoderStatus status) {
    DCHECK_CALLED_ON_VALID_SEQUENCE(decoder_sequence_checker_);
    DVLOGF(4) << "Initialization status = " << static_cast<int>(status.code());
-@@ -744,6 +755,32 @@ void VideoDecoderPipeline::OnInitializeD
+@@ -746,6 +757,32 @@ void VideoDecoderPipeline::OnInitializeD
      buffer_transcryptor_.reset();
  #endif  // BUILDFLAG(IS_CHROMEOS)
      decoder_.reset();
@@ -175,7 +175,7 @@ Index: src/media/gpu/chromeos/image_processor_factory.cc
 ===================================================================
 --- src.orig/media/gpu/chromeos/image_processor_factory.cc
 +++ src/media/gpu/chromeos/image_processor_factory.cc
-@@ -232,60 +232,29 @@ std::unique_ptr<ImageProcessor> CreateGL
+@@ -234,60 +234,29 @@ std::unique_ptr<ImageProcessor> CreateGL
      scoped_refptr<base::SequencedTaskRunner> client_task_runner,
      ImageProcessorFactory::PickFormatCB out_format_picker,
      ImageProcessor::ErrorCB error_cb) {
@@ -252,7 +252,7 @@ Index: src/media/gpu/chromeos/image_processor_factory.cc
  }
  #endif  // defined(ARCH_CPU_ARM_FAMILY)
  #endif
-@@ -351,63 +320,72 @@ ImageProcessorFactory::CreateWithInputCa
+@@ -353,63 +322,72 @@ ImageProcessorFactory::CreateWithInputCa
    if (processor)
      return processor;
  #elif BUILDFLAG(USE_V4L2_CODEC)

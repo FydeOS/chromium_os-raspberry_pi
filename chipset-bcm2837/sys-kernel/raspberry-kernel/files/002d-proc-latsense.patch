@@ -1,7 +1,7 @@
-Index: kernel-rpi/fs/proc/Kconfig
+Index: v6.12-rpi/fs/proc/Kconfig
 ===================================================================
---- kernel-rpi.orig/fs/proc/Kconfig
-+++ kernel-rpi/fs/proc/Kconfig
+--- v6.12-rpi.orig/fs/proc/Kconfig
++++ v6.12-rpi/fs/proc/Kconfig
 @@ -108,3 +108,9 @@ config PROC_PID_ARCH_STATUS
  config PROC_CPU_RESCTRL
  	def_bool n
@@ -12,10 +12,10 @@ Index: kernel-rpi/fs/proc/Kconfig
 +  depends on PROC_FS && UCLAMP_TASK
 +  help
 +  Enable /proc/pid/tasks/tid latency sensitive scheduler attribute
-Index: kernel-rpi/fs/proc/Makefile
+Index: v6.12-rpi/fs/proc/Makefile
 ===================================================================
---- kernel-rpi.orig/fs/proc/Makefile
-+++ kernel-rpi/fs/proc/Makefile
+--- v6.12-rpi.orig/fs/proc/Makefile
++++ v6.12-rpi/fs/proc/Makefile
 @@ -27,6 +27,7 @@ proc-y	+= softirqs.o
  proc-y	+= namespaces.o
  proc-y	+= self.o
@@ -24,10 +24,10 @@ Index: kernel-rpi/fs/proc/Makefile
  proc-$(CONFIG_PROC_SYSCTL)	+= proc_sysctl.o
  proc-$(CONFIG_NET)		+= proc_net.o
  proc-$(CONFIG_PROC_KCORE)	+= kcore.o
-Index: kernel-rpi/fs/proc/latsense.c
+Index: v6.12-rpi/fs/proc/latsense.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/fs/proc/latsense.c
++++ v6.12-rpi/fs/proc/latsense.c
 @@ -0,0 +1,94 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
@@ -123,11 +123,11 @@ Index: kernel-rpi/fs/proc/latsense.c
 +	.llseek		= seq_lseek,
 +	.release	= single_release,
 +};
-Index: kernel-rpi/include/linux/sched.h
+Index: v6.12-rpi/include/linux/sched.h
 ===================================================================
---- kernel-rpi.orig/include/linux/sched.h
-+++ kernel-rpi/include/linux/sched.h
-@@ -870,6 +870,10 @@ struct task_struct {
+--- v6.12-rpi.orig/include/linux/sched.h
++++ v6.12-rpi/include/linux/sched.h
+@@ -869,6 +869,10 @@ struct task_struct {
  
  	struct sched_statistics         stats;
  
@@ -138,10 +138,10 @@ Index: kernel-rpi/include/linux/sched.h
  #ifdef CONFIG_PREEMPT_NOTIFIERS
  	/* List of struct preempt_notifier: */
  	struct hlist_head		preempt_notifiers;
-Index: kernel-rpi/kernel/sched/build_utility.c
+Index: v6.12-rpi/kernel/sched/build_utility.c
 ===================================================================
---- kernel-rpi.orig/kernel/sched/build_utility.c
-+++ kernel-rpi/kernel/sched/build_utility.c
+--- v6.12-rpi.orig/kernel/sched/build_utility.c
++++ v6.12-rpi/kernel/sched/build_utility.c
 @@ -107,3 +107,7 @@
  #ifdef CONFIG_SCHED_AUTOGROUP
  # include "autogroup.c"
@@ -150,11 +150,11 @@ Index: kernel-rpi/kernel/sched/build_utility.c
 +#ifdef CONFIG_PROC_LATSENSE
 +# include "latsense.c"
 +#endif
-Index: kernel-rpi/kernel/sched/core.c
+Index: v6.12-rpi/kernel/sched/core.c
 ===================================================================
---- kernel-rpi.orig/kernel/sched/core.c
-+++ kernel-rpi/kernel/sched/core.c
-@@ -4712,6 +4712,10 @@ int sched_fork(unsigned long clone_flags
+--- v6.12-rpi.orig/kernel/sched/core.c
++++ v6.12-rpi/kernel/sched/core.c
+@@ -4713,6 +4713,10 @@ int sched_fork(unsigned long clone_flags
  		p->se.custom_slice = 0;
  		p->se.slice = sysctl_sched_base_slice;
  
@@ -165,11 +165,11 @@ Index: kernel-rpi/kernel/sched/core.c
  		/*
  		 * We don't need the reset flag anymore after the fork. It has
  		 * fulfilled its duty:
-Index: kernel-rpi/kernel/sched/fair.c
+Index: v6.12-rpi/kernel/sched/fair.c
 ===================================================================
---- kernel-rpi.orig/kernel/sched/fair.c
-+++ kernel-rpi/kernel/sched/fair.c
-@@ -8463,189 +8463,225 @@ compute_energy(struct energy_env *eenv,
+--- v6.12-rpi.orig/kernel/sched/fair.c
++++ v6.12-rpi/kernel/sched/fair.c
+@@ -8480,189 +8480,225 @@ compute_energy(struct energy_env *eenv,
   */
  static int find_energy_efficient_cpu(struct task_struct *p, int prev_cpu)
  {
@@ -574,10 +574,10 @@ Index: kernel-rpi/kernel/sched/fair.c
  }
  
  /*
-Index: kernel-rpi/kernel/sched/sched.h
+Index: v6.12-rpi/kernel/sched/sched.h
 ===================================================================
---- kernel-rpi.orig/kernel/sched/sched.h
-+++ kernel-rpi/kernel/sched/sched.h
+--- v6.12-rpi.orig/kernel/sched/sched.h
++++ v6.12-rpi/kernel/sched/sched.h
 @@ -11,6 +11,7 @@
  #include <linux/sched/cpufreq.h>
  #include <linux/sched/deadline.h>
@@ -586,7 +586,7 @@ Index: kernel-rpi/kernel/sched/sched.h
  #include <linux/sched/loadavg.h>
  #include <linux/sched/mm.h>
  #include <linux/sched/rseq_api.h>
-@@ -491,6 +492,8 @@ struct task_group {
+@@ -516,6 +517,8 @@ struct task_group {
  	struct uclamp_se	uclamp_req[UCLAMP_CNT];
  	/* Effective clamp values used for a task group */
  	struct uclamp_se	uclamp[UCLAMP_CNT];
@@ -595,7 +595,7 @@ Index: kernel-rpi/kernel/sched/sched.h
  #endif
  
  };
-@@ -3288,6 +3291,34 @@ static inline void cpufreq_update_util(s
+@@ -3313,6 +3316,34 @@ static inline void cpufreq_update_util(s
  static inline void cpufreq_update_util(struct rq *rq, unsigned int flags) { }
  #endif /* !CONFIG_CPU_FREQ */
  
@@ -630,7 +630,7 @@ Index: kernel-rpi/kernel/sched/sched.h
  #ifdef arch_scale_freq_capacity
  # ifndef arch_scale_freq_invariant
  #  define arch_scale_freq_invariant()	true
-@@ -3423,6 +3454,11 @@ uclamp_se_set(struct uclamp_se *uc_se, u
+@@ -3448,6 +3479,11 @@ uclamp_se_set(struct uclamp_se *uc_se, u
  	uc_se->user_defined = user_defined;
  }
  
@@ -642,10 +642,10 @@ Index: kernel-rpi/kernel/sched/sched.h
  #else /* !CONFIG_UCLAMP_TASK: */
  
  static inline unsigned long
-Index: kernel-rpi/include/linux/sched/latsense.h
+Index: v6.12-rpi/include/linux/sched/latsense.h
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/include/linux/sched/latsense.h
++++ v6.12-rpi/include/linux/sched/latsense.h
 @@ -0,0 +1,8 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +#ifndef _LINUX_SCHED_LATSENSE_H
@@ -655,10 +655,10 @@ Index: kernel-rpi/include/linux/sched/latsense.h
 +extern int proc_sched_get_latency_sensitive(struct task_struct *p);
 +
 +#endif /* _LINUX_SCHED_LATSENSE_H */
-Index: kernel-rpi/kernel/sched/latsense.c
+Index: v6.12-rpi/kernel/sched/latsense.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/kernel/sched/latsense.c
++++ v6.12-rpi/kernel/sched/latsense.c
 @@ -0,0 +1,17 @@
 +// SPDX-License-Identifier: GPL-2.0
 +#include "sched.h"

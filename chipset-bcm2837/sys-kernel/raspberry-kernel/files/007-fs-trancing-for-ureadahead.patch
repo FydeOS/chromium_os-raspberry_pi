@@ -1,7 +1,7 @@
-Index: kernel-rpi/fs/exec.c
+Index: v6.12-rpi/fs/exec.c
 ===================================================================
---- kernel-rpi.orig/fs/exec.c
-+++ kernel-rpi/fs/exec.c
+--- v6.12-rpi.orig/fs/exec.c
++++ v6.12-rpi/fs/exec.c
 @@ -73,6 +73,7 @@
  #include <asm/mmu_context.h>
  #include <asm/tlb.h>
@@ -21,10 +21,10 @@ Index: kernel-rpi/fs/exec.c
  	return no_free_ptr(file);
  }
  
-Index: kernel-rpi/fs/open.c
+Index: v6.12-rpi/fs/open.c
 ===================================================================
---- kernel-rpi.orig/fs/open.c
-+++ kernel-rpi/fs/open.c
+--- v6.12-rpi.orig/fs/open.c
++++ v6.12-rpi/fs/open.c
 @@ -36,6 +36,9 @@
  
  #include "internal.h"
@@ -35,7 +35,7 @@ Index: kernel-rpi/fs/open.c
  int do_truncate(struct mnt_idmap *idmap, struct dentry *dentry,
  		loff_t length, unsigned int time_attrs, struct file *filp)
  {
-@@ -1420,6 +1423,7 @@ static long do_sys_openat2(int dfd, cons
+@@ -1414,6 +1417,7 @@ static long do_sys_openat2(int dfd, cons
  			fd = PTR_ERR(f);
  		} else {
  			fd_install(fd, f);
@@ -43,10 +43,10 @@ Index: kernel-rpi/fs/open.c
  		}
  	}
  	putname(tmp);
-Index: kernel-rpi/include/trace/events/fs_trace.h
+Index: v6.12-rpi/include/trace/events/fs_trace.h
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/include/trace/events/fs_trace.h
++++ v6.12-rpi/include/trace/events/fs_trace.h
 @@ -0,0 +1,55 @@
 +#undef TRACE_SYSTEM
 +#define TRACE_SYSTEM fs

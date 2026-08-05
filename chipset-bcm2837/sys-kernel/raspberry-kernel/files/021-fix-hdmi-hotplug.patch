@@ -1,7 +1,7 @@
-Index: kernel-rpi/drivers/gpu/drm/vc4/vc4_hdmi.h
+Index: v6.12-rpi/drivers/gpu/drm/vc4/vc4_hdmi.h
 ===================================================================
---- kernel-rpi.orig/drivers/gpu/drm/vc4/vc4_hdmi.h
-+++ kernel-rpi/drivers/gpu/drm/vc4/vc4_hdmi.h
+--- v6.12-rpi.orig/drivers/gpu/drm/vc4/vc4_hdmi.h
++++ v6.12-rpi/drivers/gpu/drm/vc4/vc4_hdmi.h
 @@ -7,6 +7,8 @@
  #include <sound/dmaengine_pcm.h>
  #include <sound/hdmi-codec.h>
@@ -28,10 +28,10 @@ Index: kernel-rpi/drivers/gpu/drm/vc4/vc4_hdmi.h
  };
  
  #define connector_to_vc4_hdmi(_connector)				\
-Index: kernel-rpi/drivers/gpu/drm/vc4/vc4_hdmi.c
+Index: v6.12-rpi/drivers/gpu/drm/vc4/vc4_hdmi.c
 ===================================================================
---- kernel-rpi.orig/drivers/gpu/drm/vc4/vc4_hdmi.c
-+++ kernel-rpi/drivers/gpu/drm/vc4/vc4_hdmi.c
+--- v6.12-rpi.orig/drivers/gpu/drm/vc4/vc4_hdmi.c
++++ v6.12-rpi/drivers/gpu/drm/vc4/vc4_hdmi.c
 @@ -118,6 +118,12 @@
  static int force_hotplug;
  module_param(force_hotplug, int, 0644);

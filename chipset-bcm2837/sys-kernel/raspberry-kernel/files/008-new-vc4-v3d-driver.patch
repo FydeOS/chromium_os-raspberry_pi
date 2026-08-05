@@ -1,7 +1,7 @@
-Index: kernel-rpi/drivers/gpu/drm/drm_gem_dma_helper.c
+Index: v6.12-rpi/drivers/gpu/drm/drm_gem_dma_helper.c
 ===================================================================
---- kernel-rpi.orig/drivers/gpu/drm/drm_gem_dma_helper.c
-+++ kernel-rpi/drivers/gpu/drm/drm_gem_dma_helper.c
+--- v6.12-rpi.orig/drivers/gpu/drm/drm_gem_dma_helper.c
++++ v6.12-rpi/drivers/gpu/drm/drm_gem_dma_helper.c
 @@ -187,7 +187,7 @@ EXPORT_SYMBOL_GPL(drm_gem_dma_create);
   * A struct drm_gem_dma_object * on success or an ERR_PTR()-encoded negative
   * error code on failure.
@@ -19,10 +19,10 @@ Index: kernel-rpi/drivers/gpu/drm/drm_gem_dma_helper.c
  
  /**
   * drm_gem_dma_free - free resources associated with a DMA GEM object
-Index: kernel-rpi/drivers/gpu/drm/v3d/v3d_vc4_bind.c
+Index: v6.12-rpi/drivers/gpu/drm/v3d/v3d_vc4_bind.c
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/drivers/gpu/drm/v3d/v3d_vc4_bind.c
++++ v6.12-rpi/drivers/gpu/drm/v3d/v3d_vc4_bind.c
 @@ -0,0 +1,50 @@
 +#include <linux/fdtable.h>
 +#include <drm/drm_drv.h>
@@ -74,10 +74,10 @@ Index: kernel-rpi/drivers/gpu/drm/v3d/v3d_vc4_bind.c
 +      (u32) (unaligned_size / 1024), vc4_handle, prime_fd, *handle, ret);
 +  return ret;
 +}
-Index: kernel-rpi/drivers/gpu/drm/v3d/v3d_vc4_bind.h
+Index: v6.12-rpi/drivers/gpu/drm/v3d/v3d_vc4_bind.h
 ===================================================================
 --- /dev/null
-+++ kernel-rpi/drivers/gpu/drm/v3d/v3d_vc4_bind.h
++++ v6.12-rpi/drivers/gpu/drm/v3d/v3d_vc4_bind.h
 @@ -0,0 +1,22 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/* Copyright (C) 2023 FydeOS team */
@@ -101,10 +101,10 @@ Index: kernel-rpi/drivers/gpu/drm/v3d/v3d_vc4_bind.h
 +int import_bo_from_vc4(struct drm_device *dev, struct drm_file *file_priv,
 +  size_t unaligned_size, u32 *handle);
 +#endif /* V3D_VC4_BIND_H */
-Index: kernel-rpi/drivers/gpu/drm/vc4/vc4_drv.c
+Index: v6.12-rpi/drivers/gpu/drm/vc4/vc4_drv.c
 ===================================================================
---- kernel-rpi.orig/drivers/gpu/drm/vc4/vc4_drv.c
-+++ kernel-rpi/drivers/gpu/drm/vc4/vc4_drv.c
+--- v6.12-rpi.orig/drivers/gpu/drm/vc4/vc4_drv.c
++++ v6.12-rpi/drivers/gpu/drm/vc4/vc4_drv.c
 @@ -51,6 +51,11 @@
  #define DRIVER_MINOR 0
  #define DRIVER_PATCHLEVEL 0
@@ -177,10 +177,10 @@ Index: kernel-rpi/drivers/gpu/drm/vc4/vc4_drv.c
  	drm_dev_unplug(drm);
  	drm_atomic_helper_shutdown(drm);
  	dev_set_drvdata(dev, NULL);
-Index: kernel-rpi/include/drm/drm_gem_dma_helper.h
+Index: v6.12-rpi/include/drm/drm_gem_dma_helper.h
 ===================================================================
---- kernel-rpi.orig/include/drm/drm_gem_dma_helper.h
-+++ kernel-rpi/include/drm/drm_gem_dma_helper.h
+--- v6.12-rpi.orig/include/drm/drm_gem_dma_helper.h
++++ v6.12-rpi/include/drm/drm_gem_dma_helper.h
 @@ -142,6 +142,11 @@ int drm_gem_dma_dumb_create_internal(str
  				     struct drm_device *drm,
  				     struct drm_mode_create_dumb *args);
@@ -193,10 +193,10 @@ Index: kernel-rpi/include/drm/drm_gem_dma_helper.h
  /* create memory region for DRM framebuffer */
  int drm_gem_dma_dumb_create(struct drm_file *file_priv,
  			    struct drm_device *drm,
-Index: kernel-rpi/drivers/gpu/drm/v3d/v3d_bo.c
+Index: v6.12-rpi/drivers/gpu/drm/v3d/v3d_bo.c
 ===================================================================
---- kernel-rpi.orig/drivers/gpu/drm/v3d/v3d_bo.c
-+++ kernel-rpi/drivers/gpu/drm/v3d/v3d_bo.c
+--- v6.12-rpi.orig/drivers/gpu/drm/v3d/v3d_bo.c
++++ v6.12-rpi/drivers/gpu/drm/v3d/v3d_bo.c
 @@ -21,6 +21,7 @@
  
  #include "v3d_drv.h"
@@ -223,10 +223,10 @@ Index: kernel-rpi/drivers/gpu/drm/v3d/v3d_bo.c
  
  	bo = v3d_bo_create(dev, file_priv, PAGE_ALIGN(args->size));
  	if (IS_ERR(bo))
-Index: kernel-rpi/drivers/gpu/drm/v3d/Makefile
+Index: v6.12-rpi/drivers/gpu/drm/v3d/Makefile
 ===================================================================
---- kernel-rpi.orig/drivers/gpu/drm/v3d/Makefile
-+++ kernel-rpi/drivers/gpu/drm/v3d/Makefile
+--- v6.12-rpi.orig/drivers/gpu/drm/v3d/Makefile
++++ v6.12-rpi/drivers/gpu/drm/v3d/Makefile
 @@ -4,6 +4,7 @@
  # core driver code
  v3d-y := \
@@ -235,10 +235,10 @@ Index: kernel-rpi/drivers/gpu/drm/v3d/Makefile
  	v3d_drv.o \
  	v3d_fence.o \
  	v3d_gem.o \
-Index: kernel-rpi/drivers/gpu/drm/vc4/vc4_kms.c
+Index: v6.12-rpi/drivers/gpu/drm/vc4/vc4_kms.c
 ===================================================================
---- kernel-rpi.orig/drivers/gpu/drm/vc4/vc4_kms.c
-+++ kernel-rpi/drivers/gpu/drm/vc4/vc4_kms.c
+--- v6.12-rpi.orig/drivers/gpu/drm/vc4/vc4_kms.c
++++ v6.12-rpi/drivers/gpu/drm/vc4/vc4_kms.c
 @@ -528,7 +528,6 @@ static int vc4_atomic_commit_setup(struc
  	 */
  	if (!vc4->firmware_kms)

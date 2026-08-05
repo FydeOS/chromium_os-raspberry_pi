@@ -14,10 +14,10 @@ Adds the source file, its private header, and Kconfig/Makefile entries
 
 BUG=none
 TEST=emerge-<board> chromeos-kernel-6_12
-Index: kernel-6_12/include/linux/netfilter/xt_quota2.h
+Index: v6.12-rpi/include/linux/netfilter/xt_quota2.h
 ===================================================================
 --- /dev/null
-+++ kernel-6_12/include/linux/netfilter/xt_quota2.h
++++ v6.12-rpi/include/linux/netfilter/xt_quota2.h
 @@ -0,0 +1,26 @@
 +#ifndef _XT_QUOTA_H
 +#define _XT_QUOTA_H
@@ -45,10 +45,10 @@ Index: kernel-6_12/include/linux/netfilter/xt_quota2.h
 +};
 +
 +#endif /* _XT_QUOTA_H */
-Index: kernel-6_12/net/netfilter/Kconfig
+Index: v6.12-rpi/net/netfilter/Kconfig
 ===================================================================
---- kernel-6_12.orig/net/netfilter/Kconfig
-+++ kernel-6_12/net/netfilter/Kconfig
+--- v6.12-rpi.orig/net/netfilter/Kconfig
++++ v6.12-rpi/net/netfilter/Kconfig
 @@ -1525,6 +1525,29 @@ config NETFILTER_XT_MATCH_QUOTA
  	  If you want to compile it as a module, say M here and read
  	  <file:Documentation/kbuild/modules.rst>.  If unsure, say `N'.
@@ -79,10 +79,10 @@ Index: kernel-6_12/net/netfilter/Kconfig
  config NETFILTER_XT_MATCH_RATEEST
  	tristate '"rateest" match support'
  	depends on NETFILTER_ADVANCED
-Index: kernel-6_12/net/netfilter/Makefile
+Index: v6.12-rpi/net/netfilter/Makefile
 ===================================================================
---- kernel-6_12.orig/net/netfilter/Makefile
-+++ kernel-6_12/net/netfilter/Makefile
+--- v6.12-rpi.orig/net/netfilter/Makefile
++++ v6.12-rpi/net/netfilter/Makefile
 @@ -220,6 +220,7 @@ obj-$(CONFIG_NETFILTER_XT_MATCH_PHYSDEV)
  obj-$(CONFIG_NETFILTER_XT_MATCH_PKTTYPE) += xt_pkttype.o
  obj-$(CONFIG_NETFILTER_XT_MATCH_POLICY) += xt_policy.o
@@ -91,10 +91,10 @@ Index: kernel-6_12/net/netfilter/Makefile
  obj-$(CONFIG_NETFILTER_XT_MATCH_RATEEST) += xt_rateest.o
  obj-$(CONFIG_NETFILTER_XT_MATCH_REALM) += xt_realm.o
  obj-$(CONFIG_NETFILTER_XT_MATCH_RECENT) += xt_recent.o
-Index: kernel-6_12/net/netfilter/xt_quota2.c
+Index: v6.12-rpi/net/netfilter/xt_quota2.c
 ===================================================================
 --- /dev/null
-+++ kernel-6_12/net/netfilter/xt_quota2.c
++++ v6.12-rpi/net/netfilter/xt_quota2.c
 @@ -0,0 +1,479 @@
 +/*
 + * xt_quota2 - enhanced xt_quota that can count upwards and in packets

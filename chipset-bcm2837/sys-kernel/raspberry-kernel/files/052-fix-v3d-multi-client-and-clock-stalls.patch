@@ -1,0 +1,890 @@
+FYDE: drm/v3d: fix multi-client stalls and get the firmware mailbox off the submit path
+
+With Chrome's GPU process and SurfaceFlinger both rendering, the whole
+display would freeze for many seconds at a time, with no GPU reset and
+nothing in dmesg.
+
+The stall is not a GPU hang. Per-client fdinfo counters showed every
+client's job count frozen at exactly the same instant and resuming
+together, while CT0CS/CT1CS read 0 and CTnCA == CTnEA -- the hardware had
+finished its last job and was idle. What was blocked was job *submission*.
+
+v3d_clock_up_get() ran on every job submit and, under a device-global
+mutex, called cancel_delayed_work_sync() and clk_set_min_rate(). The V3D
+clock belongs to the VideoCore firmware, so each of those is a blocking
+mailbox round trip on a single shared channel -- a channel CPU DVFS also
+uses heavily (the ondemand governor was issuing ~115 transitions/s, each
+one two more round trips). Every GPU client on the system therefore
+serialised behind firmware mailbox latency. Pinning the CPU governor to
+performance makes the stalls disappear entirely, which confirms it.
+
+Submitters now only adjust an atomic refcount and kick a work item on a
+dedicated ordered workqueue, which reconciles the rate asynchronously and
+is the sole owner of ->clk_up (so clk_lock goes away). The idle delay
+before dropping the clock goes from 100ms to 1s, since at 100ms a normal
+interactive workload dropped and re-raised the clock in the gaps between
+frames, generating continuous mailbox traffic for no benefit. The cost is
+that the first job after an idle period may start before the clock has
+been raised; the rate is a floor rather than the operating point, so that
+is a small bounded effect and much better than stalling every client.
+
+This is what the 'latest_job' serialisation in 035 was really doing: by
+chaining every client's bin job behind the last job of any other client it
+kept the pipeline continuously busy, so clk_refcount rarely reached zero
+and the clock ping-pong stopped. It never actually serialised anything --
+the read happened before v3d->sched_lock was taken and the publish after it
+was dropped, so two concurrent submitters both saw the same predecessor --
+it just suppressed mailbox traffic as a side effect. It has been dropped
+from 035, along with the hunk in 040 that only existed to move
+mutex_lock(&v3d->sched_lock) around it.
+
+Fixed alongside, all genuine bugs found while tracking this down:
+
+ - v3d_file_priv is now refcounted. v3d_postclose()'s guard
+   (job->base.entity == &v3d_priv->sched_entity[q]) was dead code, because
+   drm_sched_entity_pop_job() NULLs sched_job->entity before ->run_job()
+   ever publishes the job. job->file_priv was therefore never cleared and
+   the struct was freed while jobs were still in flight, letting the hard
+   IRQ stats path write into freed slab. drm_sched_entity_destroy() only
+   waits for jobs to be popped, not to complete, so closing an fd with work
+   in flight is routine.
+ - v3d_job_start_stats() dereferenced job->file_priv with no NULL check at
+   all, unlike its sibling v3d_job_update_stats().
+ - Bound the number of consecutive timeouts v3d_sched_skip_reset() will
+   forgive. A job walking a corrupt control list keeps advancing CTnCA and
+   so looks like it is progressing forever, blocking every other client
+   with no reset and no log output.
+ - Publish queue->active_job under queue_lock on the render/TFU/CSD queues,
+   as the bin queue already did, and have the IRQ handler claim it under
+   the same lock with a NULL guard for late or spurious interrupts.
+ - Program CT0QMA/CT0QMS/CT0QTS unconditionally on V3D >= 4.1. They are
+   sticky, so a job leaving any of them at zero inherited the previously
+   running client's pointers.
+ - Hold queue_lock across the BPOA/BPOS writes in v3d_overflow_mem_work()
+   so the binner overflow pool cannot be handed to one job while being
+   recorded on another's unref_list.
+ - v3d_get_extensions() read an uninitialised ret once the default case
+   stopped returning -EINVAL.
+ - Move CPU-job teardown into the kref destructor. The ioctl error path was
+   freeing the job and then reading cpu_job->timestamp_query.queries
+   through it, and NULL-dereferencing when v3d_job_deallocate() had already
+   zeroed it. Also release the indirect-CSD GEM reference, which nothing
+   dropped, and stop leaking the indirect-CSD job on early error paths.
+ - Destroy the clock work on teardown; it was never cancelled on remove.
+
+Index: v6.12-rpi/drivers/gpu/drm/v3d/v3d_drv.c
+===================================================================
+--- v6.12-rpi.orig/drivers/gpu/drm/v3d/v3d_drv.c
++++ v6.12-rpi/drivers/gpu/drm/v3d/v3d_drv.c
+@@ -123,6 +123,28 @@ static int v3d_get_param_ioctl(struct dr
+ 
+ const kuid_t arc_root = KUIDT_INIT(656360);
+ 
++static void
++v3d_file_priv_release(struct kref *ref)
++{
++	struct v3d_file_priv *v3d_priv =
++		container_of(ref, struct v3d_file_priv, refcount);
++
++	kfree(v3d_priv);
++}
++
++void
++v3d_file_priv_get(struct v3d_file_priv *v3d_priv)
++{
++	kref_get(&v3d_priv->refcount);
++}
++
++void
++v3d_file_priv_put(struct v3d_file_priv *v3d_priv)
++{
++	if (v3d_priv)
++		kref_put(&v3d_priv->refcount, v3d_file_priv_release);
++}
++
+ static int
+ v3d_open(struct drm_device *dev, struct drm_file *file)
+ {
+@@ -140,6 +162,7 @@ v3d_open(struct drm_device *dev, struct
+ 	if (!v3d_priv)
+ 		return -ENOMEM;
+ 
++	kref_init(&v3d_priv->refcount);
+ 	v3d_priv->v3d = v3d;
+ 
+ 	for (i = 0; i < V3D_MAX_QUEUES; i++) {
+@@ -162,33 +185,32 @@ v3d_open(struct drm_device *dev, struct
+ err_sched:
+ 	for (i--; i >= 0; i--)
+ 		drm_sched_entity_destroy(&v3d_priv->sched_entity[i]);
+-	kfree(v3d_priv);
++	v3d_file_priv_put(v3d_priv);
+ 	return ret;
+ }
+ 
+ static void
+ v3d_postclose(struct drm_device *dev, struct drm_file *file)
+ {
+-	struct v3d_dev *v3d = to_v3d_dev(dev);
+ 	struct v3d_file_priv *v3d_priv = file->driver_priv;
+-	unsigned long irqflags;
+ 	enum v3d_queue q;
+ 
+-	for (q = 0; q < V3D_MAX_QUEUES; q++) {
+-		struct v3d_queue_state *queue = &v3d->queue[q];
+-		struct v3d_job *job = queue->active_job;
+-
++	/* drm_sched_entity_destroy() only waits for this client's jobs to be
++	 * popped off the entity, not to finish executing, so a job of ours can
++	 * still be on the GPU after this returns.  Such a job keeps its own
++	 * reference on v3d_priv, so it is safe for it to go on updating
++	 * ->stats[] from the interrupt handler after we drop ours below.
++	 *
++	 * Note there is deliberately no attempt to clear job->file_priv here:
++	 * queue->active_job->base.entity is always NULL by this point (see
++	 * drm_sched_entity_pop_job(), which NULLs it before ->run_job() ever
++	 * publishes the job), so any such test would be dead code.
++	 */
++	for (q = 0; q < V3D_MAX_QUEUES; q++)
+ 		drm_sched_entity_destroy(&v3d_priv->sched_entity[q]);
+ 
+-		if (job && job->base.entity == &v3d_priv->sched_entity[q]) {
+-			spin_lock_irqsave(&queue->queue_lock, irqflags);
+-			job->file_priv = NULL;
+-			spin_unlock_irqrestore(&queue->queue_lock, irqflags);
+-		}
+-	}
+-
+ 	v3d_perfmon_close_file(v3d_priv);
+-	kfree(v3d_priv);
++	v3d_file_priv_put(v3d_priv);
+ }
+ 
+ void v3d_get_stats(const struct v3d_stats *stats, u64 timestamp,
+Index: v6.12-rpi/drivers/gpu/drm/v3d/v3d_drv.h
+===================================================================
+--- v6.12-rpi.orig/drivers/gpu/drm/v3d/v3d_drv.h
++++ v6.12-rpi/drivers/gpu/drm/v3d/v3d_drv.h
+@@ -134,10 +134,22 @@ struct v3d_dev {
+ 	void __iomem *gca_regs;
+ 	void __iomem *sms_regs;
+ 	struct clk *clk;
+-	struct delayed_work clk_down_work;
+ 	unsigned long clk_up_rate, clk_down_rate;
+-	struct mutex clk_lock;
+-	u32 clk_refcount;
++
++	/* Number of jobs in flight that want the clock raised.  Submitters
++	 * only ever touch this and kick clk_work; they must never call into
++	 * the clock API themselves, because on this hardware that is a
++	 * blocking VideoCore firmware mailbox round trip.
++	 */
++	atomic_t clk_refcount;
++
++	/* Reconciles the actual rate with clk_refcount.  Runs on its own
++	 * ordered workqueue, so it is both serialised against itself -- it is
++	 * the only context that touches clk_up -- and immune to head-of-line
++	 * blocking behind unrelated work on the shared queue.
++	 */
++	struct workqueue_struct *clk_wq;
++	struct delayed_work clk_work;
+ 	bool clk_up;
+ 
+ 	struct reset_control *reset;
+@@ -226,6 +238,14 @@ v3d_has_csd(struct v3d_dev *v3d)
+ struct v3d_file_priv {
+ 	struct v3d_dev *v3d;
+ 
++	/* Jobs outlive the drm_file that submitted them: drm_sched_entity
++	 * teardown only waits for this client's jobs to be popped off the
++	 * entity, not to complete, so one can still be executing on the GPU
++	 * (and updating stats from the interrupt handler) when the fd is
++	 * closed.  Reference counted so it stays alive until they are done.
++	 */
++	struct kref refcount;
++
+ 	struct {
+ 		struct idr idr;
+ 		struct mutex lock;
+@@ -322,6 +342,13 @@ struct v3d_job {
+ 	 */
+ 	struct v3d_file_priv *file_priv;
+ 
++	/* Number of consecutive times the timeout handler let this job keep
++	 * running because the GPU still looked like it was making progress.
++	 * Bounded so that a job walking a corrupt control list cannot stall
++	 * every other client indefinitely.
++	 */
++	u32 timedout_skips;
++
+ 	/* Callback for the freeing of the job on refcount going to 0. */
+ 	void (*free)(struct kref *ref);
+ };
+@@ -556,6 +583,8 @@ struct drm_gem_object *v3d_prime_import_
+ void v3d_debugfs_init(struct drm_minor *minor);
+ 
+ /* v3d_drv.c */
++void v3d_file_priv_get(struct v3d_file_priv *v3d_priv);
++void v3d_file_priv_put(struct v3d_file_priv *v3d_priv);
+ void v3d_get_stats(const struct v3d_stats *stats, u64 timestamp,
+ 		   u64 *active_runtime, u64 *jobs_completed);
+ 
+@@ -635,4 +664,5 @@ int v3d_perfmon_set_global_ioctl(struct
+ /* v3d_sysfs.c */
+ int v3d_sysfs_init(struct device *dev);
+ void v3d_sysfs_destroy(struct device *dev);
+-void v3d_submit_init(struct drm_device *dev);
++int v3d_submit_init(struct drm_device *dev);
++void v3d_submit_fini(struct drm_device *dev);
+Index: v6.12-rpi/drivers/gpu/drm/v3d/v3d_gem.c
+===================================================================
+--- v6.12-rpi.orig/drivers/gpu/drm/v3d/v3d_gem.c
++++ v6.12-rpi/drivers/gpu/drm/v3d/v3d_gem.c
+@@ -291,7 +291,9 @@ v3d_gem_init(struct drm_device *dev)
+ 	if (ret)
+ 		return ret;
+ 
+-	v3d_submit_init(dev);
++	ret = v3d_submit_init(dev);
++	if (ret)
++		return ret;
+ 
+ 	/* Note: We don't allocate address 0.  Various bits of HW
+ 	 * treat 0 as special, such as the occlusion query counters
+@@ -304,6 +306,7 @@ v3d_gem_init(struct drm_device *dev)
+ 			       GFP_KERNEL | __GFP_NOWARN | __GFP_ZERO);
+ 	if (!v3d->pt) {
+ 		drm_mm_takedown(&v3d->mm);
++		v3d_submit_fini(dev);
+ 		dev_err(v3d->drm.dev,
+ 			"Failed to allocate page tables. Please ensure you have DMA enabled.\n");
+ 		return -ENOMEM;
+@@ -319,6 +322,7 @@ v3d_gem_init(struct drm_device *dev)
+ 		drm_mm_takedown(&v3d->mm);
+ 		dma_free_coherent(v3d->drm.dev, pt_size, (void *)v3d->pt,
+ 				  v3d->pt_paddr);
++		v3d_submit_fini(dev);
+ 		return ret;
+ 	}
+ 
+@@ -334,6 +338,9 @@ v3d_gem_destroy(struct drm_device *dev)
+ 	v3d_sched_fini(v3d);
+ 	v3d_gemfs_fini(v3d);
+ 
++	/* After the schedulers are gone, so nothing can re-arm the work. */
++	v3d_submit_fini(dev);
++
+ 	/* Waiting for jobs to finish would need to be done before
+ 	 * unregistering V3D.
+ 	 */
+Index: v6.12-rpi/drivers/gpu/drm/v3d/v3d_irq.c
+===================================================================
+--- v6.12-rpi.orig/drivers/gpu/drm/v3d/v3d_irq.c
++++ v6.12-rpi/drivers/gpu/drm/v3d/v3d_irq.c
+@@ -61,7 +61,18 @@ v3d_overflow_mem_work(struct work_struct
+ 	 * If we lose the race and our work task comes in after a new
+ 	 * bin job got scheduled, that's fine.  We'll just give them
+ 	 * some binner pool anyway.
++	 *
++	 * Pick the owner and program BPOA/BPOS as one critical section,
++	 * so the pool cannot be handed to one bin job while being recorded
++	 * on a different one's unref_list.  On V3D >= 4.1 the hardware makes
++	 * that interleaving unreachable anyway -- FLDONE is withheld until
++	 * the OOM state is cleared, so the job that faulted cannot retire
++	 * and let another client's bin job start (and clear BPOS) while we
++	 * are in here.  On V3D 3.3, and against any future change to the
++	 * bin queue's depth, it is a real window.
+ 	 */
++	v3d_mmu_flush_all(v3d);
++
+ 	spin_lock_irqsave(&queue->queue_lock, irqflags);
+ 	bin_job = (struct v3d_bin_job *)queue->active_job;
+ 
+@@ -72,12 +83,10 @@ v3d_overflow_mem_work(struct work_struct
+ 
+ 	drm_gem_object_get(obj);
+ 	list_add_tail(&bo->unref_head, &bin_job->render->unref_list);
+-	spin_unlock_irqrestore(&queue->queue_lock, irqflags);
+-
+-	v3d_mmu_flush_all(v3d);
+ 
+ 	V3D_CORE_WRITE(0, V3D_PTB_BPOA, bo->node.start << V3D_MMU_PAGE_SHIFT);
+ 	V3D_CORE_WRITE(0, V3D_PTB_BPOS, obj->size);
++	spin_unlock_irqrestore(&queue->queue_lock, irqflags);
+ 
+ out:
+ 	drm_gem_object_put(obj);
+@@ -88,12 +97,31 @@ v3d_irq_signal_fence(struct v3d_dev *v3d
+ 		     void (*trace_irq)(struct drm_device *, uint64_t))
+ {
+ 	struct v3d_queue_state *queue = &v3d->queue[q];
+-	struct v3d_fence *fence = to_v3d_fence(queue->active_job->irq_fence);
++	struct v3d_fence *fence;
++	struct v3d_job *job;
+ 
+-	v3d_job_update_stats(queue->active_job, q);
++	/* Claim the active job under queue_lock so that this cannot race
++	 * with the run_job path publishing the next job, or with
++	 * v3d_overflow_mem_work() inspecting it.  Note we must drop the lock
++	 * before v3d_job_update_stats(), which takes it again.
++	 */
++	spin_lock(&queue->queue_lock);
++	job = queue->active_job;
++	queue->active_job = NULL;
++	spin_unlock(&queue->queue_lock);
++
++	/* A late or spurious interrupt can arrive once the job it belonged
++	 * to has already been retired -- for instance after a GPU reset
++	 * dropped it.  There is nothing left to signal in that case.
++	 */
++	if (!job || !job->irq_fence)
++		return;
++
++	fence = to_v3d_fence(job->irq_fence);
++
++	v3d_job_update_stats(job, q);
+ 	trace_irq(&v3d->drm, fence->seqno);
+ 
+-	queue->active_job = NULL;
+ 	dma_fence_signal(&fence->base);
+ }
+ 
+Index: v6.12-rpi/drivers/gpu/drm/v3d/v3d_sched.c
+===================================================================
+--- v6.12-rpi.orig/drivers/gpu/drm/v3d/v3d_sched.c
++++ v6.12-rpi/drivers/gpu/drm/v3d/v3d_sched.c
+@@ -29,6 +29,35 @@
+ 
+ #define V3D_CSD_CFG012_WG_COUNT_SHIFT 16
+ 
++/* How many consecutive timeouts we are willing to forgive because the GPU
++ * still appears to be advancing through the control list.  A job walking a
++ * corrupt or pathological CL can "make progress" forever, and with several
++ * clients sharing the GPU that stalls everyone, so put a bound on it.
++ *
++ * At the default 500ms timeout this lets a single job hold the GPU for ~8s
++ * before we give up on it, which is far longer than any legitimate job on
++ * this hardware but still bounded.
++ */
++#define V3D_MAX_TIMEDOUT_SKIPS 16
++
++/* Publish (or clear) the job the hardware is currently running for a queue.
++ *
++ * queue_lock serialises this against the interrupt handler retiring the
++ * previous job and, for the bin queue, against v3d_overflow_mem_work()
++ * handing out binner overflow memory.
++ */
++static void
++v3d_queue_set_active_job(struct v3d_dev *v3d, enum v3d_queue q,
++			 struct v3d_job *job)
++{
++	struct v3d_queue_state *queue = &v3d->queue[q];
++	unsigned long irqflags;
++
++	spin_lock_irqsave(&queue->queue_lock, irqflags);
++	queue->active_job = job;
++	spin_unlock_irqrestore(&queue->queue_lock, irqflags);
++}
++
+ static struct v3d_job *
+ to_v3d_job(struct drm_sched_job *sched_job)
+ {
+@@ -104,20 +133,6 @@ v3d_performance_query_info_free(struct v
+ }
+ 
+ static void
+-v3d_cpu_job_free(struct drm_sched_job *sched_job)
+-{
+-	struct v3d_cpu_job *job = to_cpu_job(sched_job);
+-
+-	v3d_timestamp_query_info_free(&job->timestamp_query,
+-				      job->timestamp_query.count);
+-
+-	v3d_performance_query_info_free(&job->performance_query,
+-					job->performance_query.count);
+-
+-	v3d_job_cleanup(&job->base);
+-}
+-
+-static void
+ v3d_switch_perfmon(struct v3d_dev *v3d, struct v3d_job *job)
+ {
+ 	struct v3d_perfmon *perfmon = v3d->global_perfmon;
+@@ -136,12 +151,12 @@ v3d_switch_perfmon(struct v3d_dev *v3d,
+ }
+ 
+ static void
+-v3d_job_start_stats(struct v3d_job *job, enum v3d_queue queue)
++v3d_job_start_stats(struct v3d_job *job, enum v3d_queue q)
+ {
+ 	struct v3d_dev *v3d = job->v3d;
+-	struct v3d_file_priv *file = job->file_priv;
+-	struct v3d_stats *global_stats = &v3d->queue[queue].stats;
+-	struct v3d_stats *local_stats = &file->stats[queue];
++	struct v3d_queue_state *queue = &v3d->queue[q];
++	struct v3d_stats *global_stats = &queue->stats;
++	struct v3d_stats *local_stats;
+ 	u64 now = local_clock();
+ 	unsigned long flags;
+ 
+@@ -169,6 +184,15 @@ v3d_job_start_stats(struct v3d_job *job,
+ 	else
+ 		preempt_disable();
+ 
++	/* job->file_priv holds a reference on the v3d_file_priv and is never
++	 * cleared, so it stays valid even once the client has closed its fd
++	 * with this job still on the GPU.  No lock is needed -- and none may
++	 * be taken here: queue_lock is acquired from the hard interrupt
++	 * handler, while this runs from the scheduler worker with interrupts
++	 * enabled on !CONFIG_LOCKDEP builds.
++	 */
++	local_stats = &job->file_priv->stats[q];
++
+ 	write_seqcount_begin(&local_stats->lock);
+ 	local_stats->start_ns = now;
+ 	write_seqcount_end(&local_stats->lock);
+@@ -208,11 +232,13 @@ v3d_job_update_stats(struct v3d_job *job
+ 	else
+ 		preempt_disable();
+ 
+-	/* Don't update the local stats if the file context has already closed */
+-	spin_lock(&queue->queue_lock);
+-	if (job->file_priv)
+-		v3d_stats_update(&job->file_priv->stats[q], now);
+-	spin_unlock(&queue->queue_lock);
++	/* job->file_priv holds a reference and is never cleared, so no lock is
++	 * needed to reach the per-client stats.  Taking queue_lock here would
++	 * be actively wrong: this runs both from the hard interrupt handler
++	 * and, for the CPU and cache-clean queues, from the scheduler worker
++	 * with interrupts enabled.
++	 */
++	v3d_stats_update(&job->file_priv->stats[q], now);
+ 
+ 	v3d_stats_update(global_stats, now);
+ 
+@@ -265,18 +291,35 @@ static struct dma_fence *v3d_bin_job_run
+ 	v3d_job_start_stats(&job->base, V3D_BIN);
+ 	v3d_switch_perfmon(v3d, &job->base);
+ 
+-	/* Set the current and end address of the control list.
+-	 * Writing the end register is what starts the job.
++	/* CT0QMA/CT0QMS/CT0QTS are sticky.  From V3D 4.1 on the tile
++	 * allocation is mandatory (see the uapi documentation of
++	 * drm_v3d_submit_cl::qma), so program all three unconditionally:
++	 * with more than one client submitting, a job that left any of them
++	 * at zero would otherwise inherit the previously running client's
++	 * pointers and have the binner scribble over that client's memory.
++	 * On V3D 3.3 the CL itself may set them, so keep the old behaviour
++	 * of leaving them alone there.
+ 	 */
+-	if (job->qma) {
++	if (v3d->ver >= V3D_GEN_41) {
+ 		V3D_CORE_WRITE(0, V3D_CLE_CT0QMA, job->qma);
+ 		V3D_CORE_WRITE(0, V3D_CLE_CT0QMS, job->qms);
+-	}
+-	if (job->qts) {
+ 		V3D_CORE_WRITE(0, V3D_CLE_CT0QTS,
+-			       V3D_CLE_CT0QTS_ENABLE |
+-			       job->qts);
++			       job->qts ? (V3D_CLE_CT0QTS_ENABLE | job->qts) : 0);
++	} else {
++		if (job->qma) {
++			V3D_CORE_WRITE(0, V3D_CLE_CT0QMA, job->qma);
++			V3D_CORE_WRITE(0, V3D_CLE_CT0QMS, job->qms);
++		}
++		if (job->qts) {
++			V3D_CORE_WRITE(0, V3D_CLE_CT0QTS,
++				       V3D_CLE_CT0QTS_ENABLE |
++				       job->qts);
++		}
+ 	}
++
++	/* Set the current and end address of the control list.
++	 * Writing the end register is what starts the job.
++	 */
+ 	V3D_CORE_WRITE(0, V3D_CLE_CT0QBA, job->start);
+ 	V3D_CORE_WRITE(0, V3D_CLE_CT0QEA, job->end);
+ 
+@@ -291,11 +334,11 @@ static struct dma_fence *v3d_render_job_
+ 	struct dma_fence *fence;
+ 
+ 	if (unlikely(job->base.base.s_fence->finished.error)) {
+-		v3d->queue[V3D_RENDER].active_job = NULL;
++		v3d_queue_set_active_job(v3d, V3D_RENDER, NULL);
+ 		return NULL;
+ 	}
+ 
+-	v3d->queue[V3D_RENDER].active_job = &job->base;
++	v3d_queue_set_active_job(v3d, V3D_RENDER, &job->base);
+ 
+ 	/* Can we avoid this flush?  We need to be careful of
+ 	 * scheduling, though -- imagine job0 rendering to texture and
+@@ -339,11 +382,11 @@ v3d_tfu_job_run(struct drm_sched_job *sc
+ 	struct dma_fence *fence;
+ 
+ 	if (unlikely(job->base.base.s_fence->finished.error)) {
+-		v3d->queue[V3D_TFU].active_job = NULL;
++		v3d_queue_set_active_job(v3d, V3D_TFU, NULL);
+ 		return NULL;
+ 	}
+ 
+-	v3d->queue[V3D_TFU].active_job = &job->base;
++	v3d_queue_set_active_job(v3d, V3D_TFU, &job->base);
+ 
+ 	fence = v3d_fence_create(v3d, V3D_TFU);
+ 	if (IS_ERR(fence))
+@@ -387,11 +430,11 @@ v3d_csd_job_run(struct drm_sched_job *sc
+ 	int i, csd_cfg0_reg;
+ 
+ 	if (unlikely(job->base.base.s_fence->finished.error)) {
+-		v3d->queue[V3D_CSD].active_job = NULL;
++		v3d_queue_set_active_job(v3d, V3D_CSD, NULL);
+ 		return NULL;
+ 	}
+ 
+-	v3d->queue[V3D_CSD].active_job = &job->base;
++	v3d_queue_set_active_job(v3d, V3D_CSD, &job->base);
+ 
+ 	v3d_invalidate_caches(v3d);
+ 
+@@ -773,13 +816,27 @@ v3d_cl_job_timedout(struct drm_sched_job
+ 	 * has probably made progress and we should delay the reset. This
+ 	 * could fail if the GPU got in an infinite loop in the CL, but that
+ 	 * is pretty unlikely outside of an i-g-t testcase.
++	 *
++	 * Only forgive this a bounded number of times, though.  A job walking
++	 * a corrupt control list keeps advancing CTnCA/CTnRA and so looks
++	 * like it is progressing forever, which would block every other
++	 * client on this GPU for as long as it takes to fall off the end of
++	 * the garbage.  Resetting after V3D_MAX_TIMEDOUT_SKIPS turns that
++	 * into a bounded stall.
+ 	 */
+ 	if (*timedout_ctca != ctca || *timedout_ctra != ctra) {
+-		*timedout_ctca = ctca;
+-		*timedout_ctra = ctra;
++		if (job->timedout_skips < V3D_MAX_TIMEDOUT_SKIPS) {
++			*timedout_ctca = ctca;
++			*timedout_ctra = ctra;
++			job->timedout_skips++;
+ 
+-		v3d_sched_skip_reset(sched_job);
+-		return DRM_GPU_SCHED_STAT_NOMINAL;
++			v3d_sched_skip_reset(sched_job);
++			return DRM_GPU_SCHED_STAT_NOMINAL;
++		}
++
++		DRM_DEV_ERROR(v3d->drm.dev,
++			      "%s job still advancing after %d timeouts, resetting\n",
++			      v3d_queue_to_string(q), V3D_MAX_TIMEDOUT_SKIPS);
+ 	}
+ 
+ 	return v3d_gpu_reset_for_timeout(v3d, sched_job);
+@@ -819,13 +876,21 @@ v3d_csd_job_timedout(struct drm_sched_jo
+ 	u32 batches = V3D_CORE_READ(0, V3D_CSD_CURRENT_CFG4(v3d->ver));
+ 
+ 	/* If we've made progress, skip reset, add the job to the pending
+-	 * list, and let the timer get rearmed.
++	 * list, and let the timer get rearmed.  Bounded for the same reason
++	 * as the CL queues -- see v3d_cl_job_timedout().
+ 	 */
+ 	if (job->timedout_batches != batches) {
+-		job->timedout_batches = batches;
++		if (job->base.timedout_skips < V3D_MAX_TIMEDOUT_SKIPS) {
++			job->timedout_batches = batches;
++			job->base.timedout_skips++;
++
++			v3d_sched_skip_reset(sched_job);
++			return DRM_GPU_SCHED_STAT_NOMINAL;
++		}
+ 
+-		v3d_sched_skip_reset(sched_job);
+-		return DRM_GPU_SCHED_STAT_NOMINAL;
++		DRM_DEV_ERROR(v3d->drm.dev,
++			      "CSD job still advancing after %d timeouts, resetting\n",
++			      V3D_MAX_TIMEDOUT_SKIPS);
+ 	}
+ 
+ 	return v3d_gpu_reset_for_timeout(v3d, sched_job);
+@@ -852,19 +917,22 @@ static const struct drm_sched_backend_op
+ static const struct drm_sched_backend_ops v3d_csd_sched_ops = {
+ 	.run_job = v3d_csd_job_run,
+ 	.timedout_job = v3d_csd_job_timedout,
+-	.free_job = v3d_sched_job_free
++	.free_job = v3d_sched_job_free,
+ };
+ 
+ static const struct drm_sched_backend_ops v3d_cache_clean_sched_ops = {
+ 	.run_job = v3d_cache_clean_job_run,
+ 	.timedout_job = v3d_generic_job_timedout,
+-	.free_job = v3d_sched_job_free
++	.free_job = v3d_sched_job_free,
+ };
+ 
+ static const struct drm_sched_backend_ops v3d_cpu_sched_ops = {
+ 	.run_job = v3d_cpu_job_run,
+ 	.timedout_job = v3d_generic_job_timedout,
+-	.free_job = v3d_cpu_job_free
++	/* CPU-job teardown lives in the kref destructor, v3d_cpu_job_free()
++	 * in v3d_submit.c, so that it runs exactly once.
++	 */
++	.free_job = v3d_sched_job_free,
+ };
+ 
+ int
+Index: v6.12-rpi/drivers/gpu/drm/v3d/v3d_submit.c
+===================================================================
+--- v6.12-rpi.orig/drivers/gpu/drm/v3d/v3d_submit.c
++++ v6.12-rpi/drivers/gpu/drm/v3d/v3d_submit.c
+@@ -11,44 +11,67 @@
+ #include "v3d_regs.h"
+ #include "v3d_trace.h"
+ 
++/* How long the GPU has to stay idle before we let its clock drop.
++ *
++ * Every change costs two firmware mailbox round trips, so this wants to be
++ * comfortably longer than a frame interval: at the previous 100ms a normal
++ * interactive workload dropped and re-raised the clock in the gaps between
++ * frames, generating a continuous stream of mailbox traffic for no benefit.
++ */
++#define V3D_CLOCK_DOWN_DELAY_MS 1000
++
++/* Reconcile the clock rate with the number of jobs in flight.
++ *
++ * Only ever runs from v3d->clk_wq, which is ordered, so this is the sole
++ * context touching v3d->clk_up and no lock is needed.  If the refcount
++ * changes while we are inside clk_set_min_rate(), the requeue done by
++ * mod_delayed_work() makes us run again and converge.
++ */
+ static void
+-v3d_clock_down_work(struct work_struct *work)
++v3d_clock_work(struct work_struct *work)
+ {
+ 	struct v3d_dev *v3d =
+-		container_of(work, struct v3d_dev, clk_down_work.work);
++		container_of(work, struct v3d_dev, clk_work.work);
++	bool up = atomic_read(&v3d->clk_refcount) > 0;
+ 	int ret;
+ 
+-	ret = clk_set_min_rate(v3d->clk, v3d->clk_down_rate);
+-	v3d->clk_up = false;
+-	WARN_ON_ONCE(ret != 0);
++	if (up == v3d->clk_up)
++		return;
++
++	ret = clk_set_min_rate(v3d->clk,
++			       up ? v3d->clk_up_rate : v3d->clk_down_rate);
++	if (WARN_ON_ONCE(ret != 0))
++		return;
++
++	v3d->clk_up = up;
+ }
+ 
++/*
++ * The V3D clock is owned by the VideoCore firmware, so clk_set_min_rate() is
++ * a blocking mailbox round trip on a single shared channel -- one that CPU
++ * DVFS also uses heavily.  Doing that on the job submit path, under a
++ * device-global lock, made every GPU client on the system stall together for
++ * as long as the mailbox was busy.  So submitters only adjust the refcount
++ * and kick the work; they never block.
++ *
++ * The cost is that the first job after an idle period may start before the
++ * clock has actually been raised.  That is a small, bounded performance
++ * effect -- the rate is a floor, not the operating point -- and far
++ * preferable to stalling every client's submit.
++ */
+ static void
+ v3d_clock_up_get(struct v3d_dev *v3d)
+ {
+-	mutex_lock(&v3d->clk_lock);
+-	if (v3d->clk_refcount++ == 0) {
+-		cancel_delayed_work_sync(&v3d->clk_down_work);
+-		if (!v3d->clk_up)  {
+-			int ret;
+-
+-			ret = clk_set_min_rate(v3d->clk, v3d->clk_up_rate);
+-			WARN_ON_ONCE(ret != 0);
+-			v3d->clk_up = true;
+-		}
+-	}
+-	mutex_unlock(&v3d->clk_lock);
++	if (atomic_inc_return(&v3d->clk_refcount) == 1)
++		mod_delayed_work(v3d->clk_wq, &v3d->clk_work, 0);
+ }
+ 
+ static void
+ v3d_clock_up_put(struct v3d_dev *v3d)
+ {
+-	mutex_lock(&v3d->clk_lock);
+-	if (--v3d->clk_refcount == 0) {
+-		schedule_delayed_work(&v3d->clk_down_work,
+-			msecs_to_jiffies(100));
+-	}
+-	mutex_unlock(&v3d->clk_lock);
++	if (atomic_dec_and_test(&v3d->clk_refcount))
++		mod_delayed_work(v3d->clk_wq, &v3d->clk_work,
++				 msecs_to_jiffies(V3D_CLOCK_DOWN_DELAY_MS));
+ }
+ 
+ /* Takes the reservation lock on all the BOs being referenced, so that
+@@ -147,6 +170,8 @@ v3d_job_free_common(struct v3d_job *job,
+ 	if (job->perfmon)
+ 		v3d_perfmon_put(job->perfmon);
+ 
++	v3d_file_priv_put(job->file_priv);
++
+ 	kfree(job);
+ }
+ 
+@@ -161,9 +186,28 @@ v3d_job_free(struct kref *ref)
+ static void
+ v3d_cpu_job_free(struct kref *ref)
+ {
+-	struct v3d_job *job = container_of(ref, struct v3d_job, refcount);
++	struct v3d_cpu_job *job = container_of(ref, struct v3d_cpu_job,
++					       base.refcount);
++
++	/* Do all CPU-job teardown from the destructor, so that it happens
++	 * exactly once no matter which path releases the last reference.
++	 * Doing it from the scheduler's ->free_job instead left the ioctl
++	 * error path freeing the query arrays by hand *after* it had already
++	 * dropped the job, i.e. reading and kvfree()ing through freed memory.
++	 *
++	 * Note this deliberately calls v3d_job_free_common() with
++	 * is_gpu_job = false rather than v3d_job_free(): a CPU job never took
++	 * a v3d_clock_up_get() reference in v3d_job_init().
++	 */
++	v3d_timestamp_query_info_free(&job->timestamp_query,
++				      job->timestamp_query.count);
++	v3d_performance_query_info_free(&job->performance_query,
++					job->performance_query.count);
+ 
+-	v3d_job_free_common(job, false);
++	if (job->indirect_csd.indirect)
++		drm_gem_object_put(job->indirect_csd.indirect);
++
++	v3d_job_free_common(&job->base, false);
+ }
+ 
+ static void
+@@ -227,7 +271,6 @@ v3d_job_init(struct v3d_dev *v3d, struct
+ 
+ 	job->v3d = v3d;
+ 	job->free = free;
+-	job->file_priv = v3d_priv;
+ 
+ 	ret = drm_sched_job_init(&job->base, &v3d_priv->sched_entity[queue],
+ 				 1, v3d_priv);
+@@ -263,6 +306,13 @@ v3d_job_init(struct v3d_dev *v3d, struct
+ 	if (queue != V3D_CPU)
+ 		v3d_clock_up_get(v3d);
+ 
++	/* Taken only once we can no longer fail, since the error paths below
++	 * free the job directly rather than through v3d_job_free_common().
++	 * The job can outlive the drm_file, so it holds its own reference.
++	 */
++	v3d_file_priv_get(v3d_priv);
++	job->file_priv = v3d_priv;
++
+ 	kref_init(&job->refcount);
+ 
+ 	return 0;
+@@ -894,7 +944,7 @@ v3d_get_extensions(struct drm_file *file
+ 		   struct v3d_cpu_job *job)
+ {
+ 	struct drm_v3d_extension __user *user_ext;
+-	int ret;
++	int ret = 0;
+ 
+ 	user_ext = u64_to_user_ptr(ext_handles);
+ 	while (user_ext) {
+@@ -928,7 +978,15 @@ v3d_get_extensions(struct drm_file *file
+ 			ret = v3d_get_cpu_copy_performance_query_params(file_priv, user_ext, job);
+ 			break;
+ 		default:
++			/* Deliberately tolerated rather than rejected with
++			 * -EINVAL, so that a newer userspace can run against
++			 * this kernel.  Be aware that anything the extension
++			 * carried -- including MULTI_SYNC fences -- is then
++			 * silently dropped, so keep this loud.
++			 */
+ 			DRM_ERROR("Unknown extension id: %d\n", ext.id);
++			ret = 0;
++			break;
+ 		}
+ 
+ 		if (ret)
+@@ -1367,6 +1425,14 @@ v3d_submit_cpu_ioctl(struct drm_device *
+ 		}
+ 	}
+ 
++	/* Pick these up as soon as the extensions have been parsed, since
++	 * that is what creates them.  Several of the checks below bail out
++	 * to the fail path before the point where these used to be assigned,
++	 * which leaked the jobs and everything they hold a reference on.
++	 */
++	clean_job = cpu_job->indirect_csd.clean_job;
++	csd_job = cpu_job->indirect_csd.job;
++
+ 	/* Every CPU job must have a CPU job user extension */
+ 	if (!cpu_job->job_type) {
+ 		DRM_DEBUG("CPU job must have a CPU job user extension.\n");
+@@ -1389,9 +1455,6 @@ v3d_submit_cpu_ioctl(struct drm_device *
+ 		goto fail;
+ 	}
+ 
+-	clean_job = cpu_job->indirect_csd.clean_job;
+-	csd_job = cpu_job->indirect_csd.job;
+-
+ 	if (args->bo_handle_count) {
+ 		ret = v3d_lookup_bos(dev, file_priv, &cpu_job->base,
+ 				     args->bo_handles, args->bo_handle_count);
+@@ -1466,19 +1529,41 @@ fail:
+ 	v3d_job_cleanup((void *)csd_job);
+ 	v3d_job_cleanup(clean_job);
+ 	v3d_put_multisync_post_deps(&se);
+-	kvfree(cpu_job->timestamp_query.queries);
+-	kvfree(cpu_job->performance_query.queries);
+ 
+ 	return ret;
+ }
+ 
+-void v3d_submit_init(struct drm_device *dev) {
++int v3d_submit_init(struct drm_device *dev)
++{
++	struct v3d_dev *v3d = to_v3d_dev(dev);
++
++	atomic_set(&v3d->clk_refcount, 0);
++	v3d->clk_up = false;
++
++	v3d->clk_wq = alloc_ordered_workqueue("v3d_clk", 0);
++	if (!v3d->clk_wq)
++		return -ENOMEM;
++
++	INIT_DELAYED_WORK(&v3d->clk_work, v3d_clock_work);
++
++	/* Kick the clock so firmware knows we are using the firmware clock
++	 * interface.  Done synchronously because this is probe time, not the
++	 * submit path.
++	 */
++	WARN_ON_ONCE(clk_set_min_rate(v3d->clk, v3d->clk_up_rate) != 0);
++	WARN_ON_ONCE(clk_set_min_rate(v3d->clk, v3d->clk_down_rate) != 0);
++
++	return 0;
++}
++
++void v3d_submit_fini(struct drm_device *dev)
++{
+ 	struct v3d_dev *v3d = to_v3d_dev(dev);
+ 
+-	mutex_init(&v3d->clk_lock);
+-	INIT_DELAYED_WORK(&v3d->clk_down_work, v3d_clock_down_work);
++	if (!v3d->clk_wq)
++		return;
+ 
+-	/* kick the clock so firmware knows we are using firmware clock interface */
+-	v3d_clock_up_get(v3d);
+-	v3d_clock_up_put(v3d);
++	cancel_delayed_work_sync(&v3d->clk_work);
++	destroy_workqueue(v3d->clk_wq);
++	v3d->clk_wq = NULL;
+ }
