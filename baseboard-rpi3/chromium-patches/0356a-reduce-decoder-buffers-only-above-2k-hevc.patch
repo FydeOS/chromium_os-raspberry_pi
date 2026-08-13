@@ -1,0 +1,84 @@
+Index: src/media/gpu/chromeos/video_decoder_pipeline.cc
+===================================================================
+--- src.orig/media/gpu/chromeos/video_decoder_pipeline.cc
++++ src/media/gpu/chromeos/video_decoder_pipeline.cc
+@@ -81,7 +81,9 @@ std::optional<Fourcc> PickRenderableFour
+ // Renderer pipeline (this pool may provide buffers to the VideoDecoder
+ // directly or to the ImageProcessor, when this is instantiated).
+ size_t EstimateRequiredRendererPipelineBuffers(bool low_delay,
+-                                               bool use_protected) {
++                                               bool use_protected,
++                                               VideoCodec codec,
++                                               const gfx::Size& coded_size) {
+   // kMaxVideoFrames is meant to be the number of VideoFrames needed to populate
+   // the whole Renderer playback pipeline when there's no smoothing playback
+   // queue, i.e. in low latency scenarios such as WebRTC etc. For non-low
+@@ -100,13 +102,35 @@ size_t EstimateRequiredRendererPipelineB
+                 "kMaxVideoFrames is expected to be relatively small");
+   constexpr size_t kReducedNonLatencyPipelineDepth = 8;
+ 
++  // Only trim the renderer's share of the pool where memory pressure actually
++  // justifies it: HEVC above 2K. On platforms with a small shared CMA pool
++  // (RPi4 reserves 512MB for both decoder and GPU, of which only ~180-280MB
++  // is free once the display and compositor have taken their share) the
++  // buffer cost per stream is:
++  //
++  //   1080p  8 * 2.99MB (NC12 CAPTURE) + 16 * 2.97MB (NV12 pool) =  71MB
++  //   2K     8 * 5.27MB                + 16 * 5.27MB             = 127MB
++  //   4K     8 * 11.95MB               + 16 * 11.87MB            = 286MB
++  //
++  // So 1080p and 2K fit at full depth with margin, while 4K does not fit at
++  // all and needs the reduced pool (~214MB) just to have a chance.
++  //
++  // Reducing below 2K is not merely unnecessary, it is harmful: an H.264
++  // 1080p stream at ~24fps drains a 17-frame pool faster than frames are
++  // returned, after which the driver signals POLLERR continuously and
++  // playback dies a few seconds in.
++  constexpr int k2KArea = 2560 * 1440;
++  const bool reduce_buffers =
++      base::FeatureList::IsEnabled(kReduceHardwareVideoDecoderBuffers) &&
++      codec == VideoCodec::kHEVC && coded_size.GetArea() > k2KArea;
++
+   if (low_delay) {
+     return limits::kMaxVideoFrames + 1;
+ #if BUILDFLAG(USE_V4L2_CODEC)
+   } else if (use_protected) {
+     return kExpectedNonLatencyPipelineDepthSecure;
+ #endif
+-  } else if (base::FeatureList::IsEnabled(kReduceHardwareVideoDecoderBuffers)) {
++  } else if (reduce_buffers) {
+     return kReducedNonLatencyPipelineDepth;
+   } else {
+     return kExpectedNonLatencyPipelineDepth;
+@@ -322,6 +346,20 @@ std::unique_ptr<VideoDecoder> VideoDecod
+       /*uses_oop_video_decoder=*/false,
+       // TODO(b/195769334): Set this properly once OOP-VD is enabled for ARC.
+       /*in_video_decoder_process=*/false);
++#if BUILDFLAG(USE_V4L2_CODEC)
++  // Same fallback as Create() above, and needed for the same reason: on the
++  // Pi boards HEVC lives on a *different* device node than H264. RPi4 exposes
++  // bcm2835-codec (stateful, H264/MJPG) as /dev/video-dec0 and rpi-hevc-dec
++  // (stateless, HEVC_SLICE) as /dev/video-dec1, so IsV4L2DecoderStateful()
++  // sees H264 on the first node and picks V4L2StatefulVideoDecoder, which
++  // then fails S_FMT of V4L2_PIX_FMT_HEVC and returns without logging.
++  // Without a fallback ARC turns that into PLATFORM_FAILURE for every HEVC
++  // stream, while the browser path plays the same clip fine.
++  if (IsV4L2DecoderStateful()) {
++    pipeline->fallback_create_decoder_function_cb_ =
++        base::BindOnce(&V4L2VideoDecoder::Create);
++  }
++#endif
+   return std::make_unique<AsyncDestroyVideoDecoder<VideoDecoderPipeline>>(
+       base::WrapUnique(pipeline));
+ }
+@@ -736,7 +774,9 @@ void VideoDecoderPipeline::InitializeTas
+   }
+ 
+   estimated_num_buffers_for_renderer_ =
+-      EstimateRequiredRendererPipelineBuffers(low_delay, config.is_encrypted());
++      EstimateRequiredRendererPipelineBuffers(low_delay, config.is_encrypted(),
++                                              config.codec(),
++                                              config.coded_size());
+ 
+ #if BUILDFLAG(USE_V4L2_CODEC)
+   decryption_needs_vp9_superframe_splitting_ =

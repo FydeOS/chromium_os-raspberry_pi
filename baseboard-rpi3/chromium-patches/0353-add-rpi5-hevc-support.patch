@@ -977,7 +977,16 @@ Index: src/media/gpu/chromeos/libyuv_image_processor_backend.cc
 ===================================================================
 --- src.orig/media/gpu/chromeos/libyuv_image_processor_backend.cc
 +++ src/media/gpu/chromeos/libyuv_image_processor_backend.cc
-@@ -60,6 +60,7 @@ static constexpr struct {
+@@ -6,6 +6,8 @@
+ 
+ #include <sys/mman.h>
+ 
++#include <algorithm>
++
+ #include "base/compiler_specific.h"
+ #include "base/memory/ptr_util.h"
+ #include "base/metrics/histogram_macros.h"
+@@ -60,6 +62,7 @@ static constexpr struct {
      CONV(YUYV, YU12, kConversion, Supported),
      CONV(YV12, NV12, kConversion, Supported),
      CONV(MM21, NV12, kConversion, Supported),
@@ -985,7 +994,7 @@ Index: src/media/gpu/chromeos/libyuv_image_processor_backend.cc
      CONV(MT2T, P010, kConversion, Supported),
      // Scaling.
      CONV(NV12, NV12, kScaling, Supported),
-@@ -457,6 +458,108 @@ int LibYUVImageProcessorBackend::DoConve
+@@ -457,6 +460,109 @@ int LibYUVImageProcessorBackend::DoConve
                         input->coded_size().height()));
          }
  
@@ -1020,19 +1029,20 @@ Index: src/media/gpu/chromeos/libyuv_image_processor_backend.cc
 +              (coded_height + 15) & ~15;  // ALIGN(coded_height, 16)
 +          const int uv_rows_in_column = col_height - y_rows_in_column;
 +
-+          // Place UV right after the aligned Y plane, not at the
-+          // offset the VideoFrame layout reports (which may use the
-+          // unaligned coded_height).
-+          uint8_t* dst_uv =
-+              dst_y + y_rows_in_column * dst_y_stride;
++          // Write UV to the output's own plane. |y_rows_in_column| is the
++          // source column's 16-row alignment, a property of the VPU tiling,
++          // not of the destination buffer: deriving dst_uv from it overruns
++          // the output whenever coded_height is not 16-aligned. For 1080p
++          // that placed UV at row 1088 and wrote through row 1632, while a
++          // 1920x1080 NV12 buffer only holds 1080 * 3 / 2 == 1620 rows.
++          uint8_t* dst_uv = output->writable_data(VideoFrame::Plane::kUV);
 +          const int width = std::min(output->coded_size().width(),
 +                                     coded_width);
-+          // Copy as many rows as the output needs, limited by what
-+          // the input column actually provides.
-+          const int height = std::min(output->coded_size().height(),
-+                                      y_rows_in_column);
-+          const int uv_height = std::min(output->coded_size().height() / 2,
-+                                         uv_rows_in_column);
++          // Copy only real picture rows: never the column's alignment
++          // padding, and never more than the output can hold.
++          const int height = std::min({output->coded_size().height(),
++                                       coded_height, y_rows_in_column});
++          const int uv_height = std::min(height / 2, uv_rows_in_column);
 +
 +          // Split into full 128-byte columns and a possible partial
 +          // last column.  Using kColWidth directly in memcpy lets the
