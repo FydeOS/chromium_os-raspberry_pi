@@ -43,14 +43,50 @@ is_partition() {
  [ -n "$(partx -s -o nr -n ${partnum}:${partnum} -g $disk)" ]
 }
 
+# Size of a block device in 512-byte sectors.
+# NB: `partx -b -o size` reports bytes, not sectors, so it must not be used here.
+dev_sectors() {
+  if [ -x /sbin/blockdev ]; then
+    /sbin/blockdev --getsz "$1" 2>/dev/null && return
+  fi
+  cat "/sys/class/block/$(basename "$1")/size" 2>/dev/null
+}
+
 expand_partition() {
   local part=$1
   local disk=$(parse_disk_dev $part)
   local partnum=$(parse_partition_num $part)
   local first_sec=$(cgpt show -i ${partnum} -b ${disk})
   local last_sec=$(cgpt show ${disk}| grep "Sec GPT table" | awk '{print $1}')
+  local cur_sec=$(dev_sectors $part)
+
+  # Bail out before doing arithmetic on empty values, which would otherwise
+  # abort the script with a shell syntax error.
+  if [ -z "$first_sec" ] || [ -z "$last_sec" ] || [ -z "$cur_sec" ]; then
+    echo "Cannot determine geometry for $part (first='$first_sec' last='$last_sec' cur='$cur_sec');"
+    echo "refusing to modify the partition table."
+    return 0
+  fi
+
   local target_size=$((${last_sec}-${first_sec}-64))
   target_size=$((${target_size}/4*4))
+
+  # Never shrink a partition.
+  #
+  # cgpt will happily record a size smaller than the filesystem already living
+  # in the partition, and resize2fs cannot shrink a mounted filesystem, so the
+  # shrink silently sticks. The next boot then fails with
+  #   EXT4-fs (sdaN): bad geometry: block count X exceeds size of device (Y)
+  # which fails the stateful mount and sends the device into clobber/powerwash.
+  #
+  # This happens whenever there is no room behind the partition to grow into --
+  # e.g. an image written to a disk barely larger than itself.
+  if [ "$target_size" -le "$cur_sec" ]; then
+    echo "No free space behind $part (current ${cur_sec} sectors, computed ${target_size}); nothing to expand."
+    return 0
+  fi
+
+  echo "Expanding $part: ${cur_sec} -> ${target_size} sectors"
   echo "Check disk:$disk partition table..."
   sgdisk -e $disk
   echo "Down"
