@@ -6,11 +6,11 @@ kernelB=4
 rootA=3
 rootB=5
 CMDFILE="cmdline.txt"
-BOOTLOADER="/usr/share/raspberry-boot"
 ARC_DIR=/mnt/stateful_partition/unencrypted/android
 CLEAN_OVERLAY="$ARC_DIR/.clean_overlay"
 
 . /usr/share/cros/update_kernel_lib.sh
+. /usr/share/cros/update_dtb_lib.sh
 
 
 get_part_priority() {
@@ -92,9 +92,10 @@ main() {
  rm $tmpdir/*{4,_}db.* 2>/dev/null || true
  modify_root ${tmpdir}/${CMDFILE} $root_uuid || die "error when modified cmdline.txt"
  update_root_kernel $root_dev
- if [ -d $BOOTLOADER ]; then
-   cp -r $BOOTLOADER/* $tmpdir
- fi
+# Refresh the device tree, dt overlays and boot firmware, so an OTA does not
+# leave the new kernel running against the DT the image was flashed with.
+# Runs last: it must not disturb the config.txt/cmdline.txt edits above.
+ update_boot_payload $tmpdir
  umount $tmpdir
  rmdir $tmpdir
 }

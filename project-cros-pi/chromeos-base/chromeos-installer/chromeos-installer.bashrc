@@ -8,8 +8,10 @@ cros_post_src_install_openfyde_cros_pi_hook() {
   exeinto /usr/sbin
   doexe ${OPENFYDE_CROS_PI_BASHRC_FILESDIR}/switch_root.sh
   doexe ${OPENFYDE_CROS_PI_BASHRC_FILESDIR}/update_kernel.sh
+  doexe ${OPENFYDE_CROS_PI_BASHRC_FILESDIR}/update_dtb.sh
   insinto /usr/share/cros
   doins ${OPENFYDE_CROS_PI_BASHRC_FILESDIR}/update_kernel_lib.sh
+  doins ${OPENFYDE_CROS_PI_BASHRC_FILESDIR}/update_dtb_lib.sh
 }
 
 cros_pre_src_prepare_openfyde_cros_pi_patches() {
