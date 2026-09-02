@@ -6,6 +6,13 @@
 # migrated pre-unibuild device.
 device-config: &device_config
   name: rpi4
+  # rpi4/rpi5 have no working S3 ("deep") suspend: the write to
+  # /sys/power/state never returns and the board hangs with a black screen,
+  # recoverable only by cutting power (FYDE-559). That forced power cut then
+  # resets the batteryless RTC to 1970 and breaks first login (FYDE-558).
+  # Never let powerd take the idle-suspend action on these boards.
+  power:
+    disable-idle-suspend: "1"
 
 # Required dunder for chromeos-config to support a single device.
 chromeos:
