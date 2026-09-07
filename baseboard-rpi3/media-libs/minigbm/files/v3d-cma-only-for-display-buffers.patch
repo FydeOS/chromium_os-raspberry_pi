@@ -1,0 +1,261 @@
+FYDE-571: v3d minigbm: keep CMA for buffers a non-GPU engine actually walks
+
+BCM2711/BCM2712 put no IOMMU in front of the display, codec and camera blocks:
+the HVS scans out from a physical address and the VPU / rpivid / unicam V4L2
+devices are all videobuf2-dma-contig, so buffers those engines walk have to be
+physically contiguous. On a Pi that means CMA. v3d itself has an MMU, so a
+buffer that is only rendered, textured or read by the CPU does not.
+
+The backend was also routing every buffer carrying BO_USE_SW_MASK or
+BO_USE_LINEAR into CMA. Those flags describe how the CPU touches a buffer, not
+which engine has to walk it. CMA on a Pi is a small fixed reservation (cma-512)
+that is at the same time the only source of scanout memory, so ordinary GPU and
+CPU buffers filled and fragmented the pool until a 4K framebuffer -- 32 MiB in
+one piece -- could no longer be allocated. An ARC kiosk app on a 4K display then
+came up with every window state reporting "visible" and drew nothing, because
+GraphicBufferAllocator was failing at 3840x2160.
+
+Split the CMA condition in two and compose it:
+
+  V3D_CONTIGUOUS_REQUIRED  codec / camera / sensor. No software fallback
+                           exists for these, so a failure stays loud.
+  V3D_CONTIGUOUS_SOFT      display and cursor. If CMA cannot satisfy them we
+                           still hand back a usable buffer; it gets composited
+                           by the GPU instead of promoted to a hardware plane.
+
+V3D_LINEAR_USE is spelled out independently rather than derived from the
+contiguous set, because narrowing what goes to CMA must never narrow what stays
+linear: a buffer that leaves CMA must keep the layout its user already agreed
+to, or a plain HW_COMPOSER surface would silently become UIF-tiled.
+
+The #ifdef __ANDROID__ arm of V3D_CONTIGUOUS_SOFT is not used by this build and
+is carried deliberately. The fydroid container ships its own build of this same
+file, where the soft set is empty because Android never programs a KMS plane
+there -- SurfaceFlinger runs with a Wayland composer and no hwcomposer HAL, so
+the BO_USE_SCANOUT that cros_gralloc_helpers.cc derives from
+GRALLOC_USAGE_HW_COMPOSER is meaningless inside the container. Keeping both arms
+in one block keeps the two copies textually identical; they have silently
+drifted before.
+
+Scope: this is the host/Chrome half. Chrome does scan out, so BO_USE_SCANOUT
+stays contiguous here and the allocation that failed in the bug still comes from
+CMA on this side. The ARC half is the fydroid change above.
+
+BUG=b:FYDE-571
+TEST=emerge-rpi4-openfyde media-libs/minigbm
+TEST=emerge-rpi5-openfyde media-libs/minigbm
+TEST=static_assert harness over the mask block, host and __ANDROID__ configs:
+TEST=  host V3D_CONTIGUOUS_USE == (BO_USE_NON_GPU_HW | BO_USE_CURSOR), i.e. no
+TEST=  behaviour change for this build; usage 0xb00 contiguous and linear;
+TEST=  __ANDROID__ 0xb00 not contiguous but still linear, soft set empty;
+TEST=  decoder/camera required, contiguous and linear in both; a pure-GPU
+TEST=  buffer neither contiguous nor linear.
+TEST=Deployed to a 4K rpi4 and confirmed Chrome runs clean on it.
+TEST=NOT verified on hardware for the bug itself: reproducing FYDE-571 needs the
+TEST=ARC kiosk up at 4K, which is blocked on the DUT (enrolled kiosk will not
+TEST=auto-launch, see FYDE-559/558 RTC chain). A/B at the login screen shows no
+TEST=difference, as expected -- that state allocates almost nothing.
+
+--- a/v3d.c
++++ b/v3d.c
+@@ -27,21 +27,78 @@
+ #define CROS_CALLOC (1<<6)
+ 
+ /*
+- * Option A prototype: allocate scanout/shared/CPU-visible buffers from a CMA
+- * dma-buf heap and import the resulting dma-buf into v3d via standard PRIME,
+- * instead of borrowing a CMA BO from vc4 through the custom VC4_CALLOC ioctl
+- * flag (v3d_vc4_bind.c). The heap-backed buffer is contiguous + linear, so it
+- * is both HVS-scanout-capable (vc4 imports it) and v3d-renderable (v3d maps it
+- * into the GPU MMU via gem_prime_import_sg_table -> v3d_bo_create_finish).
+- *
+- * Pure-GPU (non-shared) buffers keep their native UIF-tiled v3d allocation.
++ * Allocate contiguous buffers from a CMA dma-buf heap and import the resulting
++ * dma-buf into v3d via standard PRIME, instead of borrowing a CMA BO from vc4
++ * through the custom VC4_CALLOC ioctl flag (v3d_vc4_bind.c). The heap-backed
++ * buffer is contiguous + linear, so it is both HVS-scanout-capable (vc4
++ * imports it) and v3d-renderable (v3d maps it into the GPU MMU via
++ * gem_prime_import_sg_table -> v3d_bo_create_finish).
+  *
+  * If no CMA heap is available at runtime, we fall back to the legacy
+  * VC4_CALLOC borrow so behaviour never regresses.
+  */
+-#define V3D_HEAP_USE                                                                               \
+-	(BO_USE_SW_MASK | BO_USE_SCANOUT | BO_USE_LINEAR | BO_USE_HW_VIDEO_DECODER |                \
+-	 BO_USE_HW_VIDEO_ENCODER)
++
++/*
++ * Which buffers actually have to come out of CMA.
++ *
++ * BCM2711/BCM2712 put no IOMMU in front of the codec and camera blocks: the
++ * VPU / rpivid / unicam V4L2 devices are all videobuf2-dma-contig, so buffers
++ * those engines walk must be physically contiguous, which on a Pi means CMA.
++ * They have no software fallback either, so a failure here must be loud.
++ *
++ * v3d itself has an MMU, so a buffer that is only rendered, textured or read by
++ * the CPU does not need CMA -- and must not take any, because CMA is a small
++ * fixed pool (dtoverlay=vc4-kms-v3d-pi4,cma-512) that is at the same time the
++ * only source of scanout memory. A 4K framebuffer needs 32 MiB of it in one
++ * piece, so letting ordinary GPU/CPU buffers fill and fragment the pool is what
++ * leaves a 4K display unable to allocate a framebuffer at all (FYDE-571).
++ */
++#define V3D_CONTIGUOUS_REQUIRED                                                                    \
++	(BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER | BO_USE_CAMERA_READ |                   \
++	 BO_USE_CAMERA_WRITE | BO_USE_SENSOR_DIRECT_DATA)
++
++/*
++ * The display/cursor half: buffers a KMS plane would scan out. These are a SOFT
++ * requirement -- if CMA cannot satisfy them we still hand back a usable buffer,
++ * it just gets composited by the GPU instead of promoted to a hardware plane.
++ *
++ * On Android this set is deliberately EMPTY. fydroid's SurfaceFlinger is built
++ * with a factory that swaps HWComposer for a Wayland composer
++ * (FydroidSurfaceFlingerFactory.cpp) and no hwcomposer HAL is packaged, so
++ * Android never programs a KMS plane: every window buffer is exported as a
++ * dma-buf and handed to Chrome, which owns the display. But
++ * cros_gralloc_helpers.cc still maps GRALLOC_USAGE_HW_COMPOSER to
++ * BO_USE_SCANOUT | BO_USE_TEXTURE, and SurfaceFlinger sets that on essentially
++ * every layer -- the 4K surface that failed in FYDE-571 had usage 0xb00
++ * (HW_COMPOSER | HW_RENDER | HW_TEXTURE). Honouring SCANOUT here therefore puts
++ * *every ARC window buffer* in CMA, which is what exhausted the pool.
++ *
++ * This cannot be fixed in cros_gralloc_helpers.cc under #ifdef DRV_V3D:
++ * BOARD_MINIGBM_DRIVERS for fydroid-rt_arm64 is "rockchip v3d vc4 realtek", so
++ * a single image carries backends that do drive real scanout hardware and do
++ * depend on BO_USE_SCANOUT. The decision has to stay backend-local, here.
++ *
++ * To restore the old behaviour (e.g. if Chrome turns out to want ARC buffers on
++ * a hardware overlay after all), give this the non-Android definition.
++ */
++#ifdef __ANDROID__
++#define V3D_CONTIGUOUS_SOFT 0
++#else
++#define V3D_CONTIGUOUS_SOFT (BO_USE_SCANOUT | BO_USE_CURSOR)
++#endif
++
++#define V3D_CONTIGUOUS_USE (V3D_CONTIGUOUS_REQUIRED | V3D_CONTIGUOUS_SOFT)
++
++/*
++ * UIF tiling is private to v3d. Any buffer the CPU maps or another device reads
++ * has to stay linear, whether or not it ends up in CMA -- dropping a buffer out
++ * of CMA must not change the layout its user already agreed to. Spelled out in
++ * full rather than derived from V3D_CONTIGUOUS_USE on purpose: narrowing what
++ * goes to CMA must never narrow what stays linear.
++ */
++#define V3D_LINEAR_USE                                                                             \
++	(BO_USE_NON_GPU_HW | BO_USE_CURSOR | BO_USE_SW_MASK | BO_USE_LINEAR |                       \
++	 BO_USE_GPU_DATA_BUFFER | BO_USE_RENDERSCRIPT | BO_USE_PROTECTED)
+ 
+ enum v3d_tiling_mode {
+         /* Untiled resources.  Not valid as texture inputs. */
+@@ -241,6 +298,9 @@
+ static int v3d_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t format,
+        uint64_t use_flags) {
+   struct v3d_driver_priv *dpriv = bo->drv->priv;
++  bool contiguous = use_flags & V3D_CONTIGUOUS_USE;
++  bool required = use_flags & V3D_CONTIGUOUS_REQUIRED;
++  bool linear = use_flags & V3D_LINEAR_USE;
+   int ret;
+   uint32_t stride, algin_height;
+   struct drm_v3d_create_bo bo_create;
+@@ -276,37 +336,52 @@
+   bo->meta.total_size = ALIGN(bo->meta.total_size, 4096);
+ 
+   /*
+-   * Shared / scanout / CPU-visible buffers must be contiguous + linear.
+-   * Prefer the CMA dma-heap (Option A); fall back to the legacy vc4 borrow
+-   * only if the heap is unavailable.
++   * Only the buffers a non-GPU engine has to walk go to CMA; prefer the CMA
++   * dma-heap and fall back to the legacy vc4 borrow if the heap is absent.
+    */
+-  if (use_flags & V3D_HEAP_USE) {
+-    if (dpriv && dpriv->heap_fd >= 0) {
+-      struct v3d_bo_priv *bpriv = NULL;
+-      ret = v3d_alloc_from_heap(bo, dpriv->heap_fd, &bpriv);
+-      if (ret)
+-        return ret;
++  if (contiguous && dpriv && dpriv->heap_fd >= 0) {
++    struct v3d_bo_priv *bpriv = NULL;
++    ret = v3d_alloc_from_heap(bo, dpriv->heap_fd, &bpriv);
++    if (!ret) {
+       bo->priv = bpriv;
+-      drv_logi("v3d bo path=CMA-HEAP  %ux%u %4s size=%zu mod=linear v3d_handle=0x%x dmabuf_fd=%d use=0x%llx\n",
++#ifdef DEBUG
++      drv_logi("v3d bo path=CMA-HEAP   %ux%u %4s size=%zu mod=linear v3d_handle=0x%x dmabuf_fd=%d use=0x%llx\n",
+         width, height, (char *)&format, bo->meta.total_size, bo->handle.u32,
+         bpriv->dmabuf_fd, (unsigned long long)use_flags);
++#endif
+       return 0;
+     }
+-    /* Legacy fallback: borrow a CMA BO from vc4 via the custom ioctl flag. */
+-    bo_create.flags = ARC_CALLOC;
++    if (required)
++      return ret;
++    /* Display-only user: keep the buffer, lose the hardware plane. */
++    drv_logi("v3d: CMA heap cannot spare %zu bytes for a %ux%u %4s buffer (use=0x%llx); "
++      "falling back to pageable memory, it will be composited rather than scanned out\n",
++      bo->meta.total_size, width, height, (char *)&format, (unsigned long long)use_flags);
++    contiguous = false;
++  }
++
++  /*
++   * No dma-heap (older kernel / no permission), or the heap is exhausted:
++   * DRM_IOCTL_V3D_CREATE_BO. ARC_CALLOC makes v3d borrow the BO from vc4's CMA
++   * allocator; without it the BO is ordinary pageable memory behind the v3d MMU.
++   */
++  bo_create.size = bo->meta.total_size;
++  bo_create.flags = contiguous ? ARC_CALLOC : 0;
++  if (contiguous || linear) {
+     bo->meta.format_modifier = DRM_FORMAT_MOD_LINEAR;
+     bo->meta.tiling = V3D_TILING_RASTER;
+-    drv_logi("v3d bo path=VC4-BORROW %ux%u %4s size=%zu mod=linear (no CMA dma-heap) use=0x%llx\n",
+-      width, height, (char *)&format, bo->meta.total_size, (unsigned long long)use_flags);
+   } else {
+-    bo_create.flags = 0;
+     bo->meta.format_modifier = DRM_FORMAT_MOD_BROADCOM_UIF;
+-    drv_logi("v3d bo path=V3D-UIF    %ux%u %4s size=%zu mod=uif (GPU-private) use=0x%llx\n",
+-      width, height, (char *)&format, bo->meta.total_size, (unsigned long long)use_flags);
+   }
+ 
+-  bo_create.size = bo->meta.total_size;
+   ret = drmIoctl(bo->drv->fd, DRM_IOCTL_V3D_CREATE_BO, &bo_create);
++  if (ret && contiguous && !required) {
++    drv_logi("v3d: vc4 CMA borrow of %zu bytes failed for a %ux%u %4s buffer (use=0x%llx); "
++      "retrying in pageable memory, it will be composited rather than scanned out\n",
++      bo->meta.total_size, width, height, (char *)&format, (unsigned long long)use_flags);
++    bo_create.flags = 0;
++    ret = drmIoctl(bo->drv->fd, DRM_IOCTL_V3D_CREATE_BO, &bo_create);
++  }
+   if (ret) {
+     drv_logv("DRM_IOCTL_V3D_CREATE_BO failed (size=%zu), ret=%d, format:%s\n", bo->meta.total_size, ret, (char *)&format);
+     return -errno;
+@@ -314,8 +389,11 @@
+ 
+   bo->handle.u32 = bo_create.handle;
+ #ifdef DEBUG
+- drv_logi("create v3d bo handler:0x%x, size:%zu, format:%4s, width:%u, height:%u, use_flags:0x%llx\n",
+-   bo->handle.u32, bo->meta.total_size, (char *)&format, width, height, use_flags & (BO_USE_SW_MASK | BO_USE_SCANOUT));
++  drv_logi("v3d bo path=%-11s %ux%u %4s size=%zu mod=%s v3d_handle=0x%x use=0x%llx\n",
++    bo_create.flags ? "VC4-BORROW" : (linear ? "V3D-LINEAR" : "V3D-UIF"),
++    width, height, (char *)&format, bo->meta.total_size,
++    bo_create.flags || linear ? "linear" : "uif", bo->handle.u32,
++    (unsigned long long)use_flags);
+ #endif
+   return 0;
+ }
+@@ -340,10 +418,13 @@
+ {
+ 	/* Imported buffers keep the standard PRIME-into-v3d path (no heap priv). */
+ 	int ret = drv_prime_bo_import(bo, data);
+-	if (!ret)
+-		drv_logi("v3d bo path=IMPORT    %ux%u %4s mod=0x%llx v3d_handle=0x%x (external dma-buf)\n",
++#ifdef DEBUG
++	if (!ret) {
++		drv_logi("v3d bo path=IMPORT     %ux%u %4s mod=0x%llx v3d_handle=0x%x (external dma-buf)\n",
+ 			bo->meta.width, bo->meta.height, (char *)&bo->meta.format,
+ 			(unsigned long long)data->format_modifier, bo->handle.u32);
++	}
++#endif
+ 	return ret;
+ }
+ 

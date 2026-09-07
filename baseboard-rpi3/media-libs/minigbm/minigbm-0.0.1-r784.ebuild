@@ -46,6 +46,7 @@ src_prepare() {
 	eapply "${FILESDIR}/vc6.patch"
 	eapply "${FILESDIR}/fix-dumb-driver-blob-height.patch"
 	eapply "${FILESDIR}/option-a-cma-heap-prototype.patch"
+	eapply "${FILESDIR}/v3d-cma-only-for-display-buffers.patch"
 	sanitizers-setup-env
 	cros-common.mk_src_prepare
 }
