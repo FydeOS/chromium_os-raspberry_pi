@@ -11,9 +11,17 @@ BO_USE_LINEAR into CMA. Those flags describe how the CPU touches a buffer, not
 which engine has to walk it. CMA on a Pi is a small fixed reservation (cma-512)
 that is at the same time the only source of scanout memory, so ordinary GPU and
 CPU buffers filled and fragmented the pool until a 4K framebuffer -- 32 MiB in
-one piece -- could no longer be allocated. An ARC kiosk app on a 4K display then
-came up with every window state reporting "visible" and drew nothing, because
-GraphicBufferAllocator was failing at 3840x2160.
+one piece -- could no longer be allocated. On a stock 4K board this reproduces
+during kiosk launch as two 8100-page __cma_alloc failures -- 8100 pages is
+exactly 3840*2160*4, the app's own framebuffer -- with GraphicBufferAllocator
+failing at 3840x2160 and the kiosk showing every window as visible while drawing
+nothing.
+
+Whether that exhaustion is what blanks the kiosk is NOT established. With the
+same mask change applied to the fydroid build of this backend, on the same board
+and the same boot, the __cma_alloc failures are gone and the kiosk still renders
+nothing -- so at least one further cause exists. This change removes a real and
+measured resource problem. It is not known to be sufficient for FYDE-571.
 
 Split the CMA condition in two and compose it:
 
@@ -51,10 +59,18 @@ TEST=  __ANDROID__ 0xb00 not contiguous but still linear, soft set empty;
 TEST=  decoder/camera required, contiguous and linear in both; a pure-GPU
 TEST=  buffer neither contiguous nor linear.
 TEST=Deployed to a 4K rpi4 and confirmed Chrome runs clean on it.
-TEST=NOT verified on hardware for the bug itself: reproducing FYDE-571 needs the
-TEST=ARC kiosk up at 4K, which is blocked on the DUT (enrolled kiosk will not
-TEST=auto-launch, see FYDE-559/558 RTC chain). A/B at the login screen shows no
-TEST=difference, as expected -- that state allocates almost nothing.
+TEST=The mask change is verified on hardware, but in the fydroid build of this
+TEST=same backend rather than this binary: a stock boot with the kiosk launching
+TEST=logs 2x "cma: __cma_alloc: linux,cma: alloc failed, req-size: 8100 pages,
+TEST=ret: -12"; on the same board and boot with only the container gralloc
+TEST=swapped for the patched build, zero such failures. That establishes what
+TEST=this change does, not that it fixes the blank screen -- the kiosk still
+TEST=renders nothing with CMA relieved (observed via host screenshot; a photo of
+TEST=the panel is pending, so read "still blank" as strongly indicated).
+TEST=This host binary is not A/B-tested against the bug, and would not be
+TEST=expected to move it on its own: Chrome's allocations are not what exhausted
+TEST=the pool. An A/B at the login screen shows no difference either way, as
+TEST=expected -- that state allocates almost nothing.
 
 --- a/v3d.c
 +++ b/v3d.c
