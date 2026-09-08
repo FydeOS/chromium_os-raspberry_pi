@@ -231,7 +231,7 @@ Index: v6.12-rpi/fs/esdfs/derive.c
 ===================================================================
 --- /dev/null
 +++ v6.12-rpi/fs/esdfs/derive.c
-@@ -0,0 +1,631 @@
+@@ -0,0 +1,641 @@
 +/*
 + * Copyright (c) 2013-2014 Motorola Mobility LLC
 + * Copyright (C) 2017      Google, Inc.
@@ -396,9 +396,12 @@ Index: v6.12-rpi/fs/esdfs/derive.c
 +	struct esdfs_inode_info *inode_i = ESDFS_I(inode);
 +	gid_t gid = sbi->upper_perms.gid;
 +	umode_t mode = inode->i_mode & S_IFMT;
++	uid_t new_uid = sbi->upper_perms.uid;
++	gid_t new_gid;
 +
 +	/*
-+	 * Build the mode in a local and publish it with a single store below.
++	 * Build the mode, uid and gid in locals and publish each with a single
++	 * store below.
 +	 *
 +	 * This used to read-modify-write inode->i_mode in place ~11 times,
 +	 * starting with "i_mode &= S_IFMT" -- i.e. momentarily mode 0000.  This
@@ -409,17 +412,21 @@ Index: v6.12-rpi/fs/esdfs/derive.c
 +	 * caller is perfectly entitled to -- a spurious, load-dependent failure
 +	 * on a live, byte-correct file.
 +	 *
-+	 * uid/gid are still published as separate stores; they never transit
-+	 * through a "deny everything" value, so they are less dangerous.
++	 * uid had the same shape of bug: upper_perms.uid was stored first and
++	 * the ANDROID_APP case overwrote it with the app's uid afterwards.  On
++	 * a .../Android/data/<pkg> directory that window publishes uid 0, and
++	 * an app that holds no sdcard_rw group has only the owner bits of 0771
++	 * to stand on -- so a racing check falls through to "other" (--x) and
++	 * denies the app its own files.  For an app-owned inode uid 0 is the
++	 * "deny everything" value, so build it up the same way.
 +	 */
-+	esdfs_i_uid_write(inode, sbi->upper_perms.uid);
 +	if (ESDFS_RESTRICT_PERMS(sbi))
-+		esdfs_i_gid_write(inode, gid);
++		new_gid = gid;
 +	else {
 +		if (gid == AID_SDCARD_RW && !test_opt(sbi, DEFAULT_NORMAL))
-+			esdfs_i_gid_write(inode, AID_SDCARD_RW);
++			new_gid = AID_SDCARD_RW;
 +		else
-+			esdfs_i_gid_write(inode, derive_uid(inode_i, gid));
++			new_gid = derive_uid(inode_i, gid);
 +		mode |= sbi->upper_perms.dmask;
 +	}
 +
@@ -436,7 +443,7 @@ Index: v6.12-rpi/fs/esdfs/derive.c
 +	case ESDFS_TREE_NONE:
 +	case ESDFS_TREE_ROOT:
 +		if (ESDFS_RESTRICT_PERMS(sbi)) {
-+			esdfs_i_gid_write(inode, AID_SDCARD_R);
++			new_gid = AID_SDCARD_R;
 +			mode |= sbi->upper_perms.dmask;
 +		} else if (test_opt(sbi, DERIVE_PUBLIC) &&
 +			   test_opt(ESDFS_SB(inode->i_sb), DERIVE_CONFINE)) {
@@ -447,7 +454,7 @@ Index: v6.12-rpi/fs/esdfs/derive.c
 +
 +	case ESDFS_TREE_MEDIA:
 +		if (ESDFS_RESTRICT_PERMS(sbi)) {
-+			esdfs_i_gid_write(inode, AID_SDCARD_R);
++			new_gid = AID_SDCARD_R;
 +			mode |= 0770;
 +		}
 +		break;
@@ -464,15 +471,14 @@ Index: v6.12-rpi/fs/esdfs/derive.c
 +	case ESDFS_TREE_ANDROID_APP:
 +	case ESDFS_TREE_ANDROID_APP_CACHE:
 +		if (inode_i->appid)
-+			esdfs_i_uid_write(inode, derive_uid(inode_i,
-+							inode_i->appid));
++			new_uid = derive_uid(inode_i, inode_i->appid);
 +		if (ESDFS_RESTRICT_PERMS(sbi))
 +			mode |= 0770;
 +		break;
 +
 +	case ESDFS_TREE_ANDROID_USER:
 +		if (ESDFS_RESTRICT_PERMS(sbi)) {
-+			esdfs_i_gid_write(inode, AID_SDCARD_ALL);
++			new_gid = AID_SDCARD_ALL;
 +			mode |= 0770;
 +		}
 +		mode |= 0770;
@@ -484,9 +490,13 @@ Index: v6.12-rpi/fs/esdfs/derive.c
 +		mode &= ~S_IXUGO;
 +
 +	/*
-+	 * Publish atomically: readers see the old mode or the new, never 0000.
-+	 * WRITE_ONCE because this races plain loads in generic_permission().
++	 * Publish atomically: readers see the old value or the new, never an
++	 * intermediate that denies everything.  WRITE_ONCE on i_mode because
++	 * this races plain loads in generic_permission(); i_uid/i_gid are one
++	 * word each and are now written exactly once, with their final value.
 +	 */
++	esdfs_i_uid_write(inode, new_uid);
++	esdfs_i_gid_write(inode, new_gid);
 +	WRITE_ONCE(inode->i_mode, mode);
 +}
 +
@@ -2114,7 +2124,7 @@ Index: v6.12-rpi/fs/esdfs/inode.c
 ===================================================================
 --- /dev/null
 +++ v6.12-rpi/fs/esdfs/inode.c
-@@ -0,0 +1,579 @@
+@@ -0,0 +1,594 @@
 +/*
 + * Copyright (c) 1998-2014 Erez Zadok
 + * Copyright (c) 2009	   Shrikar Archak
@@ -2474,14 +2484,29 @@ Index: v6.12-rpi/fs/esdfs/inode.c
 +	 *   uid=0 on an app dir     -> the uid publish was caught mid-update
 +	 *   fsuid=1023 w/ sane mode -> the caller's creds are poisoned
 +	 * No hits across a full pass rules the whole permission family out.
++	 *
++	 * Restricted to the app-private trees on purpose.  A denial on a shared
++	 * tree (.../Android/data, .../obb and their parents) is the ordinary
++	 * scoped-storage answer for an app that does not own the directory, and
++	 * those outnumbered the one real hit ~200:1 -- enough noise to bury it.
++	 * Under ESDFS_TREE_ANDROID_APP* the caller is normally the owner, so a
++	 * denial there is a genuine anomaly worth a line.
 +	 */
-+	if (err == -EACCES)
-+		pr_warn_ratelimited("ESDFS-fs: EACCES ino=%lu mode=%o uid=%u gid=%u mask=%x fsuid=%u fsgid=%u\n",
-+				    inode->i_ino, (unsigned int)inode->i_mode,
-+				    i_uid_read(inode), i_gid_read(inode),
-+				    (unsigned int)mask,
-+				    from_kuid(&init_user_ns, current_fsuid()),
-+				    from_kgid(&init_user_ns, current_fsgid()));
++	if (err == -EACCES) {
++		int tree = ESDFS_I(inode)->tree;
++
++		if (tree == ESDFS_TREE_ANDROID_APP ||
++		    tree == ESDFS_TREE_ANDROID_APP_CACHE)
++			pr_warn_ratelimited("ESDFS-fs: EACCES ino=%lu mode=%o uid=%u gid=%u mask=%x fsuid=%u fsgid=%u\n",
++					    inode->i_ino,
++					    (unsigned int)inode->i_mode,
++					    i_uid_read(inode), i_gid_read(inode),
++					    (unsigned int)mask,
++					    from_kuid(&init_user_ns,
++						      current_fsuid()),
++					    from_kgid(&init_user_ns,
++						      current_fsgid()));
++	}
 +
 +	/* Basic checking of the lower inode (can't override creds here) */
 +	lower_inode = esdfs_lower_inode(inode);
