@@ -70,7 +70,7 @@ Index: v6.12-rpi/arch/arm64/include/asm/unistd.h
 ===================================================================
 --- v6.12-rpi.orig/arch/arm64/include/asm/unistd.h
 +++ v6.12-rpi/arch/arm64/include/asm/unistd.h
-@@ -17,6 +17,357 @@
+@@ -17,6 +17,358 @@
  #define __ARCH_WANT_SYS_VFORK
  
  /*
@@ -423,6 +423,7 @@ Index: v6.12-rpi/arch/arm64/include/asm/unistd.h
 +#define __NR_compat_membarrier    389
 +#define __NR_compat_clock_gettime64 403
 +#define __NR_compat_clock_getres_time64 406
++#define __NR_compat_pidfd_open    434
 +
 +/*
   * The following SVCs are ARM private.
@@ -2143,7 +2144,7 @@ Index: v6.12-rpi/security/chromiumos/alt-syscall.h
 ===================================================================
 --- /dev/null
 +++ v6.12-rpi/security/chromiumos/alt-syscall.h
-@@ -0,0 +1,378 @@
+@@ -0,0 +1,379 @@
 +/*
 + * Linux Security Module for Chromium OS
 + *
@@ -2374,6 +2375,7 @@ Index: v6.12-rpi/security/chromiumos/alt-syscall.h
 +#define __NR_compat_openat      __NR_ia32_openat
 +#define __NR_compat_perf_event_open     __NR_ia32_perf_event_open
 +#define __NR_compat_personality __NR_ia32_personality
++#define __NR_compat_pidfd_open  __NR_ia32_pidfd_open
 +#define __NR_compat_pipe        __NR_ia32_pipe
 +#define __NR_compat_pipe2       __NR_ia32_pipe2
 +#define __NR_compat_poll        __NR_ia32_poll
@@ -2526,7 +2528,7 @@ Index: v6.12-rpi/security/chromiumos/android_whitelists.h
 ===================================================================
 --- /dev/null
 +++ v6.12-rpi/security/chromiumos/android_whitelists.h
-@@ -0,0 +1,654 @@
+@@ -0,0 +1,656 @@
 +/*
 + * Linux Security Module for Chromium OS
 + *
@@ -2693,6 +2695,7 @@ Index: v6.12-rpi/security/chromiumos/android_whitelists.h
 +	SYSCALL_ENTRY(openat),
 +	SYSCALL_ENTRY_ALT(perf_event_open, android_perf_event_open),
 +	SYSCALL_ENTRY(personality),
++	SYSCALL_ENTRY(pidfd_open),
 +	SYSCALL_ENTRY(pipe2),
 +	SYSCALL_ENTRY(ppoll),
 +	SYSCALL_ENTRY_ALT(prctl, alt_sys_prctl),
@@ -2979,6 +2982,7 @@ Index: v6.12-rpi/security/chromiumos/android_whitelists.h
 +	COMPAT_SYSCALL_ENTRY(openat),
 +	COMPAT_SYSCALL_ENTRY_ALT(perf_event_open, android_perf_event_open),
 +	COMPAT_SYSCALL_ENTRY(personality),
++	COMPAT_SYSCALL_ENTRY(pidfd_open),
 +	COMPAT_SYSCALL_ENTRY(pipe),
 +	COMPAT_SYSCALL_ENTRY(pipe2),
 +	COMPAT_SYSCALL_ENTRY(poll),
