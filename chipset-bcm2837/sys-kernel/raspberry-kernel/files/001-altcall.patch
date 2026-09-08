@@ -2144,7 +2144,7 @@ Index: v6.12-rpi/security/chromiumos/alt-syscall.h
 ===================================================================
 --- /dev/null
 +++ v6.12-rpi/security/chromiumos/alt-syscall.h
-@@ -0,0 +1,379 @@
+@@ -0,0 +1,380 @@
 +/*
 + * Linux Security Module for Chromium OS
 + *
@@ -2474,6 +2474,7 @@ Index: v6.12-rpi/security/chromiumos/alt-syscall.h
 +#define __NR_compat_unlink      __NR_ia32_unlink
 +#define __NR_compat_unlinkat    __NR_ia32_unlinkat
 +#define __NR_compat_unshare     __NR_ia32_unshare
++#define __NR_compat_userfaultfd __NR_ia32_userfaultfd
 +#define __NR_compat_ustat       __NR_ia32_ustat
 +#define __NR_compat_utimensat   __NR_ia32_utimensat
 +#define __NR_compat_utimes      __NR_ia32_utimes
@@ -2528,7 +2529,7 @@ Index: v6.12-rpi/security/chromiumos/android_whitelists.h
 ===================================================================
 --- /dev/null
 +++ v6.12-rpi/security/chromiumos/android_whitelists.h
-@@ -0,0 +1,656 @@
+@@ -0,0 +1,658 @@
 +/*
 + * Linux Security Module for Chromium OS
 + *
@@ -2784,6 +2785,7 @@ Index: v6.12-rpi/security/chromiumos/android_whitelists.h
 +	SYSCALL_ENTRY(uname),
 +	SYSCALL_ENTRY(unlinkat),
 +	SYSCALL_ENTRY(unshare),
++	SYSCALL_ENTRY(userfaultfd),
 +	SYSCALL_ENTRY(utimensat),
 +	SYSCALL_ENTRY(vmsplice),
 +	SYSCALL_ENTRY(wait4),
@@ -3073,6 +3075,7 @@ Index: v6.12-rpi/security/chromiumos/android_whitelists.h
 +	COMPAT_SYSCALL_ENTRY(unlink),
 +	COMPAT_SYSCALL_ENTRY(unlinkat),
 +	COMPAT_SYSCALL_ENTRY(unshare),
++	COMPAT_SYSCALL_ENTRY(userfaultfd),
 +	COMPAT_SYSCALL_ENTRY(ustat),
 +	COMPAT_SYSCALL_ENTRY(utimensat),
 +	COMPAT_SYSCALL_ENTRY(utimes),
