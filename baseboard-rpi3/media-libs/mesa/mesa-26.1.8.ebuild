@@ -3,11 +3,11 @@
 
 EAPI=7
 
-# Mesa 26.1.3, pinned to the same upstream release commit as
+# Mesa 26.1.8, pinned to the same upstream release commit as
 # chipset-rk3588's media-libs/mesa-panthor (both share the
 # chromiumos/third_party/mesa checkout at src/third_party/mesa).
-CROS_WORKON_COMMIT="bfce4dd45aa8658ca8a66d3a14ed9297fbab4a54"
-CROS_WORKON_TREE="3d0170ad612de025dc2519c075c642216624cb87"
+CROS_WORKON_COMMIT="0fadfea4f394211946f308458f614839ef253ee8"
+CROS_WORKON_TREE="37cab8cb62626d8c33d536e6a74ba7cf9bea602d"
 CROS_WORKON_PROJECT="chromiumos/third_party/mesa"
 CROS_WORKON_LOCALNAME="mesa"
 CROS_WORKON_MANUAL_UPREV="1"
