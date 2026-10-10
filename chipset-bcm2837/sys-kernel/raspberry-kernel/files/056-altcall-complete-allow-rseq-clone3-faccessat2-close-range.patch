@@ -1,0 +1,58 @@
+alt-syscall: allow rseq, clone3, faccessat2, close_range, pidfd_open and openat2 in "complete"
+
+A current glibc, dbus and bubblewrap call all six on every process start or
+on common paths (rseq registration at startup, clone3 for
+posix_spawn/pthread_create, faccessat2 for access()/test -x, close_range in
+exec helpers, pidfd_open in dbus-daemon and at-spi-bus-launcher to watch
+their children, openat2 in bwrap to resolve mount destinations without
+following symlinks). Under the enforcing "complete" table each one hit
+block_syscall(), which returns -ENOSYS; userspace falls back, so nothing
+broke, but every process start logged
+"blocked syscall 334/434/435/436/437/439" and flooded dmesg.
+
+The entries go in the section shared by all architectures: the table is
+keyed on __NR_<name>, and all six exist on both x86_64 (334, 434, 435,
+436, 437, 439) and arm64 (asm-generic: 293, 434, 435, 436, 437, 439), so
+this covers both. The compat (32-bit) whitelist is unchanged.
+Index: v6.12-rpi/security/chromiumos/complete_whitelists.h
+===================================================================
+--- v6.12-rpi.orig/security/chromiumos/complete_whitelists.h	2026-09-08 19:02:09.141362237 +0800
++++ v6.12-rpi/security/chromiumos/complete_whitelists.h	2026-09-29 14:28:06.059298616 +0800
+@@ -46,7 +46,9 @@
+ 	SYSCALL_ENTRY(clock_nanosleep),
+ 	SYSCALL_ENTRY(clock_settime),
+ 	SYSCALL_ENTRY(clone),
++	SYSCALL_ENTRY(clone3),
+ 	SYSCALL_ENTRY(close),
++	SYSCALL_ENTRY(close_range),
+ 	SYSCALL_ENTRY(connect),
+ 	SYSCALL_ENTRY(copy_file_range),
+ 	SYSCALL_ENTRY(delete_module),
+@@ -60,6 +62,7 @@
+ 	SYSCALL_ENTRY(exit),
+ 	SYSCALL_ENTRY(exit_group),
+ 	SYSCALL_ENTRY(faccessat),
++	SYSCALL_ENTRY(faccessat2),
+ 	SYSCALL_ENTRY(fallocate),
+ 	SYSCALL_ENTRY(fanotify_init),
+ 	SYSCALL_ENTRY(fanotify_mark),
+@@ -161,9 +164,11 @@
+ 	SYSCALL_ENTRY(name_to_handle_at),
+ 	SYSCALL_ENTRY(nanosleep),
+ 	SYSCALL_ENTRY(openat),
++	SYSCALL_ENTRY(openat2),
+ 	SYSCALL_ENTRY(open_by_handle_at),
+ 	SYSCALL_ENTRY(perf_event_open),
+ 	SYSCALL_ENTRY(personality),
++	SYSCALL_ENTRY(pidfd_open),
+ 	SYSCALL_ENTRY(pipe2),
+ 	SYSCALL_ENTRY(pivot_root),
+ 	SYSCALL_ENTRY(pkey_alloc),
+@@ -203,6 +208,7 @@
+ 	SYSCALL_ENTRY(rt_sigsuspend),
+ 	SYSCALL_ENTRY(rt_sigtimedwait),
+ 	SYSCALL_ENTRY(rt_tgsigqueueinfo),
++	SYSCALL_ENTRY(rseq),
+ 	SYSCALL_ENTRY(sched_getaffinity),
+ 	SYSCALL_ENTRY(sched_getattr),
+ 	SYSCALL_ENTRY(sched_getparam),
