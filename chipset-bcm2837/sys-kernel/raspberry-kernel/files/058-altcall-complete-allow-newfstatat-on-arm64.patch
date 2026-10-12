@@ -1,0 +1,40 @@
+alt-syscall: allow newfstatat in "complete" on arm64 too
+
+complete_whitelist[] lists newfstatat under "Unique to x86_64", but arm64
+has it as well: asm-generic's __NR3264_fstatat (79), which is __NR_newfstatat
+on a 64-bit arch with __ARCH_WANT_NEW_STAT, as arm64 is. And arm64 has no
+stat or lstat at all, so it is the only path-based stat a 64-bit arm64
+process can make -- glibc's stat(), lstat() and fstatat() all go through it.
+
+Under the enforcing "complete" table on arm64-openfyde_vmware every one of
+those returned -ENOSYS. The Notialis container (an Arch Linux ARM aarch64
+userspace, pid 1 a /bin/sh script) started, but its shell could not find a
+single external command: bash's PATH search stats each candidate, so
+dirname, sed and sleep were all "command not found" and the idle loop spun
+on "sleep: command not found". complete_permissive logged nothing but
+"sh: syscall 79 not whitelisted" (and the same from sleep), and with it the
+container came up and started its session.
+
+Nothing on x86_64 changes: the entry moves from the x86_64-only block to
+the block of syscalls both architectures share. Compared against arm64's
+syscall table, this is the only syscall the x86_64 list allows that exists
+on arm64 and was still denied there, apart from kexec_file_load.
+
+--- v6.12-rpi.orig/security/chromiumos/complete_whitelists.h
++++ v6.12-rpi/security/chromiumos/complete_whitelists.h
+@@ -340,6 +340,7 @@
+ 	SYSCALL_ENTRY(fstat),
+ 	SYSCALL_ENTRY(migrate_pages),
+ 	SYSCALL_ENTRY(mmap),
++	SYSCALL_ENTRY(newfstatat),
+ 	SYSCALL_ENTRY(rt_sigreturn),
+ 	SYSCALL_ENTRY(sync_file_range),
+ 	SYSCALL_ENTRY(umount2),
+@@ -353,7 +354,6 @@
+ 	SYSCALL_ENTRY(kexec_file_load),
+ 	SYSCALL_ENTRY(lstat),
+ 	SYSCALL_ENTRY(modify_ldt),
+-	SYSCALL_ENTRY(newfstatat),
+ 	SYSCALL_ENTRY(stat),
+ 	SYSCALL_ENTRY(_sysctl),
+ #endif
