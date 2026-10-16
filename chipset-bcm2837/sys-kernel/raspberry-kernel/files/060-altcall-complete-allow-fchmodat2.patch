@@ -1,0 +1,32 @@
+alt-syscall: allow fchmodat2 in "complete"
+
+fchmodat2 (452, Linux 6.6) is the flags-taking fchmodat, and a current
+glibc tries it first for fchmodat(AT_SYMLINK_NOFOLLOW) and lchmod(),
+falling back to fchmodat (or O_PATH + /proc) on -ENOSYS. Under the
+enforcing "complete" table it hit block_syscall(), so nothing broke but
+every call logged "blocked syscall 452" -- seen from the Notialis
+container on rpi5-openfyde ("trans_run2: blocked syscall 452").
+
+It is the same permission check as fchmodat, which both lists already
+allow, so it goes in next to faccessat2 in the shared 64-bit list (452 on
+x86_64 and arm64 alike) and next to fchmodat in the compat list (452 on
+i386 and ARM EABI too).
+
+--- v6.12-rpi.orig/security/chromiumos/complete_whitelists.h	2026-10-16 12:56:29.449761166 +0800
++++ v6.12-rpi/security/chromiumos/complete_whitelists.h	2026-10-16 12:56:29.458761318 +0800
+@@ -63,6 +63,7 @@
+ 	SYSCALL_ENTRY(exit_group),
+ 	SYSCALL_ENTRY(faccessat),
+ 	SYSCALL_ENTRY(faccessat2),
++	SYSCALL_ENTRY(fchmodat2),
+ 	SYSCALL_ENTRY(fallocate),
+ 	SYSCALL_ENTRY(fanotify_init),
+ 	SYSCALL_ENTRY(fanotify_mark),
+@@ -459,6 +460,7 @@
+ 	COMPLETE_COMPAT_ENTRY(fchdir),
+ 	COMPLETE_COMPAT_ENTRY(fchmod),
+ 	COMPLETE_COMPAT_ENTRY(fchmodat),
++	COMPLETE_COMPAT_ENTRY(fchmodat2),
+ 	COMPLETE_COMPAT_ENTRY(fchown),
+ 	COMPLETE_COMPAT_ENTRY(fchown32),
+ 	COMPLETE_COMPAT_ENTRY(fchownat),
